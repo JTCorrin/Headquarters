@@ -2,15 +2,6 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import AppNav from '$lib/components/crm/app-nav.svelte';
 
-	const { Story } = defineMeta({
-		title: 'CRM/AppNav',
-		component: AppNav,
-		tags: ['autodocs'],
-		parameters: {
-			layout: 'fullscreen'
-		}
-	});
-
 	const groups = [
 		{
 			items: [
@@ -44,8 +35,26 @@
 			]
 		}
 	];
+
+	const { Story } = defineMeta({
+		title: 'CRM/AppNav',
+		component: AppNav,
+		tags: ['autodocs'],
+		parameters: {
+			layout: 'fullscreen'
+		},
+		args: {
+			orgName: 'Acme Org',
+			groups
+		}
+	});
 </script>
 
-<div class="bg-background h-[720px]">
-	<Story name="Default" args={{ orgName: 'Acme Org', groups }} />
-</div>
+<Story name="Default">
+	{#snippet template(args)}
+		{@const props = /** @type {import('$lib/components/crm/app-nav.svelte').AppNavProps} */ (args)}
+		<div class="bg-background h-[720px]">
+			<AppNav {...props} />
+		</div>
+	{/snippet}
+</Story>
