@@ -45,8 +45,12 @@
 	let columnVisibility = $state<VisibilityState>({});
 	let rowSelection = $state<RowSelectionState>({});
 
+	// Sync pageSize from props without read/write looping on pagination.
 	$effect(() => {
-		pagination = { ...pagination, pageSize };
+		const nextSize = pageSize;
+		if (pagination.pageSize !== nextSize) {
+			pagination = { pageIndex: pagination.pageIndex, pageSize: nextSize };
+		}
 	});
 
 	const table = createSvelteTable({
@@ -99,7 +103,6 @@
 		}
 	});
 
-	// Touch controlled state so row/header renders re-run after interactions.
 	const headerGroups = $derived.by(() => {
 		void sorting;
 		void columnVisibility;
@@ -111,6 +114,7 @@
 		void columnFilters;
 		void rowSelection;
 		void columnVisibility;
+		void data;
 		return table.getRowModel().rows;
 	});
 	const selectedCount = $derived.by(() => {

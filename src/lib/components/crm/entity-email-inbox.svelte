@@ -40,16 +40,16 @@
 <div
 	class={cn(
 		'bg-card overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
-		'grid min-h-[420px] lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]',
+		'grid h-full min-h-0 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]',
 		className
 	)}
 >
-	<aside class="border-border/80 flex max-h-[560px] flex-col border-b lg:border-r lg:border-b-0">
-		<div class="flex items-center justify-between gap-2 px-4 py-3">
+	<aside class="border-border/80 flex min-h-0 flex-col border-b lg:border-r lg:border-b-0">
+		<div class="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
 			<p class="text-sm font-semibold tracking-tight">Inbox</p>
 			<span class="text-muted-foreground text-xs">{messages.length}</span>
 		</div>
-		<ul class="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
+		<ul class="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain p-0">
 			{#each messages as message (message.id)}
 				<li>
 					<button
@@ -85,9 +85,9 @@
 		</ul>
 	</aside>
 
-	<section class="flex min-h-[320px] flex-col">
+	<section class="flex min-h-0 flex-col overflow-hidden">
 		{#if selected}
-			<header class="space-y-2 border-b px-5 py-4">
+			<header class="shrink-0 space-y-2 border-b px-5 py-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div class="min-w-0 space-y-1">
 						<h3 class="text-base font-semibold tracking-tight">{selected.subject}</h3>
@@ -103,7 +103,7 @@
 					</div>
 				</div>
 			</header>
-			<div class="text-sm leading-relaxed whitespace-pre-wrap px-5 py-5">
+			<div class="min-h-0 flex-1 overflow-y-auto px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap">
 				{selected.body}
 			</div>
 		{:else}

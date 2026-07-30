@@ -57,15 +57,17 @@
 <div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
 	<AppNav {orgName} groups={navGroups} class="shrink-0" />
 
-	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
-			<ProfileHeader {breadcrumb} {title} {status} {subtitle}>
-				{#snippet actions()}
-					<Button variant="outline" size="sm">Email</Button>
-					<Button variant="outline" size="sm">New quote</Button>
-					<Button size="sm">Edit</Button>
-				{/snippet}
-			</ProfileHeader>
+	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
+		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
+			<div class="shrink-0">
+				<ProfileHeader {breadcrumb} {title} {status} {subtitle}>
+					{#snippet actions()}
+						<Button variant="outline" size="sm">Email</Button>
+						<Button variant="outline" size="sm">New quote</Button>
+						<Button size="sm">Edit</Button>
+					{/snippet}
+				</ProfileHeader>
+			</div>
 
 			<ProfileTabs {tabs}>
 				{#snippet children({ active })}
@@ -95,7 +97,7 @@
 							<Timeline events={timelineEvents} title="Activity" />
 						</div>
 					{:else if active === 'email'}
-						<EntityEmailInbox messages={emailMessages} />
+						<EntityEmailInbox messages={emailMessages} class="min-h-0 flex-1" />
 					{:else if active === 'documents'}
 						<p class="text-muted-foreground text-sm">Documents list UI lands in a later wave.</p>
 					{:else}
