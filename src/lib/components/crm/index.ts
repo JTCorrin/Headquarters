@@ -28,9 +28,15 @@ export { default as InvoiceForm } from './invoice-form.svelte';
 export { default as InvoiceFormDrawer } from './invoice-form-drawer.svelte';
 export { default as InvoicesTable } from './invoices-table.svelte';
 export { default as InvoicesListPage } from './invoices-list-page.svelte';
+export { default as QuotesTable } from './quotes-table.svelte';
+export { default as QuotesListPage } from './quotes-list-page.svelte';
+export { default as TasksTable } from './tasks-table.svelte';
+export { default as TasksListPage } from './tasks-list-page.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
+export type { QuoteRow } from './quotes-columns.js';
+export type { TaskRow } from './tasks-columns.js';
 export type { LeadCard, LeadStage } from './leads-board.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
