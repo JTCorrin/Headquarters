@@ -1,0 +1,97 @@
+import type { ColumnDef } from '@tanstack/table-core';
+import { renderComponent } from '$lib/components/ui/data-table/index.js';
+import StatusBadge from './status-badge.svelte';
+import DataTableCheckbox from './data-table-checkbox.svelte';
+import DataTableSortHeader from './data-table-sort-header.svelte';
+import DataTableRowActions from './data-table-row-actions.svelte';
+
+export interface ProductRow {
+	id: string;
+	sku: string;
+	name: string;
+	unitPrice: string;
+	stock?: number;
+	status: string;
+}
+
+export const productColumns: ColumnDef<ProductRow>[] = [
+	{
+		id: 'select',
+		header: ({ table }) =>
+			renderComponent(DataTableCheckbox, {
+				checked: table.getIsAllPageRowsSelected(),
+				indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
+				onCheckedChange: (value) => table.toggleAllPageRowsSelected(!!value),
+				'aria-label': 'Select all'
+			}),
+		cell: ({ row }) =>
+			renderComponent(DataTableCheckbox, {
+				checked: row.getIsSelected(),
+				onCheckedChange: (value) => row.toggleSelected(!!value),
+				'aria-label': 'Select row'
+			}),
+		enableSorting: false,
+		enableHiding: false
+	},
+	{
+		accessorKey: 'sku',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'SKU',
+				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) => row.getValue('sku')
+	},
+	{
+		accessorKey: 'name',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Name',
+				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) => row.getValue('name')
+	},
+	{
+		accessorKey: 'unitPrice',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Unit price',
+				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) => row.getValue('unitPrice')
+	},
+	{
+		accessorKey: 'stock',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Stock',
+				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) => {
+			const stock = row.original.stock;
+			return stock === undefined ? '—' : String(stock);
+		},
+		sortingFn: (a, b) => (a.original.stock ?? -1) - (b.original.stock ?? -1)
+	},
+	{
+		accessorKey: 'status',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Status',
+				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) =>
+			renderComponent(StatusBadge, {
+				status: row.original.status
+			})
+	},
+	{
+		id: 'actions',
+		enableHiding: false,
+		cell: ({ row }) =>
+			renderComponent(DataTableRowActions, {
+				id: row.original.id,
+				label: 'product'
+			})
+	}
+];

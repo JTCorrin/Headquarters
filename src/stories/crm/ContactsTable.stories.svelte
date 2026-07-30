@@ -25,6 +25,61 @@
 			email: 'riley@example.com',
 			status: 'Contact',
 			owner: 'Maya'
+		},
+		{
+			id: '4',
+			name: 'Jordan Lee',
+			email: 'jordan@fabrikam.com',
+			company: 'Fabrikam',
+			status: 'Lead',
+			owner: 'Maya'
+		},
+		{
+			id: '5',
+			name: 'Casey Nguyen',
+			email: 'casey@adventure.works',
+			company: 'Adventure Works',
+			status: 'Client',
+			owner: 'Joe'
+		},
+		{
+			id: '6',
+			name: 'Morgan Blake',
+			email: 'morgan@litware.io',
+			company: 'Litware',
+			status: 'Contact',
+			owner: 'Maya'
+		},
+		{
+			id: '7',
+			name: 'Taylor Kim',
+			email: 'taylor@northwind.com',
+			company: 'Northwind',
+			status: 'Client',
+			owner: 'Joe'
+		},
+		{
+			id: '8',
+			name: 'Quinn Patel',
+			email: 'quinn@contoso.io',
+			company: 'Contoso',
+			status: 'Lead',
+			owner: 'Maya'
+		},
+		{
+			id: '9',
+			name: 'Jamie Brooks',
+			email: 'jamie@example.com',
+			status: 'Contact',
+			owner: 'Joe'
+		},
+		{
+			id: '10',
+			name: 'Alex Rivera',
+			email: 'alex@fabrikam.com',
+			company: 'Fabrikam',
+			status: 'Client',
+			owner: 'Maya'
 		}
 	];
 
@@ -37,7 +92,8 @@
 
 <Story name="Default" args={{ rows }}>
 	{#snippet template(args)}
-		{@const props = /** @type {import('$lib/components/crm/contacts-table.svelte').ContactsTableProps} */ (args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/contacts-table.svelte').ContactsTableProps} */ (args)}
 		<div class="bg-background p-4">
 			<ContactsTable {...props} />
 		</div>
@@ -46,7 +102,8 @@
 
 <Story name="Empty" args={{ rows: [] }}>
 	{#snippet template(args)}
-		{@const props = /** @type {import('$lib/components/crm/contacts-table.svelte').ContactsTableProps} */ (args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/contacts-table.svelte').ContactsTableProps} */ (args)}
 		<div class="bg-background p-4">
 			<ContactsTable {...props} />
 		</div>
