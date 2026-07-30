@@ -59,6 +59,7 @@
 			total: '480.00'
 		}
 	]);
+	let lineDrawerOpen = $state(false);
 
 	const lineData = defaults(
 		{ productId: '', description: '', qty: '1', unitPrice: '' },
@@ -86,6 +87,7 @@
 					total: (qty * unit).toFixed(2)
 				}
 			];
+			lineDrawerOpen = false;
 		}
 	});
 </script>
@@ -102,6 +104,7 @@
 				{lineForm}
 				products={catalog}
 				bind:lines
+				bind:lineDrawerOpen
 				onRemoveLine={(id) => {
 					lines = lines.filter((row) => row.id !== id);
 				}}
