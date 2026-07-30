@@ -33,6 +33,7 @@ export { default as QuotesListPage } from './quotes-list-page.svelte';
 export { default as QuoteDetailPage } from './quote-detail-page.svelte';
 export { default as InvoiceDetailPage } from './invoice-detail-page.svelte';
 export { default as LineItemForm } from './line-item-form.svelte';
+export { default as LineItemFormDrawer } from './line-item-form-drawer.svelte';
 export { default as LineItemsTable } from './line-items-table.svelte';
 export { default as TasksTable } from './tasks-table.svelte';
 export { default as TasksListPage } from './tasks-list-page.svelte';

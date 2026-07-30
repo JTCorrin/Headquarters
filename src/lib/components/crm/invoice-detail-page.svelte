@@ -5,11 +5,12 @@
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import InvoiceForm from './invoice-form.svelte';
-	import LineItemForm from './line-item-form.svelte';
+	import LineItemFormDrawer from './line-item-form-drawer.svelte';
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 
 	export interface InvoiceDetailPageProps {
 		orgName: string;
@@ -20,6 +21,7 @@
 		lineForm: SuperForm<LineItemFormData>;
 		products?: CatalogProductOption[];
 		lines?: LineItemRow[];
+		lineDrawerOpen?: boolean;
 		onRemoveLine?: (id: string) => void;
 		class?: string;
 	}
@@ -33,6 +35,7 @@
 		lineForm,
 		products = [],
 		lines = $bindable<LineItemRow[]>([]),
+		lineDrawerOpen = $bindable(false),
 		onRemoveLine,
 		class: className
 	}: InvoiceDetailPageProps = $props();
@@ -46,7 +49,7 @@
 			<PageHeader
 				breadcrumb="Money / Invoices"
 				{title}
-				description="Header fields left; product-linked lines on the right."
+				description="Invoice header on the left; product-linked lines on the right."
 			>
 				{#snippet actions()}
 					<StatusBadge {status} />
@@ -56,28 +59,29 @@
 			</PageHeader>
 
 			<div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">
-				<div class="space-y-6">
-					<section
-						class="bg-card space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
-					>
-						<h2 class="text-sm font-semibold tracking-tight">Invoice details</h2>
-						<InvoiceForm form={invoiceForm} submitLabel="Save details" />
-					</section>
+				<section
+					class="bg-card space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+				>
+					<h2 class="text-sm font-semibold tracking-tight">Invoice details</h2>
+					<InvoiceForm form={invoiceForm} submitLabel="Save details" />
+				</section>
 
-					<section
-						class="bg-card space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
-					>
-						<div>
-							<h2 class="text-sm font-semibold tracking-tight">Add line item</h2>
-							<p class="text-muted-foreground text-xs">
-								Link inventory/catalog products (1→many) or free-text lines.
-							</p>
-						</div>
-						<LineItemForm form={lineForm} {products} />
-					</section>
-				</div>
-
-				<LineItemsTable rows={lines} onRemove={onRemoveLine} class="self-start" />
+				<LineItemsTable rows={lines} onRemove={onRemoveLine} class="self-start">
+					{#snippet headerActions()}
+						<LineItemFormDrawer
+							bind:open={lineDrawerOpen}
+							form={lineForm}
+							{products}
+						>
+							{#snippet trigger()}
+								<Button type="button" size="sm">
+									<PlusIcon class="size-3.5" />
+									Add line item
+								</Button>
+							{/snippet}
+						</LineItemFormDrawer>
+					{/snippet}
+				</LineItemsTable>
 			</div>
 		</div>
 	</main>
