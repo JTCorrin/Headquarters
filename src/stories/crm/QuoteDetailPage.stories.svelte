@@ -52,6 +52,32 @@
 	]);
 	let lineDrawerOpen = $state(false);
 
+	const timelineEvents = [
+		{
+			id: 'q1',
+			kind: 'status',
+			title: 'Draft created',
+			occurredAt: 'Mar 10 · 09:00',
+			actor: 'Joe'
+		},
+		{
+			id: 'q2',
+			kind: 'email',
+			title: 'Quote sent to Ava',
+			body: 'Q-0142 · Q2 retainer',
+			occurredAt: 'Mar 12 · 14:20',
+			actor: 'Joe'
+		},
+		{
+			id: 'q3',
+			kind: 'note',
+			title: 'Chase scheduled',
+			body: 'Follow up Friday if no reply',
+			occurredAt: 'Mar 14 · 11:05',
+			actor: 'Maya'
+		}
+	];
+
 	const lineData = defaults(
 		{ productId: '', description: '', qty: '1', unitPrice: '' },
 		zod4(lineItemFormSchema)
@@ -94,6 +120,7 @@
 				{quoteForm}
 				{lineForm}
 				products={catalog}
+				{timelineEvents}
 				bind:lines
 				bind:lineDrawerOpen
 				onRemoveLine={(id) => {

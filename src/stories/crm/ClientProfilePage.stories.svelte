@@ -44,7 +44,33 @@
 				}
 			],
 			timelineEvents: sampleTimelineEvents,
-			emailMessages: sampleEmailMessages
+			emailMessages: sampleEmailMessages,
+			moneyItems: [
+				{
+					id: 'm1',
+					kind: 'quote',
+					label: 'Q-0140 · Annual',
+					amount: '£18,000.00',
+					status: 'Accepted',
+					date: 'Jan 8'
+				},
+				{
+					id: 'm2',
+					kind: 'invoice',
+					label: 'INV-0875',
+					amount: '£4,500.00',
+					status: 'Paid',
+					date: 'Feb 1'
+				},
+				{
+					id: 'm3',
+					kind: 'payment',
+					label: 'Bank · INV-0875',
+					amount: '£4,500.00',
+					status: 'Matched',
+					date: 'Feb 3'
+				}
+			]
 		}
 	});
 </script>

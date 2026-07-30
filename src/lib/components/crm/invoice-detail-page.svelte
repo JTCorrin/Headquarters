@@ -7,6 +7,7 @@
 	import InvoiceForm from './invoice-form.svelte';
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
+	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
@@ -21,6 +22,7 @@
 		lineForm: SuperForm<LineItemFormData>;
 		products?: CatalogProductOption[];
 		lines?: LineItemRow[];
+		timelineEvents?: TimelineEvent[];
 		lineDrawerOpen?: boolean;
 		onRemoveLine?: (id: string) => void;
 		class?: string;
@@ -35,6 +37,7 @@
 		lineForm,
 		products = [],
 		lines = $bindable<LineItemRow[]>([]),
+		timelineEvents = [],
 		lineDrawerOpen = $bindable(false),
 		onRemoveLine,
 		class: className
@@ -49,7 +52,7 @@
 			<PageHeader
 				breadcrumb="Money / Invoices"
 				{title}
-				description="Invoice header on the left; product-linked lines on the right."
+				description="Header + lines, with chase / payment activity on the right."
 			>
 				{#snippet actions()}
 					<StatusBadge {status} />
@@ -58,7 +61,7 @@
 				{/snippet}
 			</PageHeader>
 
-			<div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">
+			<div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(260px,0.7fr)]">
 				<section
 					class="bg-card space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 				>
@@ -68,11 +71,7 @@
 
 				<LineItemsTable rows={lines} onRemove={onRemoveLine} class="self-start">
 					{#snippet headerActions()}
-						<LineItemFormDrawer
-							bind:open={lineDrawerOpen}
-							form={lineForm}
-							{products}
-						>
+						<LineItemFormDrawer bind:open={lineDrawerOpen} form={lineForm} {products}>
 							{#snippet trigger()}
 								<Button type="button" size="sm">
 									<PlusIcon class="size-3.5" />
@@ -82,6 +81,13 @@
 						</LineItemFormDrawer>
 					{/snippet}
 				</LineItemsTable>
+
+				<Timeline
+					events={timelineEvents}
+					title="Activity"
+					emptyMessage="No invoice activity yet."
+					class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
+				/>
 			</div>
 		</div>
 	</main>

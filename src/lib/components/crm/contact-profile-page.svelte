@@ -5,6 +5,7 @@
 	import InfoCard, { type InfoCardField } from './info-card.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import EntityEmailInbox, { type EmailMessage } from './entity-email-inbox.svelte';
+	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -19,6 +20,7 @@
 		contactFields: InfoCardField[];
 		timelineEvents: TimelineEvent[];
 		emailMessages?: EmailMessage[];
+		moneyItems?: MoneySummaryItem[];
 		class?: string;
 	}
 
@@ -33,6 +35,7 @@
 		contactFields,
 		timelineEvents,
 		emailMessages = [],
+		moneyItems = [],
 		class: className
 	}: ContactProfilePageProps = $props();
 
@@ -74,7 +77,7 @@
 					{:else if active === 'documents'}
 						<p class="text-muted-foreground text-sm">Documents list UI lands in a later wave.</p>
 					{:else}
-						<p class="text-muted-foreground text-sm">Quotes / invoices / payments land in a later wave.</p>
+						<MoneySummary items={moneyItems} />
 					{/if}
 				{/snippet}
 			</ProfileTabs>
