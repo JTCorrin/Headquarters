@@ -40,14 +40,24 @@ export { default as TasksListPage } from './tasks-list-page.svelte';
 export { default as TasksBoard } from './tasks-board.svelte';
 export { default as TasksBoardPage } from './tasks-board-page.svelte';
 export { default as SvarKanbanShell } from './svar-kanban-shell.svelte';
+export { default as PaymentForm } from './payment-form.svelte';
+export { default as PaymentFormDrawer } from './payment-form-drawer.svelte';
+export { default as PaymentsTable } from './payments-table.svelte';
+export { default as PaymentsListPage } from './payments-list-page.svelte';
+export { default as MoneySummary } from './money-summary.svelte';
+export { default as ClientsTable } from './clients-table.svelte';
+export { default as ClientsListPage } from './clients-list-page.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
 export type { QuoteRow } from './quotes-columns.js';
 export type { TaskRow } from './tasks-columns.js';
+export type { PaymentRow } from './payments-columns.js';
+export type { ClientRow } from './clients-columns.js';
 export type { LeadCard, LeadStage } from './leads-board.svelte';
 export type { TaskBoardCard, TaskBoardStatus } from './tasks-board.svelte';
 export type { LineItemRow } from './line-items-table.svelte';
+export type { MoneySummaryItem } from './money-summary.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,
