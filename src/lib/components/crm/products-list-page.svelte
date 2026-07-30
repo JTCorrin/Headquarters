@@ -3,7 +3,8 @@
 	import type { ProductFormData } from '$lib/schemas/product.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
-	import ProductsTable, { type ProductRow } from './products-table.svelte';
+	import ProductsTable from './products-table.svelte';
+	import type { ProductRow } from './products-columns.js';
 	import ProductFormDrawer from './product-form-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
