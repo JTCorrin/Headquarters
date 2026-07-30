@@ -11,9 +11,6 @@ export { default as ContactForm } from './contact-form.svelte';
 export { default as ContactFormDrawer } from './contact-form-drawer.svelte';
 export { default as ContactsTable } from './contacts-table.svelte';
 export { default as ProductsTable } from './products-table.svelte';
-export { default as DataTableShell } from './data-table-shell.svelte';
-export type { ContactRow } from './contacts-columns.js';
-export type { ProductRow } from './products-columns.js';
 export { default as ProductForm } from './product-form.svelte';
 export { default as ProductFormDrawer } from './product-form-drawer.svelte';
 export { default as EntityEmailInbox } from './entity-email-inbox.svelte';
@@ -21,6 +18,20 @@ export { default as ContactProfilePage } from './contact-profile-page.svelte';
 export { default as ClientProfilePage } from './client-profile-page.svelte';
 export { default as ContactsListPage } from './contacts-list-page.svelte';
 export { default as ProductsListPage } from './products-list-page.svelte';
+export { default as DataTableShell } from './data-table-shell.svelte';
+export { default as LeadsBoard } from './leads-board.svelte';
+export { default as LeadsBoardPage } from './leads-board-page.svelte';
+export { default as DashboardPage } from './dashboard-page.svelte';
+export { default as QuoteForm } from './quote-form.svelte';
+export { default as QuoteFormDrawer } from './quote-form-drawer.svelte';
+export { default as InvoiceForm } from './invoice-form.svelte';
+export { default as InvoiceFormDrawer } from './invoice-form-drawer.svelte';
+export { default as InvoicesTable } from './invoices-table.svelte';
+export { default as InvoicesListPage } from './invoices-list-page.svelte';
+export type { ContactRow } from './contacts-columns.js';
+export type { ProductRow } from './products-columns.js';
+export type { InvoiceRow } from './invoices-columns.js';
+export type { LeadCard, LeadStage } from './leads-board.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,
