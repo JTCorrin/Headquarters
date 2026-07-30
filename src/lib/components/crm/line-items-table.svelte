@@ -2,6 +2,8 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+	import type { Snippet } from 'svelte';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 
 	export interface LineItemRow {
 		id: string;
@@ -16,6 +18,8 @@
 		rows: LineItemRow[];
 		currency?: string;
 		onRemove?: (id: string) => void;
+		/** Custom header control (e.g. Add line item drawer trigger). */
+		headerActions?: Snippet;
 		class?: string;
 	}
 
@@ -23,6 +27,7 @@
 		rows,
 		currency = 'GBP',
 		onRemove,
+		headerActions,
 		class: className
 	}: LineItemsTableProps = $props();
 
@@ -41,15 +46,28 @@
 		className
 	)}
 >
-	<div class="flex items-center justify-between gap-3 border-b px-4 py-3">
-		<div>
+	<div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+		<div class="min-w-0">
 			<p class="text-sm font-semibold tracking-tight">Line items</p>
 			<p class="text-muted-foreground text-xs">{rows.length} line(s)</p>
 		</div>
-		<p class="text-sm font-medium tabular-nums">
-			{currency}
-			{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-		</p>
+		<div class="flex flex-wrap items-center gap-3">
+			<p class="text-sm font-medium tabular-nums">
+				{currency}
+				{subtotal.toLocaleString(undefined, {
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
+				})}
+			</p>
+			{#if headerActions}
+				{@render headerActions()}
+			{:else}
+				<Button type="button" size="sm" variant="outline" disabled>
+					<PlusIcon class="size-3.5" />
+					Add line item
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	<Table.Root>
@@ -85,7 +103,7 @@
 						colspan={onRemove ? 6 : 5}
 						class="text-muted-foreground h-24 text-center text-sm"
 					>
-						No line items yet — add one from the form.
+						No line items yet — use Add line item.
 					</Table.Cell>
 				</Table.Row>
 			{/each}
