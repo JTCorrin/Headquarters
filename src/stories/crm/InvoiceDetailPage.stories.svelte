@@ -61,6 +61,38 @@
 	]);
 	let lineDrawerOpen = $state(false);
 
+	const timelineEvents = [
+		{
+			id: 'i1',
+			kind: 'status',
+			title: 'Invoice issued',
+			occurredAt: 'Mar 1 · 10:00',
+			actor: 'System'
+		},
+		{
+			id: 'i2',
+			kind: 'email',
+			title: 'Sent to accounts@northwind.com',
+			occurredAt: 'Mar 1 · 10:02',
+			actor: 'Joe'
+		},
+		{
+			id: 'i3',
+			kind: 'note',
+			title: 'Chase #1',
+			body: 'Polite reminder — due in 5 days',
+			occurredAt: 'Mar 15 · 09:30',
+			actor: 'Maya'
+		},
+		{
+			id: 'i4',
+			kind: 'payment',
+			title: 'Partial payment matched · £2,000',
+			occurredAt: 'Mar 18 · 16:40',
+			actor: 'System'
+		}
+	];
+
 	const lineData = defaults(
 		{ productId: '', description: '', qty: '1', unitPrice: '' },
 		zod4(lineItemFormSchema)
@@ -103,6 +135,7 @@
 				{invoiceForm}
 				{lineForm}
 				products={catalog}
+				{timelineEvents}
 				bind:lines
 				bind:lineDrawerOpen
 				onRemoveLine={(id) => {
