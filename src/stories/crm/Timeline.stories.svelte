@@ -2,12 +2,6 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import Timeline from '$lib/components/crm/timeline.svelte';
 
-	const { Story } = defineMeta({
-		title: 'CRM/Timeline',
-		component: Timeline,
-		tags: ['autodocs']
-	});
-
 	const sampleEvents = [
 		{
 			id: '1',
@@ -74,12 +68,31 @@
 			actor: 'Joe'
 		}
 	];
+
+	const { Story } = defineMeta({
+		title: 'CRM/Timeline',
+		component: Timeline,
+		tags: ['autodocs']
+	});
 </script>
 
-<div class="bg-background max-w-xl p-4">
-	<Story name="Default" args={{ events: sampleEvents, title: 'Activity' }} />
-</div>
+<Story name="Default" args={{ events: sampleEvents, title: 'Activity' }}>
+	{#snippet template(args)}
+		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (args)}
+		<div class="bg-background max-w-xl p-4">
+			<Timeline {...props} />
+		</div>
+	{/snippet}
+</Story>
 
-<div class="bg-background max-w-xl p-4">
-	<Story name="Empty" args={{ events: [], title: 'Activity', emptyMessage: 'No activity on this contact yet.' }} />
-</div>
+<Story
+	name="Empty"
+	args={{ events: [], title: 'Activity', emptyMessage: 'No activity on this contact yet.' }}
+>
+	{#snippet template(args)}
+		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (args)}
+		<div class="bg-background max-w-xl p-4">
+			<Timeline {...props} />
+		</div>
+	{/snippet}
+</Story>

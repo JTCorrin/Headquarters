@@ -2,15 +2,6 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import ContactProfilePage from '$lib/components/crm/contact-profile-page.svelte';
 
-	const { Story } = defineMeta({
-		title: 'CRM/Pages/ContactProfile',
-		component: ContactProfilePage,
-		tags: ['autodocs'],
-		parameters: {
-			layout: 'fullscreen'
-		}
-	});
-
 	const navGroups = [
 		{
 			items: [
@@ -100,12 +91,15 @@
 			actor: 'Joe'
 		}
 	];
-</script>
 
-<div class="h-screen">
-	<Story
-		name="Default"
-		args={{
+	const { Story } = defineMeta({
+		title: 'CRM/Pages/ContactProfile',
+		component: ContactProfilePage,
+		tags: ['autodocs'],
+		parameters: {
+			layout: 'fullscreen'
+		},
+		args: {
 			orgName: 'Acme Org',
 			navGroups,
 			breadcrumb: 'Contacts / Ava Chen',
@@ -115,6 +109,18 @@
 			contactFields,
 			companyFields,
 			timelineEvents
-		}}
-	/>
-</div>
+		}
+	});
+</script>
+
+<Story name="Default">
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/contact-profile-page.svelte').ContactProfilePageProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ContactProfilePage {...props} />
+		</div>
+	{/snippet}
+</Story>

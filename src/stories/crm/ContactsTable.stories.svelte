@@ -2,12 +2,6 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import ContactsTable from '$lib/components/crm/contacts-table.svelte';
 
-	const { Story } = defineMeta({
-		title: 'CRM/ContactsTable',
-		component: ContactsTable,
-		tags: ['autodocs']
-	});
-
 	const rows = [
 		{
 			id: '1',
@@ -33,12 +27,28 @@
 			owner: 'Maya'
 		}
 	];
+
+	const { Story } = defineMeta({
+		title: 'CRM/ContactsTable',
+		component: ContactsTable,
+		tags: ['autodocs']
+	});
 </script>
 
-<div class="bg-background p-4">
-	<Story name="Default" args={{ rows }} />
-</div>
+<Story name="Default" args={{ rows }}>
+	{#snippet template(args)}
+		{@const props = /** @type {import('$lib/components/crm/contacts-table.svelte').ContactsTableProps} */ (args)}
+		<div class="bg-background p-4">
+			<ContactsTable {...props} />
+		</div>
+	{/snippet}
+</Story>
 
-<div class="bg-background p-4">
-	<Story name="Empty" args={{ rows: [] }} />
-</div>
+<Story name="Empty" args={{ rows: [] }}>
+	{#snippet template(args)}
+		{@const props = /** @type {import('$lib/components/crm/contacts-table.svelte').ContactsTableProps} */ (args)}
+		<div class="bg-background p-4">
+			<ContactsTable {...props} />
+		</div>
+	{/snippet}
+</Story>

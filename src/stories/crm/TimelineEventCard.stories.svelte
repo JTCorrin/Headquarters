@@ -34,17 +34,19 @@
 	}}
 />
 
-<div class="max-w-lg space-y-0">
-	<Story name="All kinds">
-		{#each TIMELINE_EVENT_KINDS as kind, index (kind)}
-			<TimelineEventCard
-				{kind}
-				title={`${kind} event`}
-				body="Sample body for this timeline kind."
-				occurredAt="Mar 12"
-				actor="Joe"
-				isLast={index === TIMELINE_EVENT_KINDS.length - 1}
-			/>
-		{/each}
-	</Story>
-</div>
+<Story name="All kinds">
+	{#snippet template()}
+		<div class="bg-background max-w-lg space-y-0 p-4">
+			{#each TIMELINE_EVENT_KINDS as kind, index (kind)}
+				<TimelineEventCard
+					{kind}
+					title={`${kind} event`}
+					body="Sample body for this timeline kind."
+					occurredAt="Mar 12"
+					actor="Joe"
+					isLast={index === TIMELINE_EVENT_KINDS.length - 1}
+				/>
+			{/each}
+		</div>
+	{/snippet}
+</Story>
