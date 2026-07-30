@@ -70,6 +70,26 @@ export function createSvelteTable<TData extends RowData>(options: TableOptions<T
 	updateOptions();
 
 	$effect.pre(() => {
+		// Eagerly read controlled state so Svelte tracks our $state fields.
+		// mergeObjects is Proxy-based and otherwise won't subscribe to getters.
+		const optState = options.state;
+		if (optState) {
+			optState.sorting;
+			optState.pagination;
+			optState.columnFilters;
+			optState.columnVisibility;
+			optState.rowSelection;
+			optState.globalFilter;
+			optState.columnOrder;
+			optState.columnPinning;
+			optState.expanded;
+			optState.grouping;
+		}
+		state.sorting;
+		state.pagination;
+		state.columnFilters;
+		state.columnVisibility;
+		state.rowSelection;
 		updateOptions();
 	});
 
