@@ -56,6 +56,11 @@
 		get columns() {
 			return columns;
 		},
+		getRowId: (row, index) => {
+			const id = (row as { id?: string }).id;
+			return id ?? String(index);
+		},
+		enableRowSelection: true,
 		getCoreRowModel: getCoreRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
 		getSortedRowModel: getSortedRowModel(),
@@ -94,8 +99,53 @@
 		}
 	});
 
-	const selectedCount = $derived(table.getFilteredSelectedRowModel().rows.length);
-	const filteredCount = $derived(table.getFilteredRowModel().rows.length);
+	// Touch controlled state so row/header renders re-run after interactions.
+	const headerGroups = $derived.by(() => {
+		void sorting;
+		void columnVisibility;
+		return table.getHeaderGroups();
+	});
+	const rows = $derived.by(() => {
+		void sorting;
+		void pagination;
+		void columnFilters;
+		void rowSelection;
+		void columnVisibility;
+		return table.getRowModel().rows;
+	});
+	const selectedCount = $derived.by(() => {
+		void rowSelection;
+		void columnFilters;
+		return table.getFilteredSelectedRowModel().rows.length;
+	});
+	const filteredCount = $derived.by(() => {
+		void columnFilters;
+		void sorting;
+		return table.getFilteredRowModel().rows.length;
+	});
+	const pageIndex = $derived.by(() => {
+		void pagination;
+		return table.getState().pagination.pageIndex;
+	});
+	const pageCount = $derived.by(() => {
+		void pagination;
+		void columnFilters;
+		return Math.max(table.getPageCount(), 1);
+	});
+	const canPreviousPage = $derived.by(() => {
+		void pagination;
+		return table.getCanPreviousPage();
+	});
+	const canNextPage = $derived.by(() => {
+		void pagination;
+		void columnFilters;
+		return table.getCanNextPage();
+	});
+	const filterValue = $derived.by(() => {
+		void columnFilters;
+		if (!filterColumn) return '';
+		return (table.getColumn(filterColumn)?.getFilterValue() as string) ?? '';
+	});
 </script>
 
 <div class={cn('space-y-3', className)}>
@@ -103,7 +153,7 @@
 		{#if filterColumn}
 			<Input
 				placeholder={filterPlaceholder}
-				value={(table.getColumn(filterColumn)?.getFilterValue() as string) ?? ''}
+				value={filterValue}
 				oninput={(e) => table.getColumn(filterColumn)?.setFilterValue(e.currentTarget.value)}
 				class="max-w-xs"
 			/>
@@ -135,7 +185,7 @@
 	<div class="overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10">
 		<Table.Root>
 			<Table.Header>
-				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+				{#each headerGroups as headerGroup (headerGroup.id)}
 					<Table.Row>
 						{#each headerGroup.headers as header (header.id)}
 							<Table.Head colspan={header.colSpan}>
@@ -151,9 +201,9 @@
 				{/each}
 			</Table.Header>
 			<Table.Body>
-				{#each table.getRowModel().rows as row (row.id)}
+				{#each rows as row (row.id)}
 					<Table.Row data-state={row.getIsSelected() && 'selected'}>
-						{#each row.getVisibleCells() as cell (cell.id)}
+						{#each row.getVisibleCells() as cell (`${cell.id}:${row.getIsSelected()}`)}
 							<Table.Cell>
 								<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
 							</Table.Cell>
@@ -176,13 +226,13 @@
 		</p>
 		<div class="flex items-center gap-2">
 			<span>
-				Page {table.getState().pagination.pageIndex + 1} of {Math.max(table.getPageCount(), 1)}
+				Page {pageIndex + 1} of {pageCount}
 			</span>
 			<Button
 				variant="outline"
 				size="sm"
 				onclick={() => table.previousPage()}
-				disabled={!table.getCanPreviousPage()}
+				disabled={!canPreviousPage}
 			>
 				Previous
 			</Button>
@@ -190,7 +240,7 @@
 				variant="outline"
 				size="sm"
 				onclick={() => table.nextPage()}
-				disabled={!table.getCanNextPage()}
+				disabled={!canNextPage}
 			>
 				Next
 			</Button>

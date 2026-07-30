@@ -1,15 +1,25 @@
 <script lang="ts">
-	import type { ComponentProps } from 'svelte';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+
+	export interface DataTableCheckboxProps {
+		checked?: boolean;
+		indeterminate?: boolean;
+		onCheckedChange?: (value: boolean) => void;
+		'aria-label'?: string;
+		disabled?: boolean;
+	}
 
 	let {
 		checked = false,
 		indeterminate = false,
-		onCheckedChange = (v: boolean | 'indeterminate') => {
-			checked = !!v;
-		},
+		onCheckedChange,
 		...restProps
-	}: ComponentProps<typeof Checkbox> = $props();
+	}: DataTableCheckboxProps = $props();
 </script>
 
-<Checkbox bind:checked={() => checked, onCheckedChange} {indeterminate} {...restProps} />
+<Checkbox
+	{checked}
+	{indeterminate}
+	onCheckedChange={(value) => onCheckedChange?.(!!value)}
+	{...restProps}
+/>
