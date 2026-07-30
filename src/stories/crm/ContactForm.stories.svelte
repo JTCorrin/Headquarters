@@ -1,11 +1,14 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import ContactForm from '$lib/components/crm/contact-form.svelte';
+	import ContactFormDrawer from '$lib/components/crm/contact-form-drawer.svelte';
 
 	const { Story } = defineMeta({
 		title: 'CRM/ContactForm',
-		component: ContactForm,
-		tags: ['autodocs']
+		component: ContactFormDrawer,
+		tags: ['autodocs'],
+		parameters: {
+			layout: 'fullscreen'
+		}
 	});
 </script>
 
@@ -36,12 +39,22 @@
 			}
 		}
 	});
+
+	let open = $state(true);
 </script>
 
-<Story name="Empty">
-	{#snippet children()}
-		<div class="bg-background max-w-lg rounded-2xl p-6 shadow-sm ring-1 ring-foreground/5">
-			<ContactForm {form} />
+<Story name="Drawer">
+	{#snippet template()}
+		<div class="bg-background flex h-[560px] items-start justify-center p-8">
+			<ContactFormDrawer bind:open {form} title="New contact" triggerLabel="New contact" />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Drawer closed">
+	{#snippet template()}
+		<div class="bg-background flex h-[280px] items-start justify-center p-8">
+			<ContactFormDrawer open={false} {form} title="New contact" triggerLabel="New contact" />
 		</div>
 	{/snippet}
 </Story>
