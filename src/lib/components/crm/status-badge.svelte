@@ -11,8 +11,9 @@
 
 	const variant = $derived.by(() => {
 		const key = status.toLowerCase();
-		if (['paid', 'won', 'active', 'client'].includes(key)) return 'default' as const;
-		if (['lead', 'sent', 'proposal', 'doing', 'archived'].includes(key)) return 'secondary' as const;
+		if (['paid', 'won', 'active', 'client', 'primary'].includes(key)) return 'default' as const;
+		if (['lead', 'sent', 'proposal', 'doing', 'archived', 'billing'].includes(key))
+			return 'secondary' as const;
 		if (['lost', 'void', 'overdue', 'suspended'].includes(key)) return 'destructive' as const;
 		return 'outline' as const;
 	});

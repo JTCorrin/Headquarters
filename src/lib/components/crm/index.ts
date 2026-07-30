@@ -11,7 +11,13 @@ export { default as ContactForm } from './contact-form.svelte';
 export { default as ContactFormDrawer } from './contact-form-drawer.svelte';
 export { default as ContactsTable } from './contacts-table.svelte';
 export { default as ProductsTable } from './products-table.svelte';
+export { default as ProductForm } from './product-form.svelte';
+export { default as ProductFormDrawer } from './product-form-drawer.svelte';
+export { default as EntityEmailInbox } from './entity-email-inbox.svelte';
 export { default as ContactProfilePage } from './contact-profile-page.svelte';
+export { default as ClientProfilePage } from './client-profile-page.svelte';
+export { default as ContactsListPage } from './contacts-list-page.svelte';
+export { default as ProductsListPage } from './products-list-page.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,
