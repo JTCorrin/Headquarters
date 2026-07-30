@@ -22,7 +22,7 @@
 		form,
 		open = $bindable(false),
 		title = 'New quote',
-		description = 'Draft a quote with a first line item. Products can be linked later.',
+		description = 'Create the quote header. Add product-linked line items on the quote page.',
 		submitLabel = 'Save quote',
 		triggerLabel = 'New quote',
 		class: className,

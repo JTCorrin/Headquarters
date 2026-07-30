@@ -99,34 +99,5 @@
 		{#if $errors.dueOn}<p class="text-destructive text-xs">{$errors.dueOn}</p>{/if}
 	</div>
 
-	<div class="space-y-2">
-		<Label for="invoice-line">Line item</Label>
-		<Input
-			id="invoice-line"
-			name="lineDescription"
-			bind:value={$formData.lineDescription}
-			placeholder="Monthly retainer"
-		/>
-		{#if $errors.lineDescription}<p class="text-destructive text-xs">{$errors.lineDescription}</p>{/if}
-	</div>
-
-	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="space-y-2">
-			<Label for="invoice-qty">Qty</Label>
-			<Input id="invoice-qty" name="qty" bind:value={$formData.qty} placeholder="1" />
-			{#if $errors.qty}<p class="text-destructive text-xs">{$errors.qty}</p>{/if}
-		</div>
-		<div class="space-y-2">
-			<Label for="invoice-unit">Unit price</Label>
-			<Input
-				id="invoice-unit"
-				name="unitPrice"
-				bind:value={$formData.unitPrice}
-				placeholder="4200.00"
-			/>
-			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
-		</div>
-	</div>
-
 	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
 </form>

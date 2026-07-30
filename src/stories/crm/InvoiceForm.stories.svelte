@@ -20,9 +20,6 @@
 			clientName: 'Northwind',
 			number: 'INV-0900',
 			currency: 'GBP',
-			lineDescription: 'Monthly retainer',
-			qty: '1',
-			unitPrice: '4200.00',
 			dueOn: '2026-04-01',
 			status: 'draft'
 		},
