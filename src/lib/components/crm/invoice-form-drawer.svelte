@@ -22,7 +22,7 @@
 		form,
 		open = $bindable(false),
 		title = 'New invoice',
-		description = 'Create an invoice with a first line item.',
+		description = 'Create the invoice header. Add product-linked line items on the invoice page.',
 		submitLabel = 'Save invoice',
 		triggerLabel = 'New invoice',
 		class: className,

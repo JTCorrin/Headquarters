@@ -96,9 +96,6 @@
 			clientName: '',
 			title: '',
 			currency: 'GBP',
-			lineDescription: '',
-			qty: '1',
-			unitPrice: '',
 			status: 'draft'
 		},
 		zod4(quoteFormSchema)

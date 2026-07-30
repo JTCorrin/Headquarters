@@ -20,9 +20,6 @@
 			clientName: 'Northwind',
 			title: 'Q2 retainer',
 			currency: 'GBP',
-			lineDescription: 'Monthly retainer',
-			qty: '1',
-			unitPrice: '4200.00',
 			status: 'draft'
 		},
 		zod4(quoteFormSchema)

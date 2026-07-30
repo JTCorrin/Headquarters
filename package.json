@@ -74,6 +74,7 @@
 		"zod": "^4.4.3"
 	},
 	"dependencies": {
+		"@svar-ui/svelte-kanban": "^2.6.0",
 		"@tanstack/table-core": "^8.21.3"
 	}
 }

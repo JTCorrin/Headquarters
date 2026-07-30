@@ -23,7 +23,7 @@
 			<PageHeader
 				breadcrumb="CRM"
 				title="Leads"
-				description="Pipeline board — drag-and-drop lands with the app shell."
+				description="Pipeline board — drag cards between stages (SVAR Kanban)."
 			>
 				{#snippet actions()}
 					<Button variant="outline" size="sm">Table view</Button>
@@ -31,7 +31,7 @@
 				{/snippet}
 			</PageHeader>
 
-			<LeadsBoard {leads} />
+			<LeadsBoard {leads} class="min-h-[480px]" />
 		</div>
 	</main>
 </div>

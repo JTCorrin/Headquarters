@@ -96,9 +96,6 @@
 			clientName: '',
 			number: '',
 			currency: 'GBP',
-			lineDescription: '',
-			qty: '1',
-			unitPrice: '',
 			dueOn: '',
 			status: 'draft'
 		},
