@@ -27,8 +27,20 @@
 	args={{
 		kind: 'email',
 		title: 'Q2 retainer kickoff',
-		body: 'To ava@northwind.com · Template: Client kickoff',
+		body: 'To ava@northwind.com · Template: Client kickoff\n\nHi Ava — sharing the kickoff pack and next steps for the retainer.',
 		occurredAt: 'Yesterday',
+		actor: 'Joe',
+		isLast: true
+	}}
+/>
+
+<Story
+	name="Hover expand"
+	args={{
+		kind: 'email',
+		title: 'Hover me to read the body',
+		body: 'Collapsed by default — hover or focus the card to expand the email body smoothly.',
+		occurredAt: 'Today · 10:04',
 		actor: 'Joe',
 		isLast: true
 	}}

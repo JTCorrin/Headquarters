@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface AppNavItem {
@@ -27,44 +28,48 @@
 	}: AppNavProps = $props();
 </script>
 
-<aside
+<Sidebar.Provider
 	class={cn(
-		'bg-sidebar text-sidebar-foreground flex h-full w-56 flex-col border-r border-sidebar-border',
+		'h-full! min-h-0! w-(--sidebar-width)! max-w-(--sidebar-width) shrink-0 grow-0',
 		className
 	)}
+	style="--sidebar-width: 14rem;"
 >
-	<div class="space-y-1 px-4 py-5">
-		<p class="text-lg font-semibold tracking-tight">CRM</p>
-		<p class="text-muted-foreground text-xs">{orgName}</p>
-	</div>
+	<Sidebar.Root collapsible="none" class="h-full border-r">
+		<Sidebar.Header class="gap-1 px-4 py-5">
+			<p class="text-lg font-semibold tracking-tight">CRM</p>
+			<p class="text-muted-foreground text-xs">{orgName}</p>
+		</Sidebar.Header>
 
-	<nav class="flex-1 space-y-5 overflow-y-auto px-2 pb-4">
-		{#each groups as group, gi (group.label ?? gi)}
-			<div class="space-y-1">
-				{#if group.label}
-					<p class="text-muted-foreground px-2 text-[11px] font-medium tracking-wide uppercase">
-						{group.label}
-					</p>
-				{/if}
-				{#each group.items as item (item.href + item.label)}
-					<a
-						href={item.href}
-						class={cn(
-							'block rounded-xl px-3 py-2 text-sm transition-colors',
-							item.active
-								? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-								: 'text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground'
-						)}
-						aria-current={item.active ? 'page' : undefined}
-					>
-						{item.label}
-					</a>
-				{/each}
-			</div>
-		{/each}
-	</nav>
+		<Sidebar.Content class="gap-0 px-2 pb-4">
+			{#each groups as group, gi (group.label ?? gi)}
+				<Sidebar.Group class="p-0 py-2">
+					{#if group.label}
+						<Sidebar.GroupLabel class="text-[11px] tracking-wide uppercase">
+							{group.label}
+						</Sidebar.GroupLabel>
+					{/if}
+					<Sidebar.GroupContent>
+						<Sidebar.Menu>
+							{#each group.items as item (item.href + item.label)}
+								<Sidebar.MenuItem>
+									<Sidebar.MenuButton isActive={!!item.active}>
+										{#snippet child({ props })}
+											<a href={item.href} aria-current={item.active ? 'page' : undefined} {...props}>
+												<span>{item.label}</span>
+											</a>
+										{/snippet}
+									</Sidebar.MenuButton>
+								</Sidebar.MenuItem>
+							{/each}
+						</Sidebar.Menu>
+					</Sidebar.GroupContent>
+				</Sidebar.Group>
+			{/each}
+		</Sidebar.Content>
 
-	<div class="text-muted-foreground border-t border-sidebar-border px-4 py-4 text-xs">
-		{footerLabel}
-	</div>
-</aside>
+		<Sidebar.Footer class="text-muted-foreground border-t px-4 py-4 text-xs">
+			{footerLabel}
+		</Sidebar.Footer>
+	</Sidebar.Root>
+</Sidebar.Provider>
