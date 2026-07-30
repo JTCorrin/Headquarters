@@ -3,7 +3,8 @@
 	import type { ContactFormData } from '$lib/schemas/contact.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
-	import ContactsTable, { type ContactRow } from './contacts-table.svelte';
+	import ContactsTable from './contacts-table.svelte';
+	import type { ContactRow } from './contacts-columns.js';
 	import ContactFormDrawer from './contact-form-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';

@@ -8,7 +8,6 @@
 			sku: 'SVC-RETAIN',
 			name: 'Monthly retainer',
 			unitPrice: '£4,200.00',
-			stock: undefined,
 			status: 'Active'
 		},
 		{
@@ -33,6 +32,51 @@
 			name: 'Legacy modem',
 			unitPrice: '£49.00',
 			stock: 0,
+			status: 'Archived'
+		},
+		{
+			id: '5',
+			sku: 'SVC-SETUP',
+			name: 'Onboarding setup',
+			unitPrice: '£950.00',
+			status: 'Active'
+		},
+		{
+			id: '6',
+			sku: 'HW-CAM-02',
+			name: 'Conference cam',
+			unitPrice: '£320.00',
+			stock: 12,
+			status: 'Active'
+		},
+		{
+			id: '7',
+			sku: 'LIC-AI',
+			name: 'AI assist add-on',
+			unitPrice: '£29.00',
+			stock: 999,
+			status: 'Active'
+		},
+		{
+			id: '8',
+			sku: 'SVC-AUDIT',
+			name: 'Security audit',
+			unitPrice: '£2,400.00',
+			status: 'Active'
+		},
+		{
+			id: '9',
+			sku: 'HW-DOCK',
+			name: 'USB-C dock',
+			unitPrice: '£149.00',
+			stock: 8,
+			status: 'Active'
+		},
+		{
+			id: '10',
+			sku: 'SVC-LEGACY',
+			name: 'Legacy support',
+			unitPrice: '£75.00',
 			status: 'Archived'
 		}
 	];
