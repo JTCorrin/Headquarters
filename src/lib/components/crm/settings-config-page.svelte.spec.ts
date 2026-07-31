@@ -91,4 +91,17 @@ describe('SettingsConfigPage', () => {
 		expect(page.getByTestId('tax-rate-add').elements().length).toBe(0);
 		expect(page.getByTestId('tax-rate-set-default-tax-2').elements().length).toBe(0);
 	});
+
+	it('does not offer Archive on the active default tax rate', async () => {
+		render(SettingsConfigPageTestHost, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Config'),
+			role: 'owner',
+			configuration,
+			taxRates
+		});
+
+		expect(page.getByTestId('tax-rate-archive-tax-1').elements().length).toBe(0);
+		await expect.element(page.getByTestId('tax-rate-archive-tax-2')).toBeInTheDocument();
+	});
 });

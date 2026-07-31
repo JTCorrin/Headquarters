@@ -177,7 +177,7 @@
 											>
 												Edit
 											</Button>
-											{#if rate.active}
+											{#if rate.active && !rate.is_default}
 												<Button
 													type="button"
 													size="sm"

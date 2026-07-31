@@ -9,18 +9,32 @@
 	export interface OrganisationCreateDrawerProps {
 		form: SuperForm<OrganisationCreateData>;
 		open?: boolean;
+		createError?: string | null;
 		class?: string;
 		trigger?: Snippet;
-		onValidSubmit?: () => void;
+		/**
+		 * Called after client-side validation succeeds.
+		 * Return `false` to keep the drawer open (e.g. API failure);
+		 * return `true`/void to close after success.
+		 */
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
 		form,
 		open = $bindable(false),
+		createError = null,
 		class: className,
 		trigger,
 		onValidSubmit
 	}: OrganisationCreateDrawerProps = $props();
+
+	async function handleValidSubmit() {
+		const result = await onValidSubmit?.();
+		if (result !== false) {
+			open = false;
+		}
+	}
 </script>
 
 <Drawer.Root bind:open direction="right" shouldScaleBackground={false}>
@@ -41,14 +55,13 @@
 				Creates the organisation and makes you Owner, then opens its configuration.
 			</Drawer.Description>
 		</Drawer.Header>
-		<div class="px-4 pb-6">
-			<OrganisationCreateForm
-				{form}
-				onValidSubmit={() => {
-					onValidSubmit?.();
-					open = false;
-				}}
-			/>
+		<div class="space-y-3 px-4 pb-6">
+			{#if createError}
+				<p class="text-destructive text-sm" role="alert" data-testid="organisation-create-error">
+					{createError}
+				</p>
+			{/if}
+			<OrganisationCreateForm {form} onValidSubmit={handleValidSubmit} />
 		</div>
 	</Drawer.Content>
 </Drawer.Root>

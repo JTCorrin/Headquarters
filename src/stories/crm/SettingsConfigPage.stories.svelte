@@ -147,7 +147,7 @@
 		viewState: {
 			kind: 'validation',
 			message: 'Invalid configuration',
-			fields: { timezone: 'Unknown IANA zone' }
+			fields: { timezone: 'Not/A_Zone is not a valid IANA timezone' }
 		}
 	}}
 >
