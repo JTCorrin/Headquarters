@@ -92,6 +92,15 @@ function isValidDateOnly(value: string): boolean {
   )
 }
 
+/** Matches Postgres `numeric(20, 10)`: 10 digits before the decimal, 10 after. */
+const POSITION_ABS_LIMIT = 10_000_000_000
+
+function isValidLeadPosition(value: number): boolean {
+  if (!Number.isFinite(value) || Math.abs(value) >= POSITION_ABS_LIMIT) return false
+  const scaled = value * 1e10
+  return Math.abs(scaled - Math.round(scaled)) < 1e-6
+}
+
 export function validateLeadBody(
   body: Record<string, unknown>,
   partial: false,
@@ -231,12 +240,9 @@ export function validateLeadBody(
 
   if ('position' in body) {
     const value = body.position
-    if (
-      typeof value !== 'number' ||
-      !Number.isFinite(value) ||
-      Math.abs(value) > Number.MAX_SAFE_INTEGER
-    ) {
-      fields.position = 'Must be a finite number within the safe integer range'
+    if (typeof value !== 'number' || !isValidLeadPosition(value)) {
+      fields.position =
+        'Must fit numeric(20,10): finite, |value| < 10000000000, at most 10 decimal places'
     } else {
       output.position = value
     }
@@ -312,7 +318,7 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.code === '23503') {
     return new ApiError(422, 'VALIDATION_ERROR', 'A referenced record is invalid')
   }
-  if (error.code === '23514' || error.code === '22023') {
+  if (error.code === '23514' || error.code === '22023' || error.code === '22003') {
     return new ApiError(422, 'VALIDATION_ERROR', 'The lead failed a database constraint')
   }
   if (error.code === '42501') {
