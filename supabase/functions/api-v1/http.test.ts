@@ -11,8 +11,14 @@ import {
 } from './http.ts'
 import { validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
+import {
+  validateOrganisationConfigurationBody,
+  validateOrganisationCreateBody,
+} from './organisations.ts'
 import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
 import { decodeProductCursor, validateAdjustStockBody, validateProductBody } from './products.ts'
+import { validateProfilePreferencesBody } from './profile-preferences.ts'
+import { validateTaxRateBody } from './tax-rates.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -127,6 +133,14 @@ Deno.test('lead create validation defaults stage and currency', () => {
       position: 0,
     },
   )
+  assertEquals(
+    validateLeadBody(
+      { name: 'USD org lead' },
+      false,
+      { defaultCurrency: 'USD' },
+    ).currency,
+    'USD',
+  )
 })
 
 Deno.test('lead validation rejects direct won stage and requires lost_reason', () => {
@@ -239,6 +253,22 @@ Deno.test('product create validation defaults and rejects stock writes / service
       status: 'active',
     },
   )
+  assertEquals(
+    validateProductBody(
+      { sku: 'SKU-USD', name: 'Widget', unit_price_cents: 100 },
+      false,
+      { defaultCurrency: 'USD' },
+    ).currency,
+    'USD',
+  )
+  assertEquals(
+    validateProductBody(
+      { sku: 'SKU-EUR', name: 'Widget', unit_price_cents: 100, currency: 'EUR' },
+      false,
+      { defaultCurrency: 'USD' },
+    ).currency,
+    'EUR',
+  )
   assertThrows(
     () =>
       validateProductBody(
@@ -346,4 +376,82 @@ Deno.test('Idempotency-Key parsing and request hashing', async () => {
   })
   assertEquals(a.length, 64)
   assertEquals(a === b, false)
+})
+
+Deno.test('organisation create and configuration validation', () => {
+  assertEquals(
+    validateOrganisationCreateBody({
+      name: '  Corrin Data  ',
+      slug: 'corrin-data',
+      country_code: 'gb',
+      timezone: 'Europe/London',
+    }),
+    {
+      name: 'Corrin Data',
+      slug: 'corrin-data',
+      country_code: 'GB',
+      default_currency: 'GBP',
+      timezone: 'Europe/London',
+      locale: 'en-GB',
+    },
+  )
+  assertThrows(
+    () =>
+      validateOrganisationCreateBody({
+        name: 'Bad',
+        slug: 'Bad Slug',
+        country_code: 'GB',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateOrganisationCreateBody({
+        name: 'Bad',
+        slug: 'ok-slug',
+        country_code: 'GB',
+        timezone: 'Not/A_Zone',
+      }),
+    ApiError,
+  )
+  assertEquals(
+    validateOrganisationConfigurationBody({ theme_default: 'dark', default_currency: 'USD' }),
+    { theme_default: 'dark', default_currency: 'USD' },
+  )
+  assertThrows(
+    () => validateOrganisationConfigurationBody({ theme_default: 'neon' }),
+    ApiError,
+  )
+  assertThrows(
+    () => validateOrganisationConfigurationBody({ org_id: 'x' }),
+    ApiError,
+  )
+})
+
+Deno.test('tax rate and profile preference validation', () => {
+  assertEquals(
+    validateTaxRateBody({ name: 'VAT', rate_percent: 20, is_default: true }, false),
+    { name: 'VAT', rate_percent: 20, is_default: true, active: true },
+  )
+  assertThrows(
+    () => validateTaxRateBody({ name: 'Bad', rate_percent: Number.NaN }, false),
+    ApiError,
+  )
+  assertThrows(
+    () => validateTaxRateBody({ name: 'Bad', rate_percent: 20, org_id: 'x' }, false),
+    ApiError,
+  )
+  assertThrows(() => validateTaxRateBody({}, true), ApiError)
+  assertEquals(
+    validateTaxRateBody({ name: 'Renamed' }, true),
+    { name: 'Renamed' },
+  )
+  assertEquals(
+    validateProfilePreferencesBody({ theme_preference: null }),
+    { theme_preference: null },
+  )
+  assertThrows(
+    () => validateProfilePreferencesBody({ theme_preference: 'neon' }),
+    ApiError,
+  )
 })
