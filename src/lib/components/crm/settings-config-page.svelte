@@ -36,8 +36,8 @@
 		viewState?: ResourceViewState;
 		class?: string;
 		onReload?: () => void;
-		onSaveConfig?: () => void;
-		onSavePreferences?: () => void;
+		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
+		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		/**
 		 * Return `false` (or reject) to keep the tax drawer open after a failed save.
 		 */

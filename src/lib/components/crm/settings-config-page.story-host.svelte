@@ -28,8 +28,8 @@
 		taxSaveDelayMs?: number;
 		class?: string;
 		onReload?: () => void;
-		onSaveConfig?: () => void;
-		onSavePreferences?: () => void;
+		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
+		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveTaxRate?: () => boolean | void | Promise<boolean | void>;
 		onSetDefaultTaxRate?: (taxRateId: string) => void;
 		onArchiveTaxRate?: (taxRateId: string) => void;
