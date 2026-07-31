@@ -16,7 +16,11 @@
 		readonly?: boolean;
 		submitLabel?: string;
 		class?: string;
-		onValidSubmit?: () => void;
+		/**
+		 * Called after client-side validation succeeds.
+		 * May return a Promise; awaited before ending pending state.
+		 */
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -32,6 +36,9 @@
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
 
+	let pendingSubmit = $state(false);
+	const busy = $derived($submitting || pendingSubmit);
+
 	const themeLabel = $derived(
 		themeOptions.find((t) => t === $formData.themeDefault)?.replace(/^./, (c) => c.toUpperCase()) ??
 			'Theme'
@@ -43,9 +50,17 @@
 	class={cn('space-y-4', className)}
 	data-testid="organisation-config-form"
 	use:enhance={{
-		onUpdate({ form: validated }) {
+		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
-			onValidSubmit?.();
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				// Swallow so Superforms default onError does not rethrow.
+				return false;
+			} finally {
+				pendingSubmit = false;
+			}
 		}
 	}}
 >
@@ -56,7 +71,7 @@
 				id="org-config-timezone"
 				name="timezone"
 				bind:value={$formData.timezone}
-				disabled={readonly}
+				disabled={readonly || busy}
 				aria-invalid={!!$errors.timezone}
 			/>
 			{#if $errors.timezone}<p class="text-destructive text-xs">{$errors.timezone}</p>{/if}
@@ -67,7 +82,7 @@
 				id="org-config-currency"
 				name="currency"
 				bind:value={$formData.currency}
-				disabled={readonly}
+				disabled={readonly || busy}
 				aria-invalid={!!$errors.currency}
 			/>
 			{#if $errors.currency}<p class="text-destructive text-xs">{$errors.currency}</p>{/if}
@@ -81,7 +96,7 @@
 				id="org-config-locale"
 				name="locale"
 				bind:value={$formData.locale}
-				disabled={readonly}
+				disabled={readonly || busy}
 				aria-invalid={!!$errors.locale}
 			/>
 			{#if $errors.locale}<p class="text-destructive text-xs">{$errors.locale}</p>{/if}
@@ -91,8 +106,8 @@
 			{#if readonly}
 				<Input id="org-config-theme" value={themeLabel} disabled />
 			{:else}
-				<Select.Root type="single" bind:value={$formData.themeDefault} name="themeDefault">
-					<Select.Trigger id="org-config-theme" class="w-full">{themeLabel}</Select.Trigger>
+				<Select.Root type="single" bind:value={$formData.themeDefault} name="themeDefault" disabled={busy}>
+					<Select.Trigger id="org-config-theme" class="w-full" disabled={busy}>{themeLabel}</Select.Trigger>
 					<Select.Content>
 						{#each themeOptions as option (option)}
 							<Select.Item value={option} label={option}>{option}</Select.Item>
@@ -105,8 +120,8 @@
 
 	{#if !readonly}
 		<div class="flex justify-end">
-			<Button type="submit" disabled={$submitting} data-testid="organisation-config-submit">
-				{$submitting ? 'Saving…' : submitLabel}
+			<Button type="submit" disabled={busy} data-testid="organisation-config-submit">
+				{busy ? 'Saving…' : submitLabel}
 			</Button>
 		</div>
 	{/if}

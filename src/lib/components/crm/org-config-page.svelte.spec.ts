@@ -269,6 +269,164 @@ describe('OrgConfigPage integration', () => {
 		await expect.element(page.getByTestId('org-switcher-trigger')).toHaveTextContent(/Certivue/i);
 	});
 
+	it('discards a delayed config save that completes after org switch', async () => {
+		let releaseSave: (() => void) | undefined;
+		const saveGate = new Promise<void>((resolve) => {
+			releaseSave = resolve;
+		});
+		let patchCompletions = 0;
+
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: memberships().data.map((row) => ({
+				org_id: row.organisation.id,
+				org_name: row.organisation.name,
+				org_slug: row.organisation.slug,
+				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly'
+			}))
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'GET /api/v1/organisation/configuration': async (request) => {
+					const orgId = request.headers.get('x-org-id');
+					return {
+						headers: { etag: '"1"' },
+						body: {
+							data: {
+								...orgConfig(1, orgId === ORG_B ? 'USD' : 'GBP'),
+								id: orgId ?? ORG_A,
+								name: orgId === ORG_B ? 'Certivue' : 'Corrin Data',
+								slug: orgId === ORG_B ? 'certivue' : 'corrin-data',
+								default_currency: orgId === ORG_B ? 'USD' : 'GBP'
+							}
+						}
+					};
+				},
+				'GET /api/v1/tax-rates': async () => ({ body: { data: [] } }),
+				'GET /api/v1/profile/preferences': async () => ({
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				}),
+				'PATCH /api/v1/organisation/configuration': async (request) => {
+					await saveGate;
+					patchCompletions += 1;
+					const orgId = request.headers.get('x-org-id');
+					return {
+						headers: { etag: '"2"' },
+						body: {
+							data: {
+								...orgConfig(2, 'EUR'),
+								id: orgId ?? ORG_A,
+								name: 'Stale Patch Org',
+								default_currency: 'EUR'
+							}
+						}
+					};
+				}
+			}),
+			getOrgId: () => session.selectedOrgId
+		});
+
+		render(OrgConfigPage, { api, session });
+		await expect.element(page.getByTestId('organisation-config-form')).toBeInTheDocument();
+		await page.getByLabelText(/default currency/i).fill('EUR');
+		await page.getByTestId('organisation-config-submit').click();
+		await expect.element(page.getByTestId('organisation-config-submit')).toHaveTextContent(/Saving/i);
+
+		// Switch while PATCH is gated — exercises epoch discard without UI overlay races.
+		session.selectOrg(ORG_B);
+		await vi.waitFor(() => expect(session.selectedOrgId).toBe(ORG_B));
+		await expect.element(page.getByTestId('org-switcher-trigger')).toHaveTextContent(/Certivue/i);
+		await expect.element(page.getByLabelText(/default currency/i)).toHaveValue('USD');
+
+		releaseSave?.();
+		await vi.waitFor(() => expect(patchCompletions).toBe(1));
+		// Stale EUR patch from org A must not stick on org B (resync after discard).
+		await vi.waitFor(async () => {
+			await expect.element(page.getByLabelText(/default currency/i)).toHaveValue('USD');
+		});
+		await expect.element(page.getByTestId('org-switcher-trigger')).toHaveTextContent(/Certivue/i);
+	});
+
+	it('discards a delayed tax create that completes after org switch', async () => {
+		let releaseCreate: (() => void) | undefined;
+		const createGate = new Promise<void>((resolve) => {
+			releaseCreate = resolve;
+		});
+		let createCompletions = 0;
+
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: memberships().data.map((row) => ({
+				org_id: row.organisation.id,
+				org_name: row.organisation.name,
+				org_slug: row.organisation.slug,
+				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly'
+			}))
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'GET /api/v1/organisation/configuration': async (request) => {
+					const orgId = request.headers.get('x-org-id');
+					return {
+						body: {
+							data: {
+								...orgConfig(1),
+								id: orgId ?? ORG_A,
+								name: orgId === ORG_B ? 'Certivue' : 'Corrin Data'
+							}
+						}
+					};
+				},
+				'GET /api/v1/tax-rates': async () => ({ body: { data: [] } }),
+				'GET /api/v1/profile/preferences': async () => ({
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				}),
+				'POST /api/v1/tax-rates': async () => {
+					await createGate;
+					createCompletions += 1;
+					return {
+						status: 201,
+						body: {
+							data: {
+								id: 'tax-stale',
+								org_id: ORG_A,
+								created_at: '2026-01-01T00:00:00Z',
+								updated_at: '2026-01-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 1,
+								name: 'Stale VAT',
+								rate_percent: 20,
+								is_default: false,
+								active: true
+							}
+						}
+					};
+				}
+			}),
+			getOrgId: () => session.selectedOrgId
+		});
+
+		render(OrgConfigPage, { api, session });
+		await page.getByTestId('tax-rate-add').click();
+		await page.getByLabelText(/^name$/i).fill('Stale VAT');
+		await page.getByTestId('tax-rate-submit').click();
+		await expect.element(page.getByTestId('tax-rate-submit')).toHaveTextContent(/Saving/i);
+
+		session.selectOrg(ORG_B);
+		await vi.waitFor(() => expect(session.selectedOrgId).toBe(ORG_B));
+		await expect.element(page.getByTestId('org-switcher-trigger')).toHaveTextContent(/Certivue/i);
+		await expect.element(page.getByTestId('tax-rates-empty')).toBeInTheDocument();
+
+		releaseCreate?.();
+		await vi.waitFor(() => expect(createCompletions).toBe(1));
+		await expect.element(page.getByTestId('tax-rates-empty')).toBeInTheDocument();
+		await expect.element(page.getByText('Stale VAT')).not.toBeInTheDocument();
+	});
+
 	it('surfaces 422 when tax create fails validation', async () => {
 		const session = createOrgSession({
 			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
