@@ -641,15 +641,15 @@ security definer
 set search_path = ''
 as $$
 declare
-  actor_id uuid := auth.uid();
+  v_actor_id uuid := auth.uid();
   product_org uuid;
   existing public.api_idempotency_keys;
   adjustment jsonb;
   response_body jsonb;
   response_headers jsonb;
-  expires_at timestamptz := now() + make_interval(secs => greatest(p_ttl_seconds, 60));
+  v_expires_at timestamptz := now() + make_interval(secs => greatest(p_ttl_seconds, 60));
 begin
-  if actor_id is null then
+  if v_actor_id is null then
     raise exception 'Authentication is required'
       using errcode = '42501';
   end if;
@@ -685,7 +685,7 @@ begin
     from public.api_idempotency_keys
     where api_idempotency_keys.org_id = product_org
       and api_idempotency_keys.actor_type = 'user'
-      and api_idempotency_keys.actor_id = actor_id
+      and api_idempotency_keys.actor_id = v_actor_id
       and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash
     for update;
 
@@ -728,11 +728,11 @@ begin
       ) values (
         product_org,
         'user',
-        actor_id,
+        v_actor_id,
         p_idempotency_key_hash,
         p_route,
         p_request_hash,
-        expires_at
+        v_expires_at
       );
       exit; -- claimed
     exception
@@ -767,7 +767,7 @@ begin
     resource_id = p_product_id
   where api_idempotency_keys.org_id = product_org
     and api_idempotency_keys.actor_type = 'user'
-    and api_idempotency_keys.actor_id = actor_id
+    and api_idempotency_keys.actor_id = v_actor_id
     and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash;
 
   return jsonb_build_object(
