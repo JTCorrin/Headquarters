@@ -426,10 +426,15 @@ select throws_ok(
   'idempotent adjust rejects key reuse with a different payload'
 );
 
--- Expire the key, then reclaim with a new request hash.
+-- Expire the key as a privileged fixture (authenticated SELECT hides expired
+-- rows; the reclaim path lives inside the security-definer RPC).
+reset role;
 update public.api_idempotency_keys
 set expires_at = now() - interval '1 hour'
 where idempotency_key_hash = encode(extensions.digest('idem-1', 'sha256'), 'hex');
+
+select pg_temp.as_user((select owner_id from _catalog_fixture));
+set local role authenticated;
 
 select lives_ok(
   $$
