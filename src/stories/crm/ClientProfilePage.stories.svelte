@@ -98,11 +98,13 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { documentFormSchema } from '$lib/schemas/document.js';
+	import { clientFormSchema } from '$lib/schemas/client.js';
 	import type { EntityDocument } from '$lib/components/crm/entity-documents.svelte';
 	import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
 	let documents = $state<EntityDocument[]>([...sampleDocuments]);
 	let documentDrawerOpen = $state(false);
+	let editDrawerOpen = $state(false);
 	let timelineEvents = $state<TimelineEvent[]>([...sampleTimelineEvents]);
 
 	const documentData = defaults(
@@ -113,6 +115,7 @@
 	const documentForm = superForm(documentData, {
 		validators: zod4(documentFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: true,
 		onUpdate({ form }) {
 			if (!form.valid) return;
@@ -131,6 +134,36 @@
 			documentDrawerOpen = false;
 		}
 	});
+
+	const clientData = defaults(
+		{
+			name: 'Northwind',
+			status: 'active',
+			websiteUrl: 'https://northwind.com',
+			industry: 'Wholesale / logistics',
+			primaryEmail: 'billing@northwind.com',
+			phone: '',
+			taxIdentifier: '',
+			registrationNumber: '',
+			defaultCurrency: 'GBP',
+			paymentTermsDays: '30',
+			renewalOn: '',
+			notes: ''
+		},
+		zod4(clientFormSchema)
+	);
+
+	const clientForm = superForm(clientData, {
+		validators: zod4(clientFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false,
+		onUpdate({ form }) {
+			if (!form.valid) return;
+			editDrawerOpen = false;
+		}
+	});
 </script>
 
 <Story name="Default">
@@ -143,9 +176,35 @@
 			<ClientProfilePage
 				{...props}
 				{documentForm}
+				{clientForm}
 				bind:timelineEvents
 				bind:documents
 				bind:documentDrawerOpen
+				bind:editDrawerOpen
+			/>
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Conflict412">
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/client-profile-page.svelte').ClientProfilePageProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientProfilePage
+				{...props}
+				{documentForm}
+				{clientForm}
+				bind:timelineEvents
+				bind:documents
+				bind:documentDrawerOpen
+				bind:editDrawerOpen
+				viewState={{
+					kind: 'conflict',
+					message: 'Client version does not match If-Match'
+				}}
 			/>
 		</div>
 	{/snippet}

@@ -2,6 +2,9 @@ import type { Preview, Renderer } from '@storybook/sveltekit';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import '../src/routes/layout.css';
 
+/** Enables sveltekit-superforms Storybook-safe page handling (`STORYBOOK_MODE`). */
+(globalThis as typeof globalThis & { STORIES?: boolean }).STORIES = true;
+
 // Roboto for pdfmake-html-renderer (matches pdfmake default font)
 if (typeof document !== 'undefined') {
 	const id = 'hq-roboto-font';

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { DocumentFormData } from '$lib/schemas/document.js';
+	import type { ClientFormData } from '$lib/schemas/client.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import ProfileHeader from './profile-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
@@ -10,6 +11,10 @@
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
 	import EntityProjects, { type EntityProject } from './entity-projects.svelte';
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
+	import ClientFormDrawer from './client-form-drawer.svelte';
+	import ResourceStateBanner, {
+		type ResourceViewState
+	} from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
@@ -36,9 +41,13 @@
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
+		clientForm?: SuperForm<ClientFormData>;
+		editDrawerOpen?: boolean;
+		viewState?: ResourceViewState;
 		moneyItems?: MoneySummaryItem[];
 		projects?: EntityProject[];
 		class?: string;
+		onReload?: () => void;
 	}
 
 	let {
@@ -56,9 +65,13 @@
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
 		documentDrawerOpen = $bindable(false),
+		clientForm,
+		editDrawerOpen = $bindable(false),
+		viewState = { kind: 'ready' },
 		moneyItems = [],
 		projects = [],
-		class: className
+		class: className,
+		onReload
 	}: ClientProfilePageProps = $props();
 
 	const tabs = [
@@ -80,10 +93,26 @@
 					{#snippet actions()}
 						<Button variant="outline" size="sm">Email</Button>
 						<Button variant="outline" size="sm">New quote</Button>
-						<Button size="sm">Edit</Button>
+						{#if clientForm}
+							<ClientFormDrawer
+								bind:open={editDrawerOpen}
+								form={clientForm}
+								title="Edit client"
+								description="PATCH with If-Match version — conflicts surface as 412."
+								submitLabel="Save client"
+							>
+								{#snippet trigger()}
+									<Button type="button" size="sm">Edit</Button>
+								{/snippet}
+							</ClientFormDrawer>
+						{:else}
+							<Button size="sm">Edit</Button>
+						{/if}
 					{/snippet}
 				</ProfileHeader>
 			</div>
+
+			<ResourceStateBanner state={viewState} {onReload} />
 
 			<ProfileTabs {tabs}>
 				{#snippet children({ active })}

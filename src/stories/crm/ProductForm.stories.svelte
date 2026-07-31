@@ -31,6 +31,7 @@
 	const form = superForm(data, {
 		validators: zod4(productFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false
 	});
 
