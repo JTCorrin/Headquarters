@@ -1,8 +1,18 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, validateContactBody } from './contacts.ts'
-import { ApiError, apiPath, jsonBody, parseLimit, parseVersion } from './http.ts'
+import {
+  ApiError,
+  apiPath,
+  isStrictIsoTimestamp,
+  jsonBody,
+  parseLimit,
+  parseVersion,
+} from './http.ts'
 import { validateLeadBody } from './leads.ts'
+import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
+import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
+import { decodeProductCursor, validateAdjustStockBody, validateProductBody } from './products.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -196,4 +206,144 @@ Deno.test('client create validation defaults status and rejects conversion field
       ),
     ApiError,
   )
+})
+
+Deno.test('product category create validation trims name and bounds position', () => {
+  assertEquals(
+    validateProductCategoryBody({ name: '  Widgets  ', description: 'Parts' }, false),
+    {
+      name: 'Widgets',
+      description: 'Parts',
+      position: 0,
+    },
+  )
+  assertThrows(
+    () => validateProductCategoryBody({ name: 'Bad', position: 10_000_000_000 }, false),
+    ApiError,
+  )
+})
+
+Deno.test('product create validation defaults and rejects stock writes / service tracking', () => {
+  assertEquals(
+    validateProductBody(
+      { sku: ' SKU-1 ', name: ' Widget ', unit_price_cents: 1250 },
+      false,
+    ),
+    {
+      sku: 'SKU-1',
+      name: 'Widget',
+      product_type: 'product',
+      unit_price_cents: 1250,
+      currency: 'GBP',
+      track_stock: false,
+      status: 'active',
+    },
+  )
+  assertThrows(
+    () =>
+      validateProductBody(
+        { sku: 'S1', name: 'Svc', product_type: 'service', unit_price_cents: 1, track_stock: true },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateProductBody(
+        { sku: 'S1', name: 'Widget', unit_price_cents: 1, stock_qty: 5 },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateProductBody(
+        { sku: 'S1', name: 'Widget', unit_price_cents: Number.MAX_SAFE_INTEGER + 1 },
+        false,
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('stock adjustment validation bounds quantity_delta', () => {
+  assertEquals(
+    validateAdjustStockBody({ quantity_delta: -3.5, reason: 'adjustment' }),
+    { quantity_delta: -3.5, reason: 'adjustment' },
+  )
+  assertThrows(() => validateAdjustStockBody({ quantity_delta: 0 }), ApiError)
+  assertThrows(() => validateAdjustStockBody({ quantity_delta: 10_000_000_000 }), ApiError)
+  assertThrows(() => validateAdjustStockBody({ quantity_delta: 1.00001 }), ApiError)
+  assertEquals(
+    validateAdjustStockBody({
+      quantity_delta: 1,
+      reason: 'adjustment',
+      occurred_at: '2026-07-31T12:00:00Z',
+    }),
+    {
+      quantity_delta: 1,
+      reason: 'adjustment',
+      occurred_at: '2026-07-31T12:00:00Z',
+    },
+  )
+  assertThrows(
+    () =>
+      validateAdjustStockBody({
+        quantity_delta: 1,
+        occurred_at: '2026-07-31',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateAdjustStockBody({
+        quantity_delta: 1,
+        occurred_at: '2026-02-31T12:00:00Z',
+      }),
+    ApiError,
+  )
+})
+
+Deno.test('catalog cursors require strict ISO-8601 timestamps', () => {
+  const encode = (createdAt: string) =>
+    btoa(JSON.stringify({
+      created_at: createdAt,
+      id: '52e1a71a-1c93-4ec8-a566-e0eecaf06747',
+    }))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replace(/=+$/, '')
+
+  assertEquals(
+    decodeProductCursor(encode('2026-07-31T12:00:00.123456Z')).created_at,
+    '2026-07-31T12:00:00.123456Z',
+  )
+  assertEquals(
+    decodeProductCategoryCursor(encode('2026-07-31T12:00:00+00:00')).created_at,
+    '2026-07-31T12:00:00+00:00',
+  )
+  assertEquals(isStrictIsoTimestamp('2026-02-31T12:00:00Z'), false)
+  assertThrows(() => decodeProductCursor(encode('2026-02-31T12:00:00Z')), ApiError)
+  assertThrows(() => decodeProductCursor(encode('2026-07-31 12:00:00')), ApiError)
+  assertThrows(() => decodeProductCategoryCursor(encode('July 31, 2026')), ApiError)
+})
+
+Deno.test('Idempotency-Key parsing and request hashing', async () => {
+  assertEquals(
+    parseIdempotencyKey(
+      new Request('https://example.test', { headers: { 'idempotency-key': 'adj-1' } }),
+    ),
+    'adj-1',
+  )
+  assertThrows(
+    () => parseIdempotencyKey(new Request('https://example.test')),
+    ApiError,
+  )
+  const a = await hashIdempotencyRequest('/api/v1/products/x/adjust-stock', {
+    quantity_delta: 1,
+  })
+  const b = await hashIdempotencyRequest('/api/v1/products/x/adjust-stock', {
+    quantity_delta: 2,
+  })
+  assertEquals(a.length, 64)
+  assertEquals(a === b, false)
 })
