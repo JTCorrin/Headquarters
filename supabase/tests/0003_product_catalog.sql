@@ -236,9 +236,16 @@ select throws_ok(
   'services cannot track stock'
 );
 
+-- Soft-delete as privileged role (same pattern as 0002 contact lifecycle), then
+-- prove authenticated callers can reuse the SKU on a new active row.
+reset role;
+
 update public.products
 set deleted_at = now()
 where id = (select product_id from _catalog_fixture);
+
+select pg_temp.as_user((select owner_id from _catalog_fixture));
+set local role authenticated;
 
 with recreated as (
   insert into public.products (
@@ -350,13 +357,12 @@ select ok(
 
 select throws_ok(
   $$
-    update public.product_categories
-    set name = 'Hacked'
-    where id = (select category_id from _catalog_fixture)
+    insert into public.product_categories (org_id, name)
+    select org_id, 'Readonly Category' from _catalog_fixture
   $$,
   '42501',
   null,
-  'readonly role cannot update product categories'
+  'readonly role cannot insert product categories'
 );
 
 reset role;
