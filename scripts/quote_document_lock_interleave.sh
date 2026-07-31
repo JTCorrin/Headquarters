@@ -247,7 +247,7 @@ result="$(sql_scalar "
   select
     quotes.version::text || E'\t' ||
     quote_lines.description || E'\t' ||
-    quote_lines.quantity::text || E'\t' ||
+    trunc(quote_lines.quantity)::bigint::text || E'\t' ||
     quote_lines.unit_price_cents::text
   from public.quotes
   join public.quote_lines on quote_lines.quote_id = quotes.id
