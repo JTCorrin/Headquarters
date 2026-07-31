@@ -36,7 +36,10 @@
 
 	let slugTouched = $state(false);
 	/** Tracks awaited create work so the button stays disabled if Superforms clears submitting early. */
+	/** UI busy flag (may batch); not used as the concurrency lock. */
 	let pendingSubmit = $state(false);
+	/** Synchronous lock — `$state` writes can batch, so they are not a re-entry guard. */
+	let submitLock = false;
 	const busy = $derived($submitting || pendingSubmit);
 
 	function onNameInput(event: Event) {
@@ -55,6 +58,9 @@
 	use:enhance={{
 		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
+			// Disabled buttons are not a concurrency guard (force-click / double enter).
+			if (submitLock) return false;
+			submitLock = true;
 			pendingSubmit = true;
 			try {
 				return await onValidSubmit?.();
@@ -62,6 +68,7 @@
 				// Swallow so Superforms default onError does not rethrow.
 				return false;
 			} finally {
+				submitLock = false;
 				pendingSubmit = false;
 			}
 		}

@@ -37,6 +37,9 @@ export { default as OrganisationConfigForm } from './organisation-config-form.sv
 export { default as ProfilePreferencesForm } from './profile-preferences-form.svelte';
 export { default as TaxRateForm } from './tax-rate-form.svelte';
 export { default as SettingsConfigPage } from './settings-config-page.svelte';
+export { default as AppShell } from './app-shell.svelte';
+export { default as SelectOrgPage } from './select-org-page.svelte';
+export { default as OrgConfigPage } from './org-config-page.svelte';
 export { default as DashboardPage } from './dashboard-page.svelte';
 export { default as QuoteForm } from './quote-form.svelte';
 export { default as QuoteFormDrawer } from './quote-form-drawer.svelte';
@@ -105,6 +108,10 @@ export type { LeadCard, LeadStage } from './leads-board.svelte';
 export type { ResourceViewState } from './resource-state-banner.svelte';
 export type { OrgSwitcherProps } from './org-switcher.svelte';
 export type { SettingsConfigPageProps } from './settings-config-page.svelte';
+export type { AppShellProps } from './app-shell.svelte';
+export type { SelectOrgPageProps } from './select-org-page.svelte';
+export type { OrgConfigPageProps } from './org-config-page.svelte';
+
 export type { LeadConvertResult } from './lead-detail-page.svelte';
 export type { TaskBoardCard, TaskBoardStatus } from './tasks-board.svelte';
 export type { LineItemRow } from './line-items-table.svelte';
