@@ -104,17 +104,21 @@ function isValidLeadPosition(value: number): boolean {
 export function validateLeadBody(
   body: Record<string, unknown>,
   partial: false,
+  options?: { defaultCurrency?: string },
 ): LeadCreate
 export function validateLeadBody(
   body: Record<string, unknown>,
   partial: true,
+  options?: { defaultCurrency?: string },
 ): LeadUpdate
 export function validateLeadBody(
   body: Record<string, unknown>,
   partial: boolean,
+  options: { defaultCurrency?: string } = {},
 ): LeadCreate | LeadUpdate {
   const fields: Record<string, string> = {}
   const output: LeadUpdate = {}
+  const defaultCurrency = options.defaultCurrency ?? 'GBP'
 
   for (const key of Object.keys(body)) {
     if (!WRITABLE_FIELDS.has(key)) fields[key] = 'Field is not writable'
@@ -193,7 +197,7 @@ export function validateLeadBody(
       output.currency = value
     }
   } else if (!partial) {
-    output.currency = 'GBP'
+    output.currency = defaultCurrency
   }
 
   if ('value_cents' in body) {
@@ -411,7 +415,20 @@ async function createLead(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const payload = applyLostStageSideEffects(validateLeadBody(await jsonBody(req), false))
+  const { data: organisation, error: orgError } = await db
+    .from('organisations')
+    .select('default_currency')
+    .eq('id', orgId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (orgError) throw databaseError(orgError, requestId)
+  if (!organisation) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
+
+  const payload = applyLostStageSideEffects(
+    validateLeadBody(await jsonBody(req), false, {
+      defaultCurrency: organisation.default_currency,
+    }),
+  )
   const { data, error } = await db
     .from('leads')
     .insert({ ...payload, org_id: orgId } as Database['public']['Tables']['leads']['Insert'])
