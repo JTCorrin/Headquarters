@@ -67,6 +67,14 @@ export { default as MeetingFormDrawer } from './meeting-form-drawer.svelte';
 export { default as MeetingsTable } from './meetings-table.svelte';
 export { default as MeetingsListPage } from './meetings-list-page.svelte';
 export { default as MeetingWorkspacePage } from './meeting-workspace-page.svelte';
+export { default as ProjectForm } from './project-form.svelte';
+export { default as ProjectFormDrawer } from './project-form-drawer.svelte';
+export { default as ProjectsBoard } from './projects-board.svelte';
+export { default as ProjectsBoardPage } from './projects-board-page.svelte';
+export { default as ProjectWorkspaceBoard } from './project-workspace-board.svelte';
+export { default as ProjectWorkspacePage } from './project-workspace-page.svelte';
+export { default as EntityProjects } from './entity-projects.svelte';
+export { default as ProductDetailPage } from './product-detail-page.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
@@ -84,6 +92,11 @@ export type { EmailTemplateRow } from './email-templates-columns.js';
 export type { DashboardTask } from './my-tasks-panel.svelte';
 export type { MeetingRow } from './meetings-columns.js';
 export type { ProposedMeetingTask } from './meeting-workspace-page.svelte';
+export type { ProjectCard, ProjectStage } from './projects-board.svelte';
+export type { ProjectWorkCard, ProjectWorkColumn } from './project-workspace-board.svelte';
+export type { EntityProject } from './entity-projects.svelte';
+export type { ProductUsageRow } from './product-detail-page.svelte';
+export type { ProjectClientOption } from './project-form.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,

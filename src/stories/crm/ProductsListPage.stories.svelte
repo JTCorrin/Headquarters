@@ -14,6 +14,7 @@
 			id: '1',
 			sku: 'SVC-RETAIN',
 			name: 'Monthly retainer',
+			category: 'Service',
 			unitPrice: '£4,200.00',
 			status: 'Active'
 		},
@@ -21,17 +22,49 @@
 			id: '2',
 			sku: 'HW-HUB-01',
 			name: 'Network hub',
+			category: 'Hardware',
 			unitPrice: '£189.00',
-			stock: 24,
+			stock: 4,
+			lowStockAt: 8,
 			status: 'Active'
 		},
 		{
 			id: '3',
 			sku: 'LIC-SEAT',
 			name: 'Seat licence',
+			category: 'Licence',
 			unitPrice: '£12.00',
 			stock: 500,
+			lowStockAt: 50,
 			status: 'Active'
+		},
+		{
+			id: '4',
+			sku: 'SUP-H',
+			name: 'Priority support',
+			category: 'Service',
+			unitPrice: '£90.00',
+			status: 'Active'
+		},
+		{
+			id: '5',
+			sku: 'HW-CAB-10',
+			name: 'Patch cable 10m',
+			category: 'Hardware',
+			unitPrice: '£18.00',
+			stock: 2,
+			lowStockAt: 10,
+			status: 'Active'
+		},
+		{
+			id: '6',
+			sku: 'OLD-KIT',
+			name: 'Legacy starter kit',
+			category: 'Hardware',
+			unitPrice: '£499.00',
+			stock: 0,
+			lowStockAt: 1,
+			status: 'Archived'
 		}
 	];
 </script>

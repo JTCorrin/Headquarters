@@ -8,6 +8,7 @@
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import EntityEmailInbox, { type EmailMessage } from './entity-email-inbox.svelte';
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
+	import EntityProjects, { type EntityProject } from './entity-projects.svelte';
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -36,6 +37,7 @@
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
 		moneyItems?: MoneySummaryItem[];
+		projects?: EntityProject[];
 		class?: string;
 	}
 
@@ -55,6 +57,7 @@
 		documentForm,
 		documentDrawerOpen = $bindable(false),
 		moneyItems = [],
+		projects = [],
 		class: className
 	}: ClientProfilePageProps = $props();
 
@@ -62,7 +65,8 @@
 		{ id: 'details', label: 'Details' },
 		{ id: 'email', label: 'Email' },
 		{ id: 'documents', label: 'Documents' },
-		{ id: 'money', label: 'Money' }
+		{ id: 'money', label: 'Money' },
+		{ id: 'projects', label: 'Projects' }
 	];
 </script>
 
@@ -121,8 +125,10 @@
 						{:else}
 							<p class="text-muted-foreground text-sm">Documents list UI lands in a later wave.</p>
 						{/if}
-					{:else}
+					{:else if active === 'money'}
 						<MoneySummary items={moneyItems} />
+					{:else}
+						<EntityProjects {projects} />
 					{/if}
 				{/snippet}
 			</ProfileTabs>
