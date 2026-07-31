@@ -1,6 +1,6 @@
 begin;
 
-select plan(31);
+select plan(37);
 
 select has_table('public', 'product_categories', 'product_categories table exists');
 select has_table('public', 'products', 'products table exists');
@@ -369,6 +369,89 @@ select lives_ok(
       and deleted_at is null
   $$,
   'track_stock may be enabled when there is no ledger and stock is zero/null'
+);
+
+select throws_ok(
+  $$
+    update public.products
+    set low_stock_at = 'NaN'::numeric
+    where id = (select product_id from _catalog_fixture)
+  $$,
+  '23514',
+  null,
+  'products reject NaN low_stock_at at the database boundary'
+);
+
+select lives_ok(
+  $$
+    select public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      1,
+      encode(extensions.digest('idem-1', 'sha256'), 'hex'),
+      encode(extensions.digest('req-1', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    )
+  $$,
+  'idempotent adjust claims and applies in one transaction'
+);
+
+select ok(
+  (
+    select (public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      1,
+      encode(extensions.digest('idem-1', 'sha256'), 'hex'),
+      encode(extensions.digest('req-1', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    ) ->> 'replay')::boolean
+  ),
+  'idempotent adjust replays the stored response without a second movement'
+);
+
+select throws_ok(
+  $$
+    select public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      2,
+      encode(extensions.digest('idem-1', 'sha256'), 'hex'),
+      encode(extensions.digest('req-2', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    )
+  $$,
+  '23505',
+  null,
+  'idempotent adjust rejects key reuse with a different payload'
+);
+
+-- Expire the key, then reclaim with a new request hash.
+update public.api_idempotency_keys
+set expires_at = now() - interval '1 hour'
+where idempotency_key_hash = encode(extensions.digest('idem-1', 'sha256'), 'hex');
+
+select lives_ok(
+  $$
+    select public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      1,
+      encode(extensions.digest('idem-1', 'sha256'), 'hex'),
+      encode(extensions.digest('req-3', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    )
+  $$,
+  'expired idempotency keys can be reclaimed'
+);
+
+select ok(
+  (
+    select count(*) = 3
+    from public.inventory_movements
+    where product_id = (select product_id from _catalog_fixture)
+  ),
+  'replay did not duplicate movements; reclaim applied one new delta'
 );
 
 reset role;
