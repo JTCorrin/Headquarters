@@ -55,10 +55,22 @@ create table public.leads (
       (stage = 'lost' and nullif(trim(lost_reason), '') is not null)
       or (stage <> 'lost')
     ),
-  constraint leads_won_timestamps_check
+  -- Converted leads are terminal: open/lost stages cannot retain conversion fields,
+  -- and won requires a linked client plus conversion timestamps.
+  constraint leads_conversion_invariant_check
     check (
-      (stage = 'won' and won_at is not null and converted_at is not null and client_id is not null)
-      or (stage <> 'won')
+      (
+        stage <> 'won'
+        and client_id is null
+        and won_at is null
+        and converted_at is null
+      )
+      or (
+        stage = 'won'
+        and client_id is not null
+        and won_at is not null
+        and converted_at is not null
+      )
     ),
   constraint leads_lost_timestamps_check
     check (
@@ -317,6 +329,63 @@ create trigger leads_validate_contact
 before insert or update of contact_id on public.leads
 for each row execute function private.validate_lead_contact();
 
+create or replace function private.protect_converted_lead()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.stage = 'won'
+    and (
+      new.stage is distinct from old.stage
+      or new.client_id is distinct from old.client_id
+      or new.won_at is distinct from old.won_at
+      or new.converted_at is distinct from old.converted_at
+    )
+  then
+    raise exception 'Converted leads cannot change stage or conversion fields'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger leads_protect_converted
+before update on public.leads
+for each row execute function private.protect_converted_lead();
+
+create or replace function private.prevent_soft_delete_converted_client()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.deleted_at is null
+    and new.deleted_at is not null
+    and exists (
+      select 1
+      from public.leads
+      where leads.org_id = old.org_id
+        and leads.client_id = old.id
+        and leads.deleted_at is null
+        and leads.stage = 'won'
+    )
+  then
+    raise exception 'Cannot soft-delete a client linked from an active converted lead'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger clients_prevent_soft_delete_converted
+before update of deleted_at on public.clients
+for each row execute function private.prevent_soft_delete_converted_client();
+
 create or replace function private.prevent_suspending_assigned_member()
 returns trigger
 language plpgsql
@@ -372,8 +441,11 @@ declare
   actor_id uuid := auth.uid();
   lead_row public.leads;
   client_row public.clients;
+  contact_row public.contacts;
   client_name text;
   client_status text := coalesce(nullif(trim(p_client_status), ''), 'active');
+  contact_email text;
+  contact_phone text;
   now_ts timestamptz := now();
 begin
   if actor_id is null then
@@ -405,16 +477,35 @@ begin
       using errcode = '42501';
   end if;
 
-  if lead_row.client_id is not null or lead_row.stage = 'won' then
+  if lead_row.stage = 'won' or lead_row.client_id is not null then
+    if lead_row.stage <> 'won'
+      or lead_row.client_id is null
+      or lead_row.won_at is null
+      or lead_row.converted_at is null
+    then
+      raise exception 'Converted lead is in an inconsistent state'
+        using errcode = '23514';
+    end if;
+
     select * into client_row
     from public.clients
     where clients.id = lead_row.client_id
       and clients.org_id = lead_row.org_id
-      and clients.deleted_at is null;
+    for update;
 
     if not found then
       raise exception 'Converted lead is missing its client'
         using errcode = 'P0002';
+    end if;
+
+    -- Defence in depth if a converted client was soft-deleted outside the guard.
+    if client_row.deleted_at is not null then
+      update public.clients
+      set
+        deleted_at = null,
+        updated_by = actor_id
+      where clients.id = client_row.id
+      returning * into client_row;
     end if;
 
     return jsonb_build_object(
@@ -427,6 +518,24 @@ begin
   if lead_row.stage = 'lost' then
     raise exception 'Lost leads cannot be converted'
       using errcode = '22023';
+  end if;
+
+  contact_email := null;
+  contact_phone := null;
+  if lead_row.contact_id is not null then
+    select * into contact_row
+    from public.contacts
+    where contacts.id = lead_row.contact_id
+      and contacts.org_id = lead_row.org_id
+    for update;
+
+    if not found or contact_row.deleted_at is not null then
+      raise exception 'Lead contact must be an active contact in the same organisation'
+        using errcode = '22023';
+    end if;
+
+    contact_email := contact_row.primary_email;
+    contact_phone := contact_row.primary_phone;
   end if;
 
   client_name := coalesce(
@@ -453,24 +562,8 @@ begin
     lead_row.org_id,
     client_name,
     client_status,
-    case
-      when lead_row.contact_id is null then null
-      else (
-        select contacts.primary_email
-        from public.contacts
-        where contacts.id = lead_row.contact_id
-          and contacts.org_id = lead_row.org_id
-      )
-    end,
-    case
-      when lead_row.contact_id is null then null
-      else (
-        select contacts.primary_phone
-        from public.contacts
-        where contacts.id = lead_row.contact_id
-          and contacts.org_id = lead_row.org_id
-      )
-    end,
+    contact_email,
+    contact_phone,
     lead_row.currency,
     lead_row.owner_membership_id,
     lead_row.id,
@@ -568,6 +661,9 @@ $$;
 
 revoke all on function private.validate_owner_membership() from public, anon, authenticated;
 revoke all on function private.validate_lead_contact() from public, anon, authenticated;
+revoke all on function private.protect_converted_lead() from public, anon, authenticated;
+revoke all on function private.prevent_soft_delete_converted_client()
+  from public, anon, authenticated;
 revoke all on function public.convert_lead(uuid, text, text) from public, anon;
 
 grant execute on function public.convert_lead(uuid, text, text) to authenticated;
@@ -709,15 +805,24 @@ with check (
   and updated_by = auth.uid()
 );
 
+-- Billing may read client activity but must not observe lead conversion payloads.
 create policy timeline_events_select_member
 on public.timeline_events
 for select
 to authenticated
 using (
-  private.has_org_role(
-    org_id,
-    array['owner', 'admin', 'member', 'billing', 'readonly']
-  )
+  case
+    when entity_type = 'lead' then
+      private.has_org_role(
+        org_id,
+        array['owner', 'admin', 'member', 'readonly']
+      )
+    else
+      private.has_org_role(
+        org_id,
+        array['owner', 'admin', 'member', 'billing', 'readonly']
+      )
+  end
 );
 
 revoke all on table public.leads from anon, authenticated;

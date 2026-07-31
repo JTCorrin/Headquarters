@@ -79,6 +79,19 @@ interface DatabaseError {
   message?: string
 }
 
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(5, 7))
+  const day = Number(value.slice(8, 10))
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 export function validateLeadBody(
   body: Record<string, unknown>,
   partial: false,
@@ -176,8 +189,11 @@ export function validateLeadBody(
 
   if ('value_cents' in body) {
     const value = body.value_cents
-    if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 0)) {
-      fields.value_cents = 'Must be a non-negative integer or null'
+    if (
+      value !== null &&
+      (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+    ) {
+      fields.value_cents = 'Must be a non-negative safe integer or null'
     } else {
       output.value_cents = value as number | null
     }
@@ -185,11 +201,18 @@ export function validateLeadBody(
 
   if ('probability_percent' in body) {
     const value = body.probability_percent
+    const withinScale = typeof value === 'number' &&
+      Math.abs(value * 100 - Math.round(value * 100)) < 1e-8
     if (
       value !== null &&
-      (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100)
+      (typeof value !== 'number' ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value > 100 ||
+        !withinScale)
     ) {
-      fields.probability_percent = 'Must be a number between 0 and 100, or null'
+      fields.probability_percent =
+        'Must be a number between 0 and 100 with at most 2 decimal places, or null'
     } else {
       output.probability_percent = value as number | null
     }
@@ -197,17 +220,23 @@ export function validateLeadBody(
 
   if ('expected_close_on' in body) {
     const value = body.expected_close_on
-    if (value !== null && (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
-      fields.expected_close_on = 'Must be a YYYY-MM-DD date or null'
+    if (value === null) {
+      output.expected_close_on = null
+    } else if (typeof value !== 'string' || !isValidDateOnly(value)) {
+      fields.expected_close_on = 'Must be a real YYYY-MM-DD date or null'
     } else {
-      output.expected_close_on = value as string | null
+      output.expected_close_on = value
     }
   }
 
   if ('position' in body) {
     const value = body.position
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      fields.position = 'Must be a finite number'
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      Math.abs(value) > Number.MAX_SAFE_INTEGER
+    ) {
+      fields.position = 'Must be a finite number within the safe integer range'
     } else {
       output.position = value
     }

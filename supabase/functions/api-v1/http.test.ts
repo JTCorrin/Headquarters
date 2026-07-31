@@ -137,6 +137,33 @@ Deno.test('lead validation rejects direct won stage and requires lost_reason', (
   )
 })
 
+Deno.test('lead validation rejects unsafe integers and impossible dates', () => {
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Overflow', value_cents: Number.MAX_SAFE_INTEGER + 1 },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Bad date', expected_close_on: '2026-02-31' },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Bad probability', probability_percent: 12.345 },
+        false,
+      ),
+    ApiError,
+  )
+})
+
 Deno.test('client create validation defaults status and rejects conversion fields', () => {
   assertEquals(
     validateClientBody({ name: '  Acme Ltd  ', primary_email: 'billing@acme.test' }, false),

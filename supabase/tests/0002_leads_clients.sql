@@ -1,6 +1,6 @@
 begin;
 
-select plan(28);
+select plan(43);
 
 select has_table('public', 'leads', 'leads table exists');
 select has_table('public', 'clients', 'clients table exists');
@@ -162,17 +162,42 @@ select ok(
   'anonymous users cannot execute convert_lead'
 );
 
--- Behavioural conversion: create auth user, org, contact, lead, then convert as that user.
+select ok(
+  exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.leads'::regclass
+      and conname = 'leads_conversion_invariant_check'
+  ),
+  'leads conversion invariant check exists'
+);
+
+-- Fixtures: owner + billing + readonly in org A; outsider owner in org B.
 create temporary table _pipeline_fixture (
-  user_id uuid,
+  owner_id uuid,
+  billing_id uuid,
+  readonly_id uuid,
+  outsider_id uuid,
   org_id uuid,
-  membership_id uuid,
+  other_org_id uuid,
+  owner_membership_id uuid,
+  billing_membership_id uuid,
+  readonly_membership_id uuid,
   contact_id uuid,
   lead_id uuid,
+  other_lead_id uuid,
   client_id uuid
 ) on commit drop;
 
-with created_user as (
+grant all on table _pipeline_fixture to authenticated;
+
+create or replace function pg_temp.make_auth_user(p_email text, p_name text)
+returns uuid
+language plpgsql
+as $$
+declare
+  created_id uuid := gen_random_uuid();
+begin
   insert into auth.users (
     instance_id,
     id,
@@ -192,35 +217,93 @@ with created_user as (
   )
   values (
     '00000000-0000-0000-0000-000000000000',
-    gen_random_uuid(),
+    created_id,
     'authenticated',
     'authenticated',
-    'pipeline-test@example.test',
+    p_email,
     extensions.crypt('pipeline-test-password', extensions.gen_salt('bf')),
     now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"display_name":"Pipeline Tester"}'::jsonb,
+    jsonb_build_object('display_name', p_name),
     now(),
     now(),
     '',
     '',
     '',
     ''
+  );
+  return created_id;
+end;
+$$;
+
+insert into _pipeline_fixture (
+  owner_id,
+  billing_id,
+  readonly_id,
+  outsider_id
+)
+values (
+  pg_temp.make_auth_user('pipeline-owner@example.test', 'Pipeline Owner'),
+  pg_temp.make_auth_user('pipeline-billing@example.test', 'Pipeline Billing'),
+  pg_temp.make_auth_user('pipeline-readonly@example.test', 'Pipeline Readonly'),
+  pg_temp.make_auth_user('pipeline-outsider@example.test', 'Pipeline Outsider')
+);
+
+with created_org as (
+  insert into public.organisations (name, slug, country_code)
+  values (
+    'Pipeline Org',
+    'pipeline-org-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8),
+    'GB'
   )
   returning id
 ),
-created_org as (
+other_org as (
   insert into public.organisations (name, slug, country_code)
-  values ('Pipeline Org', 'pipeline-org-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8), 'GB')
+  values (
+    'Other Org',
+    'other-org-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8),
+    'GB'
+  )
   returning id
-),
-created_membership as (
-  insert into public.memberships (org_id, user_id, role, status)
-  select created_org.id, created_user.id, 'owner', 'active'
-  from created_org, created_user
-  returning id, org_id, user_id
-),
-created_contact as (
+)
+update _pipeline_fixture
+set
+  org_id = created_org.id,
+  other_org_id = other_org.id
+from created_org, other_org;
+
+insert into public.memberships (org_id, user_id, role, status)
+select org_id, owner_id, 'owner', 'active' from _pipeline_fixture;
+
+insert into public.memberships (org_id, user_id, role, status)
+select org_id, billing_id, 'billing', 'active' from _pipeline_fixture;
+
+insert into public.memberships (org_id, user_id, role, status)
+select org_id, readonly_id, 'readonly', 'active' from _pipeline_fixture;
+
+insert into public.memberships (org_id, user_id, role, status)
+select other_org_id, outsider_id, 'owner', 'active' from _pipeline_fixture;
+
+update _pipeline_fixture
+set
+  owner_membership_id = (
+    select memberships.id
+    from public.memberships
+    join _pipeline_fixture f on f.org_id = memberships.org_id and f.owner_id = memberships.user_id
+  ),
+  billing_membership_id = (
+    select memberships.id
+    from public.memberships
+    join _pipeline_fixture f on f.org_id = memberships.org_id and f.billing_id = memberships.user_id
+  ),
+  readonly_membership_id = (
+    select memberships.id
+    from public.memberships
+    join _pipeline_fixture f on f.org_id = memberships.org_id and f.readonly_id = memberships.user_id
+  );
+
+with created_contact as (
   insert into public.contacts (
     org_id,
     display_name,
@@ -230,16 +313,20 @@ created_contact as (
     updated_by
   )
   select
-    created_membership.org_id,
+    org_id,
     'Casey Contact',
     'casey@example.test',
     '+441234567890',
-    created_membership.user_id,
-    created_membership.user_id
-  from created_membership
-  returning id, org_id
-),
-created_lead as (
+    owner_id,
+    owner_id
+  from _pipeline_fixture
+  returning id
+)
+update _pipeline_fixture
+set contact_id = created_contact.id
+from created_contact;
+
+with created_lead as (
   insert into public.leads (
     org_id,
     name,
@@ -252,33 +339,67 @@ created_lead as (
     updated_by
   )
   select
-    created_contact.org_id,
+    org_id,
     'Acme Opportunity',
     'Acme Ltd',
-    created_contact.id,
+    contact_id,
     'proposal',
     'GBP',
     250000,
-    created_membership.user_id,
-    created_membership.user_id
-  from created_contact, created_membership
+    owner_id,
+    owner_id
+  from _pipeline_fixture
   returning id
 )
-insert into _pipeline_fixture (user_id, org_id, membership_id, contact_id, lead_id)
-select
-  created_membership.user_id,
-  created_membership.org_id,
-  created_membership.id,
-  created_contact.id,
-  created_lead.id
-from created_membership, created_contact, created_lead;
+update _pipeline_fixture
+set lead_id = created_lead.id
+from created_lead;
 
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from _pipeline_fixture),
-  true
-);
-select set_config('request.jwt.claim.role', 'authenticated', true);
+with created_other_lead as (
+  insert into public.leads (
+    org_id,
+    name,
+    stage,
+    currency,
+    created_by,
+    updated_by
+  )
+  select
+    other_org_id,
+    'Other Org Lead',
+    'new',
+    'GBP',
+    outsider_id,
+    outsider_id
+  from _pipeline_fixture
+  returning id
+)
+update _pipeline_fixture
+set other_lead_id = created_other_lead.id
+from created_other_lead;
+
+create or replace function pg_temp.as_user(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', p_user_id::text, 'role', 'authenticated')::text,
+    true
+  );
+end;
+$$;
+
+grant execute on function pg_temp.as_user(uuid) to authenticated;
+
+-- Authenticated conversion happy path
+select pg_temp.as_user((select owner_id from _pipeline_fixture));
+set local role authenticated;
 
 update _pipeline_fixture
 set client_id = (
@@ -286,9 +407,11 @@ set client_id = (
   from _pipeline_fixture
 );
 
+reset role;
+
 select ok(
   (select client_id is not null from _pipeline_fixture),
-  'convert_lead creates a client for an open lead'
+  'authenticated convert_lead creates a client for an open lead'
 );
 
 select ok(
@@ -344,6 +467,9 @@ select ok(
   'convert_lead emits lead and client conversion timeline events'
 );
 
+select pg_temp.as_user((select owner_id from _pipeline_fixture));
+set local role authenticated;
+
 select ok(
   (
     select (public.convert_lead(lead_id) ->> 'idempotent')::boolean
@@ -351,6 +477,206 @@ select ok(
   ),
   'convert_lead is idempotent for an already converted lead'
 );
+
+-- Lifecycle bypass: authenticated cannot reopen a won lead
+select throws_ok(
+  $$
+    update public.leads
+    set stage = 'proposal', lost_reason = null, lost_at = null
+    where id = (select lead_id from _pipeline_fixture)
+  $$,
+  '23514',
+  null,
+  'authenticated role cannot reopen a converted won lead'
+);
+
+-- Soft-delete of converted client is blocked
+select throws_ok(
+  $$
+    update public.clients
+    set deleted_at = now()
+    where id = (select client_id from _pipeline_fixture)
+  $$,
+  '23514',
+  null,
+  'authenticated role cannot soft-delete a client linked from a converted lead'
+);
+
+reset role;
+
+-- Soft-deleted contact cannot be converted (contact was live when linked, then deleted).
+create temporary table _deleted_contact_case (
+  lead_id uuid,
+  contact_id uuid
+) on commit drop;
+
+grant all on table _deleted_contact_case to authenticated;
+
+with created_contact as (
+  insert into public.contacts (
+    org_id,
+    display_name,
+    primary_email,
+    created_by,
+    updated_by
+  )
+  select
+    org_id,
+    'Soon Deleted Contact',
+    'deleted@example.test',
+    owner_id,
+    owner_id
+  from _pipeline_fixture
+  returning id
+),
+created_lead as (
+  insert into public.leads (
+    org_id,
+    name,
+    contact_id,
+    stage,
+    currency,
+    created_by,
+    updated_by
+  )
+  select
+    f.org_id,
+    'Lead With Deleted Contact',
+    created_contact.id,
+    'qualified',
+    'GBP',
+    f.owner_id,
+    f.owner_id
+  from _pipeline_fixture f, created_contact
+  returning id, contact_id
+)
+insert into _deleted_contact_case (lead_id, contact_id)
+select id, contact_id from created_lead;
+
+update public.contacts
+set deleted_at = now()
+where id = (select contact_id from _deleted_contact_case);
+
+select pg_temp.as_user((select owner_id from _pipeline_fixture));
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.convert_lead((select lead_id from _deleted_contact_case))
+  $$,
+  '22023',
+  null,
+  'convert_lead rejects soft-deleted lead contacts'
+);
+
+-- Cross-tenant isolation
+select is_empty(
+  $$
+    select id from public.leads
+    where id = (select other_lead_id from _pipeline_fixture)
+  $$,
+  'authenticated owner cannot read another organisation lead'
+);
+
+select throws_ok(
+  $$
+    select public.convert_lead((select other_lead_id from _pipeline_fixture))
+  $$,
+  '42501',
+  null,
+  'convert_lead denies conversion outside the caller organisation'
+);
+
+-- Billing: no leads, no lead timeline, can read clients
+select pg_temp.as_user((select billing_id from _pipeline_fixture));
+
+select is_empty(
+  $$
+    select id from public.leads
+    where id = (select lead_id from _pipeline_fixture)
+  $$,
+  'billing role cannot select leads'
+);
+
+select is_empty(
+  $$
+    select id from public.timeline_events
+    where entity_type = 'lead'
+      and entity_id = (select lead_id from _pipeline_fixture)
+  $$,
+  'billing role cannot select lead timeline events'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.clients
+    where id = (select client_id from _pipeline_fixture)
+  ),
+  'billing role can select clients'
+);
+
+select throws_ok(
+  $$
+    select public.convert_lead((select lead_id from _pipeline_fixture))
+  $$,
+  '42501',
+  null,
+  'billing role cannot execute convert_lead'
+);
+
+-- Readonly: can read leads, cannot write or convert
+select pg_temp.as_user((select readonly_id from _pipeline_fixture));
+
+select ok(
+  exists (
+    select 1
+    from public.leads
+    where id = (select lead_id from _pipeline_fixture)
+  ),
+  'readonly role can select leads'
+);
+
+select throws_ok(
+  $$
+    insert into public.leads (org_id, name, stage, currency, created_by, updated_by)
+    select org_id, 'Readonly Create', 'new', 'GBP', readonly_id, readonly_id
+    from _pipeline_fixture
+  $$,
+  '42501',
+  null,
+  'readonly role cannot insert leads'
+);
+
+select throws_ok(
+  $$
+    select public.convert_lead((select lead_id from _pipeline_fixture))
+  $$,
+  '42501',
+  null,
+  'readonly role cannot execute convert_lead'
+);
+
+-- Outsider (other org owner) cannot read org A pipeline rows
+select pg_temp.as_user((select outsider_id from _pipeline_fixture));
+
+select is_empty(
+  $$
+    select id from public.leads
+    where id = (select lead_id from _pipeline_fixture)
+  $$,
+  'outsider cannot select another organisation lead'
+);
+
+select is_empty(
+  $$
+    select id from public.clients
+    where id = (select client_id from _pipeline_fixture)
+  $$,
+  'outsider cannot select another organisation client'
+);
+
+reset role;
 
 select throws_ok(
   $$
@@ -369,8 +695,8 @@ select throws_ok(
       'lost',
       'GBP',
       'no budget',
-      user_id,
-      user_id
+      owner_id,
+      owner_id
     from _pipeline_fixture
   $$,
   '23514',
