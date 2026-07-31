@@ -16,8 +16,7 @@
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright install && playwright test",
 		"storybook": "storybook dev -p 6006",
-		"build-storybook": "storybook build",
-		"auth:migrate": "auth migrate --config src/lib/server/auth.ts"
+		"build-storybook": "storybook build"
 	},
 	"devDependencies": {
 		"@chromatic-com/storybook": "latest",
@@ -40,11 +39,8 @@
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^22",
 		"@types/pdfmake": "^0.3.3",
-		"@types/pg": "^8.16.0",
 		"@vitest/browser-playwright": "^4.1.8",
 		"@vitest/coverage-v8": "^4.1.8",
-		"auth": "^1.6.23",
-		"better-auth": "^1.6.23",
 		"bits-ui": "^2.18.1",
 		"clsx": "^2.1.1",
 		"eslint": "^10.4.1",
@@ -52,7 +48,6 @@
 		"eslint-plugin-storybook": "^10.5.5",
 		"eslint-plugin-svelte": "^3.19.0",
 		"globals": "^17.6.0",
-		"pg": "^8.16.3",
 		"playwright": "^1.60.0",
 		"prettier": "^3.8.3",
 		"prettier-plugin-svelte": "^4.1.0",
