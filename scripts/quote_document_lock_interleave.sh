@@ -17,15 +17,18 @@ sql_scalar() {
 
 cleanup() {
   if [[ -n "${owner_id:-}" ]]; then
+    # Delete org first so the active-owner trigger does not block membership removal.
     psql_db >/dev/null <<SQL || true
+begin;
 select set_config('app.allow_quote_totals', 'on', true);
 delete from public.quote_lines where quote_id = '${quote_id:-00000000-0000-0000-0000-000000000000}';
 delete from public.quotes where id = '${quote_id:-00000000-0000-0000-0000-000000000000}';
 delete from public.clients where id = '${client_id:-00000000-0000-0000-0000-000000000000}';
 delete from public.document_sequences where org_id = '${org_id:-00000000-0000-0000-0000-000000000000}';
-delete from public.memberships where org_id = '${org_id:-00000000-0000-0000-0000-000000000000}';
 delete from public.organisations where id = '${org_id:-00000000-0000-0000-0000-000000000000}';
+delete from public.memberships where org_id = '${org_id:-00000000-0000-0000-0000-000000000000}';
 delete from auth.users where id = '${owner_id}';
+commit;
 SQL
   fi
   if [[ -n "${reader_pid:-}" ]]; then
@@ -89,7 +92,9 @@ client_id="$(sql_scalar "
   returning id;
 ")"
 
+# set_config(..., true) is transaction-local; wrap so auth GUCs survive until create_quote_draft.
 created="$(psql_db -Atq -F $'\t' <<SQL
+begin;
 select set_config('request.jwt.claim.sub', '${owner_id}', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config(
@@ -118,6 +123,7 @@ from (
     )
   ) as payload
 ) created;
+commit;
 SQL
 )"
 
