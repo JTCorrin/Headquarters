@@ -226,6 +226,22 @@ export type InventoryMovementRow = {
   note: string | null
 }
 
+export type ApiIdempotencyKeyRow = {
+  id: string
+  org_id: string
+  actor_type: 'user' | 'agent' | 'api_key'
+  actor_id: string
+  idempotency_key_hash: string
+  route: string
+  request_hash: string
+  response_status: number | null
+  response_body: Json | null
+  resource_type: string | null
+  resource_id: string | null
+  created_at: string
+  expires_at: string
+}
+
 type ProfileInsert = Pick<ProfileRow, 'display_name' | 'id'> & Partial<Omit<ProfileRow, 'id'>>
 type OrganisationInsert =
   & Pick<OrganisationRow, 'country_code' | 'name' | 'slug'>
@@ -263,6 +279,30 @@ type InventoryMovementInsert =
   & Pick<InventoryMovementRow, 'org_id' | 'product_id' | 'quantity_delta' | 'reason'>
   & Partial<
     Omit<InventoryMovementRow, 'id' | 'org_id' | 'product_id' | 'quantity_delta' | 'reason'>
+  >
+type ApiIdempotencyKeyInsert =
+  & Pick<
+    ApiIdempotencyKeyRow,
+    | 'actor_id'
+    | 'actor_type'
+    | 'expires_at'
+    | 'idempotency_key_hash'
+    | 'org_id'
+    | 'request_hash'
+    | 'route'
+  >
+  & Partial<
+    Omit<
+      ApiIdempotencyKeyRow,
+      | 'actor_id'
+      | 'actor_type'
+      | 'expires_at'
+      | 'id'
+      | 'idempotency_key_hash'
+      | 'org_id'
+      | 'request_hash'
+      | 'route'
+    >
   >
 
 export type Database = {
@@ -332,6 +372,12 @@ export type Database = {
         Row: InventoryMovementRow
         Insert: InventoryMovementInsert
         Update: Partial<InventoryMovementInsert>
+        Relationships: []
+      }
+      api_idempotency_keys: {
+        Row: ApiIdempotencyKeyRow
+        Insert: ApiIdempotencyKeyInsert
+        Update: Partial<ApiIdempotencyKeyInsert>
         Relationships: []
       }
     }

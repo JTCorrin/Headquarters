@@ -87,7 +87,7 @@ Product catalog routes:
 - `GET /api/v1/products/{product_id}`
 - `PATCH /api/v1/products/{product_id}`
 - `DELETE /api/v1/products/{product_id}`
-- `POST /api/v1/products/{product_id}/adjust-stock` — JSON `{ "quantity_delta", "reason?", "note?", "occurred_at?" }`
+- `POST /api/v1/products/{product_id}/adjust-stock` — requires `Idempotency-Key`; JSON `{ "quantity_delta", "reason?", "note?", "occurred_at?" }`
 
 `PATCH` and `DELETE` require the latest strong numeric ETag (for example, `If-Match: "3"`).
 Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Marking a lead as `won`

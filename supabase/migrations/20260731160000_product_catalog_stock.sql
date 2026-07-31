@@ -173,6 +173,8 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  has_ledger boolean;
 begin
   if tg_op = 'INSERT' then
     if new.track_stock then
@@ -185,11 +187,25 @@ begin
   end if;
 
   if new.track_stock is distinct from old.track_stock then
-    if new.track_stock then
-      if old.product_type = 'service' or new.product_type = 'service' then
+    if old.product_type = 'service' or new.product_type = 'service' then
+      if new.track_stock then
         raise exception 'Services cannot track stock'
           using errcode = '23514';
       end if;
+    end if;
+
+    select exists (
+      select 1
+      from public.inventory_movements
+      where inventory_movements.product_id = old.id
+    ) into has_ledger;
+
+    if has_ledger or coalesce(old.stock_qty, 0) <> 0 then
+      raise exception 'Cannot change stock tracking after stock movements or non-zero stock'
+        using errcode = '23514';
+    end if;
+
+    if new.track_stock then
       new.stock_qty := 0;
     else
       new.stock_qty := null;
@@ -212,6 +228,32 @@ $$;
 create trigger products_normalize_stock
 before insert or update of track_stock, stock_qty, product_type on public.products
 for each row execute function private.normalize_product_stock();
+
+create or replace function private.protect_product_category_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.deleted_at is null and new.deleted_at is not null then
+    if exists (
+      select 1
+      from public.products
+      where products.category_id = old.id
+        and products.deleted_at is null
+    ) then
+      raise exception 'Cannot soft-delete a category while active products reference it'
+        using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger product_categories_protect_delete
+before update of deleted_at on public.product_categories
+for each row execute function private.protect_product_category_delete();
 
 create or replace function public.adjust_product_stock(
   p_product_id uuid,
@@ -237,13 +279,21 @@ begin
       using errcode = '42501';
   end if;
 
-  if p_quantity_delta is null or p_quantity_delta = 0 then
-    raise exception 'Quantity delta must be a non-zero number'
+  if p_quantity_delta is null
+    or lower(p_quantity_delta::text) in ('nan', 'infinity', '-infinity')
+    or p_quantity_delta = 0
+  then
+    raise exception 'Quantity delta must be a finite non-zero number'
       using errcode = '22023';
   end if;
 
   if round(p_quantity_delta, 4) <> p_quantity_delta then
     raise exception 'Quantity delta supports at most 4 decimal places'
+      using errcode = '22023';
+  end if;
+
+  if abs(p_quantity_delta) >= 10000000000 then
+    raise exception 'Quantity delta exceeds numeric(14,4) bounds'
       using errcode = '22023';
   end if;
 
@@ -320,6 +370,7 @@ $$;
 
 revoke all on function private.validate_product_category() from public, anon, authenticated;
 revoke all on function private.normalize_product_stock() from public, anon, authenticated;
+revoke all on function private.protect_product_category_delete() from public, anon, authenticated;
 revoke all on function public.adjust_product_stock(uuid, numeric, text, text, timestamptz)
   from public, anon;
 
@@ -467,3 +518,78 @@ grant update (
 
 -- Authenticated clients may read the ledger but never write it directly.
 grant select on table public.inventory_movements to authenticated;
+
+-- Short-lived dedupe records for side-effecting command POSTs (stock adjust, etc.).
+create table public.api_idempotency_keys (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.organisations (id) on delete cascade,
+  actor_type text not null,
+  actor_id uuid not null,
+  idempotency_key_hash text not null,
+  route text not null,
+  request_hash text not null,
+  response_status smallint,
+  response_body jsonb,
+  resource_type text,
+  resource_id uuid,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  constraint api_idempotency_keys_actor_type_check
+    check (actor_type in ('user', 'agent', 'api_key')),
+  constraint api_idempotency_keys_route_length_check
+    check (char_length(route) between 1 and 512),
+  constraint api_idempotency_keys_hash_length_check
+    check (
+      char_length(idempotency_key_hash) = 64
+      and char_length(request_hash) = 64
+    ),
+  constraint api_idempotency_keys_unique_actor_key
+    unique (org_id, actor_type, actor_id, idempotency_key_hash)
+);
+
+create index api_idempotency_keys_expires_idx
+  on public.api_idempotency_keys (expires_at);
+
+alter table public.api_idempotency_keys enable row level security;
+
+create policy api_idempotency_keys_select_own
+on public.api_idempotency_keys
+for select
+to authenticated
+using (
+  actor_type = 'user'
+  and actor_id = auth.uid()
+  and expires_at > now()
+  and private.has_org_role(
+    org_id,
+    array['owner', 'admin', 'member', 'billing', 'readonly']
+  )
+);
+
+create policy api_idempotency_keys_insert_member
+on public.api_idempotency_keys
+for insert
+to authenticated
+with check (
+  actor_type = 'user'
+  and actor_id = auth.uid()
+  and private.has_org_role(org_id, array['owner', 'admin', 'member'])
+);
+
+create policy api_idempotency_keys_update_own
+on public.api_idempotency_keys
+for update
+to authenticated
+using (
+  actor_type = 'user'
+  and actor_id = auth.uid()
+  and private.has_org_role(org_id, array['owner', 'admin', 'member'])
+)
+with check (
+  actor_type = 'user'
+  and actor_id = auth.uid()
+  and private.has_org_role(org_id, array['owner', 'admin', 'member'])
+);
+
+revoke all on table public.api_idempotency_keys from anon, authenticated;
+grant select, insert, update on table public.api_idempotency_keys to authenticated;

@@ -104,7 +104,7 @@ function encodeCursor(row: Cursor): string {
     .replace(/=+$/, '')
 }
 
-function decodeCursor(value: string): Cursor {
+export function decodeProductCategoryCursor(value: string): Cursor {
   try {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
     const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
@@ -114,6 +114,9 @@ function decodeCursor(value: string): Cursor {
     const id = parseUuid(cursor.id ?? null, 'cursor')
     if (
       typeof createdAt !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(
+        createdAt,
+      ) ||
       Number.isNaN(Date.parse(createdAt))
     ) {
       throw new Error('Invalid timestamp')
@@ -187,7 +190,7 @@ export function handleProductCategories(
           .limit(limit + 1)
         const cursorValue = url.searchParams.get('cursor')
         if (cursorValue) {
-          const cursor = decodeCursor(cursorValue)
+          const cursor = decodeProductCategoryCursor(cursorValue)
           query = query.or(
             `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
           )
