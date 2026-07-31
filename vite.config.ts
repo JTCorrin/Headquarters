@@ -14,6 +14,10 @@ const dirname =
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+	optimizeDeps: {
+		// Vitest browser serves CJS deps raw unless pinned (storybook/test → testing-library → aria-query).
+		include: ['storybook/test', '@testing-library/dom', 'aria-query', 'lz-string', 'pretty-format']
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({

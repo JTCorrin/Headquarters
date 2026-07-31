@@ -68,10 +68,20 @@
 		}))
 	);
 
+	/** SVAR encodes string IDs with setID (`:uuid`); map back to the original lead id. */
+	function resolveLeadId(encoded: string | null): string | null {
+		if (!encoded) return null;
+		const match = leads.find(
+			(lead) => encoded === `:${lead.id}` || encoded === String(lead.id)
+		);
+		return match?.id ?? null;
+	}
+
 	function selectFromEvent(e: Event) {
 		const target = e.target as HTMLElement | null;
 		const card = target?.closest?.('[data-id]') as HTMLElement | null;
-		const id = card?.getAttribute('data-id');
+		if (!card) return;
+		const id = resolveLeadId(card.getAttribute('data-id'));
 		if (id) onSelectLead?.(id);
 	}
 
@@ -85,16 +95,10 @@
 </script>
 
 <!--
-  Board is read-only: stage moves (including Won) go through edit/convert, not drag.
-  Selection is delegated from Kanban cards via data-id.
+  Read-only board: stage changes (including Won) go through edit/convert, not drag.
+  Cards are focusable role=button from SVAR; wrapper only resolves setID-encoded data-id.
 -->
-<div
-	class={cn(className)}
-	role="listbox"
-	aria-label="Lead pipeline board"
-	tabindex="0"
-	onclick={selectFromEvent}
-	onkeydown={onKeydown}
->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class={cn(className)} data-testid="leads-board" onclick={selectFromEvent} onkeydown={onKeydown}>
 	<SvarKanbanShell {cards} {columns} readonly class="h-full" />
 </div>
