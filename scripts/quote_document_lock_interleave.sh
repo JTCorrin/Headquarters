@@ -10,8 +10,9 @@ psql_db() {
     psql -U postgres -d postgres -v ON_ERROR_STOP=1 --no-psqlrc "$@"
 }
 
+# -q suppresses INSERT/UPDATE command tags that otherwise pollute -At captures.
 sql_scalar() {
-  psql_db -At -c "$1"
+  psql_db -Atq -c "$1" | awk 'NF { print; exit }' | tr -d '\r'
 }
 
 cleanup() {
@@ -88,7 +89,7 @@ client_id="$(sql_scalar "
   returning id;
 ")"
 
-created="$(psql_db -At -F $'\t' <<SQL
+created="$(psql_db -Atq -F $'\t' <<SQL
 select set_config('request.jwt.claim.sub', '${owner_id}', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config(
@@ -120,12 +121,17 @@ from (
 SQL
 )"
 
-# psql -At prints every statement result; take the last non-empty line.
-created_line="$(printf '%s\n' "${created}" | awk 'NF { line=$0 } END { print line }')"
+# Multiple SELECTs each emit a line; keep the last non-empty result row.
+created_line="$(printf '%s\n' "${created}" | awk 'NF { line=$0 } END { print line }' | tr -d '\r')"
 quote_id="$(printf '%s' "${created_line}" | cut -f1)"
 quote_version="$(printf '%s' "${created_line}" | cut -f2)"
 
-if [[ -z "${org_id}" || -z "${quote_id}" || -z "${quote_version}" ]]; then
+if [[ ! "${owner_id}" =~ ^[0-9a-f-]{36}$ || ! "${org_id}" =~ ^[0-9a-f-]{36}$ || ! "${client_id}" =~ ^[0-9a-f-]{36}$ ]]; then
+  echo "failed to capture fixture ids (owner='${owner_id}' org='${org_id}' client='${client_id}')" >&2
+  exit 1
+fi
+
+if [[ ! "${quote_id}" =~ ^[0-9a-f-]{36}$ || ! "${quote_version}" =~ ^[0-9]+$ ]]; then
   echo "failed to create lock-probe fixture (created='${created}')" >&2
   exit 1
 fi
@@ -157,6 +163,7 @@ for _ in $(seq 1 50); do
         and wait_event = 'PgSleep'
     );
   ")"
+  sleeping="$(printf '%s' "${sleeping}" | tr -d '[:space:]')"
   if [[ "${sleeping}" == "t" ]]; then
     reader_sleeping=1
     break
@@ -208,6 +215,7 @@ for _ in $(seq 1 50); do
         and wait_event_type = 'Lock'
     );
   ")"
+  waiting="$(printf '%s' "${waiting}" | tr -d '[:space:]')"
   if [[ "${waiting}" == "t" ]]; then
     saver_waiting=1
     break
@@ -237,6 +245,7 @@ result="$(sql_scalar "
   join public.quote_lines on quote_lines.quote_id = quotes.id
   where quotes.id = '${quote_id}'::uuid;
 ")"
+result="$(printf '%s' "${result}" | tr -d '\r')"
 
 got_version="$(printf '%s' "${result}" | cut -f1)"
 got_description="$(printf '%s' "${result}" | cut -f2)"
