@@ -1,2 +1,17 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { getOrgSession } from '$lib/org/index.js';
+	import { onMount } from 'svelte';
+
+	const session = getOrgSession();
+
+	onMount(() => {
+		if (session.selectedOrgId) {
+			void goto('/org/config');
+		} else {
+			void goto('/select-org');
+		}
+	});
+</script>
+
+<p class="text-muted-foreground p-6 text-sm">Redirecting…</p>
