@@ -35,6 +35,9 @@
 	const submitting = untrack(() => form.submitting);
 
 	let slugTouched = $state(false);
+	/** Tracks awaited create work so the button stays disabled if Superforms clears submitting early. */
+	let pendingSubmit = $state(false);
+	const busy = $derived($submitting || pendingSubmit);
 
 	function onNameInput(event: Event) {
 		const value = (event.currentTarget as HTMLInputElement).value;
@@ -50,9 +53,14 @@
 	class={cn('space-y-4', className)}
 	data-testid="organisation-create-form"
 	use:enhance={{
-		onUpdate({ form: validated }) {
+		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
-			return onValidSubmit?.();
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} finally {
+				pendingSubmit = false;
+			}
 		}
 	}}
 >
@@ -135,8 +143,8 @@
 	</div>
 
 	<div class="flex justify-end">
-		<Button type="submit" disabled={$submitting} data-testid="organisation-create-submit">
-			{$submitting ? 'Creating…' : submitLabel}
+		<Button type="submit" disabled={busy} data-testid="organisation-create-submit">
+			{busy ? 'Creating…' : submitLabel}
 		</Button>
 	</div>
 </form>
