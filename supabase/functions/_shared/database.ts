@@ -14,6 +14,7 @@ export type ProfileRow = {
   avatar_path: string | null
   locale: string
   timezone: string
+  theme_preference: 'system' | 'light' | 'dark' | null
   created_at: string
   updated_at: string
 }
@@ -33,10 +34,27 @@ export type OrganisationRow = {
   timezone: string
   locale: string
   country_code: string
+  theme_default: 'system' | 'light' | 'dark'
   settings: Json
+  version: number
   created_at: string
   updated_at: string
   deleted_at: string | null
+}
+
+export type TaxRateRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  rate_percent: number
+  is_default: boolean
+  active: boolean
 }
 
 export type MembershipRow = {
@@ -243,6 +261,9 @@ export type ApiIdempotencyKeyRow = {
 }
 
 type ProfileInsert = Pick<ProfileRow, 'display_name' | 'id'> & Partial<Omit<ProfileRow, 'id'>>
+type TaxRateInsert =
+  & Pick<TaxRateRow, 'name' | 'org_id' | 'rate_percent'>
+  & Partial<Omit<TaxRateRow, 'id' | 'name' | 'org_id' | 'rate_percent'>>
 type OrganisationInsert =
   & Pick<OrganisationRow, 'country_code' | 'name' | 'slug'>
   & Partial<Omit<OrganisationRow, 'country_code' | 'id' | 'name' | 'slug'>>
@@ -318,6 +339,12 @@ export type Database = {
         Row: OrganisationRow
         Insert: OrganisationInsert
         Update: Partial<OrganisationInsert>
+        Relationships: []
+      }
+      tax_rates: {
+        Row: TaxRateRow
+        Insert: TaxRateInsert
+        Update: Partial<TaxRateInsert>
         Relationships: []
       }
       memberships: {
