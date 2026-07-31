@@ -6,7 +6,7 @@ begin;
 
 create extension if not exists dblink with schema extensions;
 
-select plan(5);
+select plan(6);
 
 select ok(
   exists (select 1 from pg_extension where extname = 'dblink'),
@@ -39,14 +39,20 @@ returns text
 language sql
 stable
 as $$
-  -- Supabase's postgres role is not a superuser; dblink requires an explicit
-  -- TCP password auth string (unix-socket peer auth is rejected).
+  -- Supabase's postgres role is not a superuser. dblink only permits
+  -- non-superuser connects when the connstr embeds credentials; use a URI
+  -- so libpq/dblink clearly see the password attribute.
   select format(
-    'host=127.0.0.1 port=%s dbname=%s user=postgres password=postgres',
+    'postgresql://postgres:postgres@127.0.0.1:%s/%s',
     current_setting('port'),
     current_database()
   );
 $$;
+
+select ok(
+  pg_temp.cq_conninfo() like 'postgresql://postgres:postgres@127.0.0.1:%',
+  'dblink conninfo embeds TCP password credentials'
+);
 
 create or replace function pg_temp.cq_set_auth(p_conn text, p_user_id uuid)
 returns void
@@ -82,7 +88,8 @@ declare
   quote_version integer;
   created jsonb;
 begin
-  perform dblink_connect('cq_setup', conn);
+  perform set_config('app.allow_test_dblink', 'on', true);
+  perform private.test_dblink_connect('cq_setup', conn);
 
   perform dblink_exec(
     'cq_setup',
@@ -231,8 +238,9 @@ declare
 begin
   select * into f from _cq_fixture;
 
-  perform dblink_connect('cq_reader', f.conninfo);
-  perform dblink_connect('cq_saver', f.conninfo);
+  perform set_config('app.allow_test_dblink', 'on', true);
+  perform private.test_dblink_connect('cq_reader', f.conninfo);
+  perform private.test_dblink_connect('cq_saver', f.conninfo);
 
   perform pg_temp.cq_set_auth('cq_reader', f.owner_id);
   perform pg_temp.cq_set_auth('cq_saver', f.owner_id);
@@ -422,7 +430,8 @@ begin
     return;
   end if;
 
-  perform dblink_connect('cq_cleanup', f.conninfo);
+  perform set_config('app.allow_test_dblink', 'on', true);
+  perform private.test_dblink_connect('cq_cleanup', f.conninfo);
   perform dblink_exec(
     'cq_cleanup',
     format(
