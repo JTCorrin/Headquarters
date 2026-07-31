@@ -14,6 +14,8 @@
 		submitLabel?: string;
 		/** Hide stage when editing a converted (won) lead elsewhere. */
 		disableStage?: boolean;
+		/** Fired only after Superforms client validation succeeds. */
+		onValidSubmit?: () => void;
 		class?: string;
 	}
 
@@ -21,6 +23,7 @@
 		form,
 		submitLabel = 'Save lead',
 		disableStage = false,
+		onValidSubmit,
 		class: className
 	}: LeadFormProps = $props();
 
@@ -43,7 +46,17 @@
 	);
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)} data-testid="lead-form">
+<form
+	method="POST"
+	class={cn('space-y-4', className)}
+	data-testid="lead-form"
+	use:enhance={{
+		onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			onValidSubmit?.();
+		}
+	}}
+>
 	<div class="space-y-2">
 		<Label for="lead-name">Name</Label>
 		<Input

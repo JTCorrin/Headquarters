@@ -67,17 +67,34 @@
 				.join(' · ')
 		}))
 	);
-</script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-	class={cn(className)}
-	onclick={(e) => {
+	function selectFromEvent(e: Event) {
 		const target = e.target as HTMLElement | null;
 		const card = target?.closest?.('[data-id]') as HTMLElement | null;
 		const id = card?.getAttribute('data-id');
 		if (id) onSelectLead?.(id);
-	}}
+	}
+
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Enter' && e.key !== ' ') return;
+		const target = e.target as HTMLElement | null;
+		if (!target?.closest?.('[data-id]')) return;
+		e.preventDefault();
+		selectFromEvent(e);
+	}
+</script>
+
+<!--
+  Board is read-only: stage moves (including Won) go through edit/convert, not drag.
+  Selection is delegated from Kanban cards via data-id.
+-->
+<div
+	class={cn(className)}
+	role="listbox"
+	aria-label="Lead pipeline board"
+	tabindex="0"
+	onclick={selectFromEvent}
+	onkeydown={onKeydown}
 >
-	<SvarKanbanShell {cards} {columns} class="h-full" />
+	<SvarKanbanShell {cards} {columns} readonly class="h-full" />
 </div>
