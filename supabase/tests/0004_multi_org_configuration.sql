@@ -91,9 +91,10 @@ select org_a, readonly_id, 'readonly', 'active' from _orgcfg_fixture;
 insert into public.memberships (org_id, user_id, role, status, suspended_at)
 select org_a, suspended_id, 'member', 'suspended', now() from _orgcfg_fixture;
 insert into public.memberships (org_id, user_id, role, status)
-select org_b, owner_id, 'owner', 'active' from _orgcfg_fixture;
-insert into public.memberships (org_id, user_id, role, status)
 select org_b, outsider_id, 'owner', 'active' from _orgcfg_fixture;
+-- Owner is multi-org: owner of A, member of B (outsider remains sole owner of B).
+insert into public.memberships (org_id, user_id, role, status)
+select org_b, owner_id, 'member', 'active' from _orgcfg_fixture;
 
 create or replace function pg_temp.as_user(p_user_id uuid)
 returns void language plpgsql security definer set search_path = pg_catalog, public as $$
