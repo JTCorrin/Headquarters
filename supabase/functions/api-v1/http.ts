@@ -6,6 +6,8 @@ export type ApiErrorCode =
   | 'METHOD_NOT_ALLOWED'
   | 'NOT_FOUND'
   | 'ORG_CONTEXT_REQUIRED'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'PRECONDITION_FAILED'
   | 'PRECONDITION_REQUIRED'
   | 'UNAUTHENTICATED'
   | 'UNSUPPORTED_MEDIA_TYPE'
@@ -23,18 +25,20 @@ export class ApiError extends Error {
 }
 
 export function apiPath(pathname: string): string {
-  const productApiIndex = pathname.indexOf('/api/v1')
-  if (productApiIndex >= 0) {
-    return pathname.slice(productApiIndex).replace(/\/+$/, '') || '/api/v1'
+  const path = pathname.replace(/\/+$/, '') || '/'
+  if (path === '/api/v1' || path.startsWith('/api/v1/')) {
+    return path
   }
 
-  const functionIndex = pathname.indexOf('/api-v1')
-  if (functionIndex >= 0) {
-    const suffix = pathname.slice(functionIndex + '/api-v1'.length).replace(/\/+$/, '')
-    return `/api/v1${suffix}`
+  for (const prefix of ['/functions/v1/api-v1', '/api-v1']) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) {
+      const suffix = path.slice(prefix.length)
+      if (suffix === '/api/v1' || suffix.startsWith('/api/v1/')) return suffix
+      return `/api/v1${suffix}`
+    }
   }
 
-  return pathname.replace(/\/+$/, '') || '/'
+  return path
 }
 
 export function jsonResponse(
@@ -105,9 +109,19 @@ export function requireJson(req: Request): void {
 export async function jsonBody(req: Request): Promise<Record<string, unknown>> {
   requireJson(req)
 
+  const declaredLength = Number(req.headers.get('content-length') ?? 0)
+  if (Number.isFinite(declaredLength) && declaredLength > 65_536) {
+    throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds 64 KiB')
+  }
+
+  const body = await req.text()
+  if (new TextEncoder().encode(body).byteLength > 65_536) {
+    throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds 64 KiB')
+  }
+
   let value: unknown
   try {
-    value = await req.json()
+    value = JSON.parse(body)
   } catch {
     throw new ApiError(400, 'BAD_REQUEST', 'Request body is not valid JSON')
   }
@@ -120,7 +134,7 @@ export async function jsonBody(req: Request): Promise<Record<string, unknown>> {
 
 export function parseVersion(req: Request): number {
   const header = req.headers.get('if-match')
-  const match = header?.match(/^(?:W\/)?"?(\d+)"?$/)
+  const match = header?.match(/^"(\d+)"$/)
   if (!match) {
     throw new ApiError(
       428,

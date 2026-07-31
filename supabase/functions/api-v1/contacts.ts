@@ -39,6 +39,17 @@ const NULLABLE_TEXT_FIELDS = [
   'notes',
 ] as const
 
+const TEXT_LIMITS: Record<(typeof NULLABLE_TEXT_FIELDS)[number], number> = {
+  first_name: 200,
+  last_name: 200,
+  primary_email: 320,
+  primary_phone: 64,
+  job_title: 200,
+  company_name: 200,
+  source: 120,
+  notes: 20_000,
+}
+
 const LIFECYCLE_STATUSES = new Set(['active', 'inactive', 'archived'])
 
 type DatabaseClient = SupabaseClient<Database>
@@ -103,6 +114,8 @@ export function validateContactBody(
     const value = body[field]
     if (value !== null && typeof value !== 'string') {
       fields[field] = 'Must be a string or null'
+    } else if (typeof value === 'string' && value.trim().length > TEXT_LIMITS[field]) {
+      fields[field] = `Must not exceed ${TEXT_LIMITS[field]} characters`
     } else {
       output[field] = typeof value === 'string' ? value.trim() || null : null
     }
@@ -145,6 +158,8 @@ export function validateContactBody(
     const value = body.metadata
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       fields.metadata = 'Must be a JSON object'
+    } else if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 16_384) {
+      fields.metadata = 'Must not exceed 16 KiB'
     } else {
       output.metadata = value as Json
     }
@@ -162,11 +177,17 @@ export function validateContactBody(
 
 function encodeCursor(contact: ContactCursor): string {
   return btoa(JSON.stringify({ created_at: contact.created_at, id: contact.id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
 }
 
 export function decodeCursor(value: string): ContactCursor {
   try {
-    const cursor = JSON.parse(atob(value)) as Partial<ContactCursor>
+    if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
+    const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+    const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<ContactCursor>
     const createdAt = cursor.created_at
     const id = parseUuid(cursor.id ?? null, 'cursor')
     if (
@@ -320,7 +341,7 @@ async function updateContact(
   const version = parseVersion(req)
   const current = await findContact(db, orgId, contactId, requestId)
   if (current.version !== version) {
-    throw new ApiError(409, 'CONFLICT', 'Contact version does not match If-Match')
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact version does not match If-Match')
   }
 
   const payload = validateContactBody(await jsonBody(req), true)
@@ -335,7 +356,9 @@ async function updateContact(
     .maybeSingle()
 
   if (error) throw databaseError(error, requestId)
-  if (!data) throw new ApiError(409, 'CONFLICT', 'Contact changed during this request')
+  if (!data) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact changed during this request')
+  }
 
   return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
 }
@@ -350,7 +373,7 @@ async function deleteContact(
   const version = parseVersion(req)
   const current = await findContact(db, orgId, contactId, requestId)
   if (current.version !== version) {
-    throw new ApiError(409, 'CONFLICT', 'Contact version does not match If-Match')
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact version does not match If-Match')
   }
 
   const { data, error } = await db
@@ -364,7 +387,9 @@ async function deleteContact(
     .maybeSingle()
 
   if (error) throw databaseError(error, requestId)
-  if (!data) throw new ApiError(409, 'CONFLICT', 'Contact changed during this request')
+  if (!data) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact changed during this request')
+  }
 
   return new Response(null, {
     status: 204,

@@ -34,6 +34,9 @@ Generate database types after a successful reset:
 supabase gen types typescript --local > src/lib/types/database.generated.ts
 ```
 
+The Edge Function currently carries a bootstrap subset in `functions/_shared/database.ts`. Replace
+that subset with generated types in the first Docker-capable follow-up and verify generation in CI.
+
 ## Request contract
 
 Every business request requires:
@@ -52,6 +55,7 @@ Contacts routes:
 - `PATCH /api/v1/contacts/{contact_id}`
 - `DELETE /api/v1/contacts/{contact_id}`
 
-`PATCH` and `DELETE` require the latest numeric ETag in `If-Match`. Deletes are soft deletes.
-Clients must never send or trust an `org_id` in a JSON body; the router derives it from the validated
-header and RLS membership.
+`PATCH` and `DELETE` require the latest strong numeric ETag (for example, `If-Match: "3"`).
+Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Clients must never send
+or trust an `org_id` in a JSON body; the router derives it from the validated header and RLS
+membership.
