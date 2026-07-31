@@ -31,7 +31,10 @@
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
 
+	/** UI busy flag (may batch); not used as the concurrency lock. */
 	let pendingSubmit = $state(false);
+	/** Synchronous lock — `$state` writes can batch, so they are not a re-entry guard. */
+	let submitLock = false;
 	const busy = $derived($submitting || pendingSubmit);
 
 	const defaultLabel = $derived($formData.isDefault === 'true' ? 'Yes' : 'No');
@@ -61,6 +64,9 @@
 	use:enhance={{
 		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
+			// Disabled buttons are not a concurrency guard (force-click / double enter).
+			if (submitLock) return false;
+			submitLock = true;
 			pendingSubmit = true;
 			try {
 				return await onValidSubmit?.();
@@ -68,6 +74,7 @@
 				// Swallow so Superforms default onError does not rethrow.
 				return false;
 			} finally {
+				submitLock = false;
 				pendingSubmit = false;
 			}
 		}
