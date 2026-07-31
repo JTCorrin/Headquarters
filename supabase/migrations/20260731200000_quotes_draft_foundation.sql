@@ -1374,6 +1374,9 @@ grant select on table public.quote_lines to authenticated;
 -- ---------------------------------------------------------------------------
 create extension if not exists dblink with schema extensions;
 
+-- Extension owner (migration role) can grant the unrestricted connect helper.
+grant execute on function extensions.dblink_connect_u(text, text) to postgres;
+
 create or replace function private.test_dblink_connect(
   p_name text,
   p_connstr text
@@ -1401,7 +1404,9 @@ begin
       using errcode = '42501';
   end if;
 
-  perform dblink_connect(p_name, p_connstr);
+  -- dblink_connect still rejects non-superusers when auth is trust/peer even
+  -- with a password in the URI; connect_u is required on Supabase local.
+  perform dblink_connect_u(p_name, p_connstr);
 end;
 $$;
 
