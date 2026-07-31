@@ -273,6 +273,34 @@ Deno.test('stock adjustment validation bounds quantity_delta', () => {
   assertThrows(() => validateAdjustStockBody({ quantity_delta: 0 }), ApiError)
   assertThrows(() => validateAdjustStockBody({ quantity_delta: 10_000_000_000 }), ApiError)
   assertThrows(() => validateAdjustStockBody({ quantity_delta: 1.00001 }), ApiError)
+  assertEquals(
+    validateAdjustStockBody({
+      quantity_delta: 1,
+      reason: 'adjustment',
+      occurred_at: '2026-07-31T12:00:00Z',
+    }),
+    {
+      quantity_delta: 1,
+      reason: 'adjustment',
+      occurred_at: '2026-07-31T12:00:00Z',
+    },
+  )
+  assertThrows(
+    () =>
+      validateAdjustStockBody({
+        quantity_delta: 1,
+        occurred_at: '2026-07-31',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateAdjustStockBody({
+        quantity_delta: 1,
+        occurred_at: '2026-02-31T12:00:00Z',
+      }),
+    ApiError,
+  )
 })
 
 Deno.test('catalog cursors require strict ISO-8601 timestamps', () => {

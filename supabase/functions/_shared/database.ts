@@ -417,6 +417,7 @@ export type Database = {
           p_idempotency_key_hash: string
           p_note?: string
           p_occurred_at?: string
+          p_org_id: string
           p_product_id: string
           p_quantity_delta: number
           p_reason?: string
