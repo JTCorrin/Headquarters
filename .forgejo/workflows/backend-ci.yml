@@ -154,6 +154,13 @@ jobs:
           docker cp supabase/tests "${test_container}:/tests"
           docker start --attach "${test_container}"
 
+      - name: Quote document GET/save lock interleaving
+        run: |
+          project_id="headquarters-${FORGEJO_RUN_ID}-${FORGEJO_RUN_ATTEMPT}"
+          database_container="supabase_db_${project_id}"
+          chmod +x scripts/quote_document_lock_interleave.sh
+          ./scripts/quote_document_lock_interleave.sh "${database_container}"
+
       - name: Lint database schemas
         run: >
           supabase db lint --local

@@ -13,7 +13,8 @@ The stable product contract is `/api/v1`. Supabase exposes the router natively u
 - thin append-only `timeline_events` for domain activity cards
 - transactional `convert_lead(...)` RPC (idempotent; emits conversion timeline events)
 - RLS role gates that exclude `billing` users from contacts/leads and write access to clients
-- authenticated `api-v1` Edge Function with Contacts, Leads, Clients CRUD and lead conversion
+- authenticated `api-v1` Edge Function with Contacts, Leads, Clients, Products, Quotes draft CRUD
+- concurrency-safe `document_sequences` and transactional quote draft RPCs
 
 The migration is the source of truth. Do not edit a linked database in Studio and leave the change
 uncommitted.
@@ -88,6 +89,16 @@ Product catalog routes:
 - `PATCH /api/v1/products/{product_id}`
 - `DELETE /api/v1/products/{product_id}`
 - `POST /api/v1/products/{product_id}/adjust-stock` — requires `Idempotency-Key`; JSON `{ "quantity_delta", "reason?", "note?", "occurred_at?" }`
+
+Quotes draft routes:
+
+- `GET /api/v1/quotes?limit=50&cursor=...&status=draft`
+- `POST /api/v1/quotes` — JSON header fields + `lines[]`; allocates `Q-####` number; server totals
+- `GET /api/v1/quotes/{quote_id}` — quote + nested `lines`
+- `PATCH /api/v1/quotes/{quote_id}` — `If-Match` required; optional atomic `lines` replacement
+- `DELETE /api/v1/quotes/{quote_id}` — soft delete draft; `If-Match` required
+
+Send/accept/create-invoice commands are intentionally omitted from this foundation slice.
 
 `PATCH` and `DELETE` require the latest strong numeric ETag (for example, `If-Match: "3"`).
 Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Marking a lead as `won`
