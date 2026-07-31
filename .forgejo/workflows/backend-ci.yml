@@ -26,10 +26,17 @@ jobs:
       - name: Verify Docker daemon
         run: docker info --format '{{.ServerVersion}}'
 
-      - name: Isolate Supabase containers for this run
+      - name: Isolate Supabase containers and ports for this run
         run: |
           project_id="headquarters-${FORGEJO_RUN_ID}-${FORGEJO_RUN_ATTEMPT}"
+          port_slot="$(((FORGEJO_RUN_ID * 10 + FORGEJO_RUN_ATTEMPT) % 10000))"
+          db_port="$((40000 + port_slot))"
+          shadow_port="$((50000 + port_slot))"
           sed -i "s/^project_id = .*/project_id = \"${project_id}\"/" supabase/config.toml
+          sed -i "/^\[db\]$/,/^\[/ {
+            s/^port = .*/port = ${db_port}/
+            s/^shadow_port = .*/shadow_port = ${shadow_port}/
+          }" supabase/config.toml
 
       - name: Install Supabase CLI
         uses: https://github.com/supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
@@ -53,6 +60,50 @@ jobs:
           deno check index.ts http.test.ts
           deno lint . ../_shared
           deno test
+
+      - name: Bridge the job container to Docker-published Postgres
+        run: |
+          docker_host="$(ip route show default | awk '{print $3; exit}')"
+          db_port="$(
+            awk '
+              /^\[db\]$/ { in_db = 1; next }
+              /^\[/ { in_db = 0 }
+              in_db && /^port =/ { print $3; exit }
+            ' supabase/config.toml
+          )"
+          nohup python3 - "${docker_host}" "${db_port}" \
+            >/tmp/supabase-db-proxy.log 2>&1 <<'PY' &
+          import select
+          import socket
+          import sys
+          import threading
+
+          host, port = sys.argv[1], int(sys.argv[2])
+
+          def forward(client):
+              try:
+                  upstream = socket.create_connection((host, port))
+                  peers = {client: upstream, upstream: client}
+                  while peers:
+                      readable, _, _ = select.select(peers, [], [])
+                      for source in readable:
+                          data = source.recv(65536)
+                          if not data:
+                              return
+                          peers[source].sendall(data)
+              finally:
+                  client.close()
+                  if "upstream" in locals():
+                      upstream.close()
+
+          with socket.create_server(("127.0.0.1", port)) as listener:
+              while True:
+                  client, _ = listener.accept()
+                  threading.Thread(target=forward, args=(client,), daemon=True).start()
+          PY
+          echo "$!" >/tmp/supabase-db-proxy.pid
+          sleep 1
+          kill -0 "$(cat /tmp/supabase-db-proxy.pid)"
 
       - name: Start local database
         run: supabase db start
@@ -78,6 +129,9 @@ jobs:
       - name: Report local database diagnostics
         if: failure()
         run: |
+          if [ -s /tmp/supabase-db-proxy.log ]; then
+            cat /tmp/supabase-db-proxy.log
+          fi
           docker ps -a
           container_id="$(
             docker ps -aq \
@@ -90,4 +144,14 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: supabase stop --no-backup || true
+        run: |
+          project_id="headquarters-${FORGEJO_RUN_ID}-${FORGEJO_RUN_ATTEMPT}"
+          if [ -f /tmp/supabase-db-proxy.pid ]; then
+            kill "$(cat /tmp/supabase-db-proxy.pid)" || true
+          fi
+          if ! supabase stop --no-backup; then
+            docker ps -aq --filter "name=${project_id}$" |
+              xargs -r docker rm -fv
+            docker volume ls -q --filter "name=${project_id}$" |
+              xargs -r docker volume rm
+          fi
