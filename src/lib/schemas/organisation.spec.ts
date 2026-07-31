@@ -37,6 +37,23 @@ describe('organisation schemas', () => {
 		expect(result.success).toBe(true);
 	});
 
+	it('rejects shape-valid but non-IANA timezones', () => {
+		const result = organisationCreateSchema.safeParse({
+			name: 'Corrin Data',
+			slug: 'corrin-data',
+			timezone: 'Not/A_Zone',
+			currency: 'GBP',
+			locale: 'en-GB',
+			country: 'GB'
+		});
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(result.error.issues.some((issue) => /IANA timezone/i.test(issue.message))).toBe(
+				true
+			);
+		}
+	});
+
 	it('bounds tax rate percent', () => {
 		expect(
 			taxRateFormSchema.safeParse({
@@ -59,10 +76,18 @@ describe('organisation schemas', () => {
 	it('accepts org config and theme preference enums', () => {
 		expect(
 			organisationConfigSchema.safeParse({
-				timezone: 'UTC',
+				timezone: 'Europe/London',
 				currency: 'USD',
 				locale: 'en-US',
 				themeDefault: 'dark'
+			}).success
+		).toBe(true);
+		expect(
+			organisationConfigSchema.safeParse({
+				timezone: 'UTC',
+				currency: 'GBP',
+				locale: 'en-GB',
+				themeDefault: 'system'
 			}).success
 		).toBe(true);
 		expect(

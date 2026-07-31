@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import OrgSwitcher from './org-switcher.svelte';
+import OrgSwitcherStoryHost from './org-switcher.story-host.svelte';
 import type { OrgMembershipSummary } from '$lib/schemas/organisation.js';
 
 const memberships: OrgMembershipSummary[] = [
@@ -48,5 +49,42 @@ describe('OrgSwitcher', () => {
 		await page.getByTestId('org-switcher-trigger').click();
 		await page.getByTestId('org-switcher-create').click();
 		await vi.waitFor(() => expect(onCreateOrg).toHaveBeenCalled());
+	});
+
+	it('keeps the create drawer open when create fails', async () => {
+		render(OrgSwitcherStoryHost, {
+			currentOrgId: memberships[0]!.org_id,
+			memberships: [memberships[0]!],
+			failCreate: true
+		});
+
+		await page.getByTestId('org-switcher-trigger').click();
+		await page.getByTestId('org-switcher-create').click();
+		await expect.element(page.getByTestId('organisation-create-drawer')).toBeInTheDocument();
+
+		await page.getByLabelText('Name').fill('Certivue');
+		await page.getByTestId('organisation-create-submit').click();
+
+		await expect.element(page.getByTestId('organisation-create-error')).toBeInTheDocument();
+		await expect.element(page.getByTestId('organisation-create-drawer')).toBeInTheDocument();
+	});
+
+	it('selects and opens configuration after successful create', async () => {
+		render(OrgSwitcherStoryHost, {
+			currentOrgId: memberships[0]!.org_id,
+			memberships: [memberships[0]!]
+		});
+
+		await page.getByTestId('org-switcher-trigger').click();
+		await page.getByTestId('org-switcher-create').click();
+		await page.getByLabelText('Name').fill('Certivue Labs');
+		await page.getByTestId('organisation-create-submit').click();
+
+		await expect
+			.element(page.getByTestId('org-create-opened-config'))
+			.toHaveTextContent(/Opened configuration for Certivue Labs/i);
+		await expect
+			.element(page.getByTestId('org-switcher-trigger'))
+			.toHaveTextContent(/Certivue Labs/i);
 	});
 });

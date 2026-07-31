@@ -17,12 +17,24 @@ export type ThemeOption = (typeof themeOptions)[number];
 export const themePreferenceOptions = [...themeOptions, 'org_default'] as const;
 export type ThemePreferenceOption = (typeof themePreferenceOptions)[number];
 
+/** Runtime IANA zones from Intl, plus UTC (not always listed by supportedValuesOf). */
+const ianaTimeZones = new Set<string>([
+	'UTC',
+	...(typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl
+		? Intl.supportedValuesOf('timeZone')
+		: [])
+]);
+
+export function isIanaTimezone(value: string): boolean {
+	return ianaTimeZones.has(value);
+}
+
 const ianaTimezone = z
 	.string()
 	.trim()
 	.min(1, 'Timezone is required')
 	.max(64)
-	.refine((value) => /^[A-Za-z0-9_+\-\/]+$/.test(value), 'Use an IANA timezone id');
+	.refine((value) => isIanaTimezone(value), 'Must be a valid IANA timezone');
 
 const currencyCode = z
 	.string()
