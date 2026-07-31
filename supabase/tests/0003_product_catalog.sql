@@ -1,6 +1,6 @@
 begin;
 
-select plan(37);
+select plan(42);
 
 select has_table('public', 'product_categories', 'product_categories table exists');
 select has_table('public', 'products', 'products table exists');
@@ -386,6 +386,7 @@ select lives_ok(
   $$
     select public.adjust_product_stock_idempotent(
       (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
       1,
       encode(extensions.digest('idem-1', 'sha256'), 'hex'),
       encode(extensions.digest('req-1', 'sha256'), 'hex'),
@@ -400,6 +401,7 @@ select ok(
   (
     select (public.adjust_product_stock_idempotent(
       (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
       1,
       encode(extensions.digest('idem-1', 'sha256'), 'hex'),
       encode(extensions.digest('req-1', 'sha256'), 'hex'),
@@ -414,6 +416,7 @@ select throws_ok(
   $$
     select public.adjust_product_stock_idempotent(
       (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
       2,
       encode(extensions.digest('idem-1', 'sha256'), 'hex'),
       encode(extensions.digest('req-2', 'sha256'), 'hex'),
@@ -426,8 +429,40 @@ select throws_ok(
   'idempotent adjust rejects key reuse with a different payload'
 );
 
--- Expire the key as a privileged fixture (authenticated SELECT hides expired
--- rows; the reclaim path lives inside the security-definer RPC).
+select throws_ok(
+  $$
+    insert into public.api_idempotency_keys (
+      org_id, actor_type, actor_id, idempotency_key_hash, route, request_hash, expires_at
+    )
+    select
+      org_id,
+      'user',
+      owner_id,
+      encode(extensions.digest('forged', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      encode(extensions.digest('forged-req', 'sha256'), 'hex'),
+      now() + interval '1 day'
+    from _catalog_fixture
+  $$,
+  '42501',
+  null,
+  'authenticated role cannot insert api_idempotency_keys directly'
+);
+
+select throws_ok(
+  $$
+    update public.api_idempotency_keys
+    set response_status = 200,
+        response_body = '{"status":200,"body":{"forged":true}}'::jsonb
+    where idempotency_key_hash = encode(extensions.digest('idem-1', 'sha256'), 'hex')
+  $$,
+  '42501',
+  null,
+  'authenticated role cannot update api_idempotency_keys directly'
+);
+
+-- Expire the key as a privileged fixture (clients have no table grants;
+-- the reclaim path lives inside the security-definer RPC).
 reset role;
 update public.api_idempotency_keys
 set expires_at = now() - interval '1 hour'
@@ -440,6 +475,7 @@ select lives_ok(
   $$
     select public.adjust_product_stock_idempotent(
       (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
       1,
       encode(extensions.digest('idem-1', 'sha256'), 'hex'),
       encode(extensions.digest('req-3', 'sha256'), 'hex'),
@@ -459,7 +495,69 @@ select ok(
   'replay did not duplicate movements; reclaim applied one new delta'
 );
 
+-- Claim, soft-delete, then prove replay still returns the stored success.
+select lives_ok(
+  $$
+    select public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
+      1,
+      encode(extensions.digest('idem-soft', 'sha256'), 'hex'),
+      encode(extensions.digest('req-soft', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    )
+  $$,
+  'idempotent adjust before soft-delete establishes a completed claim'
+);
+
 reset role;
+update public.products
+set deleted_at = now()
+where id = (select product_id from _catalog_fixture);
+
+select pg_temp.as_user((select owner_id from _catalog_fixture));
+set local role authenticated;
+
+select ok(
+  (
+    select (public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
+      1,
+      encode(extensions.digest('idem-soft', 'sha256'), 'hex'),
+      encode(extensions.digest('req-soft', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    ) ->> 'replay')::boolean
+  ),
+  'idempotent adjust replays stored success after product soft-delete'
+);
+
+select throws_ok(
+  $$
+    select public.adjust_product_stock_idempotent(
+      (select product_id from _catalog_fixture),
+      (select org_id from _catalog_fixture),
+      1,
+      encode(extensions.digest('idem-soft-new', 'sha256'), 'hex'),
+      encode(extensions.digest('req-soft-new', 'sha256'), 'hex'),
+      '/api/v1/products/x/adjust-stock',
+      'adjustment'
+    )
+  $$,
+  'P0002',
+  null,
+  'new idempotent claims are rejected after product soft-delete'
+);
+
+reset role;
+update public.products
+set deleted_at = null
+where id = (select product_id from _catalog_fixture);
+
+select pg_temp.as_user((select owner_id from _catalog_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$

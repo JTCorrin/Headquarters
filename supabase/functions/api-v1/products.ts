@@ -314,8 +314,8 @@ export function validateAdjustStockBody(body: Record<string, unknown>): {
   let occurredAt: string | undefined
   if ('occurred_at' in body) {
     const value = body.occurred_at
-    if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
-      fields.occurred_at = 'Must be an ISO-8601 timestamp'
+    if (typeof value !== 'string' || !isStrictIsoTimestamp(value)) {
+      fields.occurred_at = 'Must be a strict ISO-8601 timestamp'
     } else {
       occurredAt = value
     }
@@ -496,7 +496,8 @@ export function handleProducts(
       const productId = adjustMatch[1]
       const route = `/api/v1/products/${productId}/adjust-stock`
       const rawKey = parseIdempotencyKey(req)
-      await findProduct(db, orgId, productId, requestId)
+      // Do not preflight via findProduct: RLS hides soft-deleted rows, but retries must
+      // still replay stored success. Tenancy is enforced inside the RPC via p_org_id.
       const payload = validateAdjustStockBody(await jsonBody(req))
       const requestHash = await hashIdempotencyRequest(route, {
         product_id: productId,
@@ -508,6 +509,7 @@ export function handleProducts(
 
       const { data, error } = await db.rpc('adjust_product_stock_idempotent', {
         p_product_id: productId,
+        p_org_id: orgId,
         p_quantity_delta: payload.quantity_delta,
         p_idempotency_key_hash: keyHash,
         p_request_hash: requestHash,

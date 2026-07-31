@@ -581,51 +581,14 @@ create index api_idempotency_keys_expires_idx
 
 alter table public.api_idempotency_keys enable row level security;
 
-create policy api_idempotency_keys_select_own
-on public.api_idempotency_keys
-for select
-to authenticated
-using (
-  actor_type = 'user'
-  and actor_id = auth.uid()
-  and expires_at > now()
-  and private.has_org_role(
-    org_id,
-    array['owner', 'admin', 'member', 'billing', 'readonly']
-  )
-);
-
-create policy api_idempotency_keys_insert_member
-on public.api_idempotency_keys
-for insert
-to authenticated
-with check (
-  actor_type = 'user'
-  and actor_id = auth.uid()
-  and private.has_org_role(org_id, array['owner', 'admin', 'member'])
-);
-
-create policy api_idempotency_keys_update_own
-on public.api_idempotency_keys
-for update
-to authenticated
-using (
-  actor_type = 'user'
-  and actor_id = auth.uid()
-  and private.has_org_role(org_id, array['owner', 'admin', 'member'])
-)
-with check (
-  actor_type = 'user'
-  and actor_id = auth.uid()
-  and private.has_org_role(org_id, array['owner', 'admin', 'member'])
-);
-
-revoke all on table public.api_idempotency_keys from anon, authenticated;
-grant select, insert, update on table public.api_idempotency_keys to authenticated;
+-- No authenticated policies/grants: only security-definer RPCs may touch this table.
+-- Client-writable rows would let members forge completed responses and skip stock adjust.
+revoke all on table public.api_idempotency_keys from public, anon, authenticated;
 
 -- Atomic claim + adjust + store response (single transaction).
 create or replace function public.adjust_product_stock_idempotent(
   p_product_id uuid,
+  p_org_id uuid,
   p_quantity_delta numeric,
   p_idempotency_key_hash text,
   p_request_hash text,
@@ -643,6 +606,7 @@ as $$
 declare
   v_actor_id uuid := auth.uid();
   v_product_org uuid;
+  v_product_deleted_at timestamptz;
   v_existing public.api_idempotency_keys;
   v_adjustment jsonb;
   v_response_body jsonb;
@@ -654,7 +618,8 @@ begin
       using errcode = '42501';
   end if;
 
-  if p_idempotency_key_hash is null
+  if p_org_id is null
+    or p_idempotency_key_hash is null
     or char_length(p_idempotency_key_hash) <> 64
     or p_request_hash is null
     or char_length(p_request_hash) <> 64
@@ -665,10 +630,13 @@ begin
       using errcode = '22023';
   end if;
 
-  select products.org_id into v_product_org
+  -- Include soft-deleted products so completed claims can still replay.
+  -- Org is required from the API tenancy context (RLS hides deleted rows from clients).
+  select products.org_id, products.deleted_at
+  into v_product_org, v_product_deleted_at
   from public.products
   where products.id = p_product_id
-    and products.deleted_at is null;
+    and products.org_id = p_org_id;
 
   if v_product_org is null then
     raise exception 'Product not found'
@@ -714,6 +682,12 @@ begin
       -- Expired key: reclaim the unique slot.
       delete from public.api_idempotency_keys
       where api_idempotency_keys.id = v_existing.id;
+    end if;
+
+    -- New claims (and expired reclaim) require an active product.
+    if v_product_deleted_at is not null then
+      raise exception 'Product not found'
+        using errcode = 'P0002';
     end if;
 
     begin
@@ -782,9 +756,9 @@ end;
 $$;
 
 revoke all on function public.adjust_product_stock_idempotent(
-  uuid, numeric, text, text, text, text, text, timestamptz, integer
+  uuid, uuid, numeric, text, text, text, text, text, timestamptz, integer
 ) from public, anon;
 
 grant execute on function public.adjust_product_stock_idempotent(
-  uuid, numeric, text, text, text, text, text, timestamptz, integer
+  uuid, uuid, numeric, text, text, text, text, text, timestamptz, integer
 ) to authenticated;
