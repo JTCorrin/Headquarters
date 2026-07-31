@@ -32,6 +32,7 @@
 			label: 'Comms',
 			items: [
 				{ label: 'Email', href: '/email' },
+				{ label: 'Templates', href: '/email/templates' },
 				{ label: 'Documents', href: '/documents' }
 			]
 		}

@@ -55,6 +55,12 @@ export { default as ClientsListPage } from './clients-list-page.svelte';
 export { default as DocumentForm } from './document-form.svelte';
 export { default as DocumentFormDrawer } from './document-form-drawer.svelte';
 export { default as EntityDocuments } from './entity-documents.svelte';
+export { default as DocumentPdfPreview } from './document-pdf-preview.svelte';
+export { default as EmailTemplateForm } from './email-template-form.svelte';
+export { default as EmailTemplateFormDrawer } from './email-template-form-drawer.svelte';
+export { default as EmailTemplatesTable } from './email-templates-table.svelte';
+export { default as EmailTemplatesListPage } from './email-templates-list-page.svelte';
+export { default as EmailTemplateEditorPage } from './email-template-editor-page.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
@@ -68,6 +74,7 @@ export type { TaskBoardCard, TaskBoardStatus } from './tasks-board.svelte';
 export type { LineItemRow } from './line-items-table.svelte';
 export type { MoneySummaryItem } from './money-summary.svelte';
 export type { EntityDocument } from './entity-documents.svelte';
+export type { EmailTemplateRow } from './email-templates-columns.js';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,

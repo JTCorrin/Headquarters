@@ -39,6 +39,7 @@
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^22",
+		"@types/pdfmake": "^0.3.3",
 		"@types/pg": "^8.16.0",
 		"@vitest/browser-playwright": "^4.1.8",
 		"@vitest/coverage-v8": "^4.1.8",
@@ -75,6 +76,8 @@
 	},
 	"dependencies": {
 		"@svar-ui/svelte-kanban": "^2.6.0",
-		"@tanstack/table-core": "^8.21.3"
+		"@tanstack/table-core": "^8.21.3",
+		"pdfmake": "^0.3.11",
+		"pdfmake-html-renderer": "^0.4.1"
 	}
 }

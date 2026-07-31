@@ -36,6 +36,7 @@ export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
 			label: 'Comms',
 			items: [
 				{ label: 'Email', href: '/email', active: mark('Email') },
+				{ label: 'Templates', href: '/email/templates', active: mark('Templates') },
 				{ label: 'Documents', href: '/documents', active: mark('Documents') }
 			]
 		}
