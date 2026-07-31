@@ -7,7 +7,7 @@
 		class?: string;
 	}
 
-	let { status, class: className }: StatusBadgeProps = $props();
+	let { status = '', class: className }: StatusBadgeProps = $props();
 
 	const variant = $derived.by(() => {
 		const key = status.toLowerCase();
@@ -19,4 +19,4 @@
 	});
 </script>
 
-<Badge {variant} class={cn('capitalize', className)}>{status}</Badge>
+<Badge {variant} class={cn('capitalize', className)}>{status || 'Unknown'}</Badge>

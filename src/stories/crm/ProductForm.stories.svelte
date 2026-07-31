@@ -3,7 +3,7 @@
 	import ProductFormDrawer from '$lib/components/crm/product-form-drawer.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/ProductForm',
+		title: 'Headquarters/ProductForm',
 		component: ProductFormDrawer,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }

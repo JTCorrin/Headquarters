@@ -1,10 +1,13 @@
 <script lang="ts">
+	import type { SuperForm } from 'sveltekit-superforms';
+	import type { DocumentFormData } from '$lib/schemas/document.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import ProfileHeader from './profile-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
 	import InfoCard, { type InfoCardField } from './info-card.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import EntityEmailInbox, { type EmailMessage } from './entity-email-inbox.svelte';
+	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -29,6 +32,9 @@
 		relatedContacts?: RelatedContact[];
 		timelineEvents: TimelineEvent[];
 		emailMessages?: EmailMessage[];
+		documents?: EntityDocument[];
+		documentForm?: SuperForm<DocumentFormData>;
+		documentDrawerOpen?: boolean;
 		moneyItems?: MoneySummaryItem[];
 		class?: string;
 	}
@@ -43,8 +49,11 @@
 		companyFields,
 		billingFields = [],
 		relatedContacts = [],
-		timelineEvents,
+		timelineEvents = [],
 		emailMessages = [],
+		documents = $bindable<EntityDocument[]>([]),
+		documentForm,
+		documentDrawerOpen = $bindable(false),
 		moneyItems = [],
 		class: className
 	}: ClientProfilePageProps = $props();
@@ -102,7 +111,16 @@
 					{:else if active === 'email'}
 						<EntityEmailInbox messages={emailMessages} class="min-h-0 flex-1" />
 					{:else if active === 'documents'}
-						<p class="text-muted-foreground text-sm">Documents list UI lands in a later wave.</p>
+						{#if documentForm}
+							<EntityDocuments
+								{documents}
+								form={documentForm}
+								bind:drawerOpen={documentDrawerOpen}
+								class="min-h-0 flex-1"
+							/>
+						{:else}
+							<p class="text-muted-foreground text-sm">Documents list UI lands in a later wave.</p>
+						{/if}
 					{:else}
 						<MoneySummary items={moneyItems} />
 					{/if}

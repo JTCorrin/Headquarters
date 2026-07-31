@@ -3,7 +3,7 @@
 	import PageHeader from '$lib/components/crm/page-header.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/PageHeader',
+		title: 'Headquarters/PageHeader',
 		component: PageHeader,
 		tags: ['autodocs']
 	});

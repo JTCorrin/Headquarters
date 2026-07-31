@@ -10,7 +10,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/ProfileTabs',
+		title: 'Headquarters/ProfileTabs',
 		component: ProfileTabs,
 		tags: ['autodocs'],
 		args: {

@@ -1,5 +1,6 @@
 import type { AppNavGroup } from '$lib/components/crm/app-nav.svelte';
 import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
+import type { EntityDocument } from '$lib/components/crm/entity-documents.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
 export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
@@ -23,10 +24,11 @@ export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
 			]
 		},
 		{
-			label: 'Money',
+			label: 'Accounting',
 			items: [
 				{ label: 'Quotes', href: '/quotes', active: mark('Quotes') },
 				{ label: 'Invoices', href: '/invoices', active: mark('Invoices') },
+				{ label: 'Bills', href: '/bills', active: mark('Bills') },
 				{ label: 'Payments', href: '/payments', active: mark('Payments') }
 			]
 		},
@@ -79,6 +81,33 @@ export const sampleTimelineEvents: TimelineEvent[] = [
 		body: 'Referred by Sam at Contoso',
 		occurredAt: 'Feb 18',
 		actor: 'Joe'
+	}
+];
+
+export const sampleDocuments: EntityDocument[] = [
+	{
+		id: 'd1',
+		name: 'MSA — Northwind.pdf',
+		category: 'contract',
+		sizeLabel: '240 KB',
+		uploadedAt: 'Jan 12',
+		uploadedBy: 'Joe'
+	},
+	{
+		id: 'd2',
+		name: 'Q2 retainer proposal.pdf',
+		category: 'proposal',
+		sizeLabel: '1.1 MB',
+		uploadedAt: 'Mar 8',
+		uploadedBy: 'Maya'
+	},
+	{
+		id: 'd3',
+		name: 'Kickoff deck.pdf',
+		category: 'other',
+		sizeLabel: '3.4 MB',
+		uploadedAt: 'Mar 14',
+		uploadedBy: 'Joe'
 	}
 ];
 

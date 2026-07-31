@@ -20,10 +20,11 @@
 			]
 		},
 		{
-			label: 'Money',
+			label: 'Accounting',
 			items: [
 				{ label: 'Quotes', href: '/quotes' },
 				{ label: 'Invoices', href: '/invoices' },
+				{ label: 'Bills', href: '/bills' },
 				{ label: 'Payments', href: '/payments' }
 			]
 		},
@@ -37,7 +38,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/AppNav',
+		title: 'Headquarters/AppNav',
 		component: AppNav,
 		tags: ['autodocs'],
 		parameters: {

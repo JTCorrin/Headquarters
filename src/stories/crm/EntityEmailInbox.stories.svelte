@@ -108,7 +108,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/EntityEmailInbox',
+		title: 'Headquarters/EntityEmailInbox',
 		component: EntityEmailInbox,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }

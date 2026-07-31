@@ -3,7 +3,7 @@
 	import StatusBadge from '$lib/components/crm/status-badge.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/StatusBadge',
+		title: 'Headquarters/StatusBadge',
 		component: StatusBadge,
 		tags: ['autodocs']
 	});

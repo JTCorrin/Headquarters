@@ -25,6 +25,9 @@
 		timelineEvents?: TimelineEvent[];
 		lineDrawerOpen?: boolean;
 		onRemoveLine?: (id: string) => void;
+		onSend?: () => void;
+		onChase?: () => void;
+		onRecordPayment?: () => void;
 		class?: string;
 	}
 
@@ -32,7 +35,7 @@
 		orgName,
 		navGroups,
 		title,
-		status,
+		status = 'Draft',
 		invoiceForm,
 		lineForm,
 		products = [],
@@ -40,6 +43,9 @@
 		timelineEvents = [],
 		lineDrawerOpen = $bindable(false),
 		onRemoveLine,
+		onSend,
+		onChase,
+		onRecordPayment,
 		class: className
 	}: InvoiceDetailPageProps = $props();
 </script>
@@ -50,14 +56,17 @@
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
 			<PageHeader
-				breadcrumb="Money / Invoices"
+				breadcrumb="Accounting / Invoices"
 				{title}
 				description="Header + lines, with chase / payment activity on the right."
 			>
 				{#snippet actions()}
 					<StatusBadge {status} />
-					<Button variant="outline" size="sm">Record payment</Button>
-					<Button size="sm">Send</Button>
+					<Button variant="outline" size="sm" onclick={() => onRecordPayment?.()}>
+						Record payment
+					</Button>
+					<Button variant="outline" size="sm" onclick={() => onChase?.()}>Chase</Button>
+					<Button size="sm" onclick={() => onSend?.()}>Send</Button>
 				{/snippet}
 			</PageHeader>
 

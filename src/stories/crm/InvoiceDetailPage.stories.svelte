@@ -9,7 +9,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/Pages/InvoiceDetail',
+		title: 'Headquarters/Pages/InvoiceDetail',
 		component: InvoiceDetailPage,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }
@@ -22,6 +22,7 @@
 	import { invoiceFormSchema } from '$lib/schemas/invoice.js';
 	import { lineItemFormSchema } from '$lib/schemas/line-item.js';
 	import type { LineItemRow } from '$lib/components/crm/line-items-table.svelte';
+	import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 	import { navGroupsWithActive } from './story-fixtures.js';
 
 	const invoiceData = defaults(
@@ -60,8 +61,8 @@
 		}
 	]);
 	let lineDrawerOpen = $state(false);
-
-	const timelineEvents = [
+	let status = $state('Sent');
+	let timelineEvents = $state<TimelineEvent[]>([
 		{
 			id: 'i1',
 			kind: 'status',
@@ -91,7 +92,18 @@
 			occurredAt: 'Mar 18 · 16:40',
 			actor: 'System'
 		}
-	];
+	]);
+
+	function prependEvent(partial: Omit<TimelineEvent, 'id' | 'occurredAt'> & { occurredAt?: string }) {
+		timelineEvents = [
+			{
+				id: crypto.randomUUID(),
+				occurredAt: partial.occurredAt ?? 'Just now',
+				...partial
+			},
+			...timelineEvents
+		];
+	}
 
 	const lineData = defaults(
 		{ productId: '', description: '', qty: '1', unitPrice: '' },
@@ -131,7 +143,7 @@
 				orgName="Acme Org"
 				navGroups={navGroupsWithActive('Invoices')}
 				title="INV-0881 · Northwind"
-				status="Sent"
+				{status}
 				{invoiceForm}
 				{lineForm}
 				products={catalog}
@@ -140,6 +152,32 @@
 				bind:lineDrawerOpen
 				onRemoveLine={(id) => {
 					lines = lines.filter((row) => row.id !== id);
+				}}
+				onSend={() => {
+					status = 'Sent';
+					prependEvent({
+						kind: 'email',
+						title: 'Invoice sent',
+						body: 'Emailed to accounts@northwind.com',
+						actor: 'You'
+					});
+				}}
+				onChase={() => {
+					prependEvent({
+						kind: 'note',
+						title: 'Chase sent',
+						body: 'Payment reminder for INV-0881',
+						actor: 'You'
+					});
+				}}
+				onRecordPayment={() => {
+					status = 'Part paid';
+					prependEvent({
+						kind: 'payment',
+						title: 'Payment recorded',
+						body: 'Storybook mock — open Payments for full form',
+						actor: 'You'
+					});
 				}}
 			/>
 		</div>

@@ -3,7 +3,7 @@
 	import InfoCard from '$lib/components/crm/info-card.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/InfoCard',
+		title: 'Headquarters/InfoCard',
 		component: InfoCard,
 		tags: ['autodocs']
 	});

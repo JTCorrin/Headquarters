@@ -4,7 +4,7 @@
 	import { TIMELINE_EVENT_KINDS } from '$lib/components/crm/timeline-kinds.js';
 
 	const { Story } = defineMeta({
-		title: 'CRM/TimelineEventCard',
+		title: 'Headquarters/TimelineEventCard',
 		component: TimelineEventCard,
 		tags: ['autodocs']
 	});

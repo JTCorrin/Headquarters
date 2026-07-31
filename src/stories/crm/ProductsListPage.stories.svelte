@@ -3,7 +3,7 @@
 	import ProductsListPage from '$lib/components/crm/products-list-page.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/Pages/ProductsList',
+		title: 'Headquarters/Pages/ProductsList',
 		component: ProductsListPage,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }

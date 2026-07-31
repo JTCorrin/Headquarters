@@ -3,7 +3,7 @@
 	import StatCard from '$lib/components/crm/stat-card.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/StatCard',
+		title: 'Headquarters/StatCard',
 		component: StatCard,
 		tags: ['autodocs']
 	});
