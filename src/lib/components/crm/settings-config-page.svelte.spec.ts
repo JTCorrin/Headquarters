@@ -106,14 +106,22 @@ describe('SettingsConfigPage', () => {
 	});
 
 	it('keeps the tax drawer open on delayed save failure', async () => {
+		let releaseSave!: () => void;
+		const saveGate = new Promise<void>((resolve) => {
+			releaseSave = resolve;
+		});
+		const onSaveTaxRate = vi.fn(async () => {
+			await saveGate;
+			return false;
+		});
+
 		render(SettingsConfigPageTestHost, {
 			orgName: 'Corrin Data',
 			navGroups: navGroupsWithActive('Config'),
 			role: 'owner',
 			configuration,
 			taxRates,
-			failTaxSave: true,
-			taxSaveDelayMs: 400
+			onSaveTaxRate
 		});
 
 		await page.getByTestId('tax-rate-add').click();
@@ -124,6 +132,10 @@ describe('SettingsConfigPage', () => {
 
 		await expect.element(submit).toHaveTextContent(/Saving/i);
 		await expect.element(submit).toBeDisabled();
+		await submit.click({ force: true }).catch(() => undefined);
+		expect(onSaveTaxRate).toHaveBeenCalledTimes(1);
+
+		releaseSave();
 		await expect.element(page.getByTestId('tax-rate-save-error')).toBeInTheDocument();
 		await expect.element(page.getByTestId('tax-rate-drawer')).toBeInTheDocument();
 		await expect.element(submit).not.toBeDisabled();

@@ -5,9 +5,14 @@ import OrganisationConfigFormTestHost from './organisation-config-form.test-host
 
 describe('OrganisationConfigForm', () => {
 	it('awaits delayed save, stays pending, and rejects a second click', async () => {
-		const onValidSubmit = vi.fn(
-			() => new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 400))
-		);
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const onValidSubmit = vi.fn(async () => {
+			await gate;
+			return true;
+		});
 		render(OrganisationConfigFormTestHost, { onValidSubmit });
 
 		const submit = page.getByTestId('organisation-config-submit');
@@ -15,6 +20,8 @@ describe('OrganisationConfigForm', () => {
 		await expect.element(submit).toHaveTextContent(/Saving/i);
 		await expect.element(submit).toBeDisabled();
 		await submit.click({ force: true }).catch(() => undefined);
+		expect(onValidSubmit).toHaveBeenCalledTimes(1);
+		release();
 		await vi.waitFor(() => expect(onValidSubmit).toHaveBeenCalledTimes(1));
 		await expect.element(submit).not.toBeDisabled();
 	});
