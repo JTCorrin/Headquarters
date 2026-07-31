@@ -3,7 +3,7 @@
 	import ContactFormDrawer from '$lib/components/crm/contact-form-drawer.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/ContactForm',
+		title: 'Headquarters/ContactForm',
 		component: ContactFormDrawer,
 		tags: ['autodocs'],
 		parameters: {

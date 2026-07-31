@@ -4,7 +4,7 @@
 	import { navGroupsWithActive, sampleTimelineEvents } from './story-fixtures.js';
 
 	const { Story } = defineMeta({
-		title: 'CRM/Pages/Dashboard',
+		title: 'Headquarters/Pages/Dashboard',
 		component: DashboardPage,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' },

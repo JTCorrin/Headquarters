@@ -37,7 +37,7 @@
 >
 	<Sidebar.Root collapsible="none" class="h-full border-r">
 		<Sidebar.Header class="gap-1 px-4 py-5">
-			<p class="text-lg font-semibold tracking-tight">CRM</p>
+			<p class="text-lg font-semibold tracking-tight">Headquarters</p>
 			<p class="text-muted-foreground text-xs">{orgName}</p>
 		</Sidebar.Header>
 

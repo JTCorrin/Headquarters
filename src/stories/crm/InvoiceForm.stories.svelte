@@ -3,7 +3,7 @@
 	import InvoiceFormDrawer from '$lib/components/crm/invoice-form-drawer.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/InvoiceForm',
+		title: 'Headquarters/InvoiceForm',
 		component: InvoiceFormDrawer,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }

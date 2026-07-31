@@ -3,7 +3,7 @@
 	import ProfileHeader from '$lib/components/crm/profile-header.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/ProfileHeader',
+		title: 'Headquarters/ProfileHeader',
 		component: ProfileHeader,
 		tags: ['autodocs']
 	});

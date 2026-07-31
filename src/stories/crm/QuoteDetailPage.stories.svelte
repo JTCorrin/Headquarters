@@ -9,7 +9,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/Pages/QuoteDetail',
+		title: 'Headquarters/Pages/QuoteDetail',
 		component: QuoteDetailPage,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }
@@ -22,6 +22,7 @@
 	import { quoteFormSchema } from '$lib/schemas/quote.js';
 	import { lineItemFormSchema } from '$lib/schemas/line-item.js';
 	import type { LineItemRow } from '$lib/components/crm/line-items-table.svelte';
+	import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 	import { navGroupsWithActive } from './story-fixtures.js';
 
 	const quoteData = defaults(
@@ -51,8 +52,8 @@
 		}
 	]);
 	let lineDrawerOpen = $state(false);
-
-	const timelineEvents = [
+	let status = $state('Draft');
+	let timelineEvents = $state<TimelineEvent[]>([
 		{
 			id: 'q1',
 			kind: 'status',
@@ -76,7 +77,18 @@
 			occurredAt: 'Mar 14 · 11:05',
 			actor: 'Maya'
 		}
-	];
+	]);
+
+	function prependEvent(partial: Omit<TimelineEvent, 'id' | 'occurredAt'> & { occurredAt?: string }) {
+		timelineEvents = [
+			{
+				id: crypto.randomUUID(),
+				occurredAt: partial.occurredAt ?? 'Just now',
+				...partial
+			},
+			...timelineEvents
+		];
+	}
 
 	const lineData = defaults(
 		{ productId: '', description: '', qty: '1', unitPrice: '' },
@@ -116,7 +128,7 @@
 				orgName="Acme Org"
 				navGroups={navGroupsWithActive('Quotes')}
 				title="Q-0142 · Q2 retainer"
-				status="Draft"
+				{status}
 				{quoteForm}
 				{lineForm}
 				products={catalog}
@@ -125,6 +137,32 @@
 				bind:lineDrawerOpen
 				onRemoveLine={(id) => {
 					lines = lines.filter((row) => row.id !== id);
+				}}
+				onSend={() => {
+					status = 'Sent';
+					prependEvent({
+						kind: 'email',
+						title: 'Quote sent',
+						body: 'Emailed to Ava at Northwind',
+						actor: 'You'
+					});
+				}}
+				onChase={() => {
+					prependEvent({
+						kind: 'note',
+						title: 'Chase sent',
+						body: 'Friendly follow-up on outstanding quote',
+						actor: 'You'
+					});
+				}}
+				onConvert={() => {
+					status = 'Accepted';
+					prependEvent({
+						kind: 'status',
+						title: 'Converted to invoice',
+						body: 'Draft INV created from Q-0142',
+						actor: 'You'
+					});
 				}}
 			/>
 		</div>

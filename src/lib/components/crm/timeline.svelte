@@ -22,7 +22,7 @@
 	}
 
 	let {
-		events,
+		events = [],
 		title = 'Timeline',
 		emptyMessage = 'No activity yet.',
 		class: className,

@@ -70,7 +70,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/Timeline',
+		title: 'Headquarters/Timeline',
 		component: Timeline,
 		tags: ['autodocs']
 	});

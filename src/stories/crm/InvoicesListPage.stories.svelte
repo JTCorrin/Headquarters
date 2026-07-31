@@ -78,7 +78,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/Pages/InvoicesList',
+		title: 'Headquarters/Pages/InvoicesList',
 		component: InvoicesListPage,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }
