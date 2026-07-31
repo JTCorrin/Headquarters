@@ -63,7 +63,11 @@ jobs:
 
       - name: Bridge the job container to Docker-published Postgres
         run: |
-          docker_host="$(ip route show default | awk '{print $3; exit}')"
+          docker_host="$(
+            docker inspect "$(hostname)" \
+              --format '{{range .NetworkSettings.Networks}}{{println .Gateway}}{{end}}' |
+              awk 'NF { print; exit }'
+          )"
           db_port="$(
             awk '
               /^\[db\]$/ { in_db = 1; next }
