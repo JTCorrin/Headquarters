@@ -162,6 +162,18 @@ Deno.test('lead validation rejects unsafe integers and impossible dates', () => 
       ),
     ApiError,
   )
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Position overflow', position: 10_000_000_000 },
+        false,
+      ),
+    ApiError,
+  )
+  assertEquals(
+    validateLeadBody({ name: 'Position ok', position: 12345.6789012345 }, false).position,
+    12345.6789012345,
+  )
 })
 
 Deno.test('client create validation defaults status and rejects conversion fields', () => {

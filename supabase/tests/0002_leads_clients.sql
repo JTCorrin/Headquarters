@@ -1,6 +1,6 @@
 begin;
 
-select plan(43);
+select plan(45);
 
 select has_table('public', 'leads', 'leads table exists');
 select has_table('public', 'clients', 'clients table exists');
@@ -605,6 +605,29 @@ select is_empty(
       and entity_id = (select lead_id from _pipeline_fixture)
   $$,
   'billing role cannot select lead timeline events'
+);
+
+select is_empty(
+  $$
+    select id from public.timeline_events
+    where entity_type = 'client'
+      and entity_id = (select client_id from _pipeline_fixture)
+      and kind = 'conversion'
+  $$,
+  'billing role cannot select client conversion timeline events'
+);
+
+select is_empty(
+  $$
+    select id from public.timeline_events
+    where org_id = (select org_id from _pipeline_fixture)
+      and (
+        kind = 'conversion'
+        or source_type = 'lead'
+        or coalesce(payload ? 'lead_id', false)
+      )
+  $$,
+  'billing role cannot observe lead identifiers via timeline kind, source, or payload'
 );
 
 select ok(

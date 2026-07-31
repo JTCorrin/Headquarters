@@ -641,13 +641,14 @@ begin
       'client',
       client_row.id,
       'conversion',
-      'Client created from lead',
-      format('Converted from lead "%s"', lead_row.name),
+      -- No lead name/ID here: billing can read client timelines but must not observe leads.
+      'Client created from conversion',
+      'Converted from the sales pipeline',
       'user',
       actor_id,
-      'lead',
-      lead_row.id,
-      jsonb_build_object('client_id', client_row.id, 'lead_id', lead_row.id),
+      null,
+      null,
+      jsonb_build_object('client_id', client_row.id),
       now_ts
     );
 
@@ -805,14 +806,17 @@ with check (
   and updated_by = auth.uid()
 );
 
--- Billing may read client activity but must not observe lead conversion payloads.
+-- Billing may read ordinary client activity but must not observe lead entities,
+-- conversion cards, or rows that still point at a lead source.
 create policy timeline_events_select_member
 on public.timeline_events
 for select
 to authenticated
 using (
   case
-    when entity_type = 'lead' then
+    when entity_type = 'lead'
+      or kind = 'conversion'
+      or source_type = 'lead' then
       private.has_org_role(
         org_id,
         array['owner', 'admin', 'member', 'readonly']
