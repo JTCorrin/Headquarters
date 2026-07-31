@@ -6,8 +6,11 @@ import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
 import { handleLeads } from './leads.ts'
+import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
+import { handleProfilePreferences } from './profile-preferences.ts'
+import { handleTaxRates } from './tax-rates.ts'
 
 const corsOrigin = Deno.env.get('API_CORS_ORIGIN') ?? '*'
 
@@ -39,6 +42,14 @@ function assertCanAccessCatalog(role: MembershipRole, method: string): void {
   }
 }
 
+function isHeaderlessRoute(path: string): boolean {
+  return (
+    path === '/api/v1/health' ||
+    path === '/api/v1/organisations' ||
+    path === '/api/v1/profile/preferences'
+  )
+}
+
 export default {
   fetch: withSupabase(
     {
@@ -65,15 +76,6 @@ export default {
           return jsonResponse({ data: { status: 'ok', api_version: 'v1' } }, 200, requestId)
         }
 
-        const orgHeader = req.headers.get('x-org-id')
-        if (!orgHeader) {
-          throw new ApiError(
-            400,
-            'ORG_CONTEXT_REQUIRED',
-            'X-Org-Id is required for organisation-scoped routes',
-          )
-        }
-        const orgId = parseUuid(orgHeader, 'x-org-id')
         const userId = ctx.userClaims?.id
         if (!userId) {
           throw new ApiError(
@@ -84,6 +86,29 @@ export default {
         }
 
         const db = ctx.supabase as unknown as SupabaseClient<Database>
+
+        if (path === '/api/v1/organisations') {
+          return await handleOrganisations(req, db, path, userId, requestId)
+        }
+
+        if (path === '/api/v1/profile/preferences') {
+          return await handleProfilePreferences(req, db, path, userId, requestId)
+        }
+
+        if (isHeaderlessRoute(path)) {
+          throw new ApiError(404, 'NOT_FOUND', 'Route not found')
+        }
+
+        const orgHeader = req.headers.get('x-org-id')
+        if (!orgHeader) {
+          throw new ApiError(
+            400,
+            'ORG_CONTEXT_REQUIRED',
+            'X-Org-Id is required for organisation-scoped routes',
+          )
+        }
+        const orgId = parseUuid(orgHeader, 'x-org-id')
+
         const { data: membership, error: membershipError } = await db
           .from('memberships')
           .select('id, role, status')
@@ -101,6 +126,21 @@ export default {
         }
         if (!membership) {
           throw new ApiError(403, 'FORBIDDEN', 'No active membership for this organisation')
+        }
+
+        if (path === '/api/v1/organisation/configuration') {
+          return await handleOrganisationConfiguration(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
+        if (path === '/api/v1/tax-rates' || path.startsWith('/api/v1/tax-rates/')) {
+          return await handleTaxRates(req, db, path, orgId, membership.role, requestId)
         }
 
         if (path === '/api/v1/contacts' || path.startsWith('/api/v1/contacts/')) {
