@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- Add deterministic local-development fixtures here; never add production data or credentials.
