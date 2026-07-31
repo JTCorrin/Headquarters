@@ -1,6 +1,6 @@
 begin;
 
-select plan(36);
+select plan(38);
 
 select has_table('public', 'quotes', 'quotes table exists');
 select has_table('public', 'quote_lines', 'quote_lines table exists');
