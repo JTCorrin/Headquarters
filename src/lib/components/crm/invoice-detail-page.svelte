@@ -8,7 +8,6 @@
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
-	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -58,10 +57,10 @@
 			<PageHeader
 				breadcrumb="Accounting / Invoices"
 				{title}
+				{status}
 				description="Header + lines, with chase / payment activity on the right."
 			>
 				{#snippet actions()}
-					<StatusBadge {status} />
 					<Button variant="outline" size="sm" onclick={() => onRecordPayment?.()}>
 						Record payment
 					</Button>
@@ -70,9 +69,11 @@
 				{/snippet}
 			</PageHeader>
 
-			<div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(260px,0.7fr)]">
+			<div
+				class="grid items-start gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_minmax(260px,0.7fr)]"
+			>
 				<section
-					class="bg-card space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+					class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 				>
 					<h2 class="text-sm font-semibold tracking-tight">Invoice details</h2>
 					<InvoiceForm form={invoiceForm} submitLabel="Save details" />
