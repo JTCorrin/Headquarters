@@ -17,16 +17,15 @@ export type ThemeOption = (typeof themeOptions)[number];
 export const themePreferenceOptions = [...themeOptions, 'org_default'] as const;
 export type ThemePreferenceOption = (typeof themePreferenceOptions)[number];
 
-/** Runtime IANA zones from Intl, plus UTC (not always listed by supportedValuesOf). */
-const ianaTimeZones = new Set<string>([
-	'UTC',
-	...(typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl
-		? Intl.supportedValuesOf('timeZone')
-		: [])
-]);
-
+/** True when the runtime Intl engine recognizes the zone (canonical + aliases like US/Eastern, Etc/*). */
 export function isIanaTimezone(value: string): boolean {
-	return ianaTimeZones.has(value);
+	if (!value) return false;
+	try {
+		new Intl.DateTimeFormat('en-US', { timeZone: value });
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 const ianaTimezone = z
@@ -101,12 +100,22 @@ const ratePercentString = z
 		return Number.isFinite(n) && n >= 0 && n <= 100;
 	}, 'Rate must be between 0 and 100');
 
-export const taxRateFormSchema = z.object({
-	name: z.string().trim().min(1, 'Name is required').max(120),
-	ratePercent: ratePercentString,
-	isDefault: z.enum(['true', 'false']),
-	active: z.enum(['true', 'false'])
-});
+export const taxRateFormSchema = z
+	.object({
+		name: z.string().trim().min(1, 'Name is required').max(120),
+		ratePercent: ratePercentString,
+		isDefault: z.enum(['true', 'false']),
+		active: z.enum(['true', 'false'])
+	})
+	.superRefine((value, ctx) => {
+		if (value.isDefault === 'true' && value.active === 'false') {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['active'],
+				message: 'Default tax rate must remain active'
+			});
+		}
+	});
 
 export type TaxRateFormSchema = typeof taxRateFormSchema;
 export type TaxRateFormData = z.infer<typeof taxRateFormSchema>;

@@ -69,6 +69,28 @@ describe('OrgSwitcher', () => {
 		await expect.element(page.getByTestId('organisation-create-drawer')).toBeInTheDocument();
 	});
 
+	it('awaits delayed create failure without closing or double-submitting', async () => {
+		render(OrgSwitcherStoryHost, {
+			currentOrgId: memberships[0]!.org_id,
+			memberships: [memberships[0]!],
+			failCreate: true,
+			createDelayMs: 250
+		});
+
+		await page.getByTestId('org-switcher-trigger').click();
+		await page.getByTestId('org-switcher-create').click();
+		await page.getByLabelText('Name').fill('Slow Fail Org');
+		await page.getByTestId('organisation-create-submit').click();
+
+		await expect.element(page.getByTestId('organisation-create-submit')).toBeDisabled();
+		await expect.element(page.getByTestId('organisation-create-submit')).toHaveTextContent(
+			/Creating/i
+		);
+		await expect.element(page.getByTestId('organisation-create-error')).toBeInTheDocument();
+		await expect.element(page.getByTestId('organisation-create-drawer')).toBeInTheDocument();
+		await expect.element(page.getByTestId('organisation-create-submit')).not.toBeDisabled();
+	});
+
 	it('selects and opens configuration after successful create', async () => {
 		render(OrgSwitcherStoryHost, {
 			currentOrgId: memberships[0]!.org_id,

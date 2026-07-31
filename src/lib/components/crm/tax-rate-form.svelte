@@ -29,6 +29,22 @@
 
 	const defaultLabel = $derived($formData.isDefault === 'true' ? 'Yes' : 'No');
 	const activeLabel = $derived($formData.active === 'true' ? 'Active' : 'Archived');
+
+	function onDefaultChange(value: string | undefined) {
+		if (!value) return;
+		$formData.isDefault = value as TaxRateFormData['isDefault'];
+		if (value === 'true') {
+			$formData.active = 'true';
+		}
+	}
+
+	function onActiveChange(value: string | undefined) {
+		if (!value) return;
+		$formData.active = value as TaxRateFormData['active'];
+		if (value === 'false') {
+			$formData.isDefault = 'false';
+		}
+	}
 </script>
 
 <form
@@ -69,8 +85,15 @@
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="tax-rate-default">Default</Label>
-			<Select.Root type="single" bind:value={$formData.isDefault} name="isDefault">
-				<Select.Trigger id="tax-rate-default" class="w-full">{defaultLabel}</Select.Trigger>
+			<Select.Root
+				type="single"
+				value={$formData.isDefault}
+				onValueChange={onDefaultChange}
+				name="isDefault"
+			>
+				<Select.Trigger id="tax-rate-default" class="w-full" data-testid="tax-rate-default-trigger">
+					{defaultLabel}
+				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="true" label="Yes">Yes</Select.Item>
 					<Select.Item value="false" label="No">No</Select.Item>
@@ -79,13 +102,33 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="tax-rate-active">Status</Label>
-			<Select.Root type="single" bind:value={$formData.active} name="active">
-				<Select.Trigger id="tax-rate-active" class="w-full">{activeLabel}</Select.Trigger>
+			<Select.Root
+				type="single"
+				value={$formData.active}
+				onValueChange={onActiveChange}
+				name="active"
+			>
+				<Select.Trigger id="tax-rate-active" class="w-full" data-testid="tax-rate-active-trigger">
+					{activeLabel}
+				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="true" label="Active">Active</Select.Item>
-					<Select.Item value="false" label="Archived">Archived</Select.Item>
+					<Select.Item
+						value="false"
+						label="Archived"
+						disabled={$formData.isDefault === 'true'}
+						data-testid="tax-rate-active-archived"
+					>
+						Archived
+					</Select.Item>
 				</Select.Content>
 			</Select.Root>
+			{#if $errors.active}<p class="text-destructive text-xs">{$errors.active}</p>{/if}
+			{#if $formData.isDefault === 'true'}
+				<p class="text-muted-foreground text-xs">
+					The organisation default cannot be archived.
+				</p>
+			{/if}
 		</div>
 	</div>
 

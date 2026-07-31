@@ -14,7 +14,12 @@
 		form: SuperForm<OrganisationCreateData>;
 		submitLabel?: string;
 		class?: string;
-		onValidSubmit?: () => void;
+		/**
+		 * Called after client-side validation succeeds.
+		 * May return a Promise; Superforms awaits it before ending submitting.
+		 * Return `false` to signal failure to the drawer (keep open).
+		 */
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -47,7 +52,7 @@
 	use:enhance={{
 		onUpdate({ form: validated }) {
 			if (!validated.valid) return;
-			onValidSubmit?.();
+			return onValidSubmit?.();
 		}
 	}}
 >

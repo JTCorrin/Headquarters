@@ -9,7 +9,7 @@
 
 	export interface OrganisationCreateFormTestHostProps {
 		initial?: Partial<OrganisationCreateData>;
-		onValidSubmit?: () => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let { initial = {}, onValidSubmit }: OrganisationCreateFormTestHostProps = $props();
