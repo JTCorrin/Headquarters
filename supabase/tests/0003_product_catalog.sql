@@ -108,6 +108,7 @@ select org_id, readonly_id, 'readonly', 'active' from _catalog_fixture;
 insert into public.memberships (org_id, user_id, role, status)
 select other_org_id, outsider_id, 'owner', 'active' from _catalog_fixture;
 
+-- Seed cross-tenant product as privileged role (before switching to authenticated).
 with outsider_product as (
   insert into public.products (
     org_id, sku, name, product_type, unit_price_cents, currency,
@@ -138,8 +139,8 @@ select pg_temp.as_user((select owner_id from _catalog_fixture));
 set local role authenticated;
 
 with created_category as (
-  insert into public.product_categories (org_id, name, description, created_by, updated_by)
-  select org_id, 'Widgets', 'Widget category', owner_id, owner_id from _catalog_fixture
+  insert into public.product_categories (org_id, name, description)
+  select org_id, 'Widgets', 'Widget category' from _catalog_fixture
   returning id
 )
 update _catalog_fixture set category_id = created_category.id from created_category;
@@ -147,11 +148,11 @@ update _catalog_fixture set category_id = created_category.id from created_categ
 with created_product as (
   insert into public.products (
     org_id, sku, name, category_id, product_type, unit_price_cents, currency,
-    track_stock, status, created_by, updated_by
+    track_stock, status
   )
   select
     org_id, 'SKU-100', 'Tracked Widget', category_id, 'product', 1250, 'GBP',
-    true, 'active', owner_id, owner_id
+    true, 'active'
   from _catalog_fixture
   returning id
 )
@@ -211,9 +212,9 @@ select throws_ok(
 select throws_ok(
   $$
     insert into public.inventory_movements (
-      org_id, product_id, quantity_delta, reason, created_by
+      org_id, product_id, quantity_delta, reason
     )
-    select org_id, product_id, 1, 'adjustment', owner_id from _catalog_fixture
+    select org_id, product_id, 1, 'adjustment' from _catalog_fixture
   $$,
   '42501',
   null,
@@ -224,10 +225,10 @@ select throws_ok(
   $$
     insert into public.products (
       org_id, sku, name, product_type, unit_price_cents, currency,
-      track_stock, status, created_by, updated_by
+      track_stock, status
     )
     select org_id, 'SVC-1', 'Consulting', 'service', 5000, 'GBP',
-      true, 'active', owner_id, owner_id
+      true, 'active'
     from _catalog_fixture
   $$,
   '23514',
@@ -242,10 +243,10 @@ where id = (select product_id from _catalog_fixture);
 with recreated as (
   insert into public.products (
     org_id, sku, name, product_type, unit_price_cents, currency,
-    track_stock, status, created_by, updated_by
+    track_stock, status
   )
   select org_id, 'SKU-100', 'Tracked Widget v2', 'product', 1500, 'GBP',
-    true, 'active', owner_id, owner_id
+    true, 'active'
   from _catalog_fixture
   returning id
 )
@@ -281,8 +282,8 @@ select ok(
 
 select throws_ok(
   $$
-    insert into public.product_categories (org_id, name, created_by, updated_by)
-    select org_id, 'Widgets', owner_id, owner_id from _catalog_fixture
+    insert into public.product_categories (org_id, name)
+    select org_id, 'Widgets' from _catalog_fixture
   $$,
   '23505',
   null,
@@ -318,10 +319,9 @@ select ok(
 select throws_ok(
   $$
     insert into public.products (
-      org_id, sku, name, product_type, unit_price_cents, currency,
-      created_by, updated_by
+      org_id, sku, name, product_type, unit_price_cents, currency
     )
-    select org_id, 'BILL-1', 'Nope', 'product', 100, 'GBP', billing_id, billing_id
+    select org_id, 'BILL-1', 'Nope', 'product', 100, 'GBP'
     from _catalog_fixture
   $$,
   '42501',
