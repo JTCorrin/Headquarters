@@ -117,12 +117,42 @@ jobs:
 
       - name: Run database tests
         run: |
-          set -- supabase/tests/*.sql
-          if [ ! -e "$1" ]; then
+          test_files=(supabase/tests/*.sql)
+          if [ ! -e "${test_files[0]}" ]; then
             echo "No pgTAP test files found in supabase/tests" >&2
             exit 1
           fi
-          supabase test db "$@" --local
+
+          project_id="headquarters-${FORGEJO_RUN_ID}-${FORGEJO_RUN_ATTEMPT}"
+          database_container="supabase_db_${project_id}"
+          test_container="pgtap_${project_id}"
+          database_network="$(
+            docker inspect "${database_container}" \
+              --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' |
+              awk 'NF { print; exit }'
+          )"
+          container_tests=()
+          for test_file in "${test_files[@]}"; do
+            container_tests+=("/tests/${test_file##*/}")
+          done
+
+          # The Docker daemon cannot bind-mount paths that only exist inside
+          # Forgejo's job container, so stream the tests into a sibling container.
+          trap 'docker rm -f "${test_container}" >/dev/null 2>&1 || true' EXIT
+          docker exec "${database_container}" \
+            psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+              -c 'create extension if not exists pgtap with schema extensions'
+          docker pull ghcr.io/supabase/pg_prove:3.36
+          docker create \
+            --name "${test_container}" \
+            --network "${database_network}" \
+            --env 'PGOPTIONS=--search_path=public,extensions' \
+            ghcr.io/supabase/pg_prove:3.36 \
+            pg_prove \
+              -d "postgresql://postgres:postgres@${database_container}:5432/postgres" \
+              "${container_tests[@]}"
+          docker cp supabase/tests "${test_container}:/tests"
+          docker start --attach "${test_container}"
 
       - name: Lint database schemas
         run: >
