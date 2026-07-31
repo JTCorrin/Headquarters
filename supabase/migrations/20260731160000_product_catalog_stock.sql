@@ -642,11 +642,11 @@ set search_path = ''
 as $$
 declare
   v_actor_id uuid := auth.uid();
-  product_org uuid;
-  existing public.api_idempotency_keys;
-  adjustment jsonb;
-  response_body jsonb;
-  response_headers jsonb;
+  v_product_org uuid;
+  v_existing public.api_idempotency_keys;
+  v_adjustment jsonb;
+  v_response_body jsonb;
+  v_response_headers jsonb;
   v_expires_at timestamptz := now() + make_interval(secs => greatest(p_ttl_seconds, 60));
 begin
   if v_actor_id is null then
@@ -665,45 +665,45 @@ begin
       using errcode = '22023';
   end if;
 
-  select products.org_id into product_org
+  select products.org_id into v_product_org
   from public.products
   where products.id = p_product_id
     and products.deleted_at is null;
 
-  if product_org is null then
+  if v_product_org is null then
     raise exception 'Product not found'
       using errcode = 'P0002';
   end if;
 
-  if not private.has_org_role(product_org, array['owner', 'admin', 'member']) then
+  if not private.has_org_role(v_product_org, array['owner', 'admin', 'member']) then
     raise exception 'This action is not permitted'
       using errcode = '42501';
   end if;
 
   loop
-    select * into existing
+    select * into v_existing
     from public.api_idempotency_keys
-    where api_idempotency_keys.org_id = product_org
+    where api_idempotency_keys.org_id = v_product_org
       and api_idempotency_keys.actor_type = 'user'
       and api_idempotency_keys.actor_id = v_actor_id
       and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash
     for update;
 
     if found then
-      if existing.expires_at > now() then
-        if existing.request_hash is distinct from p_request_hash
-          or existing.route is distinct from p_route
+      if v_existing.expires_at > now() then
+        if v_existing.request_hash is distinct from p_request_hash
+          or v_existing.route is distinct from p_route
         then
           raise exception 'Idempotency-Key was reused with a different request payload'
             using errcode = '23505';
         end if;
 
-        if existing.response_status is not null and existing.response_body is not null then
+        if v_existing.response_status is not null and v_existing.response_body is not null then
           return jsonb_build_object(
             'replay', true,
-            'response_status', existing.response_status,
-            'response_body', existing.response_body -> 'body',
-            'response_headers', coalesce(existing.response_body -> 'headers', '{}'::jsonb)
+            'response_status', v_existing.response_status,
+            'response_body', v_existing.response_body -> 'body',
+            'response_headers', coalesce(v_existing.response_body -> 'headers', '{}'::jsonb)
           );
         end if;
 
@@ -713,7 +713,7 @@ begin
 
       -- Expired key: reclaim the unique slot.
       delete from public.api_idempotency_keys
-      where api_idempotency_keys.id = existing.id;
+      where api_idempotency_keys.id = v_existing.id;
     end if;
 
     begin
@@ -726,7 +726,7 @@ begin
         request_hash,
         expires_at
       ) values (
-        product_org,
+        v_product_org,
         'user',
         v_actor_id,
         p_idempotency_key_hash,
@@ -742,7 +742,7 @@ begin
     end;
   end loop;
 
-  adjustment := public.adjust_product_stock(
+  v_adjustment := public.adjust_product_stock(
     p_product_id,
     p_quantity_delta,
     p_reason,
@@ -750,22 +750,22 @@ begin
     p_occurred_at
   );
 
-  response_headers := jsonb_build_object(
-    'etag', '"' || (adjustment -> 'product' ->> 'version') || '"'
+  v_response_headers := jsonb_build_object(
+    'etag', '"' || (v_adjustment -> 'product' ->> 'version') || '"'
   );
-  response_body := jsonb_build_object(
+  v_response_body := jsonb_build_object(
     'status', 200,
-    'body', jsonb_build_object('data', adjustment),
-    'headers', response_headers
+    'body', jsonb_build_object('data', v_adjustment),
+    'headers', v_response_headers
   );
 
   update public.api_idempotency_keys
   set
     response_status = 200,
-    response_body = response_body,
+    response_body = v_response_body,
     resource_type = 'product',
     resource_id = p_product_id
-  where api_idempotency_keys.org_id = product_org
+  where api_idempotency_keys.org_id = v_product_org
     and api_idempotency_keys.actor_type = 'user'
     and api_idempotency_keys.actor_id = v_actor_id
     and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash;
@@ -773,10 +773,10 @@ begin
   return jsonb_build_object(
     'replay', false,
     'response_status', 200,
-    'response_body', response_body -> 'body',
-    'response_headers', response_headers,
-    'product', adjustment -> 'product',
-    'movement', adjustment -> 'movement'
+    'response_body', v_response_body -> 'body',
+    'response_headers', v_response_headers,
+    'product', v_adjustment -> 'product',
+    'movement', v_adjustment -> 'movement'
   );
 end;
 $$;
