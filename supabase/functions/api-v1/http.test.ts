@@ -425,6 +425,11 @@ Deno.test('tax rate and profile preference validation', () => {
     () => validateTaxRateBody({ name: 'Bad', rate_percent: 20, org_id: 'x' }, false),
     ApiError,
   )
+  assertThrows(() => validateTaxRateBody({}, true), ApiError)
+  assertEquals(
+    validateTaxRateBody({ name: 'Renamed' }, true),
+    { name: 'Renamed' },
+  )
   assertEquals(
     validateProfilePreferencesBody({ theme_preference: null }),
     { theme_preference: null },
