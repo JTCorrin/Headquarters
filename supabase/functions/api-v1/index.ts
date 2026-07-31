@@ -2,10 +2,34 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import { withSupabase } from '@supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
+import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { handleLeads } from './leads.ts'
 
 const corsOrigin = Deno.env.get('API_CORS_ORIGIN') ?? '*'
+
+type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
+
+function assertCanAccessPipeline(
+  role: MembershipRole,
+  method: string,
+  resource: 'leads' | 'clients',
+): void {
+  if (resource === 'leads' && role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access leads')
+  }
+  if (resource === 'clients' && role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read clients')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      `Readonly members cannot modify ${resource}`,
+    )
+  }
+}
 
 export default {
   fetch: withSupabase(
@@ -79,6 +103,16 @@ export default {
             throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify contacts')
           }
           return await handleContacts(req, db, path, orgId, requestId)
+        }
+
+        if (path === '/api/v1/leads' || path.startsWith('/api/v1/leads/')) {
+          assertCanAccessPipeline(membership.role, req.method, 'leads')
+          return await handleLeads(req, db, path, orgId, requestId)
+        }
+
+        if (path === '/api/v1/clients' || path.startsWith('/api/v1/clients/')) {
+          assertCanAccessPipeline(membership.role, req.method, 'clients')
+          return await handleClients(req, db, path, orgId, requestId)
         }
 
         throw new ApiError(404, 'NOT_FOUND', 'Route not found')
