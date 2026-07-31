@@ -591,6 +591,8 @@ select throws_ok(
   'soft-deleted quotes cannot be saved'
 );
 
+reset role;
+
 select ok(
   (
     select next_number = 3
@@ -600,6 +602,9 @@ select ok(
   ),
   'document sequence advances for each allocated quote number'
 );
+
+select pg_temp.as_user((select owner_id from _quotes_fixture));
+set local role authenticated;
 
 select lives_ok(
   $$
@@ -611,6 +616,8 @@ select lives_ok(
   $$,
   'create_organisation still works after quote sequence seeding'
 );
+
+reset role;
 
 select ok(
   exists (
