@@ -75,6 +75,21 @@ Clients routes:
 - `PATCH /api/v1/clients/{client_id}`
 - `DELETE /api/v1/clients/{client_id}`
 
+Product catalog routes:
+
+- `GET /api/v1/product-categories?limit=50&cursor=...`
+- `POST /api/v1/product-categories`
+- `GET /api/v1/product-categories/{category_id}`
+- `PATCH /api/v1/product-categories/{category_id}`
+- `DELETE /api/v1/product-categories/{category_id}`
+- `GET /api/v1/products?limit=50&cursor=...&status=...`
+- `POST /api/v1/products`
+- `GET /api/v1/products/{product_id}`
+- `PATCH /api/v1/products/{product_id}`
+- `DELETE /api/v1/products/{product_id}`
+- `POST /api/v1/products/{product_id}/adjust-stock` — JSON `{ "quantity_delta", "reason?", "note?", "occurred_at?" }`
+
 `PATCH` and `DELETE` require the latest strong numeric ETag (for example, `If-Match: "3"`).
 Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Marking a lead as `won`
-must go through `/convert`; clients must never send or trust an `org_id` in a JSON body.
+must go through `/convert`. Stock quantity changes only through `/adjust-stock`; clients must never
+send or trust an `org_id` in a JSON body.
