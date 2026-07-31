@@ -1,6 +1,8 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
+import { validateClientBody } from './clients.ts'
 import { decodeCursor, validateContactBody } from './contacts.ts'
 import { ApiError, apiPath, jsonBody, parseLimit, parseVersion } from './http.ts'
+import { validateLeadBody } from './leads.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -91,6 +93,106 @@ Deno.test('contact cursors reject untrusted values', () => {
             id: '52e1a71a-1c93-4ec8-a566-e0eecaf06747',
           }),
         ),
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('lead create validation defaults stage and currency', () => {
+  assertEquals(
+    validateLeadBody(
+      {
+        name: '  Acme Opportunity  ',
+        company_name: 'Acme Ltd',
+        value_cents: 125000,
+      },
+      false,
+    ),
+    {
+      name: 'Acme Opportunity',
+      company_name: 'Acme Ltd',
+      value_cents: 125000,
+      stage: 'new',
+      currency: 'GBP',
+      position: 0,
+    },
+  )
+})
+
+Deno.test('lead validation rejects direct won stage and requires lost_reason', () => {
+  assertThrows(
+    () => validateLeadBody({ name: 'Won deal', stage: 'won' }, false),
+    ApiError,
+  )
+  assertThrows(
+    () => validateLeadBody({ name: 'Lost deal', stage: 'lost' }, false),
+    ApiError,
+  )
+  assertEquals(
+    validateLeadBody(
+      { name: 'Lost deal', stage: 'lost', lost_reason: 'No budget' },
+      false,
+    ).lost_reason,
+    'No budget',
+  )
+})
+
+Deno.test('lead validation rejects unsafe integers and impossible dates', () => {
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Overflow', value_cents: Number.MAX_SAFE_INTEGER + 1 },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Bad date', expected_close_on: '2026-02-31' },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Bad probability', probability_percent: 12.345 },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Position overflow', position: 10_000_000_000 },
+        false,
+      ),
+    ApiError,
+  )
+  assertEquals(
+    validateLeadBody({ name: 'Position ok', position: 12345.6789012345 }, false).position,
+    12345.6789012345,
+  )
+})
+
+Deno.test('client create validation defaults status and rejects conversion fields', () => {
+  assertEquals(
+    validateClientBody({ name: '  Acme Ltd  ', primary_email: 'billing@acme.test' }, false),
+    {
+      name: 'Acme Ltd',
+      primary_email: 'billing@acme.test',
+      status: 'active',
+    },
+  )
+  assertThrows(
+    () =>
+      validateClientBody(
+        {
+          name: 'Acme Ltd',
+          converted_from_lead_id: '52e1a71a-1c93-4ec8-a566-e0eecaf06747',
+        },
+        false,
       ),
     ApiError,
   )
