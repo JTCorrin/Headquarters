@@ -249,10 +249,10 @@ set local role authenticated;
 
 with recreated as (
   insert into public.products (
-    org_id, sku, name, product_type, unit_price_cents, currency,
+    org_id, sku, name, category_id, product_type, unit_price_cents, currency,
     track_stock, status
   )
-  select org_id, 'SKU-100', 'Tracked Widget v2', 'product', 1500, 'GBP',
+  select org_id, 'SKU-100', 'Tracked Widget v2', category_id, 'product', 1500, 'GBP',
     true, 'active'
   from _catalog_fixture
   returning id
