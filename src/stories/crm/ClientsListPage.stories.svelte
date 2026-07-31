@@ -1,62 +1,38 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import ClientsListPage from '$lib/components/crm/clients-list-page.svelte';
+	import ClientsListPageStoryHost from '$lib/components/crm/clients-list-page.story-host.svelte';
 	import { navGroupsWithActive } from './story-fixtures.js';
 
 	const rows = [
 		{
 			id: '1',
 			name: 'Northwind',
-			status: 'Client',
+			status: 'Active',
 			owner: 'Joe',
-			openInvoices: '£2,200.00',
-			pipeline: '£4,200 quoted'
+			openInvoices: '£4,200',
+			pipeline: '£18k'
 		},
 		{
 			id: '2',
 			name: 'Contoso',
-			status: 'Client',
+			status: 'Prospect',
 			owner: 'Maya',
-			openInvoices: '£0.00',
-			pipeline: '—'
+			openInvoices: '—',
+			pipeline: '£12k'
 		},
 		{
 			id: '3',
 			name: 'Fabrikam',
 			status: 'At risk',
 			owner: 'Joe',
-			openInvoices: '£6,500.00',
-			pipeline: '£12,400 quoted'
-		},
-		{
-			id: '4',
-			name: 'Litware',
-			status: 'Client',
-			owner: 'Sam',
-			openInvoices: '£1,050.00',
-			pipeline: '£750 draft'
-		},
-		{
-			id: '5',
-			name: 'Adventure Works',
-			status: 'Churned',
-			owner: 'Maya',
-			openInvoices: '£0.00',
-			pipeline: '—'
-		},
-		{
-			id: '6',
-			name: 'Wide World Importers',
-			status: 'Client',
-			owner: 'Joe',
-			openInvoices: '£18,000.00',
-			pipeline: 'Annual renewal'
+			openInvoices: '£6,500',
+			pipeline: '£12k'
 		}
 	];
 
 	const { Story } = defineMeta({
 		title: 'Headquarters/Pages/ClientsList',
-		component: ClientsListPage,
+		component: ClientsListPageStoryHost,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' },
 		args: {
@@ -70,11 +46,55 @@
 <Story name="Default">
 	{#snippet template(args)}
 		{@const props =
-			/** @type {import('$lib/components/crm/clients-list-page.svelte').ClientsListPageProps} */ (
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
 				args
 			)}
 		<div class="h-screen">
-			<ClientsListPage {...props} />
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Empty" args={{ rows: [], viewState: { kind: 'empty' } }}>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Forbidden" args={{ rows: [], viewState: { kind: 'forbidden' } }}>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story
+	name="Conflict412"
+	args={{
+		viewState: {
+			kind: 'conflict',
+			message: 'Client version does not match If-Match'
+		}
+	}}
+>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
 		</div>
 	{/snippet}
 </Story>

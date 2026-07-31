@@ -83,6 +83,7 @@
 	const documentForm = superForm(documentData, {
 		validators: zod4(documentFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: true,
 		onUpdate({ form }) {
 			if (!form.valid) return;
