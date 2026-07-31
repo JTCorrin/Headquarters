@@ -104,4 +104,28 @@ describe('SettingsConfigPage', () => {
 		expect(page.getByTestId('tax-rate-archive-tax-1').elements().length).toBe(0);
 		await expect.element(page.getByTestId('tax-rate-archive-tax-2')).toBeInTheDocument();
 	});
+
+	it('keeps the tax drawer open on delayed save failure', async () => {
+		render(SettingsConfigPageTestHost, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Config'),
+			role: 'owner',
+			configuration,
+			taxRates,
+			failTaxSave: true,
+			taxSaveDelayMs: 400
+		});
+
+		await page.getByTestId('tax-rate-add').click();
+		await expect.element(page.getByTestId('tax-rate-drawer')).toBeInTheDocument();
+		await page.getByLabelText('Name').fill('Reduced 5%');
+		const submit = page.getByTestId('tax-rate-submit');
+		await submit.click();
+
+		await expect.element(submit).toHaveTextContent(/Saving/i);
+		await expect.element(submit).toBeDisabled();
+		await expect.element(page.getByTestId('tax-rate-save-error')).toBeInTheDocument();
+		await expect.element(page.getByTestId('tax-rate-drawer')).toBeInTheDocument();
+		await expect.element(submit).not.toBeDisabled();
+	});
 });

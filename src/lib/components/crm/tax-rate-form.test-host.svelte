@@ -6,7 +6,7 @@
 
 	export interface TaxRateFormTestHostProps {
 		initial?: Partial<TaxRateFormData>;
-		onValidSubmit?: () => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let { initial = {}, onValidSubmit }: TaxRateFormTestHostProps = $props();

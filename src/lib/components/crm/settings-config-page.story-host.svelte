@@ -20,11 +20,17 @@
 		configuration?: OrganisationConfigResource | null;
 		taxRates?: TaxRateResource[];
 		viewState?: ResourceViewState;
+		/** Simulate resolved `false` from tax save. */
+		failTaxSave?: boolean;
+		/** Simulate rejected tax save. */
+		rejectTaxSave?: boolean;
+		/** Artificial tax-save latency in ms. */
+		taxSaveDelayMs?: number;
 		class?: string;
 		onReload?: () => void;
 		onSaveConfig?: () => void;
 		onSavePreferences?: () => void;
-		onSaveTaxRate?: () => void;
+		onSaveTaxRate?: () => boolean | void | Promise<boolean | void>;
 		onSetDefaultTaxRate?: (taxRateId: string) => void;
 		onArchiveTaxRate?: (taxRateId: string) => void;
 	}
@@ -36,6 +42,9 @@
 		configuration = null,
 		taxRates = [],
 		viewState = { kind: 'ready' },
+		failTaxSave = false,
+		rejectTaxSave = false,
+		taxSaveDelayMs = 0,
 		class: className,
 		onReload,
 		onSaveConfig,
@@ -135,6 +144,20 @@
 		}));
 		onSetDefaultTaxRate?.(taxRateId);
 	}
+
+	async function handleSaveTaxRate(): Promise<boolean> {
+		if (taxSaveDelayMs > 0) {
+			await new Promise((resolve) => setTimeout(resolve, taxSaveDelayMs));
+		}
+		if (rejectTaxSave) {
+			throw new Error('Could not save tax rate — try again.');
+		}
+		if (failTaxSave) {
+			return false;
+		}
+		const result = await onSaveTaxRate?.();
+		return result === false ? false : true;
+	}
 </script>
 
 <SettingsConfigPage
@@ -152,7 +175,7 @@
 	{onReload}
 	{onSaveConfig}
 	{onSavePreferences}
-	{onSaveTaxRate}
+	onSaveTaxRate={handleSaveTaxRate}
 	onSetDefaultTaxRate={handleSetDefault}
 	{onArchiveTaxRate}
 	{onEditTaxRate}

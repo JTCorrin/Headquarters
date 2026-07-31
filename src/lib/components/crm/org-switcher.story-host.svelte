@@ -13,12 +13,15 @@
 		currentOrgId?: string;
 		memberships?: OrgMembershipSummary[];
 		switchError?: string | null;
-		/** Simulate API create failure when true. */
+		/** Simulate API create failure via resolved `false`. */
 		failCreate?: boolean;
+		/** Simulate API create failure via rejected promise. */
+		rejectCreate?: boolean;
 		/** Artificial create latency in ms (keeps submitting true while pending). */
 		createDelayMs?: number;
 		class?: string;
 		onOpenedConfig?: (orgId: string) => void;
+		onCreateAttempt?: () => void;
 	}
 
 	let {
@@ -26,9 +29,11 @@
 		memberships: initialMemberships = [],
 		switchError = null,
 		failCreate = false,
+		rejectCreate = false,
 		createDelayMs = 0,
 		class: className,
-		onOpenedConfig
+		onOpenedConfig,
+		onCreateAttempt
 	}: OrgSwitcherStoryHostProps = $props();
 
 	let currentOrgId = $state(initialOrgId);
@@ -72,9 +77,13 @@
 	);
 
 	async function handleCreate(): Promise<boolean> {
+		onCreateAttempt?.();
 		createError = null;
 		if (createDelayMs > 0) {
 			await new Promise((resolve) => setTimeout(resolve, createDelayMs));
+		}
+		if (rejectCreate) {
+			throw new Error('Could not create organisation — try again.');
 		}
 		if (failCreate) {
 			createError = 'Could not create organisation — try again.';
