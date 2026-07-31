@@ -153,3 +153,38 @@ export function parseVersion(req: Request): number {
 export function etag(version: number): string {
   return `"${version}"`
 }
+
+/** Strict ISO-8601 instant with a real calendar date (rejects Date.parse normalization). */
+export function isStrictIsoTimestamp(value: string): boolean {
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/,
+  )
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return false
+  }
+
+  // Reject impossible calendar dates (Date.parse would normalize 2026-02-31).
+  const probe = new Date(Date.UTC(year, month - 1, day))
+  return (
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day &&
+    !Number.isNaN(Date.parse(value))
+  )
+}
