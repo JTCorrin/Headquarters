@@ -1,6 +1,6 @@
 begin;
 
-select plan(30);
+select plan(35);
 
 select has_column('public', 'organisations', 'theme_default', 'organisations.theme_default exists');
 select has_column('public', 'organisations', 'version', 'organisations.version exists');
@@ -406,6 +406,97 @@ select lives_ok(
     where id = (select org_a from _orgcfg_fixture)
   $$,
   'admin can update organisation configuration'
+);
+
+select ok(
+  not exists (
+    select 1
+    from public.products
+    where products.tax_rate_id is not null
+      and not exists (
+        select 1
+        from public.tax_rates
+        where tax_rates.id = products.tax_rate_id
+          and tax_rates.org_id = products.org_id
+      )
+  ),
+  'upgrade-path invariant: every product tax_rate_id references tax_rates'
+);
+
+select pg_temp.as_user((select owner_id from _orgcfg_fixture));
+set local role authenticated;
+
+with rate as (
+  select tax_rates.id
+  from public.tax_rates
+  join _orgcfg_fixture on tax_rates.org_id = _orgcfg_fixture.org_a
+  where tax_rates.is_default
+    and tax_rates.deleted_at is null
+  limit 1
+),
+created as (
+  insert into public.products (
+    org_id, sku, name, product_type, unit_price_cents, currency,
+    tax_rate_id, track_stock, status
+  )
+  select
+    _orgcfg_fixture.org_a,
+    'TAX-P1',
+    'Taxed Widget',
+    'product',
+    100,
+    'GBP',
+    rate.id,
+    false,
+    'active'
+  from _orgcfg_fixture, rate
+  returning id, tax_rate_id
+)
+select ok(
+  exists (select 1 from created where tax_rate_id is not null),
+  'owner can assign an active tax rate to a product'
+);
+
+select throws_ok(
+  $$
+    update public.tax_rates
+    set active = false, is_default = false
+    where org_id = (select org_a from _orgcfg_fixture)
+      and is_default
+      and deleted_at is null
+  $$,
+  '23514',
+  null,
+  'cannot deactivate a tax rate while products reference it'
+);
+
+select throws_ok(
+  $$
+    update public.tax_rates
+    set deleted_at = now(), active = false, is_default = false
+    where org_id = (select org_a from _orgcfg_fixture)
+      and name = 'Zero'
+      and deleted_at is null
+  $$,
+  '23514',
+  null,
+  'cannot soft-delete a tax rate while products reference it'
+);
+
+update public.products
+set tax_rate_id = null
+where sku = 'TAX-P1'
+  and org_id = (select org_a from _orgcfg_fixture);
+
+select lives_ok(
+  $$
+    update public.tax_rates
+    set active = false, is_default = false
+    where org_id = (select org_a from _orgcfg_fixture)
+      and name = 'Zero'
+      and deleted_at is null
+  $$,
+  'tax rate may be deactivated after product references are cleared'
 );
 
 reset role;

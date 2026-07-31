@@ -101,6 +101,18 @@ create trigger tax_rates_ensure_single_default
 before insert or update of is_default, active, deleted_at on public.tax_rates
 for each row execute function private.ensure_single_default_tax_rate();
 
+-- Prior product API accepted arbitrary UUIDs with no FK. Clear orphans before
+-- attaching the new tax_rates reference so upgrades cannot fail on stale IDs.
+update public.products
+set tax_rate_id = null
+where tax_rate_id is not null
+  and not exists (
+    select 1
+    from public.tax_rates
+    where tax_rates.id = products.tax_rate_id
+      and tax_rates.org_id = products.org_id
+  );
+
 -- Products may reference an active org tax rate.
 alter table public.products
   add constraint products_tax_rate_fk
@@ -145,9 +157,45 @@ create trigger products_validate_tax_rate
 before insert or update of tax_rate_id on public.products
 for each row execute function private.validate_product_tax_rate();
 
+-- Active-rate invariant: do not deactivate/archive while products still reference.
+create or replace function private.protect_tax_rate_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  becoming_inactive boolean;
+  becoming_deleted boolean;
+begin
+  becoming_inactive := old.active and not new.active;
+  becoming_deleted := old.deleted_at is null and new.deleted_at is not null;
+
+  if becoming_inactive or becoming_deleted then
+    if exists (
+      select 1
+      from public.products
+      where products.tax_rate_id = old.id
+        and products.org_id = old.org_id
+        and products.deleted_at is null
+    ) then
+      raise exception 'Cannot deactivate or archive a tax rate while products reference it'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger tax_rates_protect_lifecycle
+before update of active, deleted_at on public.tax_rates
+for each row execute function private.protect_tax_rate_lifecycle();
+
 revoke all on function private.stamp_organisation_row() from public, anon, authenticated;
 revoke all on function private.ensure_single_default_tax_rate() from public, anon, authenticated;
 revoke all on function private.validate_product_tax_rate() from public, anon, authenticated;
+revoke all on function private.protect_tax_rate_lifecycle() from public, anon, authenticated;
 
 alter table public.tax_rates enable row level security;
 

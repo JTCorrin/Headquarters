@@ -48,6 +48,13 @@ export function validateTaxRateBody(
   }
   if ('org_id' in body) fields.org_id = 'Must not be supplied in the request body'
 
+  if (partial) {
+    const hasWritableField = Object.keys(body).some((key) => writable.has(key))
+    if (!hasWritableField) {
+      fields._ = 'At least one field is required'
+    }
+  }
+
   if ('name' in body) {
     const value = body.name
     if (typeof value !== 'string' || !value.trim() || value.trim().length > 120) {
@@ -112,6 +119,14 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
     )
   }
   if (error.code === '23514') {
+    if (error.message?.includes('while products reference')) {
+      return new ApiError(
+        422,
+        'VALIDATION_ERROR',
+        'Cannot deactivate or archive a tax rate while products reference it',
+        { tax_rate_id: 'Referenced by one or more products' },
+      )
+    }
     return new ApiError(422, 'VALIDATION_ERROR', 'Tax rate failed a database constraint')
   }
   console.error('Tax rate operation failed', {
