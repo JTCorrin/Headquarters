@@ -133,7 +133,7 @@ export default {
 
         if (path === '/api/v1/products' || path.startsWith('/api/v1/products/')) {
           assertCanAccessCatalog(membership.role, req.method)
-          return await handleProducts(req, db, path, orgId, requestId)
+          return await handleProducts(req, db, path, orgId, requestId, userId)
         }
 
         throw new ApiError(404, 'NOT_FOUND', 'Route not found')

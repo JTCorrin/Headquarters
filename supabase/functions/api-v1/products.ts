@@ -9,6 +9,13 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
+import {
+  beginIdempotentCommand,
+  completeIdempotentCommand,
+  hashIdempotencyRequest,
+  IDEMPOTENCY_KEY_HEADER,
+  parseIdempotencyKey,
+} from './idempotency.ts'
 
 const SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,sku,name,description,category_id,product_type,unit_name,unit_price_cents,cost_price_cents,currency,tax_rate_id,track_stock,stock_qty,low_stock_at,status,metadata'
@@ -333,7 +340,7 @@ function encodeCursor(row: Cursor): string {
     .replace(/=+$/, '')
 }
 
-function decodeCursor(value: string): Cursor {
+export function decodeProductCursor(value: string): Cursor {
   try {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
     const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
@@ -341,7 +348,13 @@ function decodeCursor(value: string): Cursor {
     const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<Cursor>
     const createdAt = cursor.created_at
     const id = parseUuid(cursor.id ?? null, 'cursor')
-    if (typeof createdAt !== 'string' || Number.isNaN(Date.parse(createdAt))) {
+    if (
+      typeof createdAt !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(
+        createdAt,
+      ) ||
+      Number.isNaN(Date.parse(createdAt))
+    ) {
       throw new Error('Invalid timestamp')
     }
     return { created_at: createdAt, id }
@@ -401,6 +414,7 @@ export function handleProducts(
   path: string,
   orgId: string,
   requestId: string,
+  userId: string,
 ): Promise<Response> {
   if (path === '/api/v1/products') {
     if (req.method === 'GET') {
@@ -422,7 +436,7 @@ export function handleProducts(
         if (status) query = query.eq('status', status as ProductStatus)
         const cursorValue = url.searchParams.get('cursor')
         if (cursorValue) {
-          const cursor = decodeCursor(cursorValue)
+          const cursor = decodeProductCursor(cursorValue)
           query = query.or(
             `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
           )
@@ -472,8 +486,29 @@ export function handleProducts(
     }
     return (async () => {
       const productId = adjustMatch[1]
+      const route = `/api/v1/products/${productId}/adjust-stock`
+      const rawKey = parseIdempotencyKey(req)
       await findProduct(db, orgId, productId, requestId)
       const payload = validateAdjustStockBody(await jsonBody(req))
+      const requestHash = await hashIdempotencyRequest(route, {
+        product_id: productId,
+        ...payload,
+      })
+      const { replay, keyHash } = await beginIdempotentCommand(
+        db,
+        orgId,
+        userId,
+        route,
+        rawKey,
+        requestHash,
+      )
+      if (replay) {
+        return jsonResponse(replay.body, replay.status, requestId, {
+          ...replay.headers,
+          [IDEMPOTENCY_KEY_HEADER]: rawKey,
+        })
+      }
+
       const { data, error } = await db.rpc('adjust_product_stock', {
         p_product_id: productId,
         p_quantity_delta: payload.quantity_delta,
@@ -489,8 +524,21 @@ export function handleProducts(
       if (!result.product || !result.movement) {
         throw new ApiError(500, 'INTERNAL_ERROR', 'Stock adjustment returned an incomplete payload')
       }
-      return jsonResponse({ data: result }, 200, requestId, {
-        etag: etag(result.product.version),
+
+      const responseBody = { data: result }
+      const responseHeaders = { etag: etag(result.product.version) }
+      await completeIdempotentCommand(
+        db,
+        orgId,
+        userId,
+        keyHash,
+        { status: 200, body: responseBody, headers: responseHeaders },
+        'product',
+        result.product.id,
+      )
+      return jsonResponse(responseBody, 200, requestId, {
+        ...responseHeaders,
+        [IDEMPOTENCY_KEY_HEADER]: rawKey,
       })
     })()
   }

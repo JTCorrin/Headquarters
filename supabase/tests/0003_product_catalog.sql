@@ -1,6 +1,6 @@
 begin;
 
-select plan(25);
+select plan(31);
 
 select has_table('public', 'product_categories', 'product_categories table exists');
 select has_table('public', 'products', 'products table exists');
@@ -314,7 +314,78 @@ select throws_ok(
   'adjust_product_stock denies cross-tenant products'
 );
 
+select throws_ok(
+  $$
+    update public.products
+    set track_stock = false
+    where id = (select product_id from _catalog_fixture)
+  $$,
+  '23514',
+  null,
+  'cannot disable stock tracking after movements or non-zero stock'
+);
+
+select throws_ok(
+  $$
+    select public.adjust_product_stock(
+      (select product_id from _catalog_fixture),
+      'NaN'::numeric
+    )
+  $$,
+  '22023',
+  null,
+  'adjust_product_stock rejects NaN quantity deltas'
+);
+
+select throws_ok(
+  $$
+    select public.adjust_product_stock(
+      (select product_id from _catalog_fixture),
+      'Infinity'::numeric
+    )
+  $$,
+  '22023',
+  null,
+  'adjust_product_stock rejects Infinity quantity deltas'
+);
+
+select lives_ok(
+  $$
+    insert into public.products (
+      org_id, sku, name, product_type, unit_price_cents, currency, track_stock, status
+    )
+    select org_id, 'FRESH-1', 'Untracked', 'product', 100, 'GBP', false, 'active'
+    from _catalog_fixture
+  $$,
+  'owner can create an untracked product'
+);
+
+select lives_ok(
+  $$
+    update public.products
+    set track_stock = true
+    where sku = 'FRESH-1'
+      and org_id = (select org_id from _catalog_fixture)
+      and deleted_at is null
+  $$,
+  'track_stock may be enabled when there is no ledger and stock is zero/null'
+);
+
+reset role;
+
+select throws_ok(
+  $$
+    update public.product_categories
+    set deleted_at = now()
+    where id = (select category_id from _catalog_fixture)
+  $$,
+  '23514',
+  null,
+  'cannot soft-delete a category while active products reference it'
+);
+
 select pg_temp.as_user((select billing_id from _catalog_fixture));
+set local role authenticated;
 
 select ok(
   exists (

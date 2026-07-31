@@ -3,8 +3,9 @@ import { validateClientBody } from './clients.ts'
 import { decodeCursor, validateContactBody } from './contacts.ts'
 import { ApiError, apiPath, jsonBody, parseLimit, parseVersion } from './http.ts'
 import { validateLeadBody } from './leads.ts'
-import { validateProductCategoryBody } from './product-categories.ts'
-import { validateAdjustStockBody, validateProductBody } from './products.ts'
+import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
+import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
+import { decodeProductCursor, validateAdjustStockBody, validateProductBody } from './products.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -265,4 +266,47 @@ Deno.test('stock adjustment validation bounds quantity_delta', () => {
   assertThrows(() => validateAdjustStockBody({ quantity_delta: 0 }), ApiError)
   assertThrows(() => validateAdjustStockBody({ quantity_delta: 10_000_000_000 }), ApiError)
   assertThrows(() => validateAdjustStockBody({ quantity_delta: 1.00001 }), ApiError)
+})
+
+Deno.test('catalog cursors require strict ISO-8601 timestamps', () => {
+  const encode = (createdAt: string) =>
+    btoa(JSON.stringify({
+      created_at: createdAt,
+      id: '52e1a71a-1c93-4ec8-a566-e0eecaf06747',
+    }))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replace(/=+$/, '')
+
+  assertEquals(
+    decodeProductCursor(encode('2026-07-31T12:00:00.123456Z')).created_at,
+    '2026-07-31T12:00:00.123456Z',
+  )
+  assertEquals(
+    decodeProductCategoryCursor(encode('2026-07-31T12:00:00+00:00')).created_at,
+    '2026-07-31T12:00:00+00:00',
+  )
+  assertThrows(() => decodeProductCursor(encode('2026-07-31 12:00:00')), ApiError)
+  assertThrows(() => decodeProductCategoryCursor(encode('July 31, 2026')), ApiError)
+})
+
+Deno.test('Idempotency-Key parsing and request hashing', async () => {
+  assertEquals(
+    parseIdempotencyKey(
+      new Request('https://example.test', { headers: { 'idempotency-key': 'adj-1' } }),
+    ),
+    'adj-1',
+  )
+  assertThrows(
+    () => parseIdempotencyKey(new Request('https://example.test')),
+    ApiError,
+  )
+  const a = await hashIdempotencyRequest('/api/v1/products/x/adjust-stock', {
+    quantity_delta: 1,
+  })
+  const b = await hashIdempotencyRequest('/api/v1/products/x/adjust-stock', {
+    quantity_delta: 2,
+  })
+  assertEquals(a.length, 64)
+  assertEquals(a === b, false)
 })
