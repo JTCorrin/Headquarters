@@ -892,6 +892,12 @@ set
   updated_by = (select owner_id from _quotes_fixture)
 where id = (select quote_id from _quotes_fixture);
 
+-- stamp_business_row bumps version on the planted header write.
+update _quotes_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _quotes_fixture.quote_id;
+
 do $$ begin perform set_config('app.allow_quote_totals', 'off', true); end $$;
 
 select pg_temp.as_user((select owner_id from _quotes_fixture));
@@ -958,6 +964,11 @@ set
   total_cents = 100,
   updated_by = (select owner_id from _quotes_fixture)
 where id = (select quote_id from _quotes_fixture);
+
+update _quotes_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _quotes_fixture.quote_id;
 
 do $$ begin perform set_config('app.allow_quote_totals', 'off', true); end $$;
 
