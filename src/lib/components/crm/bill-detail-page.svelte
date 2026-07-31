@@ -45,7 +45,7 @@
 		lineForm,
 		products = [],
 		lines = $bindable<LineItemRow[]>([]),
-		timelineEvents = [],
+		timelineEvents = $bindable<TimelineEvent[]>([]),
 		lineDrawerOpen = $bindable(false),
 		onRemoveLine,
 		onSchedule,
@@ -128,8 +128,10 @@
 					</LineItemsTable>
 
 					<Timeline
-						events={timelineEvents}
+						bind:events={timelineEvents}
 						title="Activity"
+						composable
+						composerActor="Joe"
 						emptyMessage="No bill activity yet."
 						class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					/>

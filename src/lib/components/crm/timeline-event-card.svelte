@@ -6,6 +6,11 @@
 		timelineKindMarkerClass,
 		type TimelineEventKind
 	} from './timeline-kinds.js';
+	import {
+		renderTimelineMarkdown,
+		timelineAccentMarkerClass
+	} from './timeline-accents.js';
+	import TimelineIcon from './timeline-icon.svelte';
 
 	export interface TimelineEventCardProps {
 		kind: TimelineEventKind | string;
@@ -13,6 +18,8 @@
 		body?: string;
 		occurredAt: string;
 		actor?: string;
+		accent?: string;
+		icon?: string;
 		/** Hide the connecting rail below this event (last item). */
 		isLast?: boolean;
 		/** Start expanded (also expands on hover/focus by default). */
@@ -26,14 +33,21 @@
 		body,
 		occurredAt,
 		actor,
+		accent,
+		icon,
 		isLast = false,
 		defaultExpanded = false,
 		class: className
 	}: TimelineEventCardProps = $props();
 
 	const kindLabel = $derived(timelineKindLabel(kind));
-	const markerClass = $derived(timelineKindMarkerClass(kind));
+	const markerClass = $derived(
+		timelineAccentMarkerClass(accent) ?? timelineKindMarkerClass(kind)
+	);
 	const hasBody = $derived(!!body?.trim());
+	const looksLikeMarkdown = $derived(
+		!!body && /(\*\*|`|^[-*]\s|\[.+\]\(https?:\/\/)/m.test(body)
+	);
 </script>
 
 <article
@@ -67,36 +81,56 @@
 		tabindex={hasBody ? 0 : undefined}
 	>
 		<Card.Header class="gap-1.5">
-			<p class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
-				{occurredAt} · {kindLabel}
-				{#if actor}
-					<span class="normal-case tracking-normal"> · {actor}</span>
-				{/if}
-			</p>
-			<Card.Title class="text-base font-semibold">{title}</Card.Title>
-			{#if hasBody}
-				<div
-					class={cn(
-						'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
-						defaultExpanded
-							? 'grid-rows-[1fr] opacity-100'
-							: 'grid-rows-[0fr] opacity-70 group-hover/timeline-card:grid-rows-[1fr] group-hover/timeline-card:opacity-100 group-focus-within/timeline-card:grid-rows-[1fr] group-focus-within/timeline-card:opacity-100'
-					)}
-				>
-					<div class="overflow-hidden">
-						<Card.Description class="pt-1 text-sm leading-relaxed">
-							{body}
-						</Card.Description>
-					</div>
-				</div>
-				{#if !defaultExpanded}
-					<p
-						class="text-muted-foreground text-[11px] transition-opacity duration-200 group-hover/timeline-card:opacity-0 group-focus-within/timeline-card:opacity-0"
+			<div class="flex items-start gap-2">
+				{#if icon}
+					<span
+						class="bg-muted text-muted-foreground mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-lg"
 					>
-						Hover to expand
-					</p>
+						<TimelineIcon name={icon} />
+					</span>
 				{/if}
-			{/if}
+				<div class="min-w-0 flex-1 space-y-1.5">
+					<p class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+						{occurredAt} · {kindLabel}
+						{#if actor}
+							<span class="normal-case tracking-normal"> · {actor}</span>
+						{/if}
+					</p>
+					<Card.Title class="text-base font-semibold">{title}</Card.Title>
+					{#if hasBody}
+						<div
+							class={cn(
+								'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
+								defaultExpanded
+									? 'grid-rows-[1fr] opacity-100'
+									: 'grid-rows-[0fr] opacity-70 group-hover/timeline-card:grid-rows-[1fr] group-hover/timeline-card:opacity-100 group-focus-within/timeline-card:grid-rows-[1fr] group-focus-within/timeline-card:opacity-100'
+							)}
+						>
+							<div class="overflow-hidden">
+								{#if looksLikeMarkdown}
+									<div
+										class="text-muted-foreground pt-1 text-sm leading-relaxed [&_a]:underline"
+									>
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+										{@html renderTimelineMarkdown(body ?? '')}
+									</div>
+								{:else}
+									<Card.Description class="pt-1 text-sm leading-relaxed">
+										{body}
+									</Card.Description>
+								{/if}
+							</div>
+						</div>
+						{#if !defaultExpanded}
+							<p
+								class="text-muted-foreground text-[11px] transition-opacity duration-200 group-hover/timeline-card:opacity-0 group-focus-within/timeline-card:opacity-0"
+							>
+								Hover to expand
+							</p>
+						{/if}
+					{/if}
+				</div>
+			</div>
 		</Card.Header>
 	</Card.Root>
 </article>

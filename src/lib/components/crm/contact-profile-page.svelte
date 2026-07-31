@@ -21,7 +21,7 @@
 		subtitle?: string;
 		companyFields: InfoCardField[];
 		contactFields: InfoCardField[];
-		timelineEvents: TimelineEvent[];
+		timelineEvents?: TimelineEvent[];
 		emailMessages?: EmailMessage[];
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
@@ -39,7 +39,7 @@
 		subtitle,
 		companyFields,
 		contactFields,
-		timelineEvents = [],
+		timelineEvents = $bindable<TimelineEvent[]>([]),
 		emailMessages = [],
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
@@ -79,7 +79,12 @@
 								<InfoCard title="Contact" fields={contactFields} />
 								<InfoCard title="Company" fields={companyFields} />
 							</div>
-							<Timeline events={timelineEvents} title="Activity" />
+							<Timeline
+								bind:events={timelineEvents}
+								title="Activity"
+								composable
+								composerActor="Joe"
+							/>
 						</div>
 					{:else if active === 'email'}
 						<EntityEmailInbox messages={emailMessages} class="min-h-0 flex-1" />
