@@ -10,6 +10,7 @@ import { handleOrganisationConfiguration, handleOrganisations } from './organisa
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
 import { handleProfilePreferences } from './profile-preferences.ts'
+import { handleQuotes } from './quotes.ts'
 import { handleTaxRates } from './tax-rates.ts'
 
 const corsOrigin = Deno.env.get('API_CORS_ORIGIN') ?? '*'
@@ -39,6 +40,15 @@ function assertCanAccessPipeline(
 function assertCanAccessCatalog(role: MembershipRole, method: string): void {
   if ((role === 'billing' || role === 'readonly') && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'This membership cannot modify the product catalog')
+  }
+}
+
+function assertCanAccessQuotes(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access quotes')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify quotes')
   }
 }
 
@@ -174,6 +184,11 @@ export default {
         if (path === '/api/v1/products' || path.startsWith('/api/v1/products/')) {
           assertCanAccessCatalog(membership.role, req.method)
           return await handleProducts(req, db, path, orgId, requestId, userId)
+        }
+
+        if (path === '/api/v1/quotes' || path.startsWith('/api/v1/quotes/')) {
+          assertCanAccessQuotes(membership.role, req.method)
+          return await handleQuotes(req, db, path, orgId, requestId)
         }
 
         throw new ApiError(404, 'NOT_FOUND', 'Route not found')

@@ -260,6 +260,62 @@ export type ApiIdempotencyKeyRow = {
   expires_at: string
 }
 
+export type QuoteRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  number: string
+  title: string
+  client_id: string | null
+  lead_id: string | null
+  contact_id: string | null
+  owner_membership_id: string | null
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'void'
+  currency: string
+  issue_on: string
+  valid_until: string | null
+  subtotal_cents: number
+  discount_cents: number
+  tax_cents: number
+  total_cents: number
+  party_snapshot: Json
+  terms: string | null
+  notes: string | null
+  internal_notes: string | null
+  sent_at: string | null
+  viewed_at: string | null
+  accepted_at: string | null
+  rejected_at: string | null
+  converted_invoice_id: string | null
+}
+
+export type QuoteLineRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  quote_id: string
+  product_id: string | null
+  sku_snapshot: string | null
+  description: string
+  quantity: number
+  unit_price_cents: number
+  discount_percent: number
+  tax_rate_percent: number
+  subtotal_cents: number
+  tax_cents: number
+  total_cents: number
+  position: number
+}
+
 type ProfileInsert = Pick<ProfileRow, 'display_name' | 'id'> & Partial<Omit<ProfileRow, 'id'>>
 type TaxRateInsert =
   & Pick<TaxRateRow, 'name' | 'org_id' | 'rate_percent'>
@@ -323,6 +379,37 @@ type ApiIdempotencyKeyInsert =
       | 'org_id'
       | 'request_hash'
       | 'route'
+    >
+  >
+type QuoteInsert =
+  & Pick<QuoteRow, 'number' | 'org_id' | 'title' | 'currency'>
+  & Partial<Omit<QuoteRow, 'id' | 'number' | 'org_id' | 'title' | 'currency'>>
+type QuoteLineInsert =
+  & Pick<
+    QuoteLineRow,
+    | 'description'
+    | 'org_id'
+    | 'position'
+    | 'quantity'
+    | 'quote_id'
+    | 'subtotal_cents'
+    | 'tax_cents'
+    | 'total_cents'
+    | 'unit_price_cents'
+  >
+  & Partial<
+    Omit<
+      QuoteLineRow,
+      | 'description'
+      | 'id'
+      | 'org_id'
+      | 'position'
+      | 'quantity'
+      | 'quote_id'
+      | 'subtotal_cents'
+      | 'tax_cents'
+      | 'total_cents'
+      | 'unit_price_cents'
     >
   >
 
@@ -407,6 +494,18 @@ export type Database = {
         Update: Partial<ApiIdempotencyKeyInsert>
         Relationships: []
       }
+      quotes: {
+        Row: QuoteRow
+        Insert: QuoteInsert
+        Update: Partial<QuoteInsert>
+        Relationships: []
+      }
+      quote_lines: {
+        Row: QuoteLineRow
+        Insert: QuoteLineInsert
+        Update: Partial<QuoteLineInsert>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -451,6 +550,32 @@ export type Database = {
           p_request_hash: string
           p_route: string
           p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      create_quote_draft: {
+        Args: {
+          p_lines?: Json
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      save_quote_draft: {
+        Args: {
+          p_expected_version: number
+          p_lines?: Json | null
+          p_org_id: string
+          p_payload: Json
+          p_quote_id: string
+        }
+        Returns: Json
+      }
+      soft_delete_quote_draft: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_quote_id: string
         }
         Returns: Json
       }

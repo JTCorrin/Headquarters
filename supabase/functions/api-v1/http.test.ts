@@ -18,6 +18,7 @@ import {
 import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
 import { decodeProductCursor, validateAdjustStockBody, validateProductBody } from './products.ts'
 import { validateProfilePreferencesBody } from './profile-preferences.ts'
+import { decodeQuoteCursor, validateQuoteBody } from './quotes.ts'
 import { validateTaxRateBody } from './tax-rates.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
@@ -424,6 +425,101 @@ Deno.test('organisation create and configuration validation', () => {
   )
   assertThrows(
     () => validateOrganisationConfigurationBody({ org_id: 'x' }),
+    ApiError,
+  )
+})
+
+Deno.test('quote create validation defaults currency and rejects calculated fields', () => {
+  const productId = '11111111-1111-4111-8111-111111111111'
+  const clientId = '22222222-2222-4222-8222-222222222222'
+  assertEquals(
+    validateQuoteBody(
+      {
+        title: '  Q2 retainer  ',
+        client_id: clientId,
+        lines: [
+          {
+            product_id: productId,
+            quantity: 2,
+            unit_price_cents: 10000,
+            tax_rate_percent: 20,
+          },
+        ],
+      },
+      false,
+      { defaultCurrency: 'USD' },
+    ),
+    {
+      title: 'Q2 retainer',
+      client_id: clientId,
+      currency: 'USD',
+      lines: [
+        {
+          product_id: productId,
+          quantity: 2,
+          unit_price_cents: 10000,
+          discount_percent: 0,
+          tax_rate_percent: 20,
+        },
+      ],
+    },
+  )
+  assertThrows(
+    () =>
+      validateQuoteBody(
+        {
+          title: 'Missing party',
+          lines: [],
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateQuoteBody(
+        {
+          title: 'Bad',
+          client_id: clientId,
+          status: 'sent',
+          lines: [],
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateQuoteBody(
+        {
+          title: 'Bad totals',
+          client_id: clientId,
+          total_cents: 1,
+          lines: [],
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertEquals(
+    validateQuoteBody(
+      {
+        title: 'Patch title',
+        discount_cents: 100,
+      },
+      true,
+    ),
+    { title: 'Patch title', discount_cents: 100 },
+  )
+  assertThrows(() => validateQuoteBody({}, true), ApiError)
+  assertThrows(
+    () =>
+      decodeQuoteCursor(
+        btoa(JSON.stringify({ created_at: 'not-a-date', id: clientId }))
+          .replaceAll('+', '-')
+          .replaceAll('/', '_')
+          .replace(/=+$/, ''),
+      ),
     ApiError,
   )
 })
