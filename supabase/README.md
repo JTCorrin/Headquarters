@@ -20,7 +20,7 @@ uncommitted.
 ```sh
 supabase start
 supabase db reset
-supabase test db supabase/tests --local
+supabase test db supabase/tests/*.sql --local
 deno fmt --check supabase/functions/api-v1
 deno lint supabase/functions/api-v1
 deno check supabase/functions/api-v1/index.ts

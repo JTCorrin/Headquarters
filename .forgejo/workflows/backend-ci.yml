@@ -116,7 +116,13 @@ jobs:
         run: supabase db reset --local
 
       - name: Run database tests
-        run: supabase test db supabase/tests --local
+        run: |
+          set -- supabase/tests/*.sql
+          if [ ! -e "$1" ]; then
+            echo "No pgTAP test files found in supabase/tests" >&2
+            exit 1
+          fi
+          supabase test db "$@" --local
 
       - name: Lint database schemas
         run: >
