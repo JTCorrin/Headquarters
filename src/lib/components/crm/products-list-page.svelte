@@ -6,6 +6,7 @@
 	import ProductsTable from './products-table.svelte';
 	import type { ProductRow } from './products-columns.js';
 	import ProductFormDrawer from './product-form-drawer.svelte';
+	import StatCard from './stat-card.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -26,6 +27,15 @@
 		drawerOpen = $bindable(false),
 		class: className
 	}: ProductsListPageProps = $props();
+
+	const activeCount = $derived(rows.filter((r) => r.status.toLowerCase() === 'active').length);
+	const trackedCount = $derived(rows.filter((r) => r.stock !== undefined).length);
+	const lowStockCount = $derived(
+		rows.filter(
+			(r) =>
+				r.stock !== undefined && r.lowStockAt !== undefined && r.stock <= r.lowStockAt
+		).length
+	);
 </script>
 
 <div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
@@ -46,6 +56,16 @@
 					</ProductFormDrawer>
 				{/snippet}
 			</PageHeader>
+
+			<div class="grid gap-3 sm:grid-cols-3">
+				<StatCard label="Active" value={String(activeCount)} hint="Sellable in catalog" />
+				<StatCard label="Tracked stock" value={String(trackedCount)} hint="Inventory on" />
+				<StatCard
+					label="Low stock"
+					value={String(lowStockCount)}
+					hint={lowStockCount ? 'Needs reorder attention' : 'All good'}
+				/>
+			</div>
 
 			<ProductsTable {rows} />
 		</div>

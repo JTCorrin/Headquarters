@@ -72,6 +72,24 @@
 					status: 'Matched',
 					date: 'Feb 3'
 				}
+			],
+			projects: [
+				{
+					id: 'p1',
+					name: 'Q2 retainer delivery',
+					status: 'Active',
+					owner: 'Joe',
+					cardCount: 8,
+					updatedAt: 'Today'
+				},
+				{
+					id: 'p2',
+					name: 'Warehouse rollout',
+					status: 'Planning',
+					owner: 'Maya',
+					cardCount: 12,
+					updatedAt: 'Mon'
+				}
 			]
 		}
 	});

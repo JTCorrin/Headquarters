@@ -9,8 +9,11 @@ export interface ProductRow {
 	id: string;
 	sku: string;
 	name: string;
+	category?: string;
 	unitPrice: string;
 	stock?: number;
+	/** When set with stock, highlight rows at or below this qty. */
+	lowStockAt?: number;
 	status: string;
 }
 
@@ -52,6 +55,15 @@ export const productColumns: ColumnDef<ProductRow>[] = [
 		cell: ({ row }) => row.getValue('name')
 	},
 	{
+		accessorKey: 'category',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Category',
+				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) => row.original.category ?? '—'
+	},
+	{
 		accessorKey: 'unitPrice',
 		header: ({ column }) =>
 			renderComponent(DataTableSortHeader, {
@@ -69,7 +81,12 @@ export const productColumns: ColumnDef<ProductRow>[] = [
 			}),
 		cell: ({ row }) => {
 			const stock = row.original.stock;
-			return stock === undefined ? '—' : String(stock);
+			if (stock === undefined) return '—';
+			const lowAt = row.original.lowStockAt;
+			if (lowAt !== undefined && stock <= lowAt) {
+				return `${stock} · low`;
+			}
+			return String(stock);
 		},
 		sortingFn: (a, b) => (a.original.stock ?? -1) - (b.original.stock ?? -1)
 	},
