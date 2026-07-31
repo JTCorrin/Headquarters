@@ -3,10 +3,10 @@
 	import PageHeader from './page-header.svelte';
 	import InfoCard, { type InfoCardField } from './info-card.svelte';
 	import StatusBadge from './status-badge.svelte';
+	import AiAssistAction from './ai-assist-action.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import UploadIcon from '@lucide/svelte/icons/upload';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import CheckIcon from '@lucide/svelte/icons/check';
 
 	export interface ProposedMeetingTask {
@@ -69,10 +69,12 @@
 						<UploadIcon class="size-3.5" />
 						Upload transcript
 					</Button>
-					<Button size="sm" onclick={() => onGenerateSummary?.()}>
-						<SparklesIcon class="size-3.5" />
-						Generate summary
-					</Button>
+					<AiAssistAction
+						label="Generate summary"
+						variant="secondary"
+						size="default"
+						onclick={() => onGenerateSummary?.()}
+					/>
 				{/snippet}
 			</PageHeader>
 

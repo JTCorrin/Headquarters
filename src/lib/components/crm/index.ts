@@ -75,6 +75,8 @@ export { default as ProjectWorkspaceBoard } from './project-workspace-board.svel
 export { default as ProjectWorkspacePage } from './project-workspace-page.svelte';
 export { default as EntityProjects } from './entity-projects.svelte';
 export { default as ProductDetailPage } from './product-detail-page.svelte';
+export { default as AiAssistAction } from './ai-assist-action.svelte';
+export { default as AiSuggestionPanel } from './ai-suggestion-panel.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
@@ -97,6 +99,7 @@ export type { ProjectWorkCard, ProjectWorkColumn } from './project-workspace-boa
 export type { EntityProject } from './entity-projects.svelte';
 export type { ProductUsageRow } from './product-detail-page.svelte';
 export type { ProjectClientOption } from './project-form.svelte';
+export type { AiSuggestionStatus, AiSuggestionVariant } from './ai-suggestion-panel.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,
