@@ -9,8 +9,11 @@ The stable product contract is `/api/v1`. Supabase exposes the router natively u
 - `organisations` and active `memberships`
 - transactional `create_organisation(...)` onboarding RPC
 - organisation-scoped `contacts` with soft deletion and optimistic concurrency
-- RLS role gates that exclude `billing` users from contact data
-- authenticated `api-v1` Edge Function with Contacts CRUD
+- organisation-scoped `leads`, `clients`, and `client_contacts`
+- thin append-only `timeline_events` for domain activity cards
+- transactional `convert_lead(...)` RPC (idempotent; emits conversion timeline events)
+- RLS role gates that exclude `billing` users from contacts/leads and write access to clients
+- authenticated `api-v1` Edge Function with Contacts, Leads, Clients CRUD and lead conversion
 
 The migration is the source of truth. Do not edit a linked database in Studio and leave the change
 uncommitted.
@@ -20,7 +23,7 @@ uncommitted.
 ```sh
 supabase start
 supabase db reset
-supabase test db supabase/tests/*.sql --local
+supabase test db supabase/tests --local
 deno fmt --check supabase/functions/api-v1
 deno lint supabase/functions/api-v1
 deno check supabase/functions/api-v1/index.ts
@@ -55,7 +58,23 @@ Contacts routes:
 - `PATCH /api/v1/contacts/{contact_id}`
 - `DELETE /api/v1/contacts/{contact_id}`
 
+Leads routes:
+
+- `GET /api/v1/leads?limit=50&cursor=...&stage=...`
+- `POST /api/v1/leads`
+- `GET /api/v1/leads/{lead_id}`
+- `PATCH /api/v1/leads/{lead_id}`
+- `DELETE /api/v1/leads/{lead_id}`
+- `POST /api/v1/leads/{lead_id}/convert` — optional JSON `{ "client_name", "client_status" }`
+
+Clients routes:
+
+- `GET /api/v1/clients?limit=50&cursor=...&status=...`
+- `POST /api/v1/clients`
+- `GET /api/v1/clients/{client_id}`
+- `PATCH /api/v1/clients/{client_id}`
+- `DELETE /api/v1/clients/{client_id}`
+
 `PATCH` and `DELETE` require the latest strong numeric ETag (for example, `If-Match: "3"`).
-Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Clients must never send
-or trust an `org_id` in a JSON body; the router derives it from the validated header and RLS
-membership.
+Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Marking a lead as `won`
+must go through `/convert`; clients must never send or trust an `org_id` in a JSON body.
