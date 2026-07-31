@@ -2,6 +2,7 @@
 -- Supabase Auth profiles, organisation tenancy, memberships, and contacts.
 
 create extension if not exists citext with schema extensions;
+set search_path = public, extensions, pg_catalog;
 
 create schema if not exists private;
 revoke all on schema private from public;
@@ -20,9 +21,9 @@ create table public.organisations (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 1 and 200),
   legal_name text,
-  slug extensions.citext not null unique,
+  slug citext not null unique,
   logo_path text,
-  billing_email extensions.citext,
+  billing_email citext,
   phone text,
   website_url text,
   tax_identifier text,
@@ -84,14 +85,14 @@ create table public.contacts (
   org_id uuid not null references public.organisations (id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  created_by uuid references public.profiles (id) on delete restrict,
-  updated_by uuid references public.profiles (id) on delete restrict,
+  created_by uuid references public.profiles (id) on delete set null,
+  updated_by uuid references public.profiles (id) on delete set null,
   deleted_at timestamptz,
   version integer not null default 1 check (version > 0),
   first_name text,
   last_name text,
   display_name text not null check (char_length(display_name) between 1 and 200),
-  primary_email extensions.citext,
+  primary_email citext,
   primary_phone text,
   job_title text,
   company_name text,
@@ -177,6 +178,123 @@ create trigger contacts_stamp_business_row
 before insert or update on public.contacts
 for each row execute function private.stamp_business_row();
 
+create or replace function private.ensure_org_has_active_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  old_org_id uuid := case when tg_op in ('UPDATE', 'DELETE') then old.org_id end;
+  new_org_id uuid := case when tg_op in ('INSERT', 'UPDATE') then new.org_id end;
+begin
+  if old_org_id is not null
+    and exists (
+      select 1 from public.organisations
+      where organisations.id = old_org_id
+    )
+    and not exists (
+      select 1 from public.memberships
+      where memberships.org_id = old_org_id
+        and memberships.role = 'owner'
+        and memberships.status = 'active'
+    )
+  then
+    raise exception 'Organisation must have one active owner'
+      using errcode = '23514';
+  end if;
+
+  if new_org_id is not null
+    and new_org_id is distinct from old_org_id
+    and exists (
+      select 1 from public.organisations
+      where organisations.id = new_org_id
+    )
+    and not exists (
+      select 1 from public.memberships
+      where memberships.org_id = new_org_id
+        and memberships.role = 'owner'
+        and memberships.status = 'active'
+    )
+  then
+    raise exception 'Organisation must have one active owner'
+      using errcode = '23514';
+  end if;
+
+  return null;
+end;
+$$;
+
+create constraint trigger memberships_require_active_owner
+after insert or update or delete on public.memberships
+deferrable initially deferred
+for each row execute function private.ensure_org_has_active_owner();
+
+create or replace function private.validate_contact_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.owner_membership_id is null
+    or (
+      tg_op = 'UPDATE'
+      and new.owner_membership_id is not distinct from old.owner_membership_id
+    )
+  then
+    return new;
+  end if;
+
+  perform memberships.id
+    from public.memberships
+    where memberships.id = new.owner_membership_id
+      and memberships.org_id = new.org_id
+      and memberships.status = 'active'
+    for no key update;
+
+  if not found then
+    raise exception 'Contact owner must be an active membership in the same organisation'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger contacts_validate_owner
+before insert or update of owner_membership_id on public.contacts
+for each row execute function private.validate_contact_owner();
+
+create or replace function private.prevent_suspending_assigned_member()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.status = 'active'
+    and new.status = 'suspended'
+    and exists (
+      select 1
+      from public.contacts
+      where contacts.org_id = old.org_id
+        and contacts.owner_membership_id = old.id
+        and contacts.deleted_at is null
+    )
+  then
+    raise exception 'Reassign active contacts before suspending this member'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger memberships_prevent_suspending_assigned_member
+before update of status on public.memberships
+for each row execute function private.prevent_suspending_assigned_member();
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -235,9 +353,12 @@ as $$
   select exists (
     select 1
     from public.memberships
+    join public.organisations
+      on organisations.id = memberships.org_id
     where memberships.org_id = target_org_id
       and memberships.user_id = auth.uid()
       and memberships.status = 'active'
+      and organisations.deleted_at is null
       and (
         allowed_roles is null
         or memberships.role = any (allowed_roles)
@@ -305,6 +426,10 @@ $$;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 revoke all on function private.set_updated_at() from public, anon, authenticated;
 revoke all on function private.stamp_business_row() from public, anon, authenticated;
+revoke all on function private.ensure_org_has_active_owner() from public, anon, authenticated;
+revoke all on function private.validate_contact_owner() from public, anon, authenticated;
+revoke all on function private.prevent_suspending_assigned_member()
+  from public, anon, authenticated;
 revoke all on function private.has_org_role(uuid, text[]) from public, anon;
 revoke all on function public.create_organisation(text, text, text, text, text, text)
   from public, anon;

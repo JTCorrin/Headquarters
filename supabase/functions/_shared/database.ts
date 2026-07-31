@@ -1,3 +1,5 @@
+// Bootstrap subset matching the first migration. Replace this with CLI-generated database types
+// after the first Docker/hosted reset, then keep generation in CI to prevent schema drift.
 export type Json =
   | boolean
   | number

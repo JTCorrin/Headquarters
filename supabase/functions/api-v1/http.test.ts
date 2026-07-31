@@ -1,6 +1,6 @@
-import { assertEquals, assertThrows } from '@std/assert'
+import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { decodeCursor, validateContactBody } from './contacts.ts'
-import { ApiError, apiPath, parseLimit, parseVersion } from './http.ts'
+import { ApiError, apiPath, jsonBody, parseLimit, parseVersion } from './http.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -9,6 +9,7 @@ Deno.test('apiPath normalises product and native function URLs', () => {
     '/api/v1/contacts',
   )
   assertEquals(apiPath('/functions/v1/api-v1/contacts/'), '/api/v1/contacts')
+  assertEquals(apiPath('/tenant/api/v1/contacts'), '/tenant/api/v1/contacts')
 })
 
 Deno.test('parseLimit applies defaults and bounds', () => {
@@ -24,11 +25,25 @@ Deno.test('parseVersion accepts numeric ETags and requires a precondition', () =
     parseVersion(new Request('https://example.test', { headers: { 'if-match': '"7"' } })),
     7,
   )
-  assertEquals(
-    parseVersion(new Request('https://example.test', { headers: { 'if-match': 'W/"8"' } })),
-    8,
+  assertThrows(
+    () => parseVersion(new Request('https://example.test', { headers: { 'if-match': 'W/"8"' } })),
+    ApiError,
   )
   assertThrows(() => parseVersion(new Request('https://example.test')), ApiError)
+})
+
+Deno.test('jsonBody rejects oversized payloads', async () => {
+  await assertRejects(
+    () =>
+      jsonBody(
+        new Request('https://example.test', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ value: 'x'.repeat(65_536) }),
+        }),
+      ),
+    ApiError,
+  )
 })
 
 Deno.test('contact create validation strips whitespace and supplies lifecycle status', () => {
