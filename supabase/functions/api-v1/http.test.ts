@@ -18,7 +18,7 @@ import {
 import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
 import { decodeProductCursor, validateAdjustStockBody, validateProductBody } from './products.ts'
 import { validateProfilePreferencesBody } from './profile-preferences.ts'
-import { decodeQuoteCursor, validateQuoteBody } from './quotes.ts'
+import { assertJsonSafeLineMoney, decodeQuoteCursor, validateQuoteBody } from './quotes.ts'
 import { validateTaxRateBody } from './tax-rates.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
@@ -519,6 +519,34 @@ Deno.test('quote create validation defaults currency and rejects calculated fiel
           .replaceAll('+', '-')
           .replaceAll('/', '_')
           .replace(/=+$/, ''),
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('quote line money rejects JSON-unsafe quantity × price products', () => {
+  const clientId = '22222222-2222-4222-8222-222222222222'
+  assertEquals(assertJsonSafeLineMoney(2, 10000), true)
+  assertEquals(assertJsonSafeLineMoney(2, Number.MAX_SAFE_INTEGER), false)
+  assertEquals(
+    assertJsonSafeLineMoney(Number.MAX_SAFE_INTEGER, 1),
+    true,
+  )
+  assertThrows(
+    () =>
+      validateQuoteBody(
+        {
+          title: 'Overflow',
+          client_id: clientId,
+          lines: [
+            {
+              description: 'Huge',
+              quantity: 2,
+              unit_price_cents: Number.MAX_SAFE_INTEGER,
+            },
+          ],
+        },
+        false,
       ),
     ApiError,
   )

@@ -571,6 +571,13 @@ export type Database = {
         }
         Returns: Json
       }
+      get_quote_document: {
+        Args: {
+          p_org_id: string
+          p_quote_id: string
+        }
+        Returns: Json
+      }
       soft_delete_quote_draft: {
         Args: {
           p_expected_version: number

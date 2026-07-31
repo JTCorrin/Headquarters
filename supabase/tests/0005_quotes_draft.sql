@@ -1,6 +1,6 @@
 begin;
 
-select plan(38);
+select plan(48);
 
 select has_table('public', 'quotes', 'quotes table exists');
 select has_table('public', 'quote_lines', 'quote_lines table exists');
@@ -629,6 +629,183 @@ select ok(
       and document_sequences.prefix = 'Q-'
   ),
   'create_organisation seeds a quote document sequence'
+);
+
+select ok(
+  lower(pg_get_functiondef('public.get_quote_document(uuid,uuid)'::regprocedure))
+    like '%for share%',
+  'get_quote_document takes FOR SHARE so concurrent save cannot tear header/lines'
+);
+
+select ok(
+  lower(pg_get_functiondef('public.save_quote_draft(uuid,uuid,integer,jsonb,jsonb)'::regprocedure))
+    like '%for update%',
+  'save_quote_draft takes FOR UPDATE and waits behind concurrent document reads'
+);
+
+-- Rebuild a live draft for remaining lifecycle probes.
+select pg_temp.as_user((select owner_id from _quotes_fixture));
+set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.create_quote_draft(
+      (select org_id from _quotes_fixture),
+      jsonb_build_object(
+        'title', 'Lifecycle quote',
+        'client_id', (select client_id from _quotes_fixture),
+        'currency', 'GBP'
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'product_id', (select product_id from _quotes_fixture),
+          'quantity', 1,
+          'sku_snapshot', 'CLIENT-HACK',
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'owner can recreate a draft for lifecycle probes'
+);
+
+update _quotes_fixture
+set
+  quote_id = quotes.id,
+  quote_version = quotes.version
+from public.quotes
+where quotes.org_id = _quotes_fixture.org_id
+  and quotes.title = 'Lifecycle quote'
+  and quotes.deleted_at is null;
+
+select is(
+  (
+    select sku_snapshot
+    from public.quote_lines
+    where quote_id = (select quote_id from _quotes_fixture)
+  ),
+  'RET-M',
+  'product lines ignore client-supplied sku_snapshot and use the product SKU'
+);
+
+select ok(
+  (
+    select
+      (public.get_quote_document(quote_id, org_id) -> 'quote' ->> 'version')::integer
+        = quote_version
+      and jsonb_array_length(public.get_quote_document(quote_id, org_id) -> 'lines') = 1
+    from _quotes_fixture
+  ),
+  'get_quote_document returns a consistent header version and line set'
+);
+
+select throws_ok(
+  $$
+    select public.create_quote_draft(
+      (select org_id from _quotes_fixture),
+      jsonb_build_object(
+        'title', 'Currency mismatch',
+        'client_id', (select client_id from _quotes_fixture),
+        'currency', 'USD'
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'product_id', (select product_id from _quotes_fixture),
+          'quantity', 1,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  '22023',
+  null,
+  'create rejects product lines whose currency differs from the quote'
+);
+
+select throws_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      jsonb_build_object('currency', 'USD'),
+      null
+    )
+  $$,
+  '22023',
+  null,
+  'save rejects currency-only changes without replacing lines'
+);
+
+select lives_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      jsonb_build_object('currency', 'USD'),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'USD free-text',
+          'quantity', 1,
+          'unit_price_cents', 100,
+          'tax_rate_percent', 0,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save allows currency change when lines are replaced atomically'
+);
+
+update _quotes_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _quotes_fixture.quote_id;
+
+select throws_ok(
+  $$
+    select public.create_quote_draft(
+      (select org_id from _quotes_fixture),
+      jsonb_build_object(
+        'title', 'Unsafe money',
+        'client_id', (select client_id from _quotes_fixture),
+        'currency', 'GBP'
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'Too big',
+          'quantity', 2,
+          'unit_price_cents', 9007199254740991,
+          'tax_rate_percent', 0,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  '22023',
+  null,
+  'create rejects line totals outside the JSON-safe integer range'
+);
+
+-- Soft-delete must still work after the linked client is removed.
+reset role;
+update public.clients
+set deleted_at = now()
+where id = (select client_id from _quotes_fixture);
+
+select pg_temp.as_user((select owner_id from _quotes_fixture));
+set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.soft_delete_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture)
+    )
+  $$,
+  'soft-delete succeeds even when the linked client was later deleted'
 );
 
 select * from finish();
