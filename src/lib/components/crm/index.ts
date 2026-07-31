@@ -3,6 +3,8 @@ export { default as StatCard } from './stat-card.svelte';
 export { default as PageHeader } from './page-header.svelte';
 export { default as TimelineEventCard } from './timeline-event-card.svelte';
 export { default as Timeline } from './timeline.svelte';
+export { default as TimelineComposer } from './timeline-composer.svelte';
+export { default as TimelineIcon } from './timeline-icon.svelte';
 export { default as InfoCard } from './info-card.svelte';
 export { default as ProfileHeader } from './profile-header.svelte';
 export { default as ProfileTabs } from './profile-tabs.svelte';
@@ -100,6 +102,9 @@ export type { EntityProject } from './entity-projects.svelte';
 export type { ProductUsageRow } from './product-detail-page.svelte';
 export type { ProjectClientOption } from './project-form.svelte';
 export type { AiSuggestionStatus, AiSuggestionVariant } from './ai-suggestion-panel.svelte';
+export type { TimelineEvent } from './timeline.svelte';
+export type { TimelineComposerSubmit } from './timeline-composer.svelte';
+export type { TimelineAccentId, TimelineIconId } from './timeline-accents.js';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,

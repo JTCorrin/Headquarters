@@ -44,7 +44,6 @@
 					email: 'billing@northwind.com'
 				}
 			],
-			timelineEvents: sampleTimelineEvents,
 			emailMessages: sampleEmailMessages,
 			documents: sampleDocuments,
 			moneyItems: [
@@ -100,9 +99,11 @@
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { documentFormSchema } from '$lib/schemas/document.js';
 	import type { EntityDocument } from '$lib/components/crm/entity-documents.svelte';
+	import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
 	let documents = $state<EntityDocument[]>([...sampleDocuments]);
 	let documentDrawerOpen = $state(false);
+	let timelineEvents = $state<TimelineEvent[]>([...sampleTimelineEvents]);
 
 	const documentData = defaults(
 		{ name: '', category: 'other', notes: '' },
@@ -142,6 +143,7 @@
 			<ClientProfilePage
 				{...props}
 				{documentForm}
+				bind:timelineEvents
 				bind:documents
 				bind:documentDrawerOpen
 			/>

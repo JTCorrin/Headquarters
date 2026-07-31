@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
 	import TimelineEventCard from './timeline-event-card.svelte';
+	import TimelineComposer, { type TimelineComposerSubmit } from './timeline-composer.svelte';
 	import type { TimelineEventKind } from './timeline-kinds.js';
+	import type { TimelineAccentId, TimelineIconId } from './timeline-accents.js';
 	import type { Snippet } from 'svelte';
 
 	export interface TimelineEvent {
@@ -11,23 +13,52 @@
 		body?: string;
 		occurredAt: string;
 		actor?: string;
+		accent?: TimelineAccentId | string;
+		icon?: TimelineIconId | string;
 	}
 
 	export interface TimelineProps {
 		events: TimelineEvent[];
 		title?: string;
 		emptyMessage?: string;
+		/** Show the ad-hoc note/event composer above the list. */
+		composable?: boolean;
+		composerActor?: string;
 		class?: string;
 		headerActions?: Snippet;
+		onAdd?: (event: TimelineComposerSubmit) => void;
 	}
 
 	let {
-		events = [],
+		events = $bindable<TimelineEvent[]>([]),
 		title = 'Timeline',
 		emptyMessage = 'No activity yet.',
+		composable = false,
+		composerActor = 'You',
 		class: className,
-		headerActions
+		headerActions,
+		onAdd
 	}: TimelineProps = $props();
+
+	function handleComposerSubmit(payload: TimelineComposerSubmit) {
+		if (onAdd) {
+			onAdd(payload);
+			return;
+		}
+		events = [
+			{
+				id: crypto.randomUUID(),
+				kind: payload.kind,
+				title: payload.title,
+				body: payload.body || undefined,
+				occurredAt: 'Just now',
+				actor: composerActor,
+				accent: payload.accent,
+				icon: payload.icon
+			},
+			...events
+		];
+	}
 </script>
 
 <section class={cn('bg-background flex min-h-0 flex-col', className)} aria-label={title}>
@@ -39,6 +70,14 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if composable}
+		<TimelineComposer
+			actor={composerActor}
+			class="mb-4"
+			onSubmit={handleComposerSubmit}
+		/>
+	{/if}
 
 	{#if events.length === 0}
 		<div
@@ -56,6 +95,8 @@
 						body={event.body}
 						occurredAt={event.occurredAt}
 						actor={event.actor}
+						accent={event.accent}
+						icon={event.icon}
 						isLast={index === events.length - 1}
 					/>
 				</li>
