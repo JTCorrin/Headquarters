@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	isIanaTimezone,
 	organisationConfigSchema,
 	organisationCreateSchema,
 	profilePreferencesSchema,
@@ -37,8 +38,25 @@ describe('organisation schemas', () => {
 		expect(result.success).toBe(true);
 	});
 
-	it('rejects shape-valid but non-IANA timezones', () => {
-		const result = organisationCreateSchema.safeParse({
+	it('validates timezones via Intl.DateTimeFormat', () => {
+		expect(isIanaTimezone('Europe/London')).toBe(true);
+		expect(isIanaTimezone('US/Eastern')).toBe(true);
+		expect(isIanaTimezone('Etc/UTC')).toBe(true);
+		expect(isIanaTimezone('UTC')).toBe(true);
+		expect(isIanaTimezone('Not/A_Zone')).toBe(false);
+
+		expect(
+			organisationCreateSchema.safeParse({
+				name: 'Corrin Data',
+				slug: 'corrin-data',
+				timezone: 'US/Eastern',
+				currency: 'USD',
+				locale: 'en-US',
+				country: 'US'
+			}).success
+		).toBe(true);
+
+		const invalid = organisationCreateSchema.safeParse({
 			name: 'Corrin Data',
 			slug: 'corrin-data',
 			timezone: 'Not/A_Zone',
@@ -46,9 +64,9 @@ describe('organisation schemas', () => {
 			locale: 'en-GB',
 			country: 'GB'
 		});
-		expect(result.success).toBe(false);
-		if (!result.success) {
-			expect(result.error.issues.some((issue) => /IANA timezone/i.test(issue.message))).toBe(
+		expect(invalid.success).toBe(false);
+		if (!invalid.success) {
+			expect(invalid.error.issues.some((issue) => /IANA timezone/i.test(issue.message))).toBe(
 				true
 			);
 		}
@@ -71,6 +89,21 @@ describe('organisation schemas', () => {
 				active: 'true'
 			}).success
 		).toBe(false);
+	});
+
+	it('rejects default tax rates that are archived', () => {
+		const result = taxRateFormSchema.safeParse({
+			name: 'VAT',
+			ratePercent: '20',
+			isDefault: 'true',
+			active: 'false'
+		});
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			expect(
+				result.error.issues.some((issue) => /must remain active/i.test(issue.message))
+			).toBe(true);
+		}
 	});
 
 	it('accepts org config and theme preference enums', () => {

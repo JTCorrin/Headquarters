@@ -15,6 +15,8 @@
 		switchError?: string | null;
 		/** Simulate API create failure when true. */
 		failCreate?: boolean;
+		/** Artificial create latency in ms (keeps submitting true while pending). */
+		createDelayMs?: number;
 		class?: string;
 		onOpenedConfig?: (orgId: string) => void;
 	}
@@ -24,6 +26,7 @@
 		memberships: initialMemberships = [],
 		switchError = null,
 		failCreate = false,
+		createDelayMs = 0,
 		class: className,
 		onOpenedConfig
 	}: OrgSwitcherStoryHostProps = $props();
@@ -70,6 +73,9 @@
 
 	async function handleCreate(): Promise<boolean> {
 		createError = null;
+		if (createDelayMs > 0) {
+			await new Promise((resolve) => setTimeout(resolve, createDelayMs));
+		}
 		if (failCreate) {
 			createError = 'Could not create organisation — try again.';
 			return false;
