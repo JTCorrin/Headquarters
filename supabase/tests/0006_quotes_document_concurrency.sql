@@ -39,8 +39,11 @@ returns text
 language sql
 stable
 as $$
+  -- Supabase's postgres role is not a superuser; dblink requires an explicit
+  -- TCP password auth string (unix-socket peer auth is rejected).
   select format(
-    'dbname=%s user=postgres password=postgres',
+    'host=127.0.0.1 port=%s dbname=%s user=postgres password=postgres',
+    current_setting('port'),
     current_database()
   );
 $$;
