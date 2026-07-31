@@ -79,8 +79,19 @@ create table public.products (
     ),
   constraint products_service_no_stock_check
     check (product_type <> 'service' or track_stock = false),
-  constraint products_low_stock_nonneg_check
-    check (low_stock_at is null or low_stock_at >= 0)
+  constraint products_stock_qty_finite_check
+    check (
+      stock_qty is null
+      or lower(stock_qty::text) not in ('nan', 'infinity', '-infinity')
+    ),
+  constraint products_low_stock_finite_check
+    check (
+      low_stock_at is null
+      or (
+        lower(low_stock_at::text) not in ('nan', 'infinity', '-infinity')
+        and low_stock_at >= 0
+      )
+    )
 );
 
 create unique index products_org_sku_uidx
@@ -106,7 +117,11 @@ create table public.inventory_movements (
   created_at timestamptz not null default now(),
   created_by uuid references public.profiles (id) on delete set null,
   product_id uuid not null,
-  quantity_delta numeric(14, 4) not null check (quantity_delta <> 0),
+  quantity_delta numeric(14, 4) not null
+    check (
+      quantity_delta <> 0
+      and lower(quantity_delta::text) not in ('nan', 'infinity', '-infinity')
+    ),
   reason text not null,
   reference_type text,
   reference_id uuid,
@@ -148,11 +163,13 @@ begin
     return new;
   end if;
 
+  -- Lock the category row so soft-delete cannot race with assignment.
   perform product_categories.id
   from public.product_categories
   where product_categories.id = new.category_id
     and product_categories.org_id = new.org_id
-    and product_categories.deleted_at is null;
+    and product_categories.deleted_at is null
+  for update;
 
   if not found then
     raise exception 'Product category must be an active category in the same organisation'
@@ -237,6 +254,18 @@ set search_path = ''
 as $$
 begin
   if old.deleted_at is null and new.deleted_at is not null then
+    -- Serialize against concurrent product insert/reassignment (which locks this category).
+    perform 1
+    from public.product_categories
+    where product_categories.id = old.id
+    for update;
+
+    perform 1
+    from public.products
+    where products.category_id = old.id
+      and products.deleted_at is null
+    for update;
+
     if exists (
       select 1
       from public.products
@@ -593,3 +622,169 @@ with check (
 
 revoke all on table public.api_idempotency_keys from anon, authenticated;
 grant select, insert, update on table public.api_idempotency_keys to authenticated;
+
+-- Atomic claim + adjust + store response (single transaction).
+create or replace function public.adjust_product_stock_idempotent(
+  p_product_id uuid,
+  p_quantity_delta numeric,
+  p_idempotency_key_hash text,
+  p_request_hash text,
+  p_route text,
+  p_reason text default 'adjustment',
+  p_note text default null,
+  p_occurred_at timestamptz default null,
+  p_ttl_seconds integer default 86400
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  product_org uuid;
+  existing public.api_idempotency_keys;
+  adjustment jsonb;
+  response_body jsonb;
+  response_headers jsonb;
+  expires_at timestamptz := now() + make_interval(secs => greatest(p_ttl_seconds, 60));
+begin
+  if actor_id is null then
+    raise exception 'Authentication is required'
+      using errcode = '42501';
+  end if;
+
+  if p_idempotency_key_hash is null
+    or char_length(p_idempotency_key_hash) <> 64
+    or p_request_hash is null
+    or char_length(p_request_hash) <> 64
+    or p_route is null
+    or char_length(p_route) < 1
+  then
+    raise exception 'Idempotency claim parameters are invalid'
+      using errcode = '22023';
+  end if;
+
+  select products.org_id into product_org
+  from public.products
+  where products.id = p_product_id
+    and products.deleted_at is null;
+
+  if product_org is null then
+    raise exception 'Product not found'
+      using errcode = 'P0002';
+  end if;
+
+  if not private.has_org_role(product_org, array['owner', 'admin', 'member']) then
+    raise exception 'This action is not permitted'
+      using errcode = '42501';
+  end if;
+
+  loop
+    select * into existing
+    from public.api_idempotency_keys
+    where api_idempotency_keys.org_id = product_org
+      and api_idempotency_keys.actor_type = 'user'
+      and api_idempotency_keys.actor_id = actor_id
+      and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash
+    for update;
+
+    if found then
+      if existing.expires_at > now() then
+        if existing.request_hash is distinct from p_request_hash
+          or existing.route is distinct from p_route
+        then
+          raise exception 'Idempotency-Key was reused with a different request payload'
+            using errcode = '23505';
+        end if;
+
+        if existing.response_status is not null and existing.response_body is not null then
+          return jsonb_build_object(
+            'replay', true,
+            'response_status', existing.response_status,
+            'response_body', existing.response_body -> 'body',
+            'response_headers', coalesce(existing.response_body -> 'headers', '{}'::jsonb)
+          );
+        end if;
+
+        raise exception 'An identical request is already in progress'
+          using errcode = '55000';
+      end if;
+
+      -- Expired key: reclaim the unique slot.
+      delete from public.api_idempotency_keys
+      where api_idempotency_keys.id = existing.id;
+    end if;
+
+    begin
+      insert into public.api_idempotency_keys (
+        org_id,
+        actor_type,
+        actor_id,
+        idempotency_key_hash,
+        route,
+        request_hash,
+        expires_at
+      ) values (
+        product_org,
+        'user',
+        actor_id,
+        p_idempotency_key_hash,
+        p_route,
+        p_request_hash,
+        expires_at
+      );
+      exit; -- claimed
+    exception
+      when unique_violation then
+        -- Concurrent claim won; loop and lock the winner's row.
+        null;
+    end;
+  end loop;
+
+  adjustment := public.adjust_product_stock(
+    p_product_id,
+    p_quantity_delta,
+    p_reason,
+    p_note,
+    p_occurred_at
+  );
+
+  response_headers := jsonb_build_object(
+    'etag', '"' || (adjustment -> 'product' ->> 'version') || '"'
+  );
+  response_body := jsonb_build_object(
+    'status', 200,
+    'body', jsonb_build_object('data', adjustment),
+    'headers', response_headers
+  );
+
+  update public.api_idempotency_keys
+  set
+    response_status = 200,
+    response_body = response_body,
+    resource_type = 'product',
+    resource_id = p_product_id
+  where api_idempotency_keys.org_id = product_org
+    and api_idempotency_keys.actor_type = 'user'
+    and api_idempotency_keys.actor_id = actor_id
+    and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash;
+
+  return jsonb_build_object(
+    'replay', false,
+    'response_status', 200,
+    'response_body', response_body -> 'body',
+    'response_headers', response_headers,
+    'product', adjustment -> 'product',
+    'movement', adjustment -> 'movement'
+  );
+end;
+$$;
+
+revoke all on function public.adjust_product_stock_idempotent(
+  uuid, numeric, text, text, text, text, text, timestamptz, integer
+) from public, anon;
+
+grant execute on function public.adjust_product_stock_idempotent(
+  uuid, numeric, text, text, text, text, text, timestamptz, integer
+) to authenticated;

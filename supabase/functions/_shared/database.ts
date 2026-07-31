@@ -412,6 +412,20 @@ export type Database = {
         }
         Returns: Json
       }
+      adjust_product_stock_idempotent: {
+        Args: {
+          p_idempotency_key_hash: string
+          p_note?: string
+          p_occurred_at?: string
+          p_product_id: string
+          p_quantity_delta: number
+          p_reason?: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

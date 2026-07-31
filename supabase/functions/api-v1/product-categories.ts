@@ -3,6 +3,7 @@ import type { Database, ProductCategoryRow } from '../_shared/database.ts'
 import {
   ApiError,
   etag,
+  isStrictIsoTimestamp,
   jsonBody,
   jsonResponse,
   parseLimit,
@@ -112,13 +113,7 @@ export function decodeProductCategoryCursor(value: string): Cursor {
     const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<Cursor>
     const createdAt = cursor.created_at
     const id = parseUuid(cursor.id ?? null, 'cursor')
-    if (
-      typeof createdAt !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(
-        createdAt,
-      ) ||
-      Number.isNaN(Date.parse(createdAt))
-    ) {
+    if (typeof createdAt !== 'string' || !isStrictIsoTimestamp(createdAt)) {
       throw new Error('Invalid timestamp')
     }
     return { created_at: createdAt, id }

@@ -1,7 +1,14 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, validateContactBody } from './contacts.ts'
-import { ApiError, apiPath, jsonBody, parseLimit, parseVersion } from './http.ts'
+import {
+  ApiError,
+  apiPath,
+  isStrictIsoTimestamp,
+  jsonBody,
+  parseLimit,
+  parseVersion,
+} from './http.ts'
 import { validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
@@ -286,6 +293,8 @@ Deno.test('catalog cursors require strict ISO-8601 timestamps', () => {
     decodeProductCategoryCursor(encode('2026-07-31T12:00:00+00:00')).created_at,
     '2026-07-31T12:00:00+00:00',
   )
+  assertEquals(isStrictIsoTimestamp('2026-02-31T12:00:00Z'), false)
+  assertThrows(() => decodeProductCursor(encode('2026-02-31T12:00:00Z')), ApiError)
   assertThrows(() => decodeProductCursor(encode('2026-07-31 12:00:00')), ApiError)
   assertThrows(() => decodeProductCategoryCursor(encode('July 31, 2026')), ApiError)
 })

@@ -3,6 +3,7 @@ import type { Database, Json, ProductRow } from '../_shared/database.ts'
 import {
   ApiError,
   etag,
+  isStrictIsoTimestamp,
   jsonBody,
   jsonResponse,
   parseLimit,
@@ -10,11 +11,10 @@ import {
   parseVersion,
 } from './http.ts'
 import {
-  beginIdempotentCommand,
-  completeIdempotentCommand,
   hashIdempotencyRequest,
   IDEMPOTENCY_KEY_HEADER,
   parseIdempotencyKey,
+  sha256Hex,
 } from './idempotency.ts'
 
 const SELECT =
@@ -348,13 +348,7 @@ export function decodeProductCursor(value: string): Cursor {
     const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<Cursor>
     const createdAt = cursor.created_at
     const id = parseUuid(cursor.id ?? null, 'cursor')
-    if (
-      typeof createdAt !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(
-        createdAt,
-      ) ||
-      Number.isNaN(Date.parse(createdAt))
-    ) {
+    if (typeof createdAt !== 'string' || !isStrictIsoTimestamp(createdAt)) {
       throw new Error('Invalid timestamp')
     }
     return { created_at: createdAt, id }
@@ -366,6 +360,20 @@ export function decodeProductCursor(value: string): Cursor {
 }
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
+  if (
+    error.code === '23505' &&
+    (error.message?.includes('Idempotency-Key') ||
+      error.message?.includes('idempotency'))
+  ) {
+    return new ApiError(
+      409,
+      'CONFLICT',
+      'Idempotency-Key was reused with a different request payload',
+    )
+  }
+  if (error.code === '55000') {
+    return new ApiError(409, 'CONFLICT', 'An identical request is already in progress')
+  }
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The product conflicts with an existing record')
   }
@@ -494,24 +502,16 @@ export function handleProducts(
         product_id: productId,
         ...payload,
       })
-      const { replay, keyHash } = await beginIdempotentCommand(
-        db,
-        orgId,
-        userId,
-        route,
-        rawKey,
-        requestHash,
-      )
-      if (replay) {
-        return jsonResponse(replay.body, replay.status, requestId, {
-          ...replay.headers,
-          [IDEMPOTENCY_KEY_HEADER]: rawKey,
-        })
-      }
+      const keyHash = await sha256Hex(rawKey)
+      // userId is intentionally unused here: the RPC uses auth.uid() inside one transaction.
+      void userId
 
-      const { data, error } = await db.rpc('adjust_product_stock', {
+      const { data, error } = await db.rpc('adjust_product_stock_idempotent', {
         p_product_id: productId,
         p_quantity_delta: payload.quantity_delta,
+        p_idempotency_key_hash: keyHash,
+        p_request_hash: requestHash,
+        p_route: route,
         p_reason: payload.reason,
         p_note: payload.note,
         p_occurred_at: payload.occurred_at,
@@ -520,26 +520,26 @@ export function handleProducts(
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
         throw new ApiError(500, 'INTERNAL_ERROR', 'Stock adjustment returned an unexpected payload')
       }
-      const result = data as { product?: ProductRow; movement?: unknown }
-      if (!result.product || !result.movement) {
+      const envelope = data as {
+        replay?: boolean
+        response_status?: number
+        response_body?: unknown
+        response_headers?: Record<string, string>
+        product?: ProductRow
+        movement?: unknown
+      }
+      const status = envelope.response_status ?? 200
+      const body = envelope.response_body ?? {
+        data: { product: envelope.product, movement: envelope.movement },
+      }
+      const headers = {
+        ...(envelope.response_headers ?? {}),
+        [IDEMPOTENCY_KEY_HEADER]: rawKey,
+      }
+      if (!envelope.replay && (!envelope.product || !envelope.movement)) {
         throw new ApiError(500, 'INTERNAL_ERROR', 'Stock adjustment returned an incomplete payload')
       }
-
-      const responseBody = { data: result }
-      const responseHeaders = { etag: etag(result.product.version) }
-      await completeIdempotentCommand(
-        db,
-        orgId,
-        userId,
-        keyHash,
-        { status: 200, body: responseBody, headers: responseHeaders },
-        'product',
-        result.product.id,
-      )
-      return jsonResponse(responseBody, 200, requestId, {
-        ...responseHeaders,
-        [IDEMPOTENCY_KEY_HEADER]: rawKey,
-      })
+      return jsonResponse(body, status, requestId, headers)
     })()
   }
 
