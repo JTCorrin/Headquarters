@@ -3,6 +3,8 @@ import { validateClientBody } from './clients.ts'
 import { decodeCursor, validateContactBody } from './contacts.ts'
 import { ApiError, apiPath, jsonBody, parseLimit, parseVersion } from './http.ts'
 import { validateLeadBody } from './leads.ts'
+import { validateProductCategoryBody } from './product-categories.ts'
+import { validateAdjustStockBody, validateProductBody } from './products.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -196,4 +198,71 @@ Deno.test('client create validation defaults status and rejects conversion field
       ),
     ApiError,
   )
+})
+
+Deno.test('product category create validation trims name and bounds position', () => {
+  assertEquals(
+    validateProductCategoryBody({ name: '  Widgets  ', description: 'Parts' }, false),
+    {
+      name: 'Widgets',
+      description: 'Parts',
+      position: 0,
+    },
+  )
+  assertThrows(
+    () => validateProductCategoryBody({ name: 'Bad', position: 10_000_000_000 }, false),
+    ApiError,
+  )
+})
+
+Deno.test('product create validation defaults and rejects stock writes / service tracking', () => {
+  assertEquals(
+    validateProductBody(
+      { sku: ' SKU-1 ', name: ' Widget ', unit_price_cents: 1250 },
+      false,
+    ),
+    {
+      sku: 'SKU-1',
+      name: 'Widget',
+      product_type: 'product',
+      unit_price_cents: 1250,
+      currency: 'GBP',
+      track_stock: false,
+      status: 'active',
+    },
+  )
+  assertThrows(
+    () =>
+      validateProductBody(
+        { sku: 'S1', name: 'Svc', product_type: 'service', unit_price_cents: 1, track_stock: true },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateProductBody(
+        { sku: 'S1', name: 'Widget', unit_price_cents: 1, stock_qty: 5 },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateProductBody(
+        { sku: 'S1', name: 'Widget', unit_price_cents: Number.MAX_SAFE_INTEGER + 1 },
+        false,
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('stock adjustment validation bounds quantity_delta', () => {
+  assertEquals(
+    validateAdjustStockBody({ quantity_delta: -3.5, reason: 'adjustment' }),
+    { quantity_delta: -3.5, reason: 'adjustment' },
+  )
+  assertThrows(() => validateAdjustStockBody({ quantity_delta: 0 }), ApiError)
+  assertThrows(() => validateAdjustStockBody({ quantity_delta: 10_000_000_000 }), ApiError)
+  assertThrows(() => validateAdjustStockBody({ quantity_delta: 1.00001 }), ApiError)
 })

@@ -172,6 +172,60 @@ export type TimelineEventRow = {
   created_at: string
 }
 
+export type ProductCategoryRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  description: string | null
+  position: number
+}
+
+export type ProductRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  sku: string
+  name: string
+  description: string | null
+  category_id: string | null
+  product_type: 'product' | 'service'
+  unit_name: string | null
+  unit_price_cents: number
+  cost_price_cents: number | null
+  currency: string
+  tax_rate_id: string | null
+  track_stock: boolean
+  stock_qty: number | null
+  low_stock_at: number | null
+  status: 'active' | 'archived'
+  metadata: Json
+}
+
+export type InventoryMovementRow = {
+  id: string
+  org_id: string
+  created_at: string
+  created_by: string | null
+  product_id: string
+  quantity_delta: number
+  reason: 'opening' | 'adjustment' | 'invoice' | 'return' | 'void'
+  reference_type: string | null
+  reference_id: string | null
+  occurred_at: string
+  note: string | null
+}
+
 type ProfileInsert = Pick<ProfileRow, 'display_name' | 'id'> & Partial<Omit<ProfileRow, 'id'>>
 type OrganisationInsert =
   & Pick<OrganisationRow, 'country_code' | 'name' | 'slug'>
@@ -198,6 +252,17 @@ type TimelineEventInsert =
       TimelineEventRow,
       'actor_type' | 'entity_id' | 'entity_type' | 'id' | 'kind' | 'org_id' | 'title'
     >
+  >
+type ProductCategoryInsert =
+  & Pick<ProductCategoryRow, 'name' | 'org_id'>
+  & Partial<Omit<ProductCategoryRow, 'id' | 'name' | 'org_id'>>
+type ProductInsert =
+  & Pick<ProductRow, 'name' | 'org_id' | 'sku' | 'unit_price_cents'>
+  & Partial<Omit<ProductRow, 'id' | 'name' | 'org_id' | 'sku' | 'unit_price_cents'>>
+type InventoryMovementInsert =
+  & Pick<InventoryMovementRow, 'org_id' | 'product_id' | 'quantity_delta' | 'reason'>
+  & Partial<
+    Omit<InventoryMovementRow, 'id' | 'org_id' | 'product_id' | 'quantity_delta' | 'reason'>
   >
 
 export type Database = {
@@ -251,6 +316,24 @@ export type Database = {
         Update: Partial<TimelineEventInsert>
         Relationships: []
       }
+      product_categories: {
+        Row: ProductCategoryRow
+        Insert: ProductCategoryInsert
+        Update: Partial<ProductCategoryInsert>
+        Relationships: []
+      }
+      products: {
+        Row: ProductRow
+        Insert: ProductInsert
+        Update: Partial<ProductInsert>
+        Relationships: []
+      }
+      inventory_movements: {
+        Row: InventoryMovementRow
+        Insert: InventoryMovementInsert
+        Update: Partial<InventoryMovementInsert>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -270,6 +353,16 @@ export type Database = {
           p_client_name?: string
           p_client_status?: string
           p_lead_id: string
+        }
+        Returns: Json
+      }
+      adjust_product_stock: {
+        Args: {
+          p_note?: string
+          p_occurred_at?: string
+          p_product_id: string
+          p_quantity_delta: number
+          p_reason?: string
         }
         Returns: Json
       }
