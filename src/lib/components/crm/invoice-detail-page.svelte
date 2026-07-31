@@ -10,6 +10,7 @@
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
+	import AiSuggestionPanel, { type AiSuggestionStatus } from './ai-suggestion-panel.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import {
@@ -31,7 +32,7 @@
 		lineDrawerOpen?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onSend?: () => void;
-		onChase?: () => void;
+		onChase?: (draft?: string) => void;
 		onRecordPayment?: () => void;
 		class?: string;
 	}
@@ -55,6 +56,31 @@
 	}: InvoiceDetailPageProps = $props();
 
 	const formData = fromStore(invoiceForm.form);
+
+	let chaseOpen = $state(false);
+	let chaseStatus = $state<AiSuggestionStatus>('idle');
+	let chaseDraft = $state('');
+	let chaseTone = $state('polite');
+
+	function openChaseAssist() {
+		chaseOpen = true;
+		chaseStatus = 'idle';
+		chaseDraft = '';
+	}
+
+	async function generateChaseDraft() {
+		chaseStatus = 'generating';
+		const client = formData.current.clientName || 'there';
+		const number = formData.current.number || title;
+		const due = formData.current.dueOn || 'the due date';
+		await new Promise((r) => setTimeout(r, 650));
+		if (chaseTone === 'firm') {
+			chaseDraft = `Hi ${client},\n\nInvoice ${number} is past due (due ${due}). Please arrange payment or reply with a remittance date this week.\n\nRegards`;
+		} else {
+			chaseDraft = `Hi ${client},\n\nFriendly reminder that invoice ${number} was due on ${due}. Happy to resend the PDF or set up a payment link if useful.\n\nThanks`;
+		}
+		chaseStatus = 'ready';
+	}
 
 	const pdfDocument = $derived(
 		buildMoneyDocumentDef({
@@ -100,10 +126,49 @@
 					<Button variant="outline" size="sm" onclick={() => onRecordPayment?.()}>
 						Record payment
 					</Button>
-					<Button variant="outline" size="sm" onclick={() => onChase?.()}>Chase</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						onclick={() => {
+							openChaseAssist();
+							onChase?.();
+						}}
+					>
+						Chase
+					</Button>
 					<Button size="sm" onclick={() => onSend?.()}>Send</Button>
 				{/snippet}
 			</PageHeader>
+
+			{#if chaseOpen}
+				<AiSuggestionPanel
+					title="Draft chase email"
+					hint="Task assist on the invoice — edit, then use. Not a chat."
+					bind:value={chaseDraft}
+					bind:activeVariant={chaseTone}
+					status={chaseStatus}
+					generateLabel="Draft chase"
+					useLabel="Use & log chase"
+					variants={[
+						{ id: 'polite', label: 'Polite' },
+						{ id: 'firm', label: 'Firm' }
+					]}
+					onGenerate={generateChaseDraft}
+					onVariantChange={(id) => {
+						chaseTone = id;
+						if (chaseStatus === 'ready') generateChaseDraft();
+					}}
+					onDiscard={() => {
+						chaseOpen = false;
+						chaseDraft = '';
+						chaseStatus = 'idle';
+					}}
+					onUse={() => {
+						onChase?.(chaseDraft);
+						chaseOpen = false;
+					}}
+				/>
+			{/if}
 
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.95fr)]">
 				<div class="space-y-6">

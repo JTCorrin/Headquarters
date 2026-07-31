@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { cn } from '$lib/utils.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import AiAssistAction from './ai-assist-action.svelte';
+	import type { AiSuggestionStatus } from './ai-suggestion-panel.svelte';
 
 	export interface EmailMessage {
 		id: string;
@@ -18,15 +21,25 @@
 		messages: EmailMessage[];
 		selectedId?: string;
 		emptyMessage?: string;
+		/** Optional mock delay (ms) for Draft response in Storybook. */
+		draftDelayMs?: number;
 		class?: string;
+		onSendReply?: (payload: { messageId: string; body: string }) => void;
 	}
 
 	let {
 		messages,
 		selectedId = $bindable<string | undefined>(undefined),
 		emptyMessage = 'No messages for this entity yet.',
-		class: className
+		draftDelayMs = 700,
+		class: className,
+		onSendReply
 	}: EntityEmailInboxProps = $props();
+
+	let composing = $state(false);
+	let replyBody = $state('');
+	let aiStatus = $state<AiSuggestionStatus>('idle');
+	let tone = $state<'warm' | 'neutral' | 'firm'>('warm');
 
 	$effect(() => {
 		if (selectedId === undefined && messages.length > 0) {
@@ -35,6 +48,50 @@
 	});
 
 	const selected = $derived(messages.find((m) => m.id === selectedId));
+
+	function setTone(id: string) {
+		if (id === 'warm' || id === 'neutral' || id === 'firm') tone = id;
+	}
+
+	function startReply() {
+		composing = true;
+		replyBody = '';
+		aiStatus = 'idle';
+	}
+
+	function cancelReply() {
+		composing = false;
+		replyBody = '';
+		aiStatus = 'idle';
+	}
+
+	function buildDraft(message: EmailMessage, draftTone: typeof tone): string {
+		const firstName = message.from.split('@')[0]?.split('.')[0] ?? 'there';
+		const greeting = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+		if (draftTone === 'firm') {
+			return `Hi ${greeting},\n\nThanks for your note on “${message.subject}”.\n\nI can confirm Thursday morning works on our side. Please send the updated agenda by Wednesday EOD so we can prepare.\n\nBest regards`;
+		}
+		if (draftTone === 'neutral') {
+			return `Hi ${greeting},\n\nThanks for getting back about “${message.subject}”.\n\nThursday morning works for me — happy to adjust if needed. Let me know what time suits you best.\n\nThanks`;
+		}
+		return `Hi ${greeting},\n\nThanks so much for the update on “${message.subject}” — Thursday morning sounds perfect.\n\nI’ll hold that slot and send a short agenda beforehand. Looking forward to it.\n\nWarm regards`;
+	}
+
+	async function draftResponse() {
+		if (!selected) return;
+		aiStatus = 'generating';
+		const message = selected;
+		const draftTone = tone;
+		await new Promise((r) => setTimeout(r, draftDelayMs));
+		replyBody = buildDraft(message, draftTone);
+		aiStatus = 'ready';
+	}
+
+	function sendReply() {
+		if (!selected || !replyBody.trim()) return;
+		onSendReply?.({ messageId: selected.id, body: replyBody.trim() });
+		cancelReply();
+	}
 </script>
 
 <div
@@ -58,7 +115,10 @@
 							'hover:bg-muted/60 w-full border-t px-4 py-3 text-left transition-colors',
 							message.id === selectedId && 'bg-muted/80'
 						)}
-						onclick={() => (selectedId = message.id)}
+						onclick={() => {
+							selectedId = message.id;
+							cancelReply();
+						}}
 					>
 						<div class="flex items-start justify-between gap-2">
 							<p
@@ -98,13 +158,79 @@
 						</p>
 					</div>
 					<div class="flex gap-2">
-						<Button variant="outline" size="sm">Reply</Button>
-						<Button size="sm">Forward</Button>
+						{#if !composing}
+							<Button variant="outline" size="sm" onclick={startReply}>Reply</Button>
+							<Button size="sm">Forward</Button>
+						{:else}
+							<Button variant="ghost" size="sm" onclick={cancelReply}>Cancel</Button>
+						{/if}
 					</div>
 				</div>
 			</header>
-			<div class="min-h-0 flex-1 overflow-y-auto px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap">
-				{selected.body}
+
+			<div class="min-h-0 flex-1 overflow-y-auto">
+				<div class="px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap">{selected.body}</div>
+
+				{#if composing}
+					<div class="border-border space-y-3 border-t px-5 py-4">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<div>
+								<p class="text-sm font-semibold tracking-tight">Reply</p>
+								<p class="text-muted-foreground text-xs">
+									To {selected.direction === 'in' ? selected.from : selected.to}
+								</p>
+							</div>
+							<div class="flex flex-wrap items-center gap-2">
+								<div class="flex gap-1">
+									{#each [
+										{ id: 'warm', label: 'Warm' },
+										{ id: 'neutral', label: 'Neutral' },
+										{ id: 'firm', label: 'Firm' }
+									] as option (option.id)}
+										<button
+											type="button"
+											class={cn(
+												'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition-colors',
+												tone === option.id
+													? 'bg-foreground text-background ring-foreground'
+													: 'bg-background text-foreground ring-foreground/10 hover:bg-muted'
+											)}
+											onclick={() => setTone(option.id)}
+										>
+											{option.label}
+										</button>
+									{/each}
+								</div>
+								<AiAssistAction
+									label="Draft response"
+									busy={aiStatus === 'generating'}
+									onclick={draftResponse}
+								/>
+							</div>
+						</div>
+
+						<Textarea
+							bind:value={replyBody}
+							rows={7}
+							placeholder="Write a reply, or use Draft response…"
+							class="min-h-[140px] resize-y text-sm"
+						/>
+
+						<div class="flex justify-end gap-2">
+							<Button type="button" size="sm" variant="outline" onclick={cancelReply}>
+								Discard
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								disabled={!replyBody.trim()}
+								onclick={sendReply}
+							>
+								Send
+							</Button>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{:else}
 			<div class="text-muted-foreground flex flex-1 items-center justify-center px-6 text-sm">
