@@ -253,6 +253,22 @@ Deno.test('product create validation defaults and rejects stock writes / service
       status: 'active',
     },
   )
+  assertEquals(
+    validateProductBody(
+      { sku: 'SKU-USD', name: 'Widget', unit_price_cents: 100 },
+      false,
+      { defaultCurrency: 'USD' },
+    ).currency,
+    'USD',
+  )
+  assertEquals(
+    validateProductBody(
+      { sku: 'SKU-EUR', name: 'Widget', unit_price_cents: 100, currency: 'EUR' },
+      false,
+      { defaultCurrency: 'USD' },
+    ).currency,
+    'EUR',
+  )
   assertThrows(
     () =>
       validateProductBody(
