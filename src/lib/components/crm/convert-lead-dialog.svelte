@@ -29,6 +29,7 @@
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
+	const enhance = untrack(() => form.enhance);
 
 	const statusOptions = [
 		{ value: 'prospect', label: 'Prospect' },
@@ -53,10 +54,13 @@
 			</Drawer.Description>
 		</Drawer.Header>
 		<form
+			method="POST"
 			class="space-y-4 px-4 pb-2"
-			onsubmit={(e) => {
-				e.preventDefault();
-				onConfirm?.();
+			use:enhance={{
+				onUpdate({ form: validated }) {
+					if (!validated.valid) return;
+					onConfirm?.();
+				}
 			}}
 		>
 			<div class="space-y-2">
@@ -66,6 +70,7 @@
 					name="clientName"
 					bind:value={$formData.clientName}
 					placeholder="Defaults to lead / company name"
+					aria-invalid={!!$errors.clientName}
 				/>
 				{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
 			</div>

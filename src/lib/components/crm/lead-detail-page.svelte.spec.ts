@@ -21,7 +21,7 @@ describe('LeadDetailPage', () => {
 		await page.getByTestId('open-convert').click();
 		await expect.element(page.getByTestId('convert-lead-dialog')).toBeInTheDocument();
 		await page.getByTestId('convert-confirm').click();
-		expect(onConvert).toHaveBeenCalled();
+		await vi.waitFor(() => expect(onConvert).toHaveBeenCalled());
 	});
 
 	it('shows conflict recovery control for 412', async () => {

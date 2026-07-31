@@ -155,12 +155,11 @@
 								]}
 							/>
 						{:else}
-							<div
-								role="presentation"
-								onsubmit={() => onSave?.()}
-							>
-								<LeadForm form={leadForm} submitLabel="Save lead" />
-							</div>
+							<LeadForm
+								form={leadForm}
+								submitLabel="Save lead"
+								onValidSubmit={() => onSave?.()}
+							/>
 						{/if}
 					</section>
 

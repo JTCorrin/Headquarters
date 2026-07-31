@@ -39,6 +39,7 @@ export default defineConfig({
 				extends: './vite.config.ts',
 				test: {
 					name: 'client',
+					setupFiles: ['./src/vitest-setup-storybook-mode.ts'],
 					browser: {
 						enabled: true,
 						provider: playwright(),
@@ -64,6 +65,7 @@ export default defineConfig({
 				plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
 				test: {
 					name: 'storybook',
+					setupFiles: ['./src/vitest-setup-storybook-mode.ts'],
 					browser: {
 						enabled: true,
 						headless: true,

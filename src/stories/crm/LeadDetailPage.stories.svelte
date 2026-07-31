@@ -1,6 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import LeadDetailPageStoryHost from '$lib/components/crm/lead-detail-page.story-host.svelte';
+	import type { LeadResource } from '$lib/schemas/lead.js';
 	import { navGroupsWithActive } from './story-fixtures.js';
 
 	const openLead = {
@@ -15,7 +16,7 @@
 		source: 'Referral',
 		expected_close_on: '2026-08-15',
 		notes: 'Needs MSA review'
-	};
+	} satisfies LeadResource;
 
 	const wonLead = {
 		...openLead,
@@ -24,7 +25,7 @@
 		client_id: '11111111-2222-4333-8444-555555555555',
 		won_at: '2026-07-30T12:00:00Z',
 		converted_at: '2026-07-30T12:00:00Z'
-	};
+	} satisfies LeadResource;
 
 	const { Story } = defineMeta({
 		title: 'Headquarters/Pages/LeadDetail',
@@ -41,10 +42,11 @@
 
 <script lang="ts">
 	import type { LeadConvertResult } from '$lib/components/crm/lead-detail-page.svelte';
+	import type { LeadResource as LeadResourceType } from '$lib/schemas/lead.js';
 
 	let converting = $state(false);
 	let lastConvertResult = $state<LeadConvertResult | null>(null);
-	let lead = $state({ ...openLead });
+	let lead = $state<LeadResourceType>({ ...openLead });
 
 	async function runConvert() {
 		converting = true;
