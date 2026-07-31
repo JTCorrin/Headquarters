@@ -154,19 +154,21 @@ select set_config(
   true
 );
 select public.get_quote_document('${quote_id}'::uuid, '${org_id}'::uuid);
-select pg_sleep(4);
+-- Hold the transaction (and FOR SHARE) after get returns; query text becomes pg_sleep.
+select pg_sleep(8);
 commit;
 SQL
 reader_pid=$!
 
+# After get_quote_document returns, pg_stat_activity.query is pg_sleep — not the RPC name.
 reader_sleeping=0
-for _ in $(seq 1 50); do
+for _ in $(seq 1 80); do
   sleeping="$(sql_scalar "
     select exists (
       select 1
       from pg_stat_activity
-      where query like '%get_quote_document%'
-        and wait_event = 'PgSleep'
+      where wait_event = 'PgSleep'
+        and query ilike '%pg_sleep%'
     );
   ")"
   sleeping="$(printf '%s' "${sleeping}" | tr -d '[:space:]')"
