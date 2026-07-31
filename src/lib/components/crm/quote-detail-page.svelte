@@ -25,6 +25,9 @@
 		timelineEvents?: TimelineEvent[];
 		lineDrawerOpen?: boolean;
 		onRemoveLine?: (id: string) => void;
+		onSend?: () => void;
+		onChase?: () => void;
+		onConvert?: () => void;
 		class?: string;
 	}
 
@@ -32,7 +35,7 @@
 		orgName,
 		navGroups,
 		title,
-		status,
+		status = 'Draft',
 		quoteForm,
 		lineForm,
 		products = [],
@@ -40,6 +43,9 @@
 		timelineEvents = [],
 		lineDrawerOpen = $bindable(false),
 		onRemoveLine,
+		onSend,
+		onChase,
+		onConvert,
 		class: className
 	}: QuoteDetailPageProps = $props();
 </script>
@@ -50,14 +56,15 @@
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
 			<PageHeader
-				breadcrumb="Money / Quotes"
+				breadcrumb="Accounting / Quotes"
 				{title}
 				description="Header + lines, with activity for sends, views, and chases."
 			>
 				{#snippet actions()}
 					<StatusBadge {status} />
-					<Button variant="outline" size="sm">Send</Button>
-					<Button size="sm">Convert to invoice</Button>
+					<Button variant="outline" size="sm" onclick={() => onSend?.()}>Send</Button>
+					<Button variant="outline" size="sm" onclick={() => onChase?.()}>Chase</Button>
+					<Button size="sm" onclick={() => onConvert?.()}>Convert to invoice</Button>
 				{/snippet}
 			</PageHeader>
 

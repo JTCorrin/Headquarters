@@ -82,7 +82,7 @@
 	];
 
 	const { Story } = defineMeta({
-		title: 'CRM/ProductsTable',
+		title: 'Headquarters/ProductsTable',
 		component: ProductsTable,
 		tags: ['autodocs']
 	});

@@ -47,6 +47,9 @@ export { default as PaymentsListPage } from './payments-list-page.svelte';
 export { default as MoneySummary } from './money-summary.svelte';
 export { default as ClientsTable } from './clients-table.svelte';
 export { default as ClientsListPage } from './clients-list-page.svelte';
+export { default as DocumentForm } from './document-form.svelte';
+export { default as DocumentFormDrawer } from './document-form-drawer.svelte';
+export { default as EntityDocuments } from './entity-documents.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
@@ -58,6 +61,7 @@ export type { LeadCard, LeadStage } from './leads-board.svelte';
 export type { TaskBoardCard, TaskBoardStatus } from './tasks-board.svelte';
 export type { LineItemRow } from './line-items-table.svelte';
 export type { MoneySummaryItem } from './money-summary.svelte';
+export type { EntityDocument } from './entity-documents.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,

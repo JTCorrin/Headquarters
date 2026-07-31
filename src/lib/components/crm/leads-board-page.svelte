@@ -21,7 +21,7 @@
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
 			<PageHeader
-				breadcrumb="CRM"
+				breadcrumb="Headquarters"
 				title="Leads"
 				description="Pipeline board — drag cards between stages (SVAR Kanban)."
 			>

@@ -4,7 +4,7 @@
 	import { navGroupsWithActive } from './story-fixtures.js';
 
 	const { Story } = defineMeta({
-		title: 'CRM/Pages/ContactsList',
+		title: 'Headquarters/Pages/ContactsList',
 		component: ContactsListPage,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }

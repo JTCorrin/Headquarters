@@ -3,7 +3,7 @@
 	import QuoteFormDrawer from '$lib/components/crm/quote-form-drawer.svelte';
 
 	const { Story } = defineMeta({
-		title: 'CRM/QuoteForm',
+		title: 'Headquarters/QuoteForm',
 		component: QuoteFormDrawer,
 		tags: ['autodocs'],
 		parameters: { layout: 'fullscreen' }
