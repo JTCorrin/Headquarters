@@ -1,0 +1,80 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Supabase migrations and API
+    # Docker socket access is host-equivalent. Never run this job for forked PR code.
+    if: forgejo.event_name == 'workflow_dispatch' || forgejo.event.pull_request.head.repo.full_name == forgejo.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out pull request
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Verify Docker daemon
+        run: docker info --format '{{.ServerVersion}}'
+
+      - name: Isolate Supabase containers for this run
+        run: |
+          project_id="headquarters-${FORGEJO_RUN_ID}-${FORGEJO_RUN_ATTEMPT}"
+          sed -i "s/^project_id = .*/project_id = \"${project_id}\"/" supabase/config.toml
+
+      - name: Install Supabase CLI
+        uses: https://github.com/supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
+        with:
+          version: 2.111.0
+
+      - name: Install Deno
+        uses: https://github.com/denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.5
+        with:
+          deno-version: 2.9.4
+
+      - name: Report tool versions
+        run: |
+          supabase --version
+          deno --version
+
+      - name: Check Edge Function
+        working-directory: supabase/functions/api-v1
+        run: |
+          deno fmt --check . ../_shared
+          deno check index.ts http.test.ts
+          deno lint . ../_shared
+          deno test
+
+      - name: Start local database
+        run: supabase db start
+
+      - name: Replay migrations and seed from zero
+        run: supabase db reset --local
+
+      - name: Run database tests
+        run: supabase test db supabase/tests --local
+
+      - name: Lint database schemas
+        run: >
+          supabase db lint --local
+          --schema public,private
+          --level warning
+          --fail-on error
+
+      - name: Verify database type generation
+        run: |
+          supabase gen types typescript --local > /tmp/database.generated.ts
+          test -s /tmp/database.generated.ts
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true
