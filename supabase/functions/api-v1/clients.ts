@@ -83,6 +83,19 @@ interface DatabaseError {
   message?: string
 }
 
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(5, 7))
+  const day = Number(value.slice(8, 10))
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 export function validateClientBody(
   body: Record<string, unknown>,
   partial: false,
@@ -169,9 +182,12 @@ export function validateClientBody(
     const value = body.payment_terms_days
     if (
       value !== null &&
-      (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 3650)
+      (typeof value !== 'number' ||
+        !Number.isSafeInteger(value) ||
+        value < 0 ||
+        value > 3650)
     ) {
-      fields.payment_terms_days = 'Must be an integer between 0 and 3650, or null'
+      fields.payment_terms_days = 'Must be a safe integer between 0 and 3650, or null'
     } else {
       output.payment_terms_days = value as number | null
     }
@@ -179,10 +195,12 @@ export function validateClientBody(
 
   if ('renewal_on' in body) {
     const value = body.renewal_on
-    if (value !== null && (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
-      fields.renewal_on = 'Must be a YYYY-MM-DD date or null'
+    if (value === null) {
+      output.renewal_on = null
+    } else if (typeof value !== 'string' || !isValidDateOnly(value)) {
+      fields.renewal_on = 'Must be a real YYYY-MM-DD date or null'
     } else {
-      output.renewal_on = value as string | null
+      output.renewal_on = value
     }
   }
 
