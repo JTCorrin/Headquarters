@@ -1,7 +1,13 @@
 <script lang="ts">
+	import type { SuperForm } from 'sveltekit-superforms';
+	import type { LeadFormData } from '$lib/schemas/lead.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import LeadsBoard, { type LeadCard } from './leads-board.svelte';
+	import LeadFormDrawer from './lead-form-drawer.svelte';
+	import ResourceStateBanner, {
+		type ResourceViewState
+	} from './resource-state-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -9,10 +15,25 @@
 		orgName: string;
 		navGroups: AppNavGroup[];
 		leads: LeadCard[];
+		leadForm: SuperForm<LeadFormData>;
+		drawerOpen?: boolean;
+		viewState?: ResourceViewState;
 		class?: string;
+		onSelectLead?: (id: string) => void;
+		onReload?: () => void;
 	}
 
-	let { orgName, navGroups, leads, class: className }: LeadsBoardPageProps = $props();
+	let {
+		orgName,
+		navGroups,
+		leads,
+		leadForm,
+		drawerOpen = $bindable(false),
+		viewState = { kind: 'ready' },
+		class: className,
+		onSelectLead,
+		onReload
+	}: LeadsBoardPageProps = $props();
 </script>
 
 <div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
@@ -23,15 +44,31 @@
 			<PageHeader
 				breadcrumb="Headquarters"
 				title="Leads"
-				description="Pipeline board — drag cards between stages (SVAR Kanban)."
+				description="Pipeline board — create leads, open a card for edit/convert. Won only via convert."
 			>
 				{#snippet actions()}
 					<Button variant="outline" size="sm">Table view</Button>
-					<Button size="sm">New lead</Button>
+					<LeadFormDrawer bind:open={drawerOpen} form={leadForm}>
+						{#snippet trigger()}
+							<Button type="button" size="sm">New lead</Button>
+						{/snippet}
+					</LeadFormDrawer>
 				{/snippet}
 			</PageHeader>
 
-			<LeadsBoard {leads} class="min-h-[480px]" />
+			<ResourceStateBanner state={viewState} {onReload} />
+
+			{#if viewState.kind === 'ready' || viewState.kind === 'empty'}
+				{#if leads.length === 0}
+					<p
+						class="text-muted-foreground rounded-3xl border border-dashed px-4 py-12 text-center text-sm"
+					>
+						No leads yet — create one to populate the board.
+					</p>
+				{:else}
+					<LeadsBoard {leads} class="min-h-[480px]" {onSelectLead} />
+				{/if}
+			{/if}
 		</div>
 	</main>
 </div>

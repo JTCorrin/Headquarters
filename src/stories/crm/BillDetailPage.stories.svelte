@@ -39,6 +39,7 @@
 	const billForm = superForm(billData, {
 		validators: zod4(billFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false
 	});
 
@@ -90,6 +91,7 @@
 	const lineForm = superForm(lineData, {
 		validators: zod4(lineItemFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: true,
 		onUpdate({ form }) {
 			if (!form.valid) return;

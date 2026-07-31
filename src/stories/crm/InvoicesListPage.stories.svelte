@@ -105,6 +105,7 @@
 	const form = superForm(data, {
 		validators: zod4(invoiceFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false
 	});
 </script>
