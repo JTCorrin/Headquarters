@@ -61,6 +61,12 @@ export { default as EmailTemplateFormDrawer } from './email-template-form-drawer
 export { default as EmailTemplatesTable } from './email-templates-table.svelte';
 export { default as EmailTemplatesListPage } from './email-templates-list-page.svelte';
 export { default as EmailTemplateEditorPage } from './email-template-editor-page.svelte';
+export { default as MyTasksPanel } from './my-tasks-panel.svelte';
+export { default as MeetingForm } from './meeting-form.svelte';
+export { default as MeetingFormDrawer } from './meeting-form-drawer.svelte';
+export { default as MeetingsTable } from './meetings-table.svelte';
+export { default as MeetingsListPage } from './meetings-list-page.svelte';
+export { default as MeetingWorkspacePage } from './meeting-workspace-page.svelte';
 export type { ContactRow } from './contacts-columns.js';
 export type { ProductRow } from './products-columns.js';
 export type { InvoiceRow } from './invoices-columns.js';
@@ -75,6 +81,9 @@ export type { LineItemRow } from './line-items-table.svelte';
 export type { MoneySummaryItem } from './money-summary.svelte';
 export type { EntityDocument } from './entity-documents.svelte';
 export type { EmailTemplateRow } from './email-templates-columns.js';
+export type { DashboardTask } from './my-tasks-panel.svelte';
+export type { MeetingRow } from './meetings-columns.js';
+export type { ProposedMeetingTask } from './meeting-workspace-page.svelte';
 export {
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,
