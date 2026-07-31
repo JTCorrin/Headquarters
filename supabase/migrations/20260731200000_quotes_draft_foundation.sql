@@ -524,6 +524,30 @@ $$;
 revoke all on function private.calculate_quote_line_amounts(numeric, bigint, numeric, numeric)
   from public, anon, authenticated;
 
+create or replace function private.assert_json_safe_cents(
+  p_amount bigint,
+  p_label text
+)
+returns bigint
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if p_amount is null
+    or p_amount < 0
+    or p_amount > 9007199254740991
+  then
+    raise exception '% exceeds JSON-safe integer range', p_label
+      using errcode = '22023';
+  end if;
+  return p_amount;
+end;
+$$;
+
+revoke all on function private.assert_json_safe_cents(bigint, text)
+  from public, anon, authenticated;
+
 drop function if exists private.replace_quote_lines(uuid, uuid, uuid, jsonb);
 
 create or replace function private.replace_quote_lines(
@@ -912,6 +936,11 @@ begin
       using errcode = '23514';
   end if;
 
+  perform private.assert_json_safe_cents(
+    line_totals.subtotal_cents - v_discount_cents + line_totals.tax_cents,
+    'Quote total_cents'
+  );
+
   update public.quotes
   set
     discount_cents = v_discount_cents,
@@ -1110,6 +1139,11 @@ begin
     raise exception 'Quote discount_cents cannot exceed subtotal_cents'
       using errcode = '23514';
   end if;
+
+  perform private.assert_json_safe_cents(
+    next_subtotal - next_discount_cents + next_tax,
+    'Quote total_cents'
+  );
 
   update public.quotes
   set

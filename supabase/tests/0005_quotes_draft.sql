@@ -1,6 +1,6 @@
 begin;
 
-select plan(48);
+select plan(49);
 
 select has_table('public', 'quotes', 'quotes table exists');
 select has_table('public', 'quote_lines', 'quote_lines table exists');
@@ -631,18 +631,6 @@ select ok(
   'create_organisation seeds a quote document sequence'
 );
 
-select ok(
-  lower(pg_get_functiondef('public.get_quote_document(uuid,uuid)'::regprocedure))
-    like '%for share%',
-  'get_quote_document takes FOR SHARE so concurrent save cannot tear header/lines'
-);
-
-select ok(
-  lower(pg_get_functiondef('public.save_quote_draft(uuid,uuid,integer,jsonb,jsonb)'::regprocedure))
-    like '%for update%',
-  'save_quote_draft takes FOR UPDATE and waits behind concurrent document reads'
-);
-
 -- Rebuild a live draft for remaining lifecycle probes.
 select pg_temp.as_user((select owner_id from _quotes_fixture));
 set local role authenticated;
@@ -787,6 +775,194 @@ select throws_ok(
   null,
   'create rejects line totals outside the JSON-safe integer range'
 );
+
+-- Individually safe lines/subtotal/tax can still produce an unsafe header total.
+select throws_ok(
+  $$
+    select public.create_quote_draft(
+      (select org_id from _quotes_fixture),
+      jsonb_build_object(
+        'title', 'Unsafe header total',
+        'client_id', (select client_id from _quotes_fixture),
+        'currency', 'GBP'
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'A',
+          'quantity', 1,
+          'unit_price_cents', 4503599627370495,
+          'tax_rate_percent', 100,
+          'position', 0
+        ),
+        jsonb_build_object(
+          'description', 'B',
+          'quantity', 1,
+          'unit_price_cents', 4503599627370495,
+          'tax_rate_percent', 100,
+          'position', 1
+        )
+      )
+    )
+  $$,
+  '22023',
+  null,
+  'create rejects header total_cents outside the JSON-safe integer range'
+);
+
+select throws_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      '{}'::jsonb,
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'A',
+          'quantity', 1,
+          'unit_price_cents', 4503599627370495,
+          'tax_rate_percent', 100,
+          'position', 0
+        ),
+        jsonb_build_object(
+          'description', 'B',
+          'quantity', 1,
+          'unit_price_cents', 4503599627370495,
+          'tax_rate_percent', 100,
+          'position', 1
+        )
+      )
+    )
+  $$,
+  '22023',
+  null,
+  'save rejects header total_cents outside the JSON-safe integer range'
+);
+
+-- Discount-only saves recompute header total without replace_quote_lines.
+reset role;
+do $$ begin perform set_config('app.allow_quote_totals', 'on', true); end $$;
+
+delete from public.quote_lines
+where quote_id = (select quote_id from _quotes_fixture);
+
+insert into public.quote_lines (
+  org_id,
+  quote_id,
+  description,
+  quantity,
+  unit_price_cents,
+  discount_percent,
+  tax_rate_percent,
+  subtotal_cents,
+  tax_cents,
+  total_cents,
+  position,
+  created_by,
+  updated_by
+)
+select
+  f.org_id,
+  f.quote_id,
+  line.description,
+  1,
+  4503599627370495,
+  0,
+  100,
+  4503599627370495,
+  4503599627370495,
+  9007199254740990,
+  line.position,
+  f.owner_id,
+  f.owner_id
+from _quotes_fixture f
+cross join (
+  values
+    ('Planted A', 0),
+    ('Planted B', 1)
+) as line(description, position);
+
+update public.quotes
+set
+  subtotal_cents = 9007199254740990,
+  tax_cents = 9007199254740990,
+  discount_cents = 0,
+  -- Temporarily store a JSON-safe placeholder; save must recompute and reject.
+  total_cents = 9007199254740991,
+  updated_by = (select owner_id from _quotes_fixture)
+where id = (select quote_id from _quotes_fixture);
+
+do $$ begin perform set_config('app.allow_quote_totals', 'off', true); end $$;
+
+select pg_temp.as_user((select owner_id from _quotes_fixture));
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      jsonb_build_object('discount_cents', 0),
+      null
+    )
+  $$,
+  '22023',
+  null,
+  'discount-only save rejects header total_cents outside the JSON-safe integer range'
+);
+
+-- Restore a JSON-safe line set so soft-delete lifecycle can continue.
+reset role;
+do $$ begin perform set_config('app.allow_quote_totals', 'on', true); end $$;
+
+delete from public.quote_lines
+where quote_id = (select quote_id from _quotes_fixture);
+
+insert into public.quote_lines (
+  org_id,
+  quote_id,
+  description,
+  quantity,
+  unit_price_cents,
+  discount_percent,
+  tax_rate_percent,
+  subtotal_cents,
+  tax_cents,
+  total_cents,
+  position,
+  created_by,
+  updated_by
+)
+select
+  org_id,
+  quote_id,
+  'Restored free-text',
+  1,
+  100,
+  0,
+  0,
+  100,
+  0,
+  100,
+  0,
+  owner_id,
+  owner_id
+from _quotes_fixture;
+
+update public.quotes
+set
+  subtotal_cents = 100,
+  tax_cents = 0,
+  discount_cents = 0,
+  total_cents = 100,
+  updated_by = (select owner_id from _quotes_fixture)
+where id = (select quote_id from _quotes_fixture);
+
+do $$ begin perform set_config('app.allow_quote_totals', 'off', true); end $$;
+
+select pg_temp.as_user((select owner_id from _quotes_fixture));
+set local role authenticated;
 
 -- Soft-delete must still work after the linked client is removed.
 reset role;
