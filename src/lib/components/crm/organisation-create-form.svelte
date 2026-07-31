@@ -16,8 +16,8 @@
 		class?: string;
 		/**
 		 * Called after client-side validation succeeds.
-		 * May return a Promise; Superforms awaits it before ending submitting.
-		 * Return `false` to signal failure to the drawer (keep open).
+		 * May return a Promise; awaited before ending pending state.
+		 * Return `false` or reject to signal failure (drawer stays open).
 		 */
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
@@ -58,6 +58,9 @@
 			pendingSubmit = true;
 			try {
 				return await onValidSubmit?.();
+			} catch {
+				// Swallow so Superforms default onError does not rethrow.
+				return false;
 			} finally {
 				pendingSubmit = false;
 			}

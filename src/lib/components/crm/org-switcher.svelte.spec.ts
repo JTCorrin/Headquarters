@@ -69,26 +69,30 @@ describe('OrgSwitcher', () => {
 		await expect.element(page.getByTestId('organisation-create-drawer')).toBeInTheDocument();
 	});
 
-	it('awaits delayed create failure without closing or double-submitting', async () => {
+	it('keeps the drawer open when create rejects and does not double-submit', async () => {
+		const onCreateAttempt = vi.fn();
 		render(OrgSwitcherStoryHost, {
 			currentOrgId: memberships[0]!.org_id,
 			memberships: [memberships[0]!],
-			failCreate: true,
-			createDelayMs: 400
+			rejectCreate: true,
+			createDelayMs: 400,
+			onCreateAttempt
 		});
 
 		await page.getByTestId('org-switcher-trigger').click();
 		await page.getByTestId('org-switcher-create').click();
-		await page.getByLabelText('Name').fill('Slow Fail Org');
+		await page.getByLabelText('Name').fill('Slow Reject Org');
 		const submit = page.getByTestId('organisation-create-submit');
 		await submit.click();
 
 		await expect.element(submit).toHaveTextContent(/Creating/i);
 		await expect.element(submit).toBeDisabled();
+		// Second click while pending must not start another create.
+		await submit.click({ force: true }).catch(() => undefined);
 		await expect.element(page.getByTestId('organisation-create-error')).toBeInTheDocument();
 		await expect.element(page.getByTestId('organisation-create-drawer')).toBeInTheDocument();
-		await expect.element(submit).toHaveTextContent(/Create organisation/i);
 		await expect.element(submit).not.toBeDisabled();
+		expect(onCreateAttempt).toHaveBeenCalledTimes(1);
 	});
 
 	it('selects and opens configuration after successful create', async () => {

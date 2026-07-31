@@ -38,7 +38,10 @@
 		onReload?: () => void;
 		onSaveConfig?: () => void;
 		onSavePreferences?: () => void;
-		onSaveTaxRate?: () => void;
+		/**
+		 * Return `false` (or reject) to keep the tax drawer open after a failed save.
+		 */
+		onSaveTaxRate?: () => boolean | void | Promise<boolean | void>;
 		onSetDefaultTaxRate?: (taxRateId: string) => void;
 		onArchiveTaxRate?: (taxRateId: string) => void;
 		onEditTaxRate?: (taxRateId: string) => void;
@@ -72,6 +75,25 @@
 	const showContent = $derived(
 		viewState.kind === 'ready' || viewState.kind === 'empty' || viewState.kind === 'conflict'
 	);
+
+	let taxSaveError = $state<string | null>(null);
+
+	async function handleTaxSave(): Promise<boolean> {
+		taxSaveError = null;
+		try {
+			const result = await onSaveTaxRate?.();
+			if (result === false) {
+				taxSaveError = 'Could not save tax rate — try again.';
+				return false;
+			}
+			taxDrawerOpen = false;
+			return true;
+		} catch (err) {
+			taxSaveError =
+				err instanceof Error ? err.message : 'Could not save tax rate — try again.';
+			return false;
+		}
+	}
 </script>
 
 <div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
@@ -122,7 +144,10 @@
 								type="button"
 								size="sm"
 								data-testid="tax-rate-add"
-								onclick={() => onAddTaxRate?.()}
+								onclick={() => {
+									taxSaveError = null;
+									onAddTaxRate?.();
+								}}
 							>
 								Add tax rate
 							</Button>
@@ -173,7 +198,10 @@
 												size="sm"
 												variant="outline"
 												data-testid={`tax-rate-edit-${rate.id}`}
-												onclick={() => onEditTaxRate?.(rate.id)}
+												onclick={() => {
+													taxSaveError = null;
+													onEditTaxRate?.(rate.id);
+												}}
 											>
 												Edit
 											</Button>
@@ -224,14 +252,13 @@
 					Setting a rate as default clears the previous active default.
 				</Drawer.Description>
 			</Drawer.Header>
-			<div class="px-4 pb-6">
-				<TaxRateForm
-					form={taxRateForm}
-					onValidSubmit={() => {
-						onSaveTaxRate?.();
-						taxDrawerOpen = false;
-					}}
-				/>
+			<div class="space-y-3 px-4 pb-6">
+				{#if taxSaveError}
+					<p class="text-destructive text-sm" role="alert" data-testid="tax-rate-save-error">
+						{taxSaveError}
+					</p>
+				{/if}
+				<TaxRateForm form={taxRateForm} onValidSubmit={handleTaxSave} />
 			</div>
 		</Drawer.Content>
 	</Drawer.Root>

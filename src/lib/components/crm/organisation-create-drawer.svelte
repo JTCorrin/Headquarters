@@ -14,7 +14,7 @@
 		trigger?: Snippet;
 		/**
 		 * Called after client-side validation succeeds.
-		 * Return `false` to keep the drawer open (e.g. API failure);
+		 * Return `false` or reject to keep the drawer open;
 		 * return `true`/void to close after success.
 		 */
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -29,10 +29,25 @@
 		onValidSubmit
 	}: OrganisationCreateDrawerProps = $props();
 
-	async function handleValidSubmit() {
-		const result = await onValidSubmit?.();
-		if (result !== false) {
+	let localError = $state<string | null>(null);
+	const displayError = $derived(createError ?? localError);
+
+	async function handleValidSubmit(): Promise<boolean> {
+		localError = null;
+		try {
+			const result = await onValidSubmit?.();
+			if (result === false) {
+				if (!createError && !localError) {
+					localError = 'Could not create organisation — try again.';
+				}
+				return false;
+			}
 			open = false;
+			return true;
+		} catch (err) {
+			localError =
+				err instanceof Error ? err.message : 'Could not create organisation — try again.';
+			return false;
 		}
 	}
 </script>
@@ -56,9 +71,9 @@
 			</Drawer.Description>
 		</Drawer.Header>
 		<div class="space-y-3 px-4 pb-6">
-			{#if createError}
+			{#if displayError}
 				<p class="text-destructive text-sm" role="alert" data-testid="organisation-create-error">
-					{createError}
+					{displayError}
 				</p>
 			{/if}
 			<OrganisationCreateForm {form} onValidSubmit={handleValidSubmit} />

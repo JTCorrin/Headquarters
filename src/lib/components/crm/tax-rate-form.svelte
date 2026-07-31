@@ -12,7 +12,11 @@
 		form: SuperForm<TaxRateFormData>;
 		submitLabel?: string;
 		class?: string;
-		onValidSubmit?: () => void;
+		/**
+		 * Called after client-side validation succeeds.
+		 * Return `false` (or reject) to signal failure; may be async.
+		 */
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -26,6 +30,9 @@
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	const busy = $derived($submitting || pendingSubmit);
 
 	const defaultLabel = $derived($formData.isDefault === 'true' ? 'Yes' : 'No');
 	const activeLabel = $derived($formData.active === 'true' ? 'Active' : 'Archived');
@@ -52,9 +59,17 @@
 	class={cn('space-y-4', className)}
 	data-testid="tax-rate-form"
 	use:enhance={{
-		onUpdate({ form: validated }) {
+		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
-			onValidSubmit?.();
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				// Swallow so Superforms default onError does not rethrow.
+				return false;
+			} finally {
+				pendingSubmit = false;
+			}
 		}
 	}}
 >
@@ -133,8 +148,8 @@
 	</div>
 
 	<div class="flex justify-end">
-		<Button type="submit" disabled={$submitting} data-testid="tax-rate-submit">
-			{$submitting ? 'Saving…' : submitLabel}
+		<Button type="submit" disabled={busy} data-testid="tax-rate-submit">
+			{busy ? 'Saving…' : submitLabel}
 		</Button>
 	</div>
 </form>
