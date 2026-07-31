@@ -14,7 +14,11 @@
 		form: SuperForm<ProfilePreferencesData>;
 		submitLabel?: string;
 		class?: string;
-		onValidSubmit?: () => void;
+		/**
+		 * Called after client-side validation succeeds.
+		 * May return a Promise; awaited before ending pending state.
+		 */
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -27,6 +31,9 @@
 	const formData = untrack(() => form.form);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	const busy = $derived($submitting || pendingSubmit);
 
 	const labels: Record<(typeof themePreferenceOptions)[number], string> = {
 		system: 'System',
@@ -43,16 +50,34 @@
 	class={cn('space-y-4', className)}
 	data-testid="profile-preferences-form"
 	use:enhance={{
-		onUpdate({ form: validated }) {
+		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
-			onValidSubmit?.();
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				// Swallow so Superforms default onError does not rethrow.
+				return false;
+			} finally {
+				pendingSubmit = false;
+			}
 		}
 	}}
 >
 	<div class="space-y-2">
 		<Label for="profile-theme">Personal theme</Label>
-		<Select.Root type="single" bind:value={$formData.themePreference} name="themePreference">
-			<Select.Trigger id="profile-theme" class="w-full" data-testid="profile-theme-trigger">
+		<Select.Root
+			type="single"
+			bind:value={$formData.themePreference}
+			name="themePreference"
+			disabled={busy}
+		>
+			<Select.Trigger
+				id="profile-theme"
+				class="w-full"
+				data-testid="profile-theme-trigger"
+				disabled={busy}
+			>
 				{themeLabel}
 			</Select.Trigger>
 			<Select.Content>
@@ -67,8 +92,8 @@
 	</div>
 
 	<div class="flex justify-end">
-		<Button type="submit" disabled={$submitting} data-testid="profile-preferences-submit">
-			{$submitting ? 'Saving…' : submitLabel}
+		<Button type="submit" disabled={busy} data-testid="profile-preferences-submit">
+			{busy ? 'Saving…' : submitLabel}
 		</Button>
 	</div>
 </form>

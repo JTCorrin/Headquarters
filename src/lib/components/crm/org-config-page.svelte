@@ -128,6 +128,34 @@
 		return fallback;
 	}
 
+	interface RequestEpoch {
+		orgId: string | null;
+		generation: number;
+	}
+
+	/**
+	 * Plain mirror of session identity for post-await stale checks.
+	 * Reading `$state` after `await` can observe a pre-await snapshot in Svelte 5;
+	 * this object is updated synchronously in an effect and is safe after suspension.
+	 */
+	const liveEpoch: RequestEpoch = {
+		orgId: null,
+		generation: -1
+	};
+
+	$effect(() => {
+		liveEpoch.orgId = session.selectedOrgId;
+		liveEpoch.generation = session.cacheGeneration;
+	});
+
+	function captureEpoch(): RequestEpoch {
+		return { orgId: liveEpoch.orgId, generation: liveEpoch.generation };
+	}
+
+	function isStale(epoch: RequestEpoch): boolean {
+		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
+	}
+
 	function resetOrgScopedState() {
 		configuration = null;
 		taxRates = [];
@@ -146,12 +174,12 @@
 			return;
 		}
 
-		const generation = session.cacheGeneration;
+		const epoch = captureEpoch();
 		viewState = { kind: 'loading' };
 		try {
 			if (session.memberships.length === 0) {
 				const rows = await api.listOrganisations();
-				if (generation !== session.cacheGeneration) return;
+				if (isStale(epoch)) return;
 				session.setMemberships(rows.map(toOrgMembershipSummary));
 			}
 
@@ -161,7 +189,7 @@
 				api.getProfilePreferences()
 			]);
 
-			if (generation !== session.cacheGeneration) return;
+			if (isStale(epoch)) return;
 
 			configuration = toOrganisationConfigResource(config);
 			taxRates = rates.map(toTaxRateResource);
@@ -169,7 +197,7 @@
 			preferencesForm.form.set(toProfilePreferencesFormData(prefs));
 			viewState = { kind: 'ready' };
 		} catch (error) {
-			if (generation !== session.cacheGeneration) return;
+			if (isStale(epoch)) return;
 			if (isApiClientError(error) && error.isForbidden) {
 				viewState = { kind: 'forbidden', message: userMessage(error, 'Forbidden') };
 				return;
@@ -191,15 +219,26 @@
 
 	async function onSaveConfig() {
 		if (!configuration) return;
+		const epoch = captureEpoch();
+		const version = configuration.version;
 		try {
 			const updated = await api.patchOrganisationConfiguration(
 				toOrganisationConfigPatch(get(configForm.form)),
-				configuration.version
+				version
 			);
+			if (isStale(epoch)) {
+				// Superforms may reapply submitted values after onUpdate; resync live org.
+				void loadAll();
+				return false;
+			}
 			configuration = toOrganisationConfigResource(updated);
 			configForm.form.set(toOrganisationConfigFormData(updated));
 			viewState = { kind: 'ready' };
 		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
 			if (isApiClientError(error) && error.isPreconditionFailed) {
 				viewState = {
 					kind: 'conflict',
@@ -227,13 +266,22 @@
 	}
 
 	async function onSavePreferences() {
+		const epoch = captureEpoch();
 		try {
 			const values = get(preferencesForm.form);
 			const updated = await api.patchProfilePreferences({
 				theme_preference: themePreferenceToApi(values.themePreference)
 			});
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
 			preferencesForm.form.set(toProfilePreferencesFormData(updated));
 		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
 			if (isApiClientError(error) && error.isValidationError) {
 				viewState = {
 					kind: 'validation',
@@ -250,22 +298,27 @@
 	}
 
 	async function onSaveTaxRate(): Promise<boolean> {
+		const epoch = captureEpoch();
 		const values = get(taxRateForm.form);
 		const body = toTaxRateCreateBody(values);
+		const editingId = editingTaxRateId;
 		try {
-			if (editingTaxRateId) {
-				const current = taxRates.find((r) => r.id === editingTaxRateId);
+			if (editingId) {
+				const current = taxRates.find((r) => r.id === editingId);
 				if (!current) return false;
-				const updated = await api.patchTaxRate(editingTaxRateId, body, current.version);
+				const updated = await api.patchTaxRate(editingId, body, current.version);
+				if (isStale(epoch)) return false;
 				taxRates = taxRates.map((r) =>
 					r.id === updated.id ? toTaxRateResource(updated) : r
 				);
 			} else {
 				const created = await api.createTaxRate(body);
+				if (isStale(epoch)) return false;
 				taxRates = [toTaxRateResource(created), ...taxRates];
 			}
 			return true;
 		} catch (error) {
+			if (isStale(epoch)) return false;
 			if (isApiClientError(error) && error.isPreconditionFailed) {
 				viewState = {
 					kind: 'conflict',
@@ -279,17 +332,17 @@
 	async function onSetDefaultTaxRate(taxRateId: string) {
 		const current = taxRates.find((r) => r.id === taxRateId);
 		if (!current || current.is_default) return;
+		const epoch = captureEpoch();
+		const version = current.version;
 		try {
-			const updated = await api.patchTaxRate(
-				taxRateId,
-				{ is_default: true },
-				current.version
-			);
+			const updated = await api.patchTaxRate(taxRateId, { is_default: true }, version);
+			if (isStale(epoch)) return;
 			taxRates = taxRates.map((rate) => {
 				if (rate.id === updated.id) return toTaxRateResource(updated);
 				return { ...rate, is_default: false };
 			});
 		} catch (error) {
+			if (isStale(epoch)) return;
 			viewState = {
 				kind: 'validation',
 				message: userMessage(error, 'Could not set default tax rate.')
@@ -300,10 +353,14 @@
 	async function onArchiveTaxRate(taxRateId: string) {
 		const current = taxRates.find((r) => r.id === taxRateId);
 		if (!current) return;
+		const epoch = captureEpoch();
+		const version = current.version;
 		try {
-			await api.deleteTaxRate(taxRateId, current.version);
+			await api.deleteTaxRate(taxRateId, version);
+			if (isStale(epoch)) return;
 			taxRates = taxRates.filter((r) => r.id !== taxRateId);
 		} catch (error) {
+			if (isStale(epoch)) return;
 			viewState = {
 				kind: 'validation',
 				message: userMessage(error, 'Could not archive tax rate.')
