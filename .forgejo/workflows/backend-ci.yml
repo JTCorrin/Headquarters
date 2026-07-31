@@ -75,6 +75,19 @@ jobs:
           supabase gen types typescript --local > /tmp/database.generated.ts
           test -s /tmp/database.generated.ts
 
+      - name: Report local database diagnostics
+        if: failure()
+        run: |
+          docker ps -a
+          container_id="$(
+            docker ps -aq \
+              --filter "name=^/supabase_db_headquarters-${FORGEJO_RUN_ID}-${FORGEJO_RUN_ATTEMPT}$"
+          )"
+          if [ -n "${container_id}" ]; then
+            docker inspect "${container_id}" --format '{{json .State}}'
+            docker logs "${container_id}"
+          fi
+
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup || true
