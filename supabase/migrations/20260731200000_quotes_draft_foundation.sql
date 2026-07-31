@@ -323,7 +323,19 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- Soft-delete must succeed even if linked parties were later removed/suspended.
+  if tg_op = 'UPDATE'
+    and new.deleted_at is not null
+    and old.deleted_at is null
+  then
+    return new;
+  end if;
+
   if new.client_id is not null
+    and (
+      tg_op = 'INSERT'
+      or new.client_id is distinct from old.client_id
+    )
     and not exists (
       select 1
       from public.clients
@@ -337,6 +349,10 @@ begin
   end if;
 
   if new.lead_id is not null
+    and (
+      tg_op = 'INSERT'
+      or new.lead_id is distinct from old.lead_id
+    )
     and not exists (
       select 1
       from public.leads
@@ -350,6 +366,10 @@ begin
   end if;
 
   if new.contact_id is not null
+    and (
+      tg_op = 'INSERT'
+      or new.contact_id is distinct from old.contact_id
+    )
     and not exists (
       select 1
       from public.contacts
@@ -363,6 +383,10 @@ begin
   end if;
 
   if new.owner_membership_id is not null
+    and (
+      tg_op = 'INSERT'
+      or new.owner_membership_id is distinct from old.owner_membership_id
+    )
     and not exists (
       select 1
       from public.memberships
@@ -500,11 +524,14 @@ $$;
 revoke all on function private.calculate_quote_line_amounts(numeric, bigint, numeric, numeric)
   from public, anon, authenticated;
 
+drop function if exists private.replace_quote_lines(uuid, uuid, uuid, jsonb);
+
 create or replace function private.replace_quote_lines(
   p_org_id uuid,
   p_quote_id uuid,
   p_actor_id uuid,
-  p_lines jsonb
+  p_lines jsonb,
+  p_quote_currency char(3)
 )
 returns table (
   subtotal_cents bigint,
@@ -530,6 +557,7 @@ declare
   amounts record;
   header_subtotal bigint := 0;
   header_tax bigint := 0;
+  json_safe_max bigint := 9007199254740991; -- Number.MAX_SAFE_INTEGER
 begin
   if p_lines is null or jsonb_typeof(p_lines) <> 'array' then
     raise exception 'Quote lines must be an array'
@@ -538,6 +566,11 @@ begin
 
   if jsonb_array_length(p_lines) > 200 then
     raise exception 'Quote cannot exceed 200 lines'
+      using errcode = '22023';
+  end if;
+
+  if p_quote_currency is null or p_quote_currency !~ '^[A-Z]{3}$' then
+    raise exception 'Quote currency must be a 3-letter ISO code'
       using errcode = '22023';
   end if;
 
@@ -552,7 +585,7 @@ begin
   loop
     line_product_id := nullif(line_item ->> 'product_id', '')::uuid;
     line_description := nullif(trim(coalesce(line_item ->> 'description', '')), '');
-    line_sku := nullif(trim(coalesce(line_item ->> 'sku_snapshot', '')), '');
+    line_sku := null;
     line_quantity := (line_item ->> 'quantity')::numeric;
     line_discount := coalesce((line_item ->> 'discount_percent')::numeric, 0);
     line_position := coalesce((line_item ->> 'position')::integer, line_index);
@@ -591,7 +624,13 @@ begin
           using errcode = '22023';
       end if;
 
-      line_sku := coalesce(line_sku, product_row.sku);
+      if product_row.currency is distinct from p_quote_currency then
+        raise exception 'Quote line product currency must match quote currency'
+          using errcode = '22023';
+      end if;
+
+      -- Product SKU snapshot is server-owned; ignore client-supplied sku_snapshot.
+      line_sku := product_row.sku;
       line_description := coalesce(line_description, product_row.name);
       line_unit_price := coalesce(
         nullif(line_item ->> 'unit_price_cents', '')::bigint,
@@ -642,6 +681,13 @@ begin
         using errcode = '22023';
     end if;
 
+    if line_unit_price > 0
+      and line_quantity > (json_safe_max::numeric / line_unit_price::numeric)
+    then
+      raise exception 'Quote line totals exceed JSON-safe integer range'
+        using errcode = '22023';
+    end if;
+
     select * into amounts
     from private.calculate_quote_line_amounts(
       line_quantity,
@@ -649,6 +695,21 @@ begin
       line_discount,
       line_tax_rate
     );
+
+    if amounts.subtotal_cents > json_safe_max
+      or amounts.tax_cents > json_safe_max
+      or amounts.total_cents > json_safe_max
+    then
+      raise exception 'Quote line totals exceed JSON-safe integer range'
+        using errcode = '22023';
+    end if;
+
+    if header_subtotal > json_safe_max - amounts.subtotal_cents
+      or header_tax > json_safe_max - amounts.tax_cents
+    then
+      raise exception 'Quote totals exceed JSON-safe integer range'
+        using errcode = '22023';
+    end if;
 
     insert into public.quote_lines (
       org_id,
@@ -694,7 +755,7 @@ begin
 end;
 $$;
 
-revoke all on function private.replace_quote_lines(uuid, uuid, uuid, jsonb)
+revoke all on function private.replace_quote_lines(uuid, uuid, uuid, jsonb, char)
   from public, anon, authenticated;
 
 create or replace function public.create_quote_draft(
@@ -842,7 +903,8 @@ begin
     p_org_id,
     quote_row.id,
     actor_id,
-    coalesce(p_lines, '[]'::jsonb)
+    coalesce(p_lines, '[]'::jsonb),
+    currency::char(3)
   );
 
   if v_discount_cents > line_totals.subtotal_cents then
@@ -1017,11 +1079,22 @@ begin
       using errcode = '22023';
   end if;
 
+  if next_currency is distinct from quote_row.currency and p_lines is null then
+    raise exception 'Changing quote currency requires replacing lines'
+      using errcode = '22023';
+  end if;
+
   perform set_config('app.allow_quote_totals', 'on', true);
 
   if p_lines is not null then
     select * into line_totals
-    from private.replace_quote_lines(p_org_id, quote_row.id, actor_id, p_lines);
+    from private.replace_quote_lines(
+      p_org_id,
+      quote_row.id,
+      actor_id,
+      p_lines,
+      next_currency
+    );
     next_subtotal := line_totals.subtotal_cents;
     next_tax := line_totals.tax_cents;
   else
@@ -1068,6 +1141,63 @@ begin
   where quote_lines.quote_id = quote_row.id;
 
   perform set_config('app.allow_quote_totals', 'off', true);
+
+  return jsonb_build_object(
+    'quote', to_jsonb(quote_row),
+    'lines', lines_json
+  );
+end;
+$$;
+
+create or replace function public.get_quote_document(
+  p_quote_id uuid,
+  p_org_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  quote_row public.quotes;
+  lines_json jsonb;
+begin
+  if actor_id is null then
+    raise exception 'Authentication is required'
+      using errcode = '42501';
+  end if;
+
+  if not private.has_org_role(
+    p_org_id,
+    array['owner', 'admin', 'member', 'readonly']
+  ) then
+    raise exception 'This action is not permitted'
+      using errcode = '42501';
+  end if;
+
+  -- Lock the header for the duration of this transaction so a concurrent save
+  -- cannot replace lines between header and line reads.
+  select * into quote_row
+  from public.quotes
+  where quotes.id = p_quote_id
+    and quotes.org_id = p_org_id
+    and quotes.deleted_at is null
+  for share;
+
+  if not found then
+    raise exception 'Quote not found'
+      using errcode = 'P0002';
+  end if;
+
+  select coalesce(
+    jsonb_agg(to_jsonb(quote_lines) order by quote_lines.position, quote_lines.id),
+    '[]'::jsonb
+  )
+  into lines_json
+  from public.quote_lines
+  where quote_lines.quote_id = quote_row.id
+    and quote_lines.org_id = quote_row.org_id;
 
   return jsonb_build_object(
     'quote', to_jsonb(quote_row),
@@ -1140,12 +1270,14 @@ $$;
 revoke all on function public.create_quote_draft(uuid, jsonb, jsonb) from public, anon;
 revoke all on function public.save_quote_draft(uuid, uuid, integer, jsonb, jsonb)
   from public, anon;
+revoke all on function public.get_quote_document(uuid, uuid) from public, anon;
 revoke all on function public.soft_delete_quote_draft(uuid, uuid, integer)
   from public, anon;
 
 grant execute on function public.create_quote_draft(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.save_quote_draft(uuid, uuid, integer, jsonb, jsonb)
   to authenticated;
+grant execute on function public.get_quote_document(uuid, uuid) to authenticated;
 grant execute on function public.soft_delete_quote_draft(uuid, uuid, integer)
   to authenticated;
 

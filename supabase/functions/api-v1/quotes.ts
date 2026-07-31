@@ -14,9 +14,6 @@ import {
 const QUOTE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,title,client_id,lead_id,contact_id,owner_membership_id,status,currency,issue_on,valid_until,subtotal_cents,discount_cents,tax_cents,total_cents,party_snapshot,terms,notes,internal_notes,sent_at,viewed_at,accepted_at,rejected_at,converted_invoice_id'
 
-const LINE_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,version,quote_id,product_id,sku_snapshot,description,quantity,unit_price_cents,discount_percent,tax_rate_percent,subtotal_cents,tax_cents,total_cents,position'
-
 const HEADER_WRITABLE = new Set([
   'title',
   'client_id',
@@ -114,6 +111,18 @@ function hasAtMostFourDecimals(value: number): boolean {
   return Math.abs(scaled - Math.round(scaled)) < 1e-6
 }
 
+/** Reject quantity × unit_price products that would round in JSON number encoding. */
+export function assertJsonSafeLineMoney(
+  quantity: number,
+  unitPriceCents: number,
+): boolean {
+  if (!Number.isFinite(quantity) || !Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0) {
+    return false
+  }
+  if (unitPriceCents === 0) return true
+  return quantity <= Number.MAX_SAFE_INTEGER / unitPriceCents
+}
+
 function validateQuoteLine(
   body: Record<string, unknown>,
   index: number,
@@ -177,6 +186,15 @@ function validateQuoteLine(
     }
   } else if (productId === null || !('product_id' in body)) {
     fields[`${prefix}.unit_price_cents`] = 'Required for free-text lines'
+  }
+
+  if (
+    typeof quantity === 'number' &&
+    unitPrice !== undefined &&
+    !assertJsonSafeLineMoney(quantity, unitPrice)
+  ) {
+    fields[`${prefix}.unit_price_cents`] =
+      'quantity × unit_price_cents exceeds JSON-safe integer range'
   }
 
   let discountPercent = 0
@@ -593,28 +611,15 @@ async function findQuoteDocument(
   quoteId: string,
   requestId: string,
 ): Promise<QuoteDocument> {
-  const { data: quote, error } = await db
-    .from('quotes')
-    .select(QUOTE_SELECT)
-    .eq('org_id', orgId)
-    .eq('id', quoteId)
-    .is('deleted_at', null)
-    .maybeSingle()
+  // Single transactional RPC: FOR SHARE on the header, then lines, so a concurrent
+  // save cannot return a stale ETag with replaced lines.
+  const { data, error } = await db.rpc('get_quote_document', {
+    p_quote_id: quoteId,
+    p_org_id: orgId,
+  })
 
   if (error) throw databaseError(error, requestId)
-  if (!quote) throw new ApiError(404, 'NOT_FOUND', 'Quote not found')
-
-  const { data: lines, error: lineError } = await db
-    .from('quote_lines')
-    .select(LINE_SELECT)
-    .eq('org_id', orgId)
-    .eq('quote_id', quoteId)
-    .order('position', { ascending: true })
-    .order('id', { ascending: true })
-
-  if (lineError) throw databaseError(lineError, requestId)
-
-  return { ...quote, lines: lines ?? [] }
+  return asQuoteDocument(data)
 }
 
 async function getQuote(
