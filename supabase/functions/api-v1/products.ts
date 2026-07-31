@@ -88,17 +88,21 @@ function hasAtMostFourDecimals(value: number): boolean {
 export function validateProductBody(
   body: Record<string, unknown>,
   partial: false,
+  options?: { defaultCurrency?: string },
 ): Create
 export function validateProductBody(
   body: Record<string, unknown>,
   partial: true,
+  options?: { defaultCurrency?: string },
 ): Update
 export function validateProductBody(
   body: Record<string, unknown>,
   partial: boolean,
+  options: { defaultCurrency?: string } = {},
 ): Create | Update {
   const fields: Record<string, string> = {}
   const output: Update = {}
+  const defaultCurrency = options.defaultCurrency ?? 'GBP'
 
   for (const key of Object.keys(body)) {
     if (!WRITABLE.has(key)) fields[key] = 'Field is not writable'
@@ -191,7 +195,7 @@ export function validateProductBody(
       output.currency = value
     }
   } else if (!partial) {
-    output.currency = 'GBP'
+    output.currency = defaultCurrency
   }
 
   if (!partial || 'unit_price_cents' in body) {
@@ -467,7 +471,18 @@ export function handleProducts(
     }
     if (req.method === 'POST') {
       return (async () => {
-        const payload = validateProductBody(await jsonBody(req), false)
+        const { data: organisation, error: orgError } = await db
+          .from('organisations')
+          .select('default_currency')
+          .eq('id', orgId)
+          .is('deleted_at', null)
+          .maybeSingle()
+        if (orgError) throw databaseError(orgError, requestId)
+        if (!organisation) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
+
+        const payload = validateProductBody(await jsonBody(req), false, {
+          defaultCurrency: organisation.default_currency,
+        })
         const { data, error } = await db
           .from('products')
           .insert(
