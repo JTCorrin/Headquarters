@@ -45,7 +45,7 @@
 		lineForm,
 		products = [],
 		lines = $bindable<LineItemRow[]>([]),
-		timelineEvents = [],
+		timelineEvents = $bindable<TimelineEvent[]>([]),
 		lineDrawerOpen = $bindable(false),
 		onRemoveLine,
 		onSend,
@@ -126,8 +126,10 @@
 					</LineItemsTable>
 
 					<Timeline
-						events={timelineEvents}
+						bind:events={timelineEvents}
 						title="Activity"
+						composable
+						composerActor="Joe"
 						emptyMessage="No quote activity yet."
 						class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					/>

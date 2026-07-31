@@ -9,7 +9,9 @@
 			title: 'Invoice #881 paid · £4,200',
 			body: 'Matched via Stripe · email sent to billing contact',
 			occurredAt: 'Today · 09:12',
-			actor: 'System'
+			actor: 'System',
+			accent: 'emerald',
+			icon: 'payment'
 		},
 		{
 			id: '2',
@@ -17,7 +19,9 @@
 			title: 'Q2 planning call',
 			body: 'Notes synced from Meeting assistant · 3 tasks proposed',
 			occurredAt: 'Yesterday · 15:40',
-			actor: 'Joe'
+			actor: 'Joe',
+			accent: 'indigo',
+			icon: 'meeting'
 		},
 		{
 			id: '3',
@@ -25,7 +29,9 @@
 			title: 'Retainer kickoff sent',
 			body: 'To ava@northwind.com · Template: Client kickoff',
 			occurredAt: 'Mon · 11:02',
-			actor: 'Joe'
+			actor: 'Joe',
+			accent: 'sky',
+			icon: 'email'
 		},
 		{
 			id: '4',
@@ -33,7 +39,9 @@
 			title: 'Lead → Client',
 			body: 'Converted after signed proposal',
 			occurredAt: 'Mar 2',
-			actor: 'Joe'
+			actor: 'Joe',
+			accent: 'orange',
+			icon: 'status'
 		},
 		{
 			id: '5',
@@ -41,7 +49,9 @@
 			title: 'MSA uploaded',
 			body: 'northwind-msa-2026.pdf',
 			occurredAt: 'Feb 28',
-			actor: 'Ava'
+			actor: 'Ava',
+			accent: 'amber',
+			icon: 'document'
 		},
 		{
 			id: '6',
@@ -49,7 +59,9 @@
 			title: 'Send onboarding checklist',
 			body: 'Due Fri · assigned to Joe',
 			occurredAt: 'Feb 27',
-			actor: 'Joe'
+			actor: 'Joe',
+			accent: 'rose',
+			icon: 'task'
 		},
 		{
 			id: '7',
@@ -57,15 +69,19 @@
 			title: 'Discovery call logged',
 			body: '20m · pain points: invoicing lag, multi-contact ownership',
 			occurredAt: 'Feb 20',
-			actor: 'Joe'
+			actor: 'Joe',
+			accent: 'violet',
+			icon: 'call'
 		},
 		{
 			id: '8',
 			kind: 'note',
 			title: 'Intro via referral',
-			body: 'Referred by Sam at Contoso',
+			body: 'Referred by Sam at Contoso — **priority** follow-up',
 			occurredAt: 'Feb 18',
-			actor: 'Joe'
+			actor: 'Joe',
+			accent: 'slate',
+			icon: 'note'
 		}
 	];
 
@@ -74,6 +90,12 @@
 		component: Timeline,
 		tags: ['autodocs']
 	});
+</script>
+
+<script lang="ts">
+	import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
+
+	let events = $state<TimelineEvent[]>([...sampleEvents]);
 </script>
 
 <Story name="Default" args={{ events: sampleEvents, title: 'Activity' }}>
@@ -85,6 +107,20 @@
 	{/snippet}
 </Story>
 
+<Story name="WithComposer">
+	{#snippet template()}
+		<div class="bg-background max-w-xl p-4">
+			<Timeline
+				bind:events
+				title="Activity"
+				composable
+				composerActor="Joe"
+				emptyMessage="No activity yet — add a note above."
+			/>
+		</div>
+	{/snippet}
+</Story>
+
 <Story
 	name="Empty"
 	args={{ events: [], title: 'Activity', emptyMessage: 'No activity on this contact yet.' }}
@@ -92,7 +128,7 @@
 	{#snippet template(args)}
 		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (args)}
 		<div class="bg-background max-w-xl p-4">
-			<Timeline {...props} />
+			<Timeline {...props} composable composerActor="Joe" />
 		</div>
 	{/snippet}
 </Story>
