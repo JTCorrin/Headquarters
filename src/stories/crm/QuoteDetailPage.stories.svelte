@@ -38,6 +38,7 @@
 	const quoteForm = superForm(quoteData, {
 		validators: zod4(quoteFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false
 	});
 
@@ -98,6 +99,7 @@
 	const lineForm = superForm(lineData, {
 		validators: zod4(lineItemFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: true,
 		onUpdate({ form }) {
 			if (!form.valid) return;

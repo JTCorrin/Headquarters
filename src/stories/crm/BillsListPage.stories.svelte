@@ -86,6 +86,7 @@
 	const form = superForm(data, {
 		validators: zod4(billFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false
 	});
 </script>

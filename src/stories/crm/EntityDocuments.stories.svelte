@@ -27,6 +27,7 @@
 	const form = superForm(documentData, {
 		validators: zod4(documentFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: true,
 		onUpdate({ form: f }) {
 			if (!f.valid) return;

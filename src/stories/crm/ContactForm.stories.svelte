@@ -32,6 +32,7 @@
 	const form = superForm(data, {
 		validators: zod4(contactFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false,
 		onUpdate({ form: f }) {
 			if (f.valid) {

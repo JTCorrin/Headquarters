@@ -90,6 +90,7 @@
 	const form = superForm(data, {
 		validators: zod4(paymentFormSchema),
 		SPA: true,
+		warnings: { duplicateId: false },
 		resetForm: false
 	});
 </script>
