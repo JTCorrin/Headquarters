@@ -1,5 +1,7 @@
 import type { ApiResult } from '../request.js';
 import type {
+	ApiClient,
+	ApiClientListParams,
 	ApiContact,
 	ApiContactCreateBody,
 	ApiContactListParams,
@@ -97,6 +99,13 @@ export interface ContactsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiContact>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface ClientsEndpoints {
+	list(
+		params?: ApiClientListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiClient[]>>;
 }
 
 export interface DocumentsEndpoints {

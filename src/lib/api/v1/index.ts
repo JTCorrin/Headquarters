@@ -12,6 +12,7 @@ export { getApiV1Client, setApiV1Client } from './context.js';
 export * from './mappers.js';
 export type * from './types.js';
 export type {
+	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
 	OrganisationConfigEndpoints,

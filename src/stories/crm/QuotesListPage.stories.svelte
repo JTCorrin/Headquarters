@@ -93,6 +93,7 @@
 
 	const data = defaults(
 		{
+			clientId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
 			clientName: '',
 			title: '',
 			currency: 'GBP',

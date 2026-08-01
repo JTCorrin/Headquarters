@@ -24,6 +24,7 @@ export function requiresSelectedOrg(pathname: string): boolean {
 	if (pathname === '/select-org') return false;
 	if (pathname.startsWith('/org/')) return true;
 	if (pathname === '/contacts' || pathname.startsWith('/contacts/')) return true;
+	if (pathname === '/quotes' || pathname.startsWith('/quotes/')) return true;
 	return false;
 }
 

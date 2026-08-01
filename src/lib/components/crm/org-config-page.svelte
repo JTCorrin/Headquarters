@@ -448,6 +448,8 @@
 		<AppShell
 			{currentOrgId}
 			memberships={session.memberships}
+			{orgName}
+			{navGroups}
 			{switchError}
 			{busy}
 			{createError}
@@ -475,6 +477,7 @@
 				{onArchiveTaxRate}
 				{onEditTaxRate}
 				{onAddTaxRate}
+				showNav={false}
 			/>
 		</AppShell>
 	</div>

@@ -6,23 +6,28 @@
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
-		toContactCreateBody,
-		toContactListItem,
+		quoteStatusLabel,
 		toOrganisationCreateBody,
-		toOrgMembershipSummary
+		toOrgMembershipSummary,
+		toQuoteFormData,
+		toQuoteUpdateBody
 	} from '$lib/api/v1/mappers.js';
+	import type { ApiQuoteDocument } from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import { contactFormSchema, type ContactListItem } from '$lib/schemas/contact.js';
+	import { lineItemFormSchema } from '$lib/schemas/line-item.js';
 	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import { quoteFormSchema, type QuoteClientOption } from '$lib/schemas/quote.js';
+	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
-	import ContactsListPage from './contacts-list-page.svelte';
+	import QuoteDetailPage from './quote-detail-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
-	export interface ContactsPageProps {
+	export interface QuotePageProps {
 		api: ApiV1Client;
 		session: OrgSession;
+		quoteId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
@@ -32,33 +37,46 @@
 	let {
 		api,
 		session,
+		quoteId,
 		onMissingOrg,
 		onSwitchNavigate,
 		onLogout,
 		class: className
-	}: ContactsPageProps = $props();
+	}: QuotePageProps = $props();
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
-	let rows = $state<ContactListItem[]>([]);
+	let quote = $state<ApiQuoteDocument | null>(null);
+	let clientOptions = $state<QuoteClientOption[]>([]);
+	let lines = $state<LineItemRow[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
-	let drawerOpen = $state(false);
+	let lineDrawerOpen = $state(false);
 
-	const contactForm = superForm(
+	const quoteForm = superForm(
 		defaults(
 			{
-				name: '',
-				email: '',
-				phone: '',
-				company: '',
+				clientId: '00000000-0000-4000-8000-000000000000',
+				clientName: '',
 				title: '',
-				status: 'active' as const
+				currency: 'GBP' as const,
+				status: 'draft' as const
 			},
-			zod4(contactFormSchema)
+			zod4(quoteFormSchema)
 		),
 		{
-			validators: zod4(contactFormSchema),
+			validators: zod4(quoteFormSchema),
+			SPA: true,
+			warnings: { duplicateId: false },
+			applyAction: false,
+			resetForm: false
+		}
+	);
+
+	const lineForm = superForm(
+		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
+		{
+			validators: zod4(lineItemFormSchema),
 			SPA: true,
 			warnings: { duplicateId: false },
 			applyAction: false,
@@ -70,13 +88,14 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Contacts'));
+	const navGroups = $derived(appNavGroups('Quotes'));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
 			if (error.isNetworkError) return 'Network error — check your connection and retry.';
 			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
+			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Quote not found.';
 			if (error.isValidationError) {
 				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
 				return error.message;
@@ -89,30 +108,52 @@
 	interface RequestEpoch {
 		orgId: string | null;
 		generation: number;
+		quoteId: string;
 	}
 
 	const liveEpoch: RequestEpoch = {
 		orgId: null,
-		generation: -1
+		generation: -1,
+		quoteId: ''
 	};
 
 	$effect(() => {
 		liveEpoch.orgId = session.selectedOrgId;
 		liveEpoch.generation = session.cacheGeneration;
+		liveEpoch.quoteId = quoteId;
 	});
 
 	function captureEpoch(): RequestEpoch {
-		return { orgId: liveEpoch.orgId, generation: liveEpoch.generation };
+		return {
+			orgId: liveEpoch.orgId,
+			generation: liveEpoch.generation,
+			quoteId: liveEpoch.quoteId
+		};
 	}
 
 	function isStale(epoch: RequestEpoch): boolean {
-		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
+		return (
+			epoch.orgId !== liveEpoch.orgId ||
+			epoch.generation !== liveEpoch.generation ||
+			epoch.quoteId !== liveEpoch.quoteId
+		);
 	}
 
 	function resetOrgScopedState() {
-		rows = [];
-		drawerOpen = false;
+		quote = null;
+		lines = [];
+		clientOptions = [];
 		viewState = { kind: 'loading' };
+	}
+
+	function mapLines(document: ApiQuoteDocument): LineItemRow[] {
+		return document.lines.map((line) => ({
+			id: line.id,
+			description: line.description,
+			qty: String(line.quantity),
+			unitPrice: (line.unit_price_cents / 100).toFixed(2),
+			total: (line.total_cents / 100).toFixed(2)
+		}));
 	}
 
 	async function loadAll() {
@@ -120,7 +161,7 @@
 			onMissingOrg?.();
 			viewState = {
 				kind: 'forbidden',
-				message: 'Select an organisation before opening contacts.'
+				message: 'Select an organisation before opening quotes.'
 			};
 			return;
 		}
@@ -134,49 +175,62 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const listed = await api.contacts.list({ limit: 50 });
+			const [result, clients] = await Promise.all([
+				api.quotes.get(quoteId),
+				api.clients.list({ limit: 100 })
+			]);
 			if (isStale(epoch)) return;
 
-			rows = listed.data.map(toContactListItem);
-			viewState =
-				rows.length === 0
-					? { kind: 'empty', message: 'No contacts yet — add your first person.' }
-					: { kind: 'ready' };
+			quote = result.data;
+			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			quoteForm.form.set(toQuoteFormData(result.data));
+			lines = mapLines(result.data);
+			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
+			quote = null;
+			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
+				viewState = { kind: 'not_found', message: 'Quote not found.' };
+				return;
+			}
 			if (isApiClientError(error) && error.isForbidden) {
 				viewState = { kind: 'forbidden', message: userMessage(error, 'Forbidden') };
 				return;
 			}
 			viewState = {
 				kind: 'validation',
-				message: userMessage(error, 'Could not load contacts.')
+				message: userMessage(error, 'Could not load quote.')
 			};
 		}
 	}
 
-	async function onCreateContact(): Promise<boolean> {
+	async function onSaveQuote(): Promise<boolean> {
+		if (!quote) return false;
 		const epoch = captureEpoch();
 		try {
-			const created = await api.contacts.create(toContactCreateBody(get(contactForm.form)));
+			const updated = await api.quotes.update(
+				quote.id,
+				toQuoteUpdateBody(get(quoteForm.form)),
+				quote.version
+			);
 			if (isStale(epoch)) return false;
-			rows = [toContactListItem(created), ...rows];
+			quote = updated;
+			quoteForm.form.set(toQuoteFormData(updated));
+			lines = mapLines(updated);
 			viewState = { kind: 'ready' };
-			contactForm.form.set({
-				name: '',
-				email: '',
-				phone: '',
-				company: '',
-				title: '',
-				status: 'active'
-			});
-			drawerOpen = false;
 			return true;
 		} catch (error) {
 			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Quote changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
 			viewState = {
 				kind: 'validation',
-				message: userMessage(error, 'Could not create contact — try again.'),
+				message: userMessage(error, 'Could not save quote — try again.'),
 				fields: isApiClientError(error) ? error.fields : undefined
 			};
 			return false;
@@ -211,12 +265,13 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
+		void quoteId;
 		void loadAll();
 	});
 </script>
 
 {#if currentOrgId}
-	<div class={className} data-testid="contacts-page">
+	<div class={className} data-testid="quote-page">
 		<AppShell
 			{currentOrgId}
 			memberships={session.memberships}
@@ -230,28 +285,33 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready' && viewState.kind !== 'empty'}
+				{#if viewState.kind !== 'ready'}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
+				{:else if quote}
+					<QuoteDetailPage
+						{orgName}
+						{navGroups}
+						title="{quote.number} · {quote.title}"
+						status={quoteStatusLabel(quote.status)}
+						{quoteForm}
+						{lineForm}
+						{clientOptions}
+						bind:lines
+						bind:lineDrawerOpen
+						onSaveQuote={onSaveQuote}
+						showNav={false}
+						class="min-h-0 flex-1"
+					/>
 				{/if}
-				<ContactsListPage
-					{orgName}
-					{navGroups}
-					{rows}
-					form={contactForm}
-					bind:drawerOpen
-					onValidSubmit={onCreateContact}
-					showNav={false}
-					class="min-h-0 flex-1"
-				/>
 			</div>
 		</AppShell>
 	</div>
 {:else}
-	<div class="p-6" data-testid="contacts-page">
+	<div class="p-6" data-testid="quote-page">
 		<p class="text-destructive text-sm" role="alert">
-			Select an organisation before opening contacts.
+			Select an organisation before opening quotes.
 		</p>
 	</div>
 {/if}
