@@ -397,6 +397,16 @@ Deno.test('organisation create and configuration validation', () => {
       locale: 'en-GB',
     },
   )
+  // V8 supportedValuesOf('timeZone') often omits literal "UTC".
+  assertEquals(
+    validateOrganisationCreateBody({
+      name: 'UTC Org',
+      slug: 'utc-org',
+      country_code: 'GB',
+      timezone: 'UTC',
+    }).timezone,
+    'UTC',
+  )
   assertThrows(
     () =>
       validateOrganisationCreateBody({

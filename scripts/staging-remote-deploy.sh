@@ -8,8 +8,10 @@ REPO_URL="${REPO_URL:-https://forge.purecambo.org/joe/crm-project.git}"
 BRANCH="${BRANCH:-staging}"
 APP_HOST="${APP_HOST:-192.168.5.136}"
 APP_PORT="${APP_PORT:-4173}"
-# Browser → Kong → edge function. Client paths are `/api/v1/...`.
-PUBLIC_API_BASE_URL="${PUBLIC_API_BASE_URL:-http://${APP_HOST}:54321/functions/v1/api-v1}"
+# Same-origin SvelteKit proxy serves `/api/v1/*` on :APP_PORT. Leave empty unless
+# you intentionally want the browser to call Kong/edge directly.
+PUBLIC_API_BASE_URL="${PUBLIC_API_BASE_URL:-}"
+STAGING_ORIGIN="http://${APP_HOST}:${APP_PORT}"
 UNIT_NAME="${UNIT_NAME:-headquarters-staging}"
 PNPM_VERSION="${PNPM_VERSION:-10}"
 
@@ -62,13 +64,21 @@ log "pnpm $(pnpm --version) / node $(node --version)"
 pnpm install --frozen-lockfile
 
 # Point Auth redirects at the LAN preview URL for this staging box.
+# Keep email confirmations off (config.toml) so email/password signup returns a JWT.
 if [[ -f supabase/config.toml ]]; then
 	sed -i \
-		-e "s|^site_url = .*|site_url = \"http://${APP_HOST}:${APP_PORT}\"|" \
-		-e "s|^additional_redirect_urls = .*|additional_redirect_urls = [\"http://${APP_HOST}:${APP_PORT}\"]|" \
+		-e "s|^site_url = .*|site_url = \"${STAGING_ORIGIN}\"|" \
+		-e "s|^additional_redirect_urls = .*|additional_redirect_urls = [\"${STAGING_ORIGIN}\"]|" \
 		-e "s|^api_url = .*|api_url = \"http://${APP_HOST}\"|" \
 		supabase/config.toml
 fi
+
+# Edge Function CORS for browser → Kong (Auth uses its own allow-list via site_url).
+# api-v1 defaults to `*` when unset; pin staging origin explicitly.
+mkdir -p supabase
+cat > supabase/.env <<EOF
+API_CORS_ORIGIN=${STAGING_ORIGIN}
+EOF
 
 log "starting Supabase (migrations apply on first start)"
 if supabase status >/dev/null 2>&1; then
@@ -78,14 +88,29 @@ else
 	supabase start
 fi
 
+status_json="$(supabase status -o json)"
+PUBLIC_SUPABASE_URL="$(printf '%s' "$status_json" | jq -r '.API_URL // .apiUrl // empty')"
+PUBLIC_SUPABASE_ANON_KEY="$(printf '%s' "$status_json" | jq -r '.ANON_KEY // .anonKey // empty')"
+if [[ -z "$PUBLIC_SUPABASE_URL" || -z "$PUBLIC_SUPABASE_ANON_KEY" ]]; then
+	log "failed to read API_URL / ANON_KEY from supabase status -o json"
+	printf '%s\n' "$status_json" | head -c 2000 >&2 || true
+	exit 1
+fi
+# Prefer the LAN host so browsers on the LAN reach Kong (not 127.0.0.1 from inside the CT).
+PUBLIC_SUPABASE_URL="http://${APP_HOST}:54321"
+log "Supabase API ${PUBLIC_SUPABASE_URL}"
+
 # Ensure user services survive SSH disconnects / reboot.
 if command -v loginctl >/dev/null 2>&1; then
 	sudo loginctl enable-linger "$(id -un)" >/dev/null 2>&1 || true
 fi
 
-# Persist public API origin for the SvelteKit build (dynamic public env).
+# Persist public env for the SvelteKit build (dynamic public env).
+# Empty PUBLIC_API_BASE_URL → same-origin `/api/v1/...` via the app proxy.
 cat > .env <<EOF
 PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
+PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
+PUBLIC_SUPABASE_ANON_KEY=${PUBLIC_SUPABASE_ANON_KEY}
 EOF
 
 log "building SvelteKit"
@@ -104,6 +129,8 @@ Type=simple
 WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
 Environment=PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
+Environment=PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
+Environment=PUBLIC_SUPABASE_ANON_KEY=${PUBLIC_SUPABASE_ANON_KEY}
 ExecStart=$(command -v pnpm) preview --host 0.0.0.0 --port ${APP_PORT}
 Restart=on-failure
 RestartSec=5
@@ -119,7 +146,7 @@ systemctl --user restart "${UNIT_NAME}.service"
 # Give the preview a moment, then probe.
 sleep 2
 if systemctl --user is-active --quiet "${UNIT_NAME}.service"; then
-	log "preview active on http://${APP_HOST}:${APP_PORT} (sha ${SHA})"
+	log "preview active on ${STAGING_ORIGIN} (sha ${SHA})"
 else
 	log "preview failed to start — recent logs:"
 	systemctl --user status "${UNIT_NAME}.service" --no-pager || true
@@ -129,4 +156,16 @@ fi
 
 curl -fsS --max-time 10 "http://127.0.0.1:${APP_PORT}/" >/dev/null
 log "HTTP probe ok"
+
+# Auth → organisations smoke (email/password, confirmations off).
+if [[ -x scripts/auth_signup_org_curl_proof.sh ]]; then
+	log "running auth signup → org curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/auth_signup_org_curl_proof.sh
+else
+	log "auth curl proof script missing — skipped"
+fi
+
 log "done"
