@@ -18,8 +18,8 @@ export type { ApiRequestFn, ApiRequestOptions, ApiResult } from './request.js';
 
 export interface ApiV1ClientOptions {
 	/**
-	 * API origin or absolute prefix. Defaults to `PUBLIC_API_BASE_URL` (Vite/SvelteKit
-	 * public env) when set, otherwise empty (same-origin `/api/v1/...` paths).
+	 * API origin or absolute prefix. Defaults to empty (same-origin `/api/v1/...` paths).
+	 * Pass `PUBLIC_API_BASE_URL` from `$env/static/public` at the SvelteKit composition root.
 	 */
 	baseUrl?: string;
 	fetch?: typeof fetch;
@@ -42,13 +42,6 @@ export interface ApiV1Client {
 function normalizeBaseUrl(baseUrl: string | undefined): string {
 	if (!baseUrl) return '';
 	return baseUrl.replace(/\/+$/, '');
-}
-
-function defaultBaseUrl(): string {
-	// Public Vite/SvelteKit env — inlined at build for SSR + client. Prefer this over
-	// `$env/dynamic/public`, which Storybook/vitest browser harnesses do not always provide.
-	const fromEnv = (import.meta.env.PUBLIC_API_BASE_URL as string | undefined)?.trim();
-	return normalizeBaseUrl(fromEnv || undefined);
 }
 
 function resolvePath(baseUrl: string, path: string): string {
@@ -101,9 +94,7 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client {
-	const baseUrl = normalizeBaseUrl(
-		options.baseUrl !== undefined ? options.baseUrl : defaultBaseUrl()
-	);
+	const baseUrl = normalizeBaseUrl(options.baseUrl);
 	const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
 	const createRequestId =
 		options.createRequestId ??
@@ -117,27 +108,29 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		requestOptions: ApiRequestOptions = {}
 	): Promise<ApiResult<T>> => {
 		const orgScoped = requestOptions.orgScoped ?? false;
+		// Capture org before any await so a concurrent org switch cannot change X-Org-Id
+		// after this request was initiated (token lookup may be async).
+		const orgIdAtStart = orgScoped ? options.getOrgId?.() : undefined;
+		if (orgScoped && !orgIdAtStart) {
+			throw new ApiClientError({
+				status: 400,
+				code: 'ORG_CONTEXT_REQUIRED',
+				message: 'X-Org-Id is required for organisation-scoped routes'
+			});
+		}
+
 		const headers = new Headers(requestOptions.headers);
 		headers.set('Accept', 'application/json');
 		if (!headers.has('x-request-id')) {
 			headers.set('x-request-id', createRequestId());
 		}
+		if (orgIdAtStart) {
+			headers.set('X-Org-Id', orgIdAtStart);
+		}
 
 		const token = await options.getAccessToken?.();
 		if (token) {
 			headers.set('Authorization', `Bearer ${token}`);
-		}
-
-		if (orgScoped) {
-			const orgId = options.getOrgId?.();
-			if (!orgId) {
-				throw new ApiClientError({
-					status: 400,
-					code: 'ORG_CONTEXT_REQUIRED',
-					message: 'X-Org-Id is required for organisation-scoped routes'
-				});
-			}
-			headers.set('X-Org-Id', orgId);
 		}
 
 		if (requestOptions.ifMatchVersion !== undefined) {

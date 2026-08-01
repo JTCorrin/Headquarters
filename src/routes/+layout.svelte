@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { PUBLIC_API_BASE_URL } from '$env/static/public';
+	import { resolveApiV1BaseUrl } from '$lib/api/v1/base-url.js';
 	import { createApiV1Client, setApiV1Client } from '$lib/api/v1/index.js';
 	import { createOrgSession, setOrgSession } from '$lib/org/index.js';
 	import favicon from '$lib/assets/favicon.svg';
@@ -15,6 +17,7 @@
 	});
 
 	const api = createApiV1Client({
+		baseUrl: resolveApiV1BaseUrl(PUBLIC_API_BASE_URL),
 		getOrgId: () => session.selectedOrgId,
 		getAccessToken: () => null
 	});

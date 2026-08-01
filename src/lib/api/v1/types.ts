@@ -192,21 +192,32 @@ export interface ApiQuoteLine {
 
 export type ApiQuoteDocument = ApiQuote & { lines: ApiQuoteLine[] };
 
-export interface ApiQuoteLineInput {
-	product_id?: string | null;
-	description?: string;
+/** Product line — description/unit price may be inherited server-side from the product. */
+export interface ApiQuoteProductLineInput {
+	product_id: string;
 	quantity: number;
+	description?: string;
 	unit_price_cents?: number;
 	discount_percent?: number;
 	tax_rate_percent?: number;
 	position?: number;
 }
 
-export interface ApiQuoteCreateBody {
-	title: string;
+/** Free-text line — description and unit_price_cents are required by the API. */
+export interface ApiQuoteFreeTextLineInput {
+	product_id?: null;
+	description: string;
+	quantity: number;
+	unit_price_cents: number;
+	discount_percent?: number;
+	tax_rate_percent?: number;
+	position?: number;
+}
+
+export type ApiQuoteLineInput = ApiQuoteProductLineInput | ApiQuoteFreeTextLineInput;
+
+interface ApiQuoteWritableFields {
 	currency?: string;
-	client_id?: string | null;
-	lead_id?: string | null;
 	contact_id?: string | null;
 	owner_membership_id?: string | null;
 	issue_on?: string;
@@ -215,12 +226,24 @@ export interface ApiQuoteCreateBody {
 	terms?: string | null;
 	notes?: string | null;
 	internal_notes?: string | null;
-	lines: ApiQuoteLineInput[];
 }
 
-export type ApiQuoteUpdateBody = Partial<Omit<ApiQuoteCreateBody, 'lines' | 'title' | 'currency'>> & {
+/**
+ * Create requires a party: client_id or lead_id (server also rejects neither).
+ * Runtime cross-field checks remain server-owned.
+ */
+export type ApiQuoteCreateBody = ApiQuoteWritableFields & {
+	title: string;
+	lines: ApiQuoteLineInput[];
+} & (
+	| { client_id: string; lead_id?: null }
+	| { lead_id: string; client_id?: null }
+);
+
+export type ApiQuoteUpdateBody = ApiQuoteWritableFields & {
 	title?: string;
-	currency?: string;
+	client_id?: string | null;
+	lead_id?: string | null;
 	lines?: ApiQuoteLineInput[];
 };
 
