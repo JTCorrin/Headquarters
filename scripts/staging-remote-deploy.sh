@@ -179,4 +179,15 @@ else
 	log "contacts/quotes curl proof script missing — skipped"
 fi
 
+# Leads + clients CRUD smoke (JWT + X-Org-Id).
+if [[ -x scripts/leads_clients_staging_curl_proof.sh ]]; then
+	log "running leads + clients curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/leads_clients_staging_curl_proof.sh
+else
+	log "leads/clients curl proof script missing — skipped"
+fi
+
 log "done"
