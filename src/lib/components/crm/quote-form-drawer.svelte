@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteFormData } from '$lib/schemas/quote.js';
+	import type { QuoteClientOption, QuoteFormData } from '$lib/schemas/quote.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import QuoteForm from './quote-form.svelte';
@@ -14,8 +14,10 @@
 		description?: string;
 		submitLabel?: string;
 		triggerLabel?: string;
+		clientOptions?: QuoteClientOption[];
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -25,8 +27,10 @@
 		description = 'Create the quote header. Add product-linked line items on the quote page.',
 		submitLabel = 'Save quote',
 		triggerLabel = 'New quote',
+		clientOptions = [],
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: QuoteFormDrawerProps = $props();
 </script>
 
@@ -37,7 +41,9 @@
 		</Drawer.Trigger>
 	{:else}
 		<Drawer.Trigger>
-			<Button type="button">{triggerLabel}</Button>
+			{#snippet child({ props })}
+				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+			{/snippet}
 		</Drawer.Trigger>
 	{/if}
 
@@ -47,7 +53,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<QuoteForm {form} {submitLabel} />
+			<QuoteForm {form} {submitLabel} {clientOptions} {onValidSubmit} class="max-w-none" />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

@@ -6,21 +6,25 @@
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
-		toContactCreateBody,
-		toContactListItem,
 		toOrganisationCreateBody,
-		toOrgMembershipSummary
+		toOrgMembershipSummary,
+		toQuoteCreateBody,
+		toQuoteListItem
 	} from '$lib/api/v1/mappers.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import { contactFormSchema, type ContactListItem } from '$lib/schemas/contact.js';
 	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		quoteFormSchema,
+		type QuoteClientOption,
+		type QuoteListItem
+	} from '$lib/schemas/quote.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
-	import ContactsListPage from './contacts-list-page.svelte';
+	import QuotesListPage from './quotes-list-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
-	export interface ContactsPageProps {
+	export interface QuotesPageProps {
 		api: ApiV1Client;
 		session: OrgSession;
 		onMissingOrg?: () => void;
@@ -36,29 +40,29 @@
 		onSwitchNavigate,
 		onLogout,
 		class: className
-	}: ContactsPageProps = $props();
+	}: QuotesPageProps = $props();
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
-	let rows = $state<ContactListItem[]>([]);
+	let rows = $state<QuoteListItem[]>([]);
+	let clientOptions = $state<QuoteClientOption[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let drawerOpen = $state(false);
 
-	const contactForm = superForm(
+	const quoteForm = superForm(
 		defaults(
 			{
-				name: '',
-				email: '',
-				phone: '',
-				company: '',
+				clientId: '00000000-0000-4000-8000-000000000000',
+				clientName: '',
 				title: '',
-				status: 'active' as const
+				currency: 'GBP' as const,
+				status: 'draft' as const
 			},
-			zod4(contactFormSchema)
+			zod4(quoteFormSchema)
 		),
 		{
-			validators: zod4(contactFormSchema),
+			validators: zod4(quoteFormSchema),
 			SPA: true,
 			warnings: { duplicateId: false },
 			applyAction: false,
@@ -70,7 +74,7 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Contacts'));
+	const navGroups = $derived(appNavGroups('Quotes'));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
@@ -111,6 +115,7 @@
 
 	function resetOrgScopedState() {
 		rows = [];
+		clientOptions = [];
 		drawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
@@ -120,7 +125,7 @@
 			onMissingOrg?.();
 			viewState = {
 				kind: 'forbidden',
-				message: 'Select an organisation before opening contacts.'
+				message: 'Select an organisation before opening quotes.'
 			};
 			return;
 		}
@@ -134,13 +139,24 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const listed = await api.contacts.list({ limit: 50 });
+			const [listed, clients] = await Promise.all([
+				api.quotes.list({ limit: 50, status: 'draft' }),
+				api.clients.list({ limit: 100 })
+			]);
 			if (isStale(epoch)) return;
 
-			rows = listed.data.map(toContactListItem);
+			rows = listed.data.map(toQuoteListItem);
+			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			if (clientOptions[0] && get(quoteForm.form).clientId.startsWith('00000000')) {
+				quoteForm.form.update((current) => ({
+					...current,
+					clientId: clientOptions[0]!.id,
+					clientName: clientOptions[0]!.name
+				}));
+			}
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No contacts yet — add your first person.' }
+					? { kind: 'empty', message: 'No draft quotes yet — create your first quote.' }
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -150,25 +166,25 @@
 			}
 			viewState = {
 				kind: 'validation',
-				message: userMessage(error, 'Could not load contacts.')
+				message: userMessage(error, 'Could not load quotes.')
 			};
 		}
 	}
 
-	async function onCreateContact(): Promise<boolean> {
+	async function onCreateQuote(): Promise<boolean> {
 		const epoch = captureEpoch();
 		try {
-			const created = await api.contacts.create(toContactCreateBody(get(contactForm.form)));
+			const created = await api.quotes.create(toQuoteCreateBody(get(quoteForm.form)));
 			if (isStale(epoch)) return false;
-			rows = [toContactListItem(created), ...rows];
+			rows = [toQuoteListItem(created), ...rows];
 			viewState = { kind: 'ready' };
-			contactForm.form.set({
-				name: '',
-				email: '',
-				phone: '',
-				company: '',
+			const firstClient = clientOptions[0];
+			quoteForm.form.set({
+				clientId: firstClient?.id ?? '00000000-0000-4000-8000-000000000000',
+				clientName: firstClient?.name ?? '',
 				title: '',
-				status: 'active'
+				currency: 'GBP',
+				status: 'draft'
 			});
 			drawerOpen = false;
 			return true;
@@ -176,7 +192,7 @@
 			if (isStale(epoch)) return false;
 			viewState = {
 				kind: 'validation',
-				message: userMessage(error, 'Could not create contact — try again.'),
+				message: userMessage(error, 'Could not create quote — try again.'),
 				fields: isApiClientError(error) ? error.fields : undefined
 			};
 			return false;
@@ -216,7 +232,7 @@
 </script>
 
 {#if currentOrgId}
-	<div class={className} data-testid="contacts-page">
+	<div class={className} data-testid="quotes-page">
 		<AppShell
 			{currentOrgId}
 			memberships={session.memberships}
@@ -235,13 +251,14 @@
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{/if}
-				<ContactsListPage
+				<QuotesListPage
 					{orgName}
 					{navGroups}
 					{rows}
-					form={contactForm}
+					form={quoteForm}
+					{clientOptions}
 					bind:drawerOpen
-					onValidSubmit={onCreateContact}
+					onValidSubmit={onCreateQuote}
 					showNav={false}
 					class="min-h-0 flex-1"
 				/>
@@ -249,9 +266,9 @@
 		</AppShell>
 	</div>
 {:else}
-	<div class="p-6" data-testid="contacts-page">
+	<div class="p-6" data-testid="quotes-page">
 		<p class="text-destructive text-sm" role="alert">
-			Select an organisation before opening contacts.
+			Select an organisation before opening quotes.
 		</p>
 	</div>
 {/if}
