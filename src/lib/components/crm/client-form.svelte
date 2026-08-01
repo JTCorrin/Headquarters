@@ -13,14 +13,24 @@
 		form: SuperForm<ClientFormData>;
 		submitLabel?: string;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
-	let { form, submitLabel = 'Save client', class: className }: ClientFormProps = $props();
+	let {
+		form,
+		submitLabel = 'Save client',
+		class: className,
+		onValidSubmit
+	}: ClientFormProps = $props();
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	let submitLock = false;
+	const busy = $derived($submitting || pendingSubmit);
 
 	const statusOptions = [
 		{ value: 'prospect', label: 'Prospect' },
@@ -35,7 +45,27 @@
 	);
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)} data-testid="client-form">
+<form
+	method="POST"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+	class={cn('space-y-4', className)}
+	data-testid="client-form"
+>
 	<div class="space-y-2">
 		<Label for="client-name">Name</Label>
 		<Input
@@ -157,5 +187,5 @@
 		<Textarea id="client-notes" name="notes" bind:value={$formData.notes} rows={3} />
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={busy}>{submitLabel}</Button>
 </form>

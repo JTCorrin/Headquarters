@@ -19,8 +19,11 @@
 		clientForm: SuperForm<ClientFormData>;
 		drawerOpen?: boolean;
 		viewState?: ResourceViewState;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
 		onReload?: () => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -30,13 +33,23 @@
 		clientForm,
 		drawerOpen = $bindable(false),
 		viewState = { kind: 'ready' },
+		showNav = true,
 		class: className,
-		onReload
+		onReload,
+		onValidSubmit
 	}: ClientsListPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -47,11 +60,12 @@
 			>
 				{#snippet actions()}
 					<Button type="button" variant="outline" size="sm">Import</Button>
-					<ClientFormDrawer bind:open={drawerOpen} form={clientForm}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">New client</Button>
-						{/snippet}
-					</ClientFormDrawer>
+					<ClientFormDrawer
+						bind:open={drawerOpen}
+						form={clientForm}
+						{onValidSubmit}
+						triggerLabel="New client"
+					/>
 				{/snippet}
 			</PageHeader>
 
