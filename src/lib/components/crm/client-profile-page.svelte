@@ -46,8 +46,11 @@
 		viewState?: ResourceViewState;
 		moneyItems?: MoneySummaryItem[];
 		projects?: EntityProject[];
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
 		onReload?: () => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -70,8 +73,10 @@
 		viewState = { kind: 'ready' },
 		moneyItems = [],
 		projects = [],
+		showNav = true,
 		class: className,
-		onReload
+		onReload,
+		onValidSubmit
 	}: ClientProfilePageProps = $props();
 
 	const tabs = [
@@ -83,8 +88,16 @@
 	];
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
 		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
@@ -100,6 +113,7 @@
 								title="Edit client"
 								description="PATCH with If-Match version — conflicts surface as 412."
 								submitLabel="Save client"
+								{onValidSubmit}
 							>
 								{#snippet trigger()}
 									<Button type="button" size="sm">Edit</Button>
