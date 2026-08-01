@@ -254,6 +254,55 @@ export interface ApiQuoteListParams {
 	status?: 'draft';
 }
 
+export type ApiContactLifecycleStatus = 'active' | 'inactive' | 'archived';
+
+export interface ApiContact {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	first_name: string | null;
+	last_name: string | null;
+	display_name: string;
+	primary_email: string | null;
+	primary_phone: string | null;
+	job_title: string | null;
+	company_name: string | null;
+	owner_membership_id: string | null;
+	lifecycle_status: ApiContactLifecycleStatus;
+	source: string | null;
+	notes: string | null;
+	last_contacted_at: string | null;
+	metadata: Record<string, unknown>;
+}
+
+export interface ApiContactCreateBody {
+	display_name: string;
+	first_name?: string | null;
+	last_name?: string | null;
+	primary_email?: string | null;
+	primary_phone?: string | null;
+	job_title?: string | null;
+	company_name?: string | null;
+	owner_membership_id?: string | null;
+	lifecycle_status?: ApiContactLifecycleStatus;
+	source?: string | null;
+	notes?: string | null;
+	metadata?: Record<string, unknown>;
+}
+
+export type ApiContactUpdateBody = Partial<ApiContactCreateBody>;
+
+export interface ApiContactListParams {
+	limit?: number;
+	cursor?: string;
+	lifecycle_status?: ApiContactLifecycleStatus;
+}
+
 export interface ApiTaxRateListParams {
 	limit?: number;
 }

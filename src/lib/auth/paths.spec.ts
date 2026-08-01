@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isAuthPublicPath, isOnboardingPath, postAuthDestination } from './paths.js';
+import {
+	isAuthPublicPath,
+	isOnboardingPath,
+	postAuthDestination,
+	requiresSelectedOrg
+} from './paths.js';
 
 describe('auth paths', () => {
 	it('recognises public and onboarding paths', () => {
@@ -7,6 +12,14 @@ describe('auth paths', () => {
 		expect(isAuthPublicPath('/org/config')).toBe(false);
 		expect(isOnboardingPath('/onboarding/create-org')).toBe(true);
 		expect(isOnboardingPath('/onboarding/invite-team')).toBe(true);
+	});
+
+	it('requires selected org for org-scoped app routes', () => {
+		expect(requiresSelectedOrg('/org/config')).toBe(true);
+		expect(requiresSelectedOrg('/contacts')).toBe(true);
+		expect(requiresSelectedOrg('/contacts/abc')).toBe(true);
+		expect(requiresSelectedOrg('/select-org')).toBe(false);
+		expect(requiresSelectedOrg('/login')).toBe(false);
 	});
 
 	it('routes post-auth destinations', () => {

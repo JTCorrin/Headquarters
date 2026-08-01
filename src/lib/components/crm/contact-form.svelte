@@ -12,9 +12,19 @@
 		form: SuperForm<ContactFormData>;
 		submitLabel?: string;
 		class?: string;
+		/**
+		 * Called after client-side validation succeeds.
+		 * Return `false` (or reject) to signal failure; may be async.
+		 */
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
-	let { form, submitLabel = 'Save contact', class: className }: ContactFormProps = $props();
+	let {
+		form,
+		submitLabel = 'Save contact',
+		class: className,
+		onValidSubmit
+	}: ContactFormProps = $props();
 
 	// SuperForm instance is stable; stores inside are the reactive surface.
 	const formData = untrack(() => form.form);
@@ -22,10 +32,14 @@
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
 
+	let pendingSubmit = $state(false);
+	let submitLock = false;
+	const busy = $derived($submitting || pendingSubmit);
+
 	const statusOptions = [
-		{ value: 'contact', label: 'Contact' },
-		{ value: 'lead', label: 'Lead' },
-		{ value: 'client', label: 'Client' }
+		{ value: 'active', label: 'Active' },
+		{ value: 'inactive', label: 'Inactive' },
+		{ value: 'archived', label: 'Archived' }
 	] as const;
 
 	const statusLabel = $derived(
@@ -33,10 +47,36 @@
 	);
 </script>
 
-<form method="POST" use:enhance class={cn('max-w-lg space-y-4', className)}>
+<form
+	method="POST"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+	class={cn('max-w-lg space-y-4', className)}
+	data-testid="contact-form"
+>
 	<div class="space-y-2">
 		<Label for="contact-name">Name</Label>
-		<Input id="contact-name" name="name" bind:value={$formData.name} placeholder="Ava Chen" aria-invalid={!!$errors.name} />
+		<Input
+			id="contact-name"
+			name="name"
+			bind:value={$formData.name}
+			placeholder="Ava Chen"
+			aria-invalid={!!$errors.name}
+		/>
 		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
 	</div>
 
@@ -61,7 +101,12 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="contact-company">Company</Label>
-			<Input id="contact-company" name="company" bind:value={$formData.company} placeholder="Northwind" />
+			<Input
+				id="contact-company"
+				name="company"
+				bind:value={$formData.company}
+				placeholder="Northwind"
+			/>
 			{#if $errors.company}<p class="text-destructive text-xs">{$errors.company}</p>{/if}
 		</div>
 	</div>
@@ -92,5 +137,5 @@
 		{#if $errors.status}<p class="text-destructive text-xs">{$errors.status}</p>{/if}
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={busy}>{submitLabel}</Button>
 </form>

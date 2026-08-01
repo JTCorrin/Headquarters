@@ -16,6 +16,7 @@
 		triggerLabel?: string;
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -26,7 +27,8 @@
 		submitLabel = 'Save contact',
 		triggerLabel = 'New contact',
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: ContactFormDrawerProps = $props();
 </script>
 
@@ -37,7 +39,9 @@
 		</Drawer.Trigger>
 	{:else}
 		<Drawer.Trigger>
-			<Button type="button">{triggerLabel}</Button>
+			{#snippet child({ props })}
+				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+			{/snippet}
 		</Drawer.Trigger>
 	{/if}
 
@@ -47,7 +51,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ContactForm {form} {submitLabel} class="max-w-none" />
+			<ContactForm {form} {submitLabel} {onValidSubmit} class="max-w-none" />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

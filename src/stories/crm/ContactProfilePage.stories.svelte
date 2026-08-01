@@ -18,7 +18,7 @@
 			navGroups: navGroupsWithActive('Contacts'),
 			breadcrumb: 'Contacts / Ava Chen',
 			title: 'Ava Chen',
-			status: 'Client',
+			status: 'Active',
 			subtitle: 'Primary at Northwind · Owner Joe · Tags: retainer, EU',
 			contactFields: [
 				{ label: 'Email', value: 'ava@northwind.com' },
