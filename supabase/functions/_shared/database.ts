@@ -660,6 +660,14 @@ export type Database = {
         }
         Returns: Json
       }
+      soft_delete_contact: {
+        Args: {
+          p_contact_id: string
+          p_expected_version: number
+          p_org_id: string
+        }
+        Returns: undefined
+      }
       browse_entity_documents: {
         Args: {
           p_org_id: string
