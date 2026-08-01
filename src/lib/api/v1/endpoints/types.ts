@@ -1,5 +1,19 @@
 import type { ApiResult } from '../request.js';
 import type {
+	ApiDocumentBrowseParams,
+	ApiDocumentBrowseResult,
+	ApiDocumentDownloadResult,
+	ApiDocumentEntityType,
+	ApiDocumentFinalizeBody,
+	ApiDocumentFolderCreateBody,
+	ApiDocumentFolderPatchBody,
+	ApiDocumentFolderResult,
+	ApiDocumentLinkResult,
+	ApiDocumentMoveBody,
+	ApiDocumentRenameBody,
+	ApiDocumentResult,
+	ApiDocumentUploadIntentBody,
+	ApiDocumentUploadIntentResult,
 	ApiOrganisationConfiguration,
 	ApiOrganisationConfigurationPatch,
 	ApiOrganisationCreateBody,
@@ -63,4 +77,61 @@ export interface QuotesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiQuoteDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface DocumentsEndpoints {
+	browse(
+		entityType: ApiDocumentEntityType,
+		entityId: string,
+		params?: ApiDocumentBrowseParams,
+		signal?: AbortSignal
+	): Promise<ApiDocumentBrowseResult>;
+	createFolder(
+		entityType: ApiDocumentEntityType,
+		entityId: string,
+		body: ApiDocumentFolderCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiDocumentFolderResult>;
+	updateFolder(
+		folderId: string,
+		body: ApiDocumentFolderPatchBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiDocumentFolderResult>;
+	deleteFolder(folderId: string, version: number, signal?: AbortSignal): Promise<void>;
+	restoreFolder(
+		folderId: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiDocumentFolderResult>;
+	createUploadIntent(
+		entityType: ApiDocumentEntityType,
+		entityId: string,
+		body: ApiDocumentUploadIntentBody,
+		signal?: AbortSignal
+	): Promise<ApiDocumentUploadIntentResult>;
+	finalize(
+		documentId: string,
+		body?: ApiDocumentFinalizeBody,
+		signal?: AbortSignal
+	): Promise<ApiDocumentResult>;
+	download(documentId: string, signal?: AbortSignal): Promise<ApiDocumentDownloadResult>;
+	rename(
+		documentId: string,
+		body: ApiDocumentRenameBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiDocumentResult>;
+	move(
+		documentId: string,
+		body: ApiDocumentMoveBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiDocumentLinkResult>;
+	delete(documentId: string, version: number, signal?: AbortSignal): Promise<void>;
+	restore(
+		documentId: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiDocumentResult>;
 }

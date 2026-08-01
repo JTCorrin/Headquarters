@@ -257,3 +257,161 @@ export interface ApiQuoteListParams {
 export interface ApiTaxRateListParams {
 	limit?: number;
 }
+
+/** Entity types that can host a document workspace. */
+export type ApiDocumentEntityType =
+	| 'client'
+	| 'contact'
+	| 'lead'
+	| 'organisation'
+	| 'meeting';
+
+export type ApiDocumentCategory =
+	| 'contract'
+	| 'proposal'
+	| 'invoice'
+	| 'receipt'
+	| 'transcript'
+	| 'recording'
+	| 'other';
+
+export type ApiDocumentStatus = 'pending_upload' | 'ready' | 'orphan' | 'failed';
+
+export type ApiDocumentScanStatus = 'pending' | 'clean' | 'infected' | 'failed';
+
+export interface ApiDocumentFolder {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	entity_type: ApiDocumentEntityType;
+	entity_id: string;
+	parent_id: string | null;
+	name: string;
+}
+
+export interface ApiDocument {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	category: ApiDocumentCategory;
+	notes: string | null;
+	bucket: string;
+	storage_path: string;
+	storage_version: string | null;
+	mime_type: string;
+	size_bytes: number;
+	sha256: string;
+	uploaded_by: string | null;
+	uploaded_at: string | null;
+	scan_status: ApiDocumentScanStatus;
+	metadata: Record<string, unknown>;
+	status: ApiDocumentStatus;
+	upload_expires_at: string | null;
+}
+
+export interface ApiDocumentLink {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	document_id: string;
+	entity_type: ApiDocumentEntityType;
+	entity_id: string;
+	folder_id: string | null;
+}
+
+export interface ApiDocumentBrowseItem {
+	document: ApiDocument;
+	link: ApiDocumentLink;
+}
+
+export interface ApiDocumentBrowseResult {
+	folders: ApiDocumentFolder[];
+	documents: ApiDocumentBrowseItem[];
+}
+
+export interface ApiDocumentBrowseParams {
+	folder_id?: string | null;
+}
+
+export interface ApiDocumentFolderCreateBody {
+	name: string;
+	parent_id?: string | null;
+}
+
+export interface ApiDocumentFolderResult {
+	folder: ApiDocumentFolder;
+}
+
+export interface ApiDocumentFolderPatchBody {
+	name?: string;
+	parent_id?: string | null;
+}
+
+export interface ApiDocumentUploadIntentBody {
+	name: string;
+	category: ApiDocumentCategory;
+	mime_type: string;
+	size_bytes: number;
+	sha256: string;
+	folder_id?: string | null;
+}
+
+export interface ApiDocumentSignedUpload {
+	signed_url: string;
+	token: string;
+	path: string;
+	expires_in: number;
+}
+
+export interface ApiDocumentUploadIntentResult {
+	document: ApiDocument;
+	link: ApiDocumentLink;
+	upload: ApiDocumentSignedUpload;
+}
+
+export interface ApiDocumentFinalizeBody {
+	expected_size_bytes?: number | null;
+	expected_sha256?: string | null;
+}
+
+export interface ApiDocumentResult {
+	document: ApiDocument;
+}
+
+export interface ApiDocumentLinkResult {
+	link: ApiDocumentLink;
+}
+
+export interface ApiDocumentDownloadResult {
+	document_id: string;
+	signed_url: string;
+	expires_in: number;
+	mime_type: string;
+	name: string;
+}
+
+export interface ApiDocumentRenameBody {
+	name: string;
+}
+
+export interface ApiDocumentMoveBody {
+	entity_type: ApiDocumentEntityType;
+	entity_id: string;
+	folder_id?: string | null;
+}

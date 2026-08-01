@@ -12,9 +12,18 @@ export { getApiV1Client, setApiV1Client } from './context.js';
 export * from './mappers.js';
 export type * from './types.js';
 export type {
+	DocumentsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
 	TaxRatesEndpoints
 } from './endpoints/index.js';
+export {
+	createDocumentWorkspaceController,
+	formatDocumentSizeLabel,
+	mapBrowseToWorkspaceView,
+	sha256Hex,
+	type DocumentWorkspaceController,
+	type DocumentWorkspaceControllerOptions
+} from './document-workspace-controller.svelte.js';
