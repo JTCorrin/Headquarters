@@ -136,6 +136,32 @@ printf '%s' "$get_lead" | jq -e \
 	'.data.stage == $stage and (.data.position | tonumber) == 3.5' >/dev/null \
 	|| die "lead get after board move: ${get_lead}"
 
+log "POST contact with invalid client_id → 422, no orphan"
+bogus_client="00000000-0000-4000-8000-000000000099"
+orphan_code="$(
+	curl -sS --max-time 30 -o /tmp/lb-orphan.body -w '%{http_code}' \
+		-X POST "${API_BASE}/api/v1/contacts" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg cid "$bogus_client" '{
+			display_name: "Should Not Persist",
+			client_id: $cid
+		}')"
+)"
+[[ "$orphan_code" == "422" ]] || die "expected 422 for bad contact client_id, got ${orphan_code}: $(cat /tmp/lb-orphan.body)"
+list_after_orphan="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/contacts" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+printf '%s' "$list_after_orphan" | jq -e \
+	'[.data[] | select(.display_name == "Should Not Persist")] | length == 0' >/dev/null \
+	|| die "orphan contact left after bad client_id: ${list_after_orphan}"
+
 log "POST contact with client_id → primary client_contacts"
 create_contact="$(
 	curl -fsS --max-time 30 \
@@ -153,7 +179,7 @@ create_contact="$(
 CONTACT_ID="$(printf '%s' "$create_contact" | jq -r '.data.id // empty')"
 CONTACT_CLIENT="$(printf '%s' "$create_contact" | jq -r '.data.client_id // empty')"
 CONTACT_VER="$(printf '%s' "$create_contact" | jq -r '.data.version // empty')"
-[[ "$CONTACT_CLIENT" == "$CLIENT_ID" && -n "$CONTACT_ID" ]] \
+[[ "$CONTACT_CLIENT" == "$CLIENT_ID" && -n "$CONTACT_ID" && -n "$CONTACT_VER" ]] \
 	|| die "contact client_id link: ${create_contact}"
 
 log "GET contact returns linked client_id"
@@ -167,7 +193,7 @@ get_contact="$(
 printf '%s' "$get_contact" | jq -e --arg cid "$CLIENT_ID" '.data.client_id == $cid' >/dev/null \
 	|| die "contact get client_id: ${get_contact}"
 
-log "PATCH contact clear client_id"
+log "PATCH contact clear client_id (advances version)"
 patch_contact="$(
 	curl -fsS --max-time 30 \
 		-X PATCH "${API_BASE}/api/v1/contacts/${CONTACT_ID}" \
@@ -178,8 +204,26 @@ patch_contact="$(
 		-H 'content-type: application/json' \
 		-d "$(jq -n '{client_id: null}')"
 )"
+NEW_VER="$(printf '%s' "$patch_contact" | jq -r '.data.version // empty')"
 [[ "$(printf '%s' "$patch_contact" | jq -r '.data.client_id')" == "null" ]] \
 	|| die "expected null client_id after clear: ${patch_contact}"
+[[ -n "$NEW_VER" && "$NEW_VER" != "$CONTACT_VER" ]] \
+	|| die "link-only PATCH must advance version: was ${CONTACT_VER} now ${NEW_VER}: ${patch_contact}"
+CONTACT_VER="$NEW_VER"
+
+log "PATCH contact stale If-Match rejected"
+stale_code="$(
+	curl -sS --max-time 30 -o /tmp/lb-stale.body -w '%{http_code}' \
+		-X PATCH "${API_BASE}/api/v1/contacts/${CONTACT_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'If-Match: "1"' \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg cid "$CLIENT_ID" '{client_id: $cid}')"
+)"
+[[ "$stale_code" == "412" ]] \
+	|| die "expected 412 for stale contact version, got ${stale_code}: $(cat /tmp/lb-stale.body)"
 
 log "cross-org lead client_id denied"
 # Second org + client owned by same user
@@ -222,7 +266,33 @@ cross_code="$(
 		}')"
 )"
 [[ "$cross_code" == "422" || "$cross_code" == "403" ]] \
-	|| die "expected 422/403 for cross-org client_id, got ${cross_code}: $(cat /tmp/lb-cross.body)"
-log "cross-org denial HTTP ${cross_code}"
+	|| die "expected 422/403 for cross-org lead client_id, got ${cross_code}: $(cat /tmp/lb-cross.body)"
+log "cross-org lead denial HTTP ${cross_code}"
 
-log "PASS lead board reorder + currency fallback + contact client link + tenancy"
+log "cross-org contact client_id denied (atomic, no orphan)"
+cross_contact_code="$(
+	curl -sS --max-time 30 -o /tmp/lb-cross-contact.body -w '%{http_code}' \
+		-X POST "${API_BASE}/api/v1/contacts" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg cid "$FOREIGN_CLIENT" '{
+			display_name: "Cross Org Contact",
+			client_id: $cid
+		}')"
+)"
+[[ "$cross_contact_code" == "422" || "$cross_contact_code" == "403" ]] \
+	|| die "expected 422/403 for cross-org contact client_id, got ${cross_contact_code}: $(cat /tmp/lb-cross-contact.body)"
+list_after_cross="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/contacts" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+printf '%s' "$list_after_cross" | jq -e \
+	'[.data[] | select(.display_name == "Cross Org Contact")] | length == 0' >/dev/null \
+	|| die "orphan contact after cross-org client_id: ${list_after_cross}"
+
+log "PASS lead board reorder + currency fallback + atomic contact client link + tenancy"
