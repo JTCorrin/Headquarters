@@ -1,12 +1,11 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteFormData } from '$lib/schemas/quote.js';
+	import type { QuoteClientOption, QuoteFormData } from '$lib/schemas/quote.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import QuotesTable from './quotes-table.svelte';
 	import type { QuoteRow } from './quotes-columns.js';
 	import QuoteFormDrawer from './quote-form-drawer.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface QuotesListPageProps {
@@ -15,7 +14,11 @@
 		rows: QuoteRow[];
 		form: SuperForm<QuoteFormData>;
 		drawerOpen?: boolean;
+		clientOptions?: QuoteClientOption[];
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -24,12 +27,23 @@
 		rows,
 		form,
 		drawerOpen = $bindable(false),
-		class: className
+		clientOptions = [],
+		showNav = true,
+		class: className,
+		onValidSubmit
 	}: QuotesListPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -39,11 +53,13 @@
 				description="Draft, send, and convert quotes into invoices."
 			>
 				{#snippet actions()}
-					<QuoteFormDrawer bind:open={drawerOpen} {form}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">New quote</Button>
-						{/snippet}
-					</QuoteFormDrawer>
+					<QuoteFormDrawer
+						bind:open={drawerOpen}
+						{form}
+						{clientOptions}
+						{onValidSubmit}
+						triggerLabel="New quote"
+					/>
 				{/snippet}
 			</PageHeader>
 

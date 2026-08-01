@@ -17,6 +17,7 @@
 
 	const data = defaults(
 		{
+			clientId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
 			clientName: 'Northwind',
 			title: 'Q2 retainer',
 			currency: 'GBP',

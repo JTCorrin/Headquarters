@@ -254,6 +254,39 @@ export interface ApiQuoteListParams {
 	status?: 'draft';
 }
 
+export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
+
+export interface ApiClient {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	status: ApiClientStatus;
+	website_url: string | null;
+	industry: string | null;
+	primary_email: string | null;
+	phone: string | null;
+	tax_identifier: string | null;
+	registration_number: string | null;
+	default_currency: string | null;
+	payment_terms_days: number | null;
+	owner_membership_id: string | null;
+	converted_from_lead_id: string | null;
+	renewal_on: string | null;
+	notes: string | null;
+	metadata: Record<string, unknown>;
+}
+
+export interface ApiClientListParams {
+	limit?: number;
+	cursor?: string;
+}
+
 export type ApiContactLifecycleStatus = 'active' | 'inactive' | 'archived';
 
 export interface ApiContact {
