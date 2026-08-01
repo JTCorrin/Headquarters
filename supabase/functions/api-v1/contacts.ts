@@ -208,6 +208,9 @@ export function decodeCursor(value: string): ContactCursor {
 }
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('version conflict')) {
+    return new ApiError(412, 'PRECONDITION_FAILED', 'Contact version does not match If-Match')
+  }
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The contact conflicts with an existing record')
   }
@@ -219,6 +222,9 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
+  }
+  if (error.code === 'P0002') {
+    return new ApiError(404, 'NOT_FOUND', 'Contact not found')
   }
   console.error('Contact database operation failed', {
     request_id: requestId,
@@ -371,25 +377,15 @@ async function deleteContact(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findContact(db, orgId, contactId, requestId)
-  if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact version does not match If-Match')
-  }
-
-  const { data, error } = await db
-    .from('contacts')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('org_id', orgId)
-    .eq('id', contactId)
-    .eq('version', version)
-    .is('deleted_at', null)
-    .select('id')
-    .maybeSingle()
+  // Direct UPDATE ... deleted_at hits RLS 42501 for authenticated callers on
+  // staging; mutate through the security-definer RPC (same pattern as quotes).
+  const { error } = await db.rpc('soft_delete_contact', {
+    p_contact_id: contactId,
+    p_org_id: orgId,
+    p_expected_version: version,
+  })
 
   if (error) throw databaseError(error, requestId)
-  if (!data) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact changed during this request')
-  }
 
   return new Response(null, {
     status: 204,
