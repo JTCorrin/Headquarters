@@ -322,126 +322,37 @@ async function listContacts(
   )
 }
 
-async function findActiveClientForContact(
-  db: DatabaseClient,
-  orgId: string,
-  clientId: string,
-  requestId: string,
-): Promise<void> {
-  const { data, error } = await db
-    .from('clients')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('id', clientId)
-    .is('deleted_at', null)
-    .maybeSingle()
+type ContactRpcResult = {
+  contact: ContactRow
+  client_id: string | null
+}
 
-  if (error) throw databaseError(error, requestId)
-  if (!data) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Contact validation failed', {
+function parseContactRpcResult(data: unknown, requestId: string): ContactRpcResult {
+  if (!data || typeof data !== 'object') {
+    console.error('Contact RPC returned unexpected payload', { request_id: requestId })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'The contact operation failed')
+  }
+  const row = data as { contact?: ContactRow; client_id?: string | null }
+  if (!row.contact || typeof row.contact !== 'object') {
+    console.error('Contact RPC missing contact row', { request_id: requestId })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'The contact operation failed')
+  }
+  return {
+    contact: row.contact,
+    client_id: row.client_id ?? null,
+  }
+}
+
+function mapContactClientRpcError(error: DatabaseError, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('contact client must be an active client')) {
+    return new ApiError(422, 'VALIDATION_ERROR', 'Contact validation failed', {
       client_id: 'Must reference an active client in this organisation',
     })
   }
+  return databaseError(error, requestId)
 }
 
-async function syncContactClientLink(
-  db: DatabaseClient,
-  orgId: string,
-  contactId: string,
-  clientId: string | null,
-  requestId: string,
-): Promise<string | null> {
-  if (clientId === null) {
-    const { error } = await db
-      .from('client_contacts')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('org_id', orgId)
-      .eq('contact_id', contactId)
-      .is('deleted_at', null)
-    if (error) throw databaseError(error, requestId)
-    return null
-  }
-
-  await findActiveClientForContact(db, orgId, clientId, requestId)
-
-  // Single-select form: drop other active links for this contact.
-  const { error: clearOtherError } = await db
-    .from('client_contacts')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('org_id', orgId)
-    .eq('contact_id', contactId)
-    .neq('client_id', clientId)
-    .is('deleted_at', null)
-  if (clearOtherError) throw databaseError(clearOtherError, requestId)
-
-  // One primary contact per client.
-  const { error: demoteError } = await db
-    .from('client_contacts')
-    .update({ is_primary: false })
-    .eq('org_id', orgId)
-    .eq('client_id', clientId)
-    .eq('is_primary', true)
-    .neq('contact_id', contactId)
-    .is('deleted_at', null)
-  if (demoteError) throw databaseError(demoteError, requestId)
-
-  const { data: activeLink, error: activeError } = await db
-    .from('client_contacts')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('client_id', clientId)
-    .eq('contact_id', contactId)
-    .is('deleted_at', null)
-    .maybeSingle()
-  if (activeError) throw databaseError(activeError, requestId)
-
-  if (activeLink) {
-    const { error: promoteError } = await db
-      .from('client_contacts')
-      .update({ is_primary: true, role: 'primary' })
-      .eq('id', activeLink.id)
-      .eq('org_id', orgId)
-    if (promoteError) throw databaseError(promoteError, requestId)
-    return clientId
-  }
-
-  const { data: softLinks, error: softError } = await db
-    .from('client_contacts')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('client_id', clientId)
-    .eq('contact_id', contactId)
-    .not('deleted_at', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-  if (softError) throw databaseError(softError, requestId)
-
-  const softLink = softLinks?.[0]
-  if (softLink) {
-    const { error: restoreError } = await db
-      .from('client_contacts')
-      .update({
-        deleted_at: null,
-        is_primary: true,
-        role: 'primary',
-      })
-      .eq('id', softLink.id)
-      .eq('org_id', orgId)
-    if (restoreError) throw databaseError(restoreError, requestId)
-  } else {
-    const { error: insertError } = await db.from('client_contacts').insert({
-      org_id: orgId,
-      client_id: clientId,
-      contact_id: contactId,
-      role: 'primary',
-      is_primary: true,
-    })
-    if (insertError) throw databaseError(insertError, requestId)
-  }
-
-  return clientId
-}
-
+/** Resolve form client_id from the contact's primary client_contacts link only. */
 async function resolveContactClientIds(
   db: DatabaseClient,
   orgId: string,
@@ -453,19 +364,16 @@ async function resolveContactClientIds(
 
   const { data, error } = await db
     .from('client_contacts')
-    .select('contact_id, client_id, is_primary, created_at')
+    .select('contact_id, client_id')
     .eq('org_id', orgId)
     .in('contact_id', contactIds)
+    .eq('is_primary', true)
     .is('deleted_at', null)
-    .order('is_primary', { ascending: false })
-    .order('created_at', { ascending: false })
 
   if (error) throw databaseError(error, requestId)
 
   for (const row of data ?? []) {
-    if (!map.has(row.contact_id)) {
-      map.set(row.contact_id, row.client_id)
-    }
+    map.set(row.contact_id, row.client_id)
   }
   return map
 }
@@ -486,29 +394,26 @@ async function createContact(
   const body = await jsonBody(req)
   const clientLink = extractContactClientId(body)
   const payload = validateContactBody(body, false)
-  const { data, error } = await db
-    .from('contacts')
-    .insert({ ...payload, org_id: orgId })
-    .select(CONTACT_SELECT)
-    .single()
-
-  if (error) throw databaseError(error, requestId)
-
-  let clientId: string | null = null
-  if (clientLink.provided) {
-    clientId = await syncContactClientLink(
-      db,
-      orgId,
-      data.id,
-      clientLink.clientId,
-      requestId,
-    )
-  }
-
-  return jsonResponse({ data: { ...data, client_id: clientId } }, 201, requestId, {
-    etag: etag(data.version),
-    location: `/api/v1/contacts/${data.id}`,
+  // Atomic contact insert + optional primary client_contacts link (no orphan on 422).
+  const { data, error } = await db.rpc('create_contact_with_primary_client', {
+    p_org_id: orgId,
+    p_payload: payload,
+    p_client_id: clientLink.clientId,
+    p_set_client_id: clientLink.provided,
   })
+
+  if (error) throw mapContactClientRpcError(error, requestId)
+
+  const result = parseContactRpcResult(data, requestId)
+  return jsonResponse(
+    { data: { ...result.contact, client_id: result.client_id } },
+    201,
+    requestId,
+    {
+      etag: etag(result.contact.version),
+      location: `/api/v1/contacts/${result.contact.id}`,
+    },
+  )
 }
 
 async function findContact(
@@ -551,56 +456,33 @@ async function updateContact(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findContact(db, orgId, contactId, requestId)
-  if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact version does not match If-Match')
-  }
-
   const body = await jsonBody(req)
   const clientLink = extractContactClientId(body)
   const payload = validateContactBody(body, true)
 
-  // client_id-only PATCH is valid (virtual field).
+  // client_id-only PATCH is valid (virtual field); RPC bumps version for If-Match.
   if (Object.keys(payload).length === 0 && !clientLink.provided) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'At least one writable field is required')
   }
 
-  let data = current
-  if (Object.keys(payload).length > 0) {
-    const { data: updated, error } = await db
-      .from('contacts')
-      .update(payload)
-      .eq('org_id', orgId)
-      .eq('id', contactId)
-      .eq('version', version)
-      .is('deleted_at', null)
-      .select(CONTACT_SELECT)
-      .maybeSingle()
-
-    if (error) throw databaseError(error, requestId)
-    if (!updated) {
-      throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact changed during this request')
-    }
-    data = updated
-  }
-
-  let clientId: string | null
-  if (clientLink.provided) {
-    clientId = await syncContactClientLink(
-      db,
-      orgId,
-      contactId,
-      clientLink.clientId,
-      requestId,
-    )
-  } else {
-    const clientIds = await resolveContactClientIds(db, orgId, [contactId], requestId)
-    clientId = clientIds.get(contactId) ?? null
-  }
-
-  return jsonResponse({ data: { ...data, client_id: clientId } }, 200, requestId, {
-    etag: etag(data.version),
+  const { data, error } = await db.rpc('update_contact_with_primary_client', {
+    p_contact_id: contactId,
+    p_org_id: orgId,
+    p_expected_version: version,
+    p_payload: payload,
+    p_client_id: clientLink.clientId,
+    p_set_client_id: clientLink.provided,
   })
+
+  if (error) throw mapContactClientRpcError(error, requestId)
+
+  const result = parseContactRpcResult(data, requestId)
+  return jsonResponse(
+    { data: { ...result.contact, client_id: result.client_id } },
+    200,
+    requestId,
+    { etag: etag(result.contact.version) },
+  )
 }
 
 async function deleteContact(
