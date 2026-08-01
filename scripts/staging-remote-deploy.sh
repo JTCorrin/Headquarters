@@ -17,32 +17,29 @@ log() { printf '[staging-deploy] %s\n' "$*"; }
 
 mkdir -p "$(dirname "$APP_DIR")"
 
-if [[ ! -d "$APP_DIR/.git" ]]; then
-	log "cloning ${REPO_URL} → ${APP_DIR}"
-	# Allow a pre-created app dir (e.g. scripts/ dropped by CI) without failing clone.
-	if [[ -d "$APP_DIR" ]] && [[ -n "$(ls -A "$APP_DIR" 2>/dev/null || true)" ]]; then
-		tmp_clone="$(mktemp -d /tmp/hq-clone.XXXXXX)"
-		git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$tmp_clone"
-		# Preserve an existing deploy.log if present.
-		if [[ -f "$APP_DIR/deploy.log" ]]; then
-			cp -a "$APP_DIR/deploy.log" "$tmp_clone/deploy.log" || true
-		fi
-		find "$APP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-		shopt -s dotglob
-		mv "$tmp_clone"/* "$APP_DIR"/
-		shopt -u dotglob
-		rmdir "$tmp_clone" 2>/dev/null || rm -rf "$tmp_clone"
-	else
-		mkdir -p "$(dirname "$APP_DIR")"
-		git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
-	fi
-else
+if [[ -d "$APP_DIR/.git" ]]; then
 	log "fetching ${BRANCH} in ${APP_DIR}"
 	git -C "$APP_DIR" remote set-url origin "$REPO_URL"
 	git -C "$APP_DIR" fetch --prune origin "$BRANCH"
 	git -C "$APP_DIR" checkout -B "$BRANCH" "origin/${BRANCH}"
 	git -C "$APP_DIR" reset --hard "origin/${BRANCH}"
 	git -C "$APP_DIR" clean -fd
+else
+	# Atomic replace avoids races when CI drops scripts/ into a pre-created app dir.
+	log "cloning ${REPO_URL} → ${APP_DIR}"
+	mkdir -p "$(dirname "$APP_DIR")"
+	new_dir="${APP_DIR}.new"
+	old_dir="${APP_DIR}.old"
+	rm -rf "$new_dir" "$old_dir"
+	git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$new_dir"
+	if [[ -f "$APP_DIR/deploy.log" ]]; then
+		cp -a "$APP_DIR/deploy.log" "$new_dir/deploy.log" || true
+	fi
+	if [[ -d "$APP_DIR" ]]; then
+		mv "$APP_DIR" "$old_dir"
+	fi
+	mv "$new_dir" "$APP_DIR"
+	rm -rf "$old_dir"
 fi
 
 cd "$APP_DIR"
