@@ -1,18 +1,13 @@
 import type { ColumnDef } from '@tanstack/table-core';
+import type { ContactListItem } from '$lib/schemas/contact.js';
 import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import ContactNameLink from './contact-name-link.svelte';
 
-export interface ContactRow {
-	id: string;
-	name: string;
-	email: string;
-	company?: string;
-	status: string;
-	owner?: string;
-}
+export type ContactRow = ContactListItem;
 
 export const contactColumns: ColumnDef<ContactRow>[] = [
 	{
@@ -40,7 +35,11 @@ export const contactColumns: ColumnDef<ContactRow>[] = [
 				label: 'Name',
 				onclick: column.getToggleSortingHandler()
 			}),
-		cell: ({ row }) => row.getValue('name')
+		cell: ({ row }) =>
+			renderComponent(ContactNameLink, {
+				id: row.original.id,
+				name: row.original.name
+			})
 	},
 	{
 		accessorKey: 'email',

@@ -8,6 +8,7 @@ const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const ORG_B = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
 const CLIENT_ID = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
 const QUOTE_ID = '11111111-2222-4333-8444-555555555555';
+const CONTACT_ID = '22222222-3333-4444-8555-666666666666';
 
 const sampleOrgMembership = {
 	membership: {
@@ -301,6 +302,99 @@ describe('createApiV1Client', () => {
 		const updated = await client.organisationConfig.update({ default_currency: 'USD' }, 7);
 		expect(updated.version).toBe(8);
 		expect(updated.default_currency).toBe('USD');
+	});
+
+	it('supports contact CRUD with ETag / If-Match / 204', async () => {
+		const sampleContact = {
+			id: CONTACT_ID,
+			org_id: ORG_A,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			first_name: null,
+			last_name: null,
+			display_name: 'Ava Chen',
+			primary_email: 'ava@northwind.com',
+			primary_phone: null,
+			job_title: null,
+			company_name: 'Northwind',
+			owner_membership_id: null,
+			lifecycle_status: 'active' as const,
+			source: null,
+			notes: null,
+			last_contacted_at: null,
+			metadata: {}
+		};
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/contacts': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const url = new URL(request.url);
+				expect(url.searchParams.get('limit')).toBe('25');
+				expect(url.searchParams.get('lifecycle_status')).toBe('active');
+				return { body: { data: [sampleContact], meta: { next_cursor: null } } };
+			},
+			'POST /api/v1/contacts': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const body = await request.json();
+				expect(body.display_name).toBe('Ava Chen');
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: { data: sampleContact }
+				};
+			},
+			[`GET /api/v1/contacts/${CONTACT_ID}`]: async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				return {
+					headers: { etag: '"1"' },
+					body: { data: sampleContact }
+				};
+			},
+			[`PATCH /api/v1/contacts/${CONTACT_ID}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				const body = await request.json();
+				expect(body.lifecycle_status).toBe('inactive');
+				return {
+					body: {
+						data: { ...sampleContact, version: 2, lifecycle_status: 'inactive' }
+					}
+				};
+			},
+			[`DELETE /api/v1/contacts/${CONTACT_ID}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(request.headers.get('content-type')).toBeNull();
+				return { status: 204 };
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const listed = await client.contacts.list({ limit: 25, lifecycle_status: 'active' });
+		expect(listed.data).toHaveLength(1);
+		expect(listed.data[0]?.display_name).toBe('Ava Chen');
+
+		const created = await client.contacts.create({
+			display_name: 'Ava Chen',
+			primary_email: 'ava@northwind.com',
+			company_name: 'Northwind'
+		});
+		expect(created.id).toBe(CONTACT_ID);
+
+		const got = await client.contacts.get(CONTACT_ID);
+		expect(got.etag).toBe('"1"');
+		expect(got.data.company_name).toBe('Northwind');
+
+		const updated = await client.contacts.update(
+			CONTACT_ID,
+			{ lifecycle_status: 'inactive' },
+			1
+		);
+		expect(updated.version).toBe(2);
+
+		await client.contacts.delete(CONTACT_ID, 2);
 	});
 
 	it('supports quote draft CRUD with ETag / If-Match / 204', async () => {

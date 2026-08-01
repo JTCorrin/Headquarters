@@ -6,7 +6,6 @@
 	import ContactsTable from './contacts-table.svelte';
 	import type { ContactRow } from './contacts-columns.js';
 	import ContactFormDrawer from './contact-form-drawer.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface ContactsListPageProps {
@@ -16,6 +15,7 @@
 		form: SuperForm<ContactFormData>;
 		drawerOpen?: boolean;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -24,12 +24,13 @@
 		rows,
 		form,
 		drawerOpen = $bindable(false),
-		class: className
+		class: className,
+		onValidSubmit
 	}: ContactsListPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div class={cn('bg-background text-foreground flex h-full min-h-svh', className)}>
+	<AppNav {orgName} groups={navGroups} class="shrink-0 self-stretch" />
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -39,11 +40,12 @@
 				description="People and companies in your pipeline."
 			>
 				{#snippet actions()}
-					<ContactFormDrawer bind:open={drawerOpen} {form}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">New contact</Button>
-						{/snippet}
-					</ContactFormDrawer>
+					<ContactFormDrawer
+						bind:open={drawerOpen}
+						{form}
+						{onValidSubmit}
+						triggerLabel="New contact"
+					/>
 				{/snippet}
 			</PageHeader>
 
