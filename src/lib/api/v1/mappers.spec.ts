@@ -1,18 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+	clientStatusLabel,
 	contactLifecycleLabel,
+	leadStageLabel,
 	quoteStatusLabel,
 	themePreferenceFromApi,
 	themePreferenceToApi,
+	toClientCreateBody,
+	toClientFormData,
+	toClientRow,
 	toContactCreateBody,
 	toContactFormData,
 	toContactListItem,
+	toLeadCard,
+	toLeadCreateBody,
+	toLeadFormData,
 	toOrganisationCreateBody,
 	toOrgMembershipSummary,
 	toQuoteCreateBody,
 	toQuoteListItem
 } from './mappers.js';
-import type { ApiContact, ApiQuote } from './types.js';
+import type { ApiClient, ApiContact, ApiLead, ApiQuote } from './types.js';
 
 const sampleContact: ApiContact = {
 	id: '11111111-2222-4333-8444-555555555555',
@@ -190,6 +198,145 @@ describe('api mappers', () => {
 			client_id: sampleQuote.client_id,
 			currency: 'GBP',
 			lines: []
+		});
+	});
+
+	it('maps leads between API and form/board shapes', () => {
+		const sampleLead: ApiLead = {
+			id: '11111111-2222-4333-8444-555555555555',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 2,
+			name: 'Contoso expansion',
+			company_name: 'Contoso',
+			contact_id: null,
+			client_id: null,
+			stage: 'qualified',
+			value_cents: 250000,
+			currency: 'GBP',
+			probability_percent: 40,
+			source: 'referral',
+			owner_membership_id: null,
+			expected_close_on: '2026-09-01',
+			lost_reason: null,
+			won_at: null,
+			lost_at: null,
+			converted_at: null,
+			position: 1,
+			notes: 'Hot',
+			metadata: {}
+		};
+		expect(leadStageLabel('qualified')).toBe('Qualified');
+		expect(toLeadCard(sampleLead)).toMatchObject({
+			id: sampleLead.id,
+			name: 'Contoso expansion',
+			companyName: 'Contoso',
+			stage: 'qualified',
+			valueCents: 250000
+		});
+		expect(toLeadFormData(sampleLead)).toMatchObject({
+			name: 'Contoso expansion',
+			stage: 'qualified',
+			valueCents: '250000',
+			currency: 'GBP'
+		});
+		expect(
+			toLeadCreateBody({
+				name: '  Northwind pilot  ',
+				companyName: '',
+				stage: 'new',
+				valueCents: '1000',
+				currency: 'USD',
+				probabilityPercent: '',
+				source: '',
+				expectedCloseOn: '',
+				lostReason: '',
+				notes: ''
+			})
+		).toEqual({
+			name: 'Northwind pilot',
+			company_name: null,
+			stage: 'new',
+			value_cents: 1000,
+			currency: 'USD',
+			probability_percent: null,
+			source: null,
+			expected_close_on: null,
+			lost_reason: null,
+			notes: null
+		});
+	});
+
+	it('maps clients between API and form/list shapes', () => {
+		const sampleClient: ApiClient = {
+			id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			name: 'Northwind',
+			status: 'on_hold',
+			website_url: 'https://northwind.example',
+			industry: 'Logistics',
+			primary_email: 'billing@northwind.com',
+			phone: null,
+			tax_identifier: null,
+			registration_number: null,
+			default_currency: 'GBP',
+			payment_terms_days: 30,
+			owner_membership_id: null,
+			converted_from_lead_id: null,
+			renewal_on: null,
+			notes: null,
+			metadata: {}
+		};
+		expect(clientStatusLabel('on_hold')).toBe('On Hold');
+		expect(toClientRow(sampleClient)).toMatchObject({
+			id: sampleClient.id,
+			name: 'Northwind',
+			status: 'On Hold'
+		});
+		expect(toClientFormData(sampleClient)).toMatchObject({
+			name: 'Northwind',
+			status: 'on_hold',
+			defaultCurrency: 'GBP',
+			paymentTermsDays: '30'
+		});
+		expect(
+			toClientCreateBody({
+				name: '  Adventure Works  ',
+				status: 'active',
+				websiteUrl: '',
+				industry: 'Retail',
+				primaryEmail: '',
+				phone: '',
+				taxIdentifier: '',
+				registrationNumber: '',
+				defaultCurrency: 'EUR',
+				paymentTermsDays: '',
+				renewalOn: '',
+				notes: ''
+			})
+		).toEqual({
+			name: 'Adventure Works',
+			status: 'active',
+			website_url: null,
+			industry: 'Retail',
+			primary_email: null,
+			phone: null,
+			tax_identifier: null,
+			registration_number: null,
+			default_currency: 'EUR',
+			payment_terms_days: null,
+			renewal_on: null,
+			notes: null
 		});
 	});
 });

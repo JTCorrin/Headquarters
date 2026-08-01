@@ -4,6 +4,7 @@ import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import ClientNameLink from './client-name-link.svelte';
 
 export interface ClientRow {
 	id: string;
@@ -39,6 +40,11 @@ export const clientColumns: ColumnDef<ClientRow>[] = [
 			renderComponent(DataTableSortHeader, {
 				label: 'Client',
 				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) =>
+			renderComponent(ClientNameLink, {
+				id: row.original.id,
+				name: row.original.name
 			})
 	},
 	{

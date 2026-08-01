@@ -287,6 +287,93 @@ export interface ApiClientListParams {
 	cursor?: string;
 }
 
+export interface ApiClientCreateBody {
+	name: string;
+	status?: ApiClientStatus;
+	website_url?: string | null;
+	industry?: string | null;
+	primary_email?: string | null;
+	phone?: string | null;
+	tax_identifier?: string | null;
+	registration_number?: string | null;
+	default_currency?: string | null;
+	payment_terms_days?: number | null;
+	owner_membership_id?: string | null;
+	renewal_on?: string | null;
+	notes?: string | null;
+	metadata?: Record<string, unknown>;
+}
+
+export type ApiClientUpdateBody = Partial<ApiClientCreateBody>;
+
+export type ApiLeadStage = 'new' | 'qualified' | 'proposal' | 'won' | 'lost';
+export type ApiLeadWritableStage = 'new' | 'qualified' | 'proposal' | 'lost';
+
+export interface ApiLead {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	company_name: string | null;
+	contact_id: string | null;
+	client_id: string | null;
+	stage: ApiLeadStage;
+	value_cents: number | null;
+	currency: string;
+	probability_percent: number | null;
+	source: string | null;
+	owner_membership_id: string | null;
+	expected_close_on: string | null;
+	lost_reason: string | null;
+	won_at: string | null;
+	lost_at: string | null;
+	converted_at: string | null;
+	position: number;
+	notes: string | null;
+	metadata: Record<string, unknown>;
+}
+
+export interface ApiLeadCreateBody {
+	name: string;
+	company_name?: string | null;
+	contact_id?: string | null;
+	stage?: ApiLeadWritableStage;
+	value_cents?: number | null;
+	currency?: string;
+	probability_percent?: number | null;
+	source?: string | null;
+	owner_membership_id?: string | null;
+	expected_close_on?: string | null;
+	lost_reason?: string | null;
+	position?: number;
+	notes?: string | null;
+	metadata?: Record<string, unknown>;
+}
+
+export type ApiLeadUpdateBody = Partial<ApiLeadCreateBody>;
+
+export interface ApiLeadListParams {
+	limit?: number;
+	cursor?: string;
+	stage?: ApiLeadStage;
+}
+
+export interface ApiLeadConvertBody {
+	client_name?: string;
+	client_status?: ApiClientStatus;
+}
+
+export interface ApiLeadConvertResult {
+	lead: ApiLead;
+	client: ApiClient;
+	idempotent: boolean;
+}
+
 export type ApiContactLifecycleStatus = 'active' | 'inactive' | 'archived';
 
 export interface ApiContact {
