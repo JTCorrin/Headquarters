@@ -7,14 +7,16 @@
 		org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
 		org_name: 'Corrin Data',
 		org_slug: 'corrin-data',
-		role: 'owner'
+		role: 'owner',
+		theme_default: 'system'
 	} satisfies OrgMembershipSummary;
 
 	const certivue = {
 		org_id: '11111111-2222-4333-8444-555555555555',
 		org_name: 'Certivue Extremely Long Organisation Name That Truncates Nicely',
 		org_slug: 'certivue',
-		role: 'member'
+		role: 'member',
+		theme_default: 'system'
 	} satisfies OrgMembershipSummary;
 
 	const memberships = [corrin, certivue];

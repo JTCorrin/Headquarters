@@ -63,8 +63,22 @@ export function slugifyOrganisationName(name: string): string {
 		.slice(0, 63);
 }
 
+/**
+ * Display names used in Superforms SPA validators.
+ * Do **not** use Zod `.trim()` here — Superforms applies the schema while typing and
+ * would strip a trailing space, making multi-word names impossible to enter.
+ * Trim at the API mapper / server boundary instead.
+ */
+function requiredDisplayName(max: number) {
+	return z
+		.string()
+		.min(1, 'Name is required')
+		.max(max)
+		.refine((value) => value.trim().length > 0, 'Name is required');
+}
+
 export const organisationCreateSchema = z.object({
-	name: z.string().trim().min(1, 'Name is required').max(200),
+	name: requiredDisplayName(200),
 	slug: z
 		.string()
 		.trim()
@@ -102,7 +116,7 @@ const ratePercentString = z
 
 export const taxRateFormSchema = z
 	.object({
-		name: z.string().trim().min(1, 'Name is required').max(120),
+		name: requiredDisplayName(120),
 		ratePercent: ratePercentString,
 		isDefault: z.enum(['true', 'false']),
 		active: z.enum(['true', 'false'])
@@ -133,6 +147,8 @@ export interface OrgMembershipSummary {
 	org_slug: string;
 	logo_url?: string | null;
 	role: MembershipRole;
+	/** Organisation default theme — used to apply appearance when personal pref is org_default. */
+	theme_default: ThemeOption;
 }
 
 export interface OrganisationConfigResource {

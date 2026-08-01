@@ -28,7 +28,8 @@ export function toOrgMembershipSummary(
 		org_name: row.organisation.name,
 		org_slug: row.organisation.slug,
 		logo_url: row.organisation.logo_path,
-		role: row.membership.role
+		role: row.membership.role,
+		theme_default: row.organisation.theme_default ?? 'system'
 	};
 }
 
@@ -40,7 +41,8 @@ export function membershipFromCreateResult(
 		org_name: result.organisation.name,
 		org_slug: result.organisation.slug,
 		logo_url: result.organisation.logo_path,
-		role: result.membership.role
+		role: result.membership.role,
+		theme_default: result.organisation.theme_default ?? 'system'
 	};
 }
 
@@ -48,8 +50,8 @@ export function toOrganisationCreateBody(
 	data: OrganisationCreateData
 ): ApiOrganisationCreateBody {
 	return {
-		name: data.name,
-		slug: data.slug,
+		name: data.name.trim(),
+		slug: data.slug.trim(),
 		country_code: data.country,
 		default_currency: data.currency,
 		timezone: data.timezone,
@@ -106,7 +108,7 @@ export function toTaxRateResource(rate: ApiTaxRate): TaxRateResource {
 
 export function toTaxRateCreateBody(data: TaxRateFormData): ApiTaxRateCreateBody {
 	return {
-		name: data.name,
+		name: data.name.trim(),
 		rate_percent: Number(data.ratePercent),
 		is_default: data.isDefault === 'true',
 		active: data.active === 'true'
