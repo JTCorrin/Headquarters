@@ -668,6 +668,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      soft_delete_lead: {
+        Args: {
+          p_expected_version: number
+          p_lead_id: string
+          p_org_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_client: {
+        Args: {
+          p_client_id: string
+          p_expected_version: number
+          p_org_id: string
+        }
+        Returns: undefined
+      }
       browse_entity_documents: {
         Args: {
           p_org_id: string

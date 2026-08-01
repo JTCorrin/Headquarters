@@ -258,6 +258,9 @@ export function decodeClientCursor(value: string): ClientCursor {
 }
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('version conflict')) {
+    return new ApiError(412, 'PRECONDITION_FAILED', 'Client version does not match If-Match')
+  }
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The client conflicts with an existing record')
   }
@@ -269,6 +272,9 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
+  }
+  if (error.code === 'P0002') {
+    return new ApiError(404, 'NOT_FOUND', 'Client not found')
   }
   console.error('Client database operation failed', {
     request_id: requestId,
@@ -421,25 +427,15 @@ async function deleteClient(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findClient(db, orgId, clientId, requestId)
-  if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Client version does not match If-Match')
-  }
-
-  const { data, error } = await db
-    .from('clients')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('org_id', orgId)
-    .eq('id', clientId)
-    .eq('version', version)
-    .is('deleted_at', null)
-    .select('id')
-    .maybeSingle()
+  // Direct UPDATE ... deleted_at hits RLS 42501 for authenticated callers on
+  // staging; mutate through the security-definer RPC (same pattern as contacts).
+  const { error } = await db.rpc('soft_delete_client', {
+    p_client_id: clientId,
+    p_org_id: orgId,
+    p_expected_version: version,
+  })
 
   if (error) throw databaseError(error, requestId)
-  if (!data) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Client changed during this request')
-  }
 
   return new Response(null, {
     status: 204,
