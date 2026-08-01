@@ -21,7 +21,8 @@ if [[ -d "$APP_DIR/.git" ]]; then
 	log "fetching ${BRANCH} in ${APP_DIR}"
 	git -C "$APP_DIR" remote set-url origin "$REPO_URL"
 	git -C "$APP_DIR" fetch --prune origin "$BRANCH"
-	git -C "$APP_DIR" checkout -B "$BRANCH" "origin/${BRANCH}"
+	# -f: CI may have scp'd this script into the tree before invoking it.
+	git -C "$APP_DIR" checkout -f -B "$BRANCH" "origin/${BRANCH}"
 	git -C "$APP_DIR" reset --hard "origin/${BRANCH}"
 	git -C "$APP_DIR" clean -fd
 else
