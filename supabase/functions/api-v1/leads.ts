@@ -17,6 +17,7 @@ const WRITABLE_FIELDS = new Set([
   'name',
   'company_name',
   'contact_id',
+  'client_id',
   'stage',
   'value_cents',
   'currency',
@@ -53,6 +54,7 @@ type LeadWritable = {
   name?: string
   company_name?: string | null
   contact_id?: string | null
+  client_id?: string | null
   stage?: LeadStage
   value_cents?: number | null
   currency?: string
@@ -154,6 +156,19 @@ export function validateLeadBody(
         output.contact_id = parseUuid(typeof value === 'string' ? value : null, 'contact_id')
       } catch {
         fields.contact_id = 'Must be a UUID or null'
+      }
+    }
+  }
+
+  if ('client_id' in body) {
+    const value = body.client_id
+    if (value === null) {
+      output.client_id = null
+    } else {
+      try {
+        output.client_id = parseUuid(typeof value === 'string' ? value : null, 'client_id')
+      } catch {
+        fields.client_id = 'Must be a UUID or null'
       }
     }
   }
@@ -358,6 +373,45 @@ function applyLostStageSideEffects<T extends LeadUpdate>(
   return payload
 }
 
+/** Resolve omitted currency: client default → organisation default. */
+export function resolveLeadCurrency(options: {
+  explicit?: string
+  clientDefault?: string | null
+  orgDefault: string
+}): string {
+  if (options.explicit) return options.explicit
+  if (
+    typeof options.clientDefault === 'string' &&
+    /^[A-Z]{3}$/.test(options.clientDefault)
+  ) {
+    return options.clientDefault
+  }
+  return options.orgDefault
+}
+
+async function findActiveClient(
+  db: DatabaseClient,
+  orgId: string,
+  clientId: string,
+  requestId: string,
+): Promise<{ id: string; default_currency: string | null }> {
+  const { data, error } = await db
+    .from('clients')
+    .select('id, default_currency')
+    .eq('org_id', orgId)
+    .eq('id', clientId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error) throw databaseError(error, requestId)
+  if (!data) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Lead validation failed', {
+      client_id: 'Must reference an active client in this organisation',
+    })
+  }
+  return data
+}
+
 async function listLeads(
   req: Request,
   db: DatabaseClient,
@@ -427,11 +481,26 @@ async function createLead(
   if (orgError) throw databaseError(orgError, requestId)
   if (!organisation) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
 
-  const payload = applyLostStageSideEffects(
-    validateLeadBody(await jsonBody(req), false, {
-      defaultCurrency: organisation.default_currency,
-    }),
-  )
+  const body = await jsonBody(req)
+  // Validate shape first so UUID errors surface as field validation.
+  const draft = validateLeadBody(body, false, {
+    defaultCurrency: organisation.default_currency ?? 'GBP',
+  })
+
+  let clientDefault: string | null = null
+  if (draft.client_id) {
+    clientDefault = (await findActiveClient(db, orgId, draft.client_id, requestId))
+      .default_currency
+  }
+
+  if (!('currency' in body)) {
+    draft.currency = resolveLeadCurrency({
+      clientDefault,
+      orgDefault: organisation.default_currency ?? 'GBP',
+    })
+  }
+
+  const payload = applyLostStageSideEffects(draft)
   const { data, error } = await db
     .from('leads')
     .insert({ ...payload, org_id: orgId } as Database['public']['Tables']['leads']['Insert'])
@@ -495,13 +564,34 @@ async function updateLead(
     )
   }
 
-  const payload = applyLostStageSideEffects(
-    validateLeadBody(await jsonBody(req), true),
+  const body = await jsonBody(req)
+  const draft = applyLostStageSideEffects(
+    validateLeadBody(body, true),
     current.stage,
   )
+
+  if (draft.client_id) {
+    const client = await findActiveClient(db, orgId, draft.client_id, requestId)
+    if (!('currency' in body)) {
+      const { data: organisation, error: orgError } = await db
+        .from('organisations')
+        .select('default_currency')
+        .eq('id', orgId)
+        .is('deleted_at', null)
+        .maybeSingle()
+      if (orgError) throw databaseError(orgError, requestId)
+      if (!organisation) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
+
+      draft.currency = resolveLeadCurrency({
+        clientDefault: client.default_currency,
+        orgDefault: organisation.default_currency ?? 'GBP',
+      })
+    }
+  }
+
   const { data, error } = await db
     .from('leads')
-    .update(payload)
+    .update(draft)
     .eq('org_id', orgId)
     .eq('id', leadId)
     .eq('version', version)
