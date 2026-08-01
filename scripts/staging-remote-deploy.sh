@@ -47,9 +47,16 @@ cd "$APP_DIR"
 SHA="$(git rev-parse HEAD)"
 log "checked out ${BRANCH} @ ${SHA}"
 
-# Match Frontend CI lockfile tooling (box may have a newer global pnpm).
-corepack enable
-corepack prepare "pnpm@${PNPM_VERSION}" --activate
+# Match Frontend CI lockfile tooling. Do not run `corepack enable` — on this
+# Debian box `/usr/bin/pnpm` is a root-owned npm global symlink and corepack
+# fails with EACCES trying to unlink it. Install a user-local pnpm instead.
+PNPM_PREFIX="${HOME}/.local"
+mkdir -p "${PNPM_PREFIX}/bin"
+export PATH="${PNPM_PREFIX}/bin:${PATH}"
+if ! pnpm --version 2>/dev/null | grep -q "^${PNPM_VERSION}\\."; then
+	log "installing pnpm@${PNPM_VERSION} into ${PNPM_PREFIX}"
+	npm install -g --prefix "${PNPM_PREFIX}" "pnpm@${PNPM_VERSION}"
+fi
 log "pnpm $(pnpm --version) / node $(node --version)"
 
 pnpm install --frozen-lockfile
