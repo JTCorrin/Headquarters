@@ -198,6 +198,8 @@
 		<AppShell
 			{currentOrgId}
 			memberships={session.memberships}
+			{orgName}
+			{navGroups}
 			{switchError}
 			{busy}
 			{createError}
@@ -222,6 +224,7 @@
 							: (contact.job_title ?? undefined)}
 						{contactFields}
 						{companyFields}
+						showNav={false}
 						class="min-h-0 flex-1"
 					/>
 				{/if}

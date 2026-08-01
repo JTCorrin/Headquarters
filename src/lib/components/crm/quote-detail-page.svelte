@@ -33,6 +33,10 @@
 		onSend?: () => void;
 		onChase?: () => void;
 		onConvert?: () => void;
+		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
+		clientOptions?: import('$lib/schemas/quote.js').QuoteClientOption[];
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
 	}
 
@@ -51,6 +55,9 @@
 		onSend,
 		onChase,
 		onConvert,
+		onSaveQuote,
+		clientOptions = [],
+		showNav = true,
 		class: className
 	}: QuoteDetailPageProps = $props();
 
@@ -85,8 +92,16 @@
 	);
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -109,7 +124,12 @@
 						class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<h2 class="text-sm font-semibold tracking-tight">Quote details</h2>
-						<QuoteForm form={quoteForm} submitLabel="Save details" />
+						<QuoteForm
+							form={quoteForm}
+							submitLabel="Save details"
+							{clientOptions}
+							onValidSubmit={onSaveQuote}
+						/>
 					</section>
 
 					<LineItemsTable rows={lines} onRemove={onRemoveLine} class="self-start">

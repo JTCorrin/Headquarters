@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteFormData } from '$lib/schemas/quote.js';
+	import type { QuoteClientOption, QuoteFormData } from '$lib/schemas/quote.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -11,15 +11,27 @@
 	export interface QuoteFormProps {
 		form: SuperForm<QuoteFormData>;
 		submitLabel?: string;
+		clientOptions?: QuoteClientOption[];
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
-	let { form, submitLabel = 'Save quote', class: className }: QuoteFormProps = $props();
+	let {
+		form,
+		submitLabel = 'Save quote',
+		clientOptions = [],
+		class: className,
+		onValidSubmit
+	}: QuoteFormProps = $props();
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	let submitLock = false;
+	const busy = $derived($submitting || pendingSubmit);
 
 	const currencyOptions = [
 		{ value: 'GBP', label: 'GBP' },
@@ -30,7 +42,9 @@
 		{ value: 'draft', label: 'Draft' },
 		{ value: 'sent', label: 'Sent' },
 		{ value: 'accepted', label: 'Accepted' },
-		{ value: 'rejected', label: 'Rejected' }
+		{ value: 'rejected', label: 'Rejected' },
+		{ value: 'expired', label: 'Expired' },
+		{ value: 'void', label: 'Void' }
 	] as const;
 
 	const currencyLabel = $derived(
@@ -39,20 +53,70 @@
 	const statusLabel = $derived(
 		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Status'
 	);
+	const clientLabel = $derived(
+		clientOptions.find((o) => o.id === $formData.clientId)?.name ??
+			($formData.clientName || 'Select client')
+	);
+	const useClientSelect = $derived(clientOptions.length > 0);
+
+	$effect(() => {
+		const selected = clientOptions.find((o) => o.id === $formData.clientId);
+		if (selected && $formData.clientName !== selected.name) {
+			$formData.clientName = selected.name;
+		}
+	});
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)}>
-	<div class="space-y-2">
-		<Label for="quote-client">Client</Label>
-		<Input
-			id="quote-client"
-			name="clientName"
-			bind:value={$formData.clientName}
-			placeholder="Northwind"
-			aria-invalid={!!$errors.clientName}
-		/>
-		{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
-	</div>
+<form
+	method="POST"
+	class={cn('space-y-4', className)}
+	data-testid="quote-form"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+>
+	{#if useClientSelect}
+		<div class="space-y-2">
+			<Label for="quote-client">Client</Label>
+			<Select.Root type="single" bind:value={$formData.clientId} name="clientId">
+				<Select.Trigger id="quote-client" class="w-full" aria-invalid={!!$errors.clientId}>
+					{clientLabel}
+				</Select.Trigger>
+				<Select.Content>
+					{#each clientOptions as option (option.id)}
+						<Select.Item value={option.id} label={option.name}>{option.name}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+		</div>
+	{:else}
+		<div class="space-y-2">
+			<Label for="quote-client">Client</Label>
+			<Input
+				id="quote-client"
+				name="clientName"
+				bind:value={$formData.clientName}
+				placeholder="Northwind"
+				aria-invalid={!!$errors.clientName}
+			/>
+			{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
+			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+		</div>
+	{/if}
 
 	<div class="space-y-2">
 		<Label for="quote-title">Title</Label>
@@ -91,5 +155,5 @@
 		</div>
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={busy}>{submitLabel}</Button>
 </form>

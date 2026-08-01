@@ -8,6 +8,7 @@
 		type OrganisationCreateData,
 		type OrgMembershipSummary
 	} from '$lib/schemas/organisation.js';
+	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import OrgSwitcher from './org-switcher.svelte';
 	import OrganisationCreateDrawer from './organisation-create-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -16,6 +17,9 @@
 	export interface AppShellProps {
 		currentOrgId: string;
 		memberships: OrgMembershipSummary[];
+		/** When set with navGroups, AppNav spans the full browser/window height. */
+		orgName?: string;
+		navGroups?: AppNavGroup[];
 		switchError?: string | null;
 		busy?: boolean;
 		createError?: string | null;
@@ -32,6 +36,8 @@
 	let {
 		currentOrgId,
 		memberships,
+		orgName,
+		navGroups,
 		switchError = null,
 		busy = false,
 		createError = null,
@@ -71,50 +77,58 @@
 		const result = await onValidCreate?.(data);
 		return result === false ? false : true;
 	}
+
+	const showNav = $derived(Boolean(orgName && navGroups && navGroups.length > 0));
 </script>
 
 <div
-	class={cn('bg-background text-foreground flex min-h-svh flex-col', className)}
+	class={cn('bg-background text-foreground flex h-svh overflow-hidden', className)}
 	data-testid="app-shell"
 >
-	<header
-		class="flex flex-wrap items-center gap-3 border-b px-4 py-3"
-		data-testid="app-shell-header"
-	>
-		<OrgSwitcher
-			{currentOrgId}
-			{memberships}
-			{switchError}
-			{busy}
-			onSwitchOrg={onSwitchOrg}
-			onCreateOrg={() => {
-				createOpen = true;
-			}}
-		/>
-		<div class="ms-auto flex items-center gap-2">
-			{#if headerExtra}
-				{@render headerExtra()}
+	{#if showNav && orgName && navGroups}
+		<AppNav {orgName} groups={navGroups} class="h-svh shrink-0" />
+	{/if}
+
+	<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+		<header
+			class="flex flex-wrap items-center gap-3 border-b px-4 py-3"
+			data-testid="app-shell-header"
+		>
+			<OrgSwitcher
+				{currentOrgId}
+				{memberships}
+				{switchError}
+				{busy}
+				onSwitchOrg={onSwitchOrg}
+				onCreateOrg={() => {
+					createOpen = true;
+				}}
+			/>
+			<div class="ms-auto flex items-center gap-2">
+				{#if headerExtra}
+					{@render headerExtra()}
+				{/if}
+				{#if onLogout}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onclick={() => {
+							void onLogout();
+						}}
+						data-testid="auth-logout"
+					>
+						Log out
+					</Button>
+				{/if}
+			</div>
+		</header>
+		<main class="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="app-shell-main">
+			{#if children}
+				{@render children()}
 			{/if}
-			{#if onLogout}
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onclick={() => {
-						void onLogout();
-					}}
-					data-testid="auth-logout"
-				>
-					Log out
-				</Button>
-			{/if}
-		</div>
-	</header>
-	<main class="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="app-shell-main">
-		{#if children}
-			{@render children()}
-		{/if}
-	</main>
+		</main>
+	</div>
 
 	<OrganisationCreateDrawer
 		form={createForm}

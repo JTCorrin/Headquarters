@@ -1,4 +1,5 @@
 import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { createClientsEndpoints } from './endpoints/clients.js';
 import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
@@ -7,6 +8,7 @@ import { createProfilePreferencesEndpoints } from './endpoints/profile-preferenc
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
 import type {
+	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
 	OrganisationConfigEndpoints,
@@ -42,6 +44,7 @@ export interface ApiV1Client {
 	profilePreferences: ProfilePreferencesEndpoints;
 	quotes: QuotesEndpoints;
 	contacts: ContactsEndpoints;
+	clients: ClientsEndpoints;
 	documents: DocumentsEndpoints;
 }
 
@@ -212,6 +215,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		profilePreferences: createProfilePreferencesEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		contacts: createContactsEndpoints(request),
+		clients: createClientsEndpoints(request),
 		documents: createDocumentsEndpoints(request)
 	};
 }
