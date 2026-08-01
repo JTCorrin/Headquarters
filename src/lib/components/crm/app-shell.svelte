@@ -10,6 +10,7 @@
 	} from '$lib/schemas/organisation.js';
 	import OrgSwitcher from './org-switcher.svelte';
 	import OrganisationCreateDrawer from './organisation-create-drawer.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface AppShellProps {
@@ -22,6 +23,7 @@
 		children?: Snippet;
 		headerExtra?: Snippet;
 		onSwitchOrg?: (orgId: string) => void;
+		onLogout?: () => void | Promise<void>;
 		onValidCreate?: (
 			data: OrganisationCreateData
 		) => boolean | void | Promise<boolean | void>;
@@ -37,6 +39,7 @@
 		children,
 		headerExtra,
 		onSwitchOrg,
+		onLogout,
 		onValidCreate
 	}: AppShellProps = $props();
 
@@ -88,9 +91,24 @@
 				createOpen = true;
 			}}
 		/>
-		{#if headerExtra}
-			<div class="ms-auto">{@render headerExtra()}</div>
-		{/if}
+		<div class="ms-auto flex items-center gap-2">
+			{#if headerExtra}
+				{@render headerExtra()}
+			{/if}
+			{#if onLogout}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onclick={() => {
+						void onLogout();
+					}}
+					data-testid="auth-logout"
+				>
+					Log out
+				</Button>
+			{/if}
+		</div>
 	</header>
 	<main class="min-h-0 flex-1 overflow-auto" data-testid="app-shell-main">
 		{#if children}
