@@ -3,7 +3,11 @@
 	import SvarKanbanShell, { type MoveCardEvent } from './svar-kanban-shell.svelte';
 	import { cn } from '$lib/utils.js';
 	import { computeBoardPosition } from '$lib/money.js';
-	import { leadStages } from '$lib/schemas/lead.js';
+	import { buildReorderMove, buildStageMove } from '$lib/lead-board-moves.js';
+	import { leadStages, leadWritableStages } from '$lib/schemas/lead.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 
 	export type LeadStage = (typeof leadStages)[number];
 
@@ -32,7 +36,7 @@
 		stages?: { id: LeadStage; label: string }[];
 		class?: string;
 		onSelectLead?: (id: string) => void;
-		/** Fired after an accessible drag/drop move (or keyboard reorder). */
+		/** Fired after drag/drop or keyboard move controls. */
 		onMoveLead?: (move: LeadBoardMove) => void | Promise<void>;
 		/** When a move into Won is attempted (convert-only). */
 		onMoveBlocked?: (message: string) => void;
@@ -45,6 +49,13 @@
 		{ id: 'won', label: 'Won' },
 		{ id: 'lost', label: 'Lost' }
 	];
+
+	const writableStageOptions = [
+		{ value: 'new', label: 'New' },
+		{ value: 'qualified', label: 'Qualified' },
+		{ value: 'proposal', label: 'Proposal' },
+		{ value: 'lost', label: 'Lost' }
+	] as const;
 
 	let {
 		leads,
@@ -89,6 +100,17 @@
 			}))
 	);
 
+	const movableLeads = $derived(
+		leads
+			.filter((lead) => lead.stage !== 'won')
+			.slice()
+			.sort((a, b) => {
+				const stageCmp = a.stage.localeCompare(b.stage);
+				if (stageCmp !== 0) return stageCmp;
+				return (a.position ?? 0) - (b.position ?? 0);
+			})
+	);
+
 	/** SVAR encodes string IDs with setID (`:uuid`); map back to the original lead id. */
 	function resolveLeadId(encoded: string | number | null | undefined): string | null {
 		if (encoded == null) return null;
@@ -99,6 +121,7 @@
 
 	function selectFromEvent(e: Event) {
 		const target = e.target as HTMLElement | null;
+		if (target?.closest?.('[data-testid="leads-board-keyboard-moves"]')) return;
 		const card = target?.closest?.('[data-id]') as HTMLElement | null;
 		if (!card) return;
 		const id = resolveLeadId(card.getAttribute('data-id'));
@@ -108,9 +131,15 @@
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key !== 'Enter' && e.key !== ' ') return;
 		const target = e.target as HTMLElement | null;
+		if (target?.closest?.('[data-testid="leads-board-keyboard-moves"]')) return;
+		if (target?.closest?.('button, select, input, textarea, a')) return;
 		if (!target?.closest?.('[data-id]')) return;
 		e.preventDefault();
 		selectFromEvent(e);
+	}
+
+	function emitMove(move: LeadBoardMove) {
+		void onMoveLead?.(move);
 	}
 
 	function handleInit(api: KanbanInstanceApi) {
@@ -145,24 +174,129 @@
 			l.id === id ? { ...l, stage } : l
 		);
 		const position = computeBoardPosition(optimisticColumn, beforeId, id);
-		void onMoveLead?.({ id, stage, position, beforeId });
+		emitMove({ id, stage, position, beforeId });
+	}
+
+	function onKeyboardStageChange(leadId: string, stage: string) {
+		if (!(leadWritableStages as readonly string[]).includes(stage)) {
+			onMoveBlocked?.('Won is convert-only — use Convert lead on the detail page.');
+			return;
+		}
+		const move = buildStageMove(leads, leadId, stage as LeadStage);
+		if (!move) return;
+		emitMove(move);
+	}
+
+	function onKeyboardReorder(leadId: string, direction: 'up' | 'down') {
+		const move = buildReorderMove(leads, leadId, direction);
+		if (!move) return;
+		emitMove(move);
+	}
+
+	function canMove(leadId: string, direction: 'up' | 'down'): boolean {
+		return buildReorderMove(leads, leadId, direction) != null;
+	}
+
+	function stageLabel(stage: string): string {
+		return writableStageOptions.find((o) => o.value === stage)?.label ?? stage;
 	}
 </script>
 
 <!--
-  Interactive board: drag between/within stages; Won blocked (convert-only).
-  Cards remain keyboard-activatable for open; remountKey resets SVAR after blocked moves.
+  Interactive board: pointer drag + explicit keyboard move controls.
+  Won blocked (convert-only). remountKey resets SVAR after blocked pointer moves.
 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class={cn(className)} data-testid="leads-board" onclick={selectFromEvent} onkeydown={onKeydown}>
+<div class={cn('space-y-4', className)} data-testid="leads-board" onclick={selectFromEvent} onkeydown={onKeydown}>
 	{#key remountKey}
 		<SvarKanbanShell
 			{cards}
 			{columns}
 			readonly={false}
-			class="h-full"
+			class="h-full min-h-[420px]"
 			onInit={handleInit}
 			onMoveCard={handleMoveCard}
 		/>
 	{/key}
+
+	<section
+		class="bg-muted/40 space-y-3 rounded-3xl p-4 ring-1 ring-foreground/5"
+		data-testid="leads-board-keyboard-moves"
+		aria-label="Keyboard lead moves"
+	>
+		<div>
+			<h3 class="text-sm font-semibold tracking-tight">Keyboard moves</h3>
+			<p class="text-muted-foreground text-xs">
+				Change stage or reorder within a stage. Won is convert-only.
+			</p>
+		</div>
+
+		{#if movableLeads.length === 0}
+			<p class="text-muted-foreground text-sm">No movable leads on the board.</p>
+		{:else}
+			<ul class="space-y-3">
+				{#each movableLeads as lead (lead.id)}
+					<li
+						class="bg-card flex flex-col gap-3 rounded-2xl p-3 ring-1 ring-foreground/5 sm:flex-row sm:items-end sm:justify-between"
+						data-testid={`lead-move-row-${lead.id}`}
+					>
+						<div class="min-w-0">
+							<p class="truncate text-sm font-medium">{lead.name}</p>
+							<p class="text-muted-foreground text-xs capitalize">{lead.stage}</p>
+						</div>
+						<div class="flex flex-wrap items-end gap-2">
+							<div class="space-y-1">
+								<Label for={`lead-stage-${lead.id}`} class="text-xs">Stage</Label>
+								<Select.Root
+									type="single"
+									value={lead.stage === 'won' ? 'proposal' : lead.stage}
+									onValueChange={(value) => {
+										if (value) onKeyboardStageChange(lead.id, value);
+									}}
+								>
+									<Select.Trigger
+										id={`lead-stage-${lead.id}`}
+										class="w-[9.5rem]"
+										aria-label={`Stage for ${lead.name}`}
+										data-testid={`lead-stage-${lead.id}`}
+									>
+										{stageLabel(lead.stage)}
+									</Select.Trigger>
+									<Select.Content>
+										{#each writableStageOptions as option (option.value)}
+											<Select.Item value={option.value} label={option.label}>
+												{option.label}
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
+							</div>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!canMove(lead.id, 'up')}
+								aria-label={`Move ${lead.name} up in ${lead.stage}`}
+								data-testid={`lead-move-up-${lead.id}`}
+								onclick={() => onKeyboardReorder(lead.id, 'up')}
+							>
+								Move up
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!canMove(lead.id, 'down')}
+								aria-label={`Move ${lead.name} down in ${lead.stage}`}
+								data-testid={`lead-move-down-${lead.id}`}
+								onclick={() => onKeyboardReorder(lead.id, 'down')}
+							>
+								Move down
+							</Button>
+						</div>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
 </div>
