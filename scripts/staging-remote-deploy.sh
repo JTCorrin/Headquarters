@@ -17,25 +17,46 @@ log() { printf '[staging-deploy] %s\n' "$*"; }
 
 mkdir -p "$(dirname "$APP_DIR")"
 
-if [[ ! -d "$APP_DIR/.git" ]]; then
-	log "cloning ${REPO_URL} → ${APP_DIR}"
-	git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
-else
+if [[ -d "$APP_DIR/.git" ]]; then
 	log "fetching ${BRANCH} in ${APP_DIR}"
 	git -C "$APP_DIR" remote set-url origin "$REPO_URL"
 	git -C "$APP_DIR" fetch --prune origin "$BRANCH"
-	git -C "$APP_DIR" checkout -B "$BRANCH" "origin/${BRANCH}"
+	# -f: CI may have scp'd this script into the tree before invoking it.
+	git -C "$APP_DIR" checkout -f -B "$BRANCH" "origin/${BRANCH}"
 	git -C "$APP_DIR" reset --hard "origin/${BRANCH}"
 	git -C "$APP_DIR" clean -fd
+else
+	# Atomic replace avoids races when CI drops scripts/ into a pre-created app dir.
+	log "cloning ${REPO_URL} → ${APP_DIR}"
+	mkdir -p "$(dirname "$APP_DIR")"
+	new_dir="${APP_DIR}.new"
+	old_dir="${APP_DIR}.old"
+	rm -rf "$new_dir" "$old_dir"
+	git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$new_dir"
+	if [[ -f "$APP_DIR/deploy.log" ]]; then
+		cp -a "$APP_DIR/deploy.log" "$new_dir/deploy.log" || true
+	fi
+	if [[ -d "$APP_DIR" ]]; then
+		mv "$APP_DIR" "$old_dir"
+	fi
+	mv "$new_dir" "$APP_DIR"
+	rm -rf "$old_dir"
 fi
 
 cd "$APP_DIR"
 SHA="$(git rev-parse HEAD)"
 log "checked out ${BRANCH} @ ${SHA}"
 
-# Match Frontend CI lockfile tooling (box may have a newer global pnpm).
-corepack enable
-corepack prepare "pnpm@${PNPM_VERSION}" --activate
+# Match Frontend CI lockfile tooling. Do not run `corepack enable` — on this
+# Debian box `/usr/bin/pnpm` is a root-owned npm global symlink and corepack
+# fails with EACCES trying to unlink it. Install a user-local pnpm instead.
+PNPM_PREFIX="${HOME}/.local"
+mkdir -p "${PNPM_PREFIX}/bin"
+export PATH="${PNPM_PREFIX}/bin:${PATH}"
+if ! pnpm --version 2>/dev/null | grep -q "^${PNPM_VERSION}\\."; then
+	log "installing pnpm@${PNPM_VERSION} into ${PNPM_PREFIX}"
+	npm install -g --prefix "${PNPM_PREFIX}" "pnpm@${PNPM_VERSION}"
+fi
 log "pnpm $(pnpm --version) / node $(node --version)"
 
 pnpm install --frozen-lockfile
