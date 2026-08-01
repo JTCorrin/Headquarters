@@ -1,6 +1,6 @@
 begin;
 
-select plan(56);
+select plan(57);
 
 select has_table('public', 'documents', 'documents table exists');
 select has_table('public', 'document_folders', 'document_folders table exists');
@@ -827,16 +827,20 @@ where id = (select reap_document_id from _docs_fixture);
 select pg_temp.as_user((select owner_id from _docs_fixture));
 set local role authenticated;
 
+-- Split across statements: same-statement SELECT cannot see UPDATEs
+-- performed inside reap_expired_document_uploads (statement snapshot).
 select ok(
+  public.reap_expired_document_uploads() >= 1,
+  'reap_expired_document_uploads reaps at least one expired pending upload'
+);
+
+select is(
   (
-    select
-      public.reap_expired_document_uploads() >= 1
-      and (
-        select status
-        from public.documents
-        where id = (select reap_document_id from _docs_fixture)
-      ) = 'orphan'
+    select status
+    from public.documents
+    where id = (select reap_document_id from _docs_fixture)
   ),
+  'orphan',
   'reap_expired_document_uploads marks expired pending uploads as orphan'
 );
 
