@@ -364,6 +364,9 @@ export function decodeProductCursor(value: string): Cursor {
 }
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('version conflict')) {
+    return new ApiError(412, 'PRECONDITION_FAILED', 'Product version does not match If-Match')
+  }
   if (
     error.code === '23505' &&
     (error.message?.includes('Idempotency-Key') ||
@@ -598,23 +601,14 @@ export function handleProducts(
   if (req.method === 'DELETE') {
     return (async () => {
       const version = parseVersion(req)
-      const current = await findProduct(db, orgId, productId, requestId)
-      if (current.version !== version) {
-        throw new ApiError(412, 'PRECONDITION_FAILED', 'Product version does not match If-Match')
-      }
-      const { data, error } = await db
-        .from('products')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('org_id', orgId)
-        .eq('id', productId)
-        .eq('version', version)
-        .is('deleted_at', null)
-        .select('id')
-        .maybeSingle()
+      // Direct UPDATE ... deleted_at hits RLS 42501 for authenticated callers on
+      // staging; mutate through the security-definer RPC (same pattern as contacts).
+      const { error } = await db.rpc('soft_delete_product', {
+        p_product_id: productId,
+        p_org_id: orgId,
+        p_expected_version: version,
+      })
       if (error) throw databaseError(error, requestId)
-      if (!data) {
-        throw new ApiError(412, 'PRECONDITION_FAILED', 'Product changed during this request')
-      }
       return new Response(null, { status: 204, headers: { 'x-request-id': requestId } })
     })()
   }

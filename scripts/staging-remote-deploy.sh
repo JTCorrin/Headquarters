@@ -190,4 +190,15 @@ else
 	log "leads/clients curl proof script missing — skipped"
 fi
 
+# Products CRUD smoke (JWT + X-Org-Id).
+if [[ -x scripts/products_staging_curl_proof.sh ]]; then
+	log "running products curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/products_staging_curl_proof.sh
+else
+	log "products curl proof script missing — skipped"
+fi
+
 log "done"
