@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(16);
 
 select ok(
   exists (
@@ -43,7 +43,9 @@ create temporary table _link_fixture (
   org_id uuid,
   other_org_id uuid,
   contact_id uuid,
+  contact_version integer,
   prior_primary_contact_id uuid,
+  prior_primary_version integer,
   client_id uuid,
   other_client_id uuid,
   lead_id uuid
@@ -330,6 +332,13 @@ select
   org_id, client_id, contact_id, 'billing', false, owner_id, owner_id
 from _link_fixture;
 
+update _link_fixture
+set
+  contact_version = (select version from public.contacts where id = contact_id),
+  prior_primary_version = (
+    select version from public.contacts where id = prior_primary_contact_id
+  );
+
 -- convert_lead reuses the pre-linked client and promotes the contact to primary
 select ok(
   (
@@ -390,6 +399,31 @@ select ok(
   'convert_lead demotes prior primary with is_primary and role kept consistent'
 );
 
+select ok(
+  (
+    select version > f.contact_version
+    from public.contacts
+    join _link_fixture f on f.contact_id = contacts.id
+  ),
+  'convert_lead bumps the lead contact version when primary link changes'
+);
+
+select ok(
+  (
+    select version > f.prior_primary_version
+    from public.contacts
+    join _link_fixture f on f.prior_primary_contact_id = contacts.id
+  ),
+  'convert_lead bumps the displaced prior-primary contact version'
+);
+
+update _link_fixture
+set
+  contact_version = (select version from public.contacts where id = contact_id),
+  prior_primary_version = (
+    select version from public.contacts where id = prior_primary_contact_id
+  );
+
 -- Corrupt primary after conversion; idempotent retry must repair it.
 update public.client_contacts
 set
@@ -441,6 +475,25 @@ select ok(
   ),
   'idempotent convert_lead repairs/confirms the intended primary relation'
 );
+
+-- Soft-deleted contact on an already-won lead must fail idempotent retry.
+update public.contacts
+set deleted_at = now()
+where id = (select contact_id from _link_fixture);
+
+select pg_temp.as_user((select owner_id from _link_fixture));
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.convert_lead((select lead_id from _link_fixture))
+  $$,
+  '22023',
+  null,
+  'idempotent convert_lead rejects a soft-deleted lead contact'
+);
+
+reset role;
 
 select * from finish();
 
