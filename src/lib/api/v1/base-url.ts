@@ -1,6 +1,6 @@
 /**
- * Normalize optional `PUBLIC_API_BASE_URL` from SvelteKit `$env/static/public`
- * for `createApiV1Client({ baseUrl })`. Empty/whitespace → same-origin (undefined).
+ * Normalize optional `PUBLIC_API_BASE_URL` from SvelteKit `$env/dynamic/public`
+ * for `createApiV1Client({ baseUrl })`. Empty/whitespace/absent → same-origin (undefined).
  */
 export function resolveApiV1BaseUrl(publicApiBaseUrl: string | undefined): string | undefined {
 	const trimmed = publicApiBaseUrl?.trim();
