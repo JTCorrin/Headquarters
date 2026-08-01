@@ -42,10 +42,13 @@
 	let submitLock = false;
 	const busy = $derived($submitting || pendingSubmit);
 
-	const themeLabel = $derived(
-		themeOptions.find((t) => t === $formData.themeDefault)?.replace(/^./, (c) => c.toUpperCase()) ??
-			'Theme'
-	);
+	const themeLabels: Record<(typeof themeOptions)[number], string> = {
+		system: 'System',
+		light: 'Light',
+		dark: 'Dark'
+	};
+
+	const themeLabel = $derived(themeLabels[$formData.themeDefault] ?? 'Theme');
 </script>
 
 <form
@@ -71,6 +74,8 @@
 		}
 	}}
 >
+	<!-- bits-ui Select is not a native control; keep FormData in sync for Superforms SPA. -->
+	<input type="hidden" name="themeDefault" value={$formData.themeDefault} />
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="org-config-timezone">Timezone</Label>
@@ -113,11 +118,20 @@
 			{#if readonly}
 				<Input id="org-config-theme" value={themeLabel} disabled />
 			{:else}
-				<Select.Root type="single" bind:value={$formData.themeDefault} name="themeDefault" disabled={busy}>
-					<Select.Trigger id="org-config-theme" class="w-full" disabled={busy}>{themeLabel}</Select.Trigger>
+				<Select.Root type="single" bind:value={$formData.themeDefault} disabled={busy}>
+					<Select.Trigger
+						id="org-config-theme"
+						class="w-full"
+						disabled={busy}
+						data-testid="organisation-theme-trigger"
+					>
+						{themeLabel}
+					</Select.Trigger>
 					<Select.Content>
 						{#each themeOptions as option (option)}
-							<Select.Item value={option} label={option}>{option}</Select.Item>
+							<Select.Item value={option} label={themeLabels[option]}
+								>{themeLabels[option]}</Select.Item
+							>
 						{/each}
 					</Select.Content>
 				</Select.Root>
