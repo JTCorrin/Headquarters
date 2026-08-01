@@ -6,8 +6,9 @@ describe('leadFormSchema', () => {
 		const parsed = leadFormSchema.safeParse({
 			name: 'Contoso expansion',
 			companyName: 'Contoso',
+			clientId: '',
 			stage: 'proposal',
-			valueCents: '1800000',
+			valueAmount: '18000',
 			currency: 'GBP',
 			probabilityPercent: '60.5',
 			source: 'Referral',
@@ -31,12 +32,12 @@ describe('leadFormSchema', () => {
 		}
 	});
 
-	it('rejects unsafe valueCents', () => {
+	it('rejects invalid decimal amounts', () => {
 		const parsed = leadFormSchema.safeParse({
 			name: 'Overflow',
 			stage: 'new',
 			currency: 'GBP',
-			valueCents: '12.5'
+			valueAmount: '12.345'
 		});
 		expect(parsed.success).toBe(false);
 	});

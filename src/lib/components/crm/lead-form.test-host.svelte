@@ -14,8 +14,9 @@
 		{
 			name: '',
 			companyName: '',
+			clientId: '',
 			stage: 'new',
-			valueCents: '',
+			valueAmount: '',
 			currency: 'GBP',
 			probabilityPercent: '',
 			source: '',
@@ -36,4 +37,4 @@
 	});
 </script>
 
-<LeadForm {form} />
+<LeadForm {form} orgCurrency="GBP" />
