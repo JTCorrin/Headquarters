@@ -1,17 +1,44 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
+	import { getAuthSession } from '$lib/auth/index.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import SelectOrgPage from '$lib/components/crm/select-org-page.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 
 	const api = getApiV1Client();
 	const session = getOrgSession();
+	const auth = getAuthSession();
+
+	async function handleLogout() {
+		await auth.signOut();
+		session.clearSelection();
+		session.setMemberships([]);
+		void goto('/login');
+	}
 </script>
 
-<SelectOrgPage
-	{api}
-	{session}
-	onSelected={() => {
-		void goto('/org/config');
-	}}
-/>
+<div class="relative">
+	{#if auth.enabled}
+		<div class="absolute end-4 top-4 z-10">
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				onclick={() => {
+					void handleLogout();
+				}}
+				data-testid="auth-logout"
+			>
+				Log out
+			</Button>
+		</div>
+	{/if}
+	<SelectOrgPage
+		{api}
+		{session}
+		onSelected={() => {
+			void goto('/org/config');
+		}}
+	/>
+</div>

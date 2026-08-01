@@ -37,11 +37,18 @@
 		session: OrgSession;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
 
-	let { api, session, onMissingOrg, onSwitchNavigate, class: className }: OrgConfigPageProps =
-		$props();
+	let {
+		api,
+		session,
+		onMissingOrg,
+		onSwitchNavigate,
+		onLogout,
+		class: className
+	}: OrgConfigPageProps = $props();
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let configuration = $state<OrganisationConfigResource | null>(null);
@@ -436,6 +443,7 @@
 			{busy}
 			{createError}
 			{onSwitchOrg}
+			{onLogout}
 			{onValidCreate}
 		>
 			<SettingsConfigPage
