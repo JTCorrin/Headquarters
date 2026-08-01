@@ -50,7 +50,12 @@ jobs:
         env:
           # Explicitly empty — composition root uses $env/dynamic/public for this optional override.
           PUBLIC_API_BASE_URL: ''
-        run: pnpm exec vitest run
+        run: |
+          # Serialize Vitest projects so client + storybook browser servers cannot race
+          # Vite/Rolldown optimizeDeps on a cold CI cache. All three projects = full 65-file suite.
+          pnpm exec vitest run --project server
+          pnpm exec vitest run --project client
+          pnpm exec vitest run --project storybook
 
       - name: Production SvelteKit build (no PUBLIC_API_BASE_URL)
         env:
