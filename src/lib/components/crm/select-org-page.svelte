@@ -75,7 +75,7 @@
 	async function loadMemberships() {
 		viewState = { kind: 'loading' };
 		try {
-			const rows = await api.listOrganisations();
+			const rows = await api.organisations.list();
 			const memberships = rows.map(toOrgMembershipSummary);
 			session.setMemberships(memberships);
 			viewState =
@@ -111,7 +111,7 @@
 	async function handleCreate(): Promise<boolean> {
 		createError = null;
 		try {
-			const result = await api.createOrganisation(
+			const result = await api.organisations.create(
 				toOrganisationCreateBody(get(createForm.form))
 			);
 			const membership = membershipFromCreateResult(result);

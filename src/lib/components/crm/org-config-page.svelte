@@ -178,15 +178,15 @@
 		viewState = { kind: 'loading' };
 		try {
 			if (session.memberships.length === 0) {
-				const rows = await api.listOrganisations();
+				const rows = await api.organisations.list();
 				if (isStale(epoch)) return;
 				session.setMemberships(rows.map(toOrgMembershipSummary));
 			}
 
 			const [config, rates, prefs] = await Promise.all([
-				api.getOrganisationConfiguration(),
-				api.listTaxRates(),
-				api.getProfilePreferences()
+				api.organisationConfig.get(),
+				api.taxRates.list(),
+				api.profilePreferences.get()
 			]);
 
 			if (isStale(epoch)) return;
@@ -222,7 +222,7 @@
 		const epoch = captureEpoch();
 		const version = configuration.version;
 		try {
-			const updated = await api.patchOrganisationConfiguration(
+			const updated = await api.organisationConfig.update(
 				toOrganisationConfigPatch(get(configForm.form)),
 				version
 			);
@@ -269,7 +269,7 @@
 		const epoch = captureEpoch();
 		try {
 			const values = get(preferencesForm.form);
-			const updated = await api.patchProfilePreferences({
+			const updated = await api.profilePreferences.update({
 				theme_preference: themePreferenceToApi(values.themePreference)
 			});
 			if (isStale(epoch)) {
@@ -306,13 +306,13 @@
 			if (editingId) {
 				const current = taxRates.find((r) => r.id === editingId);
 				if (!current) return false;
-				const updated = await api.patchTaxRate(editingId, body, current.version);
+				const updated = await api.taxRates.update(editingId, body, current.version);
 				if (isStale(epoch)) return false;
 				taxRates = taxRates.map((r) =>
 					r.id === updated.id ? toTaxRateResource(updated) : r
 				);
 			} else {
-				const created = await api.createTaxRate(body);
+				const created = await api.taxRates.create(body);
 				if (isStale(epoch)) return false;
 				taxRates = [toTaxRateResource(created), ...taxRates];
 			}
@@ -335,7 +335,7 @@
 		const epoch = captureEpoch();
 		const version = current.version;
 		try {
-			const updated = await api.patchTaxRate(taxRateId, { is_default: true }, version);
+			const updated = await api.taxRates.update(taxRateId, { is_default: true }, version);
 			if (isStale(epoch)) return;
 			taxRates = taxRates.map((rate) => {
 				if (rate.id === updated.id) return toTaxRateResource(updated);
@@ -356,7 +356,7 @@
 		const epoch = captureEpoch();
 		const version = current.version;
 		try {
-			await api.deleteTaxRate(taxRateId, version);
+			await api.taxRates.delete(taxRateId, version);
 			if (isStale(epoch)) return;
 			taxRates = taxRates.filter((r) => r.id !== taxRateId);
 		} catch (error) {
@@ -406,7 +406,7 @@
 	async function onValidCreate(data: OrganisationCreateData): Promise<boolean> {
 		createError = null;
 		try {
-			const result = await api.createOrganisation(toOrganisationCreateBody(data));
+			const result = await api.organisations.create(toOrganisationCreateBody(data));
 			const membership = membershipFromCreateResult(result);
 			session.setMemberships([...session.memberships, membership]);
 			resetOrgScopedState();
