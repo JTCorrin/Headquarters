@@ -1,6 +1,9 @@
 import type { AppNavGroup } from '$lib/components/crm/app-nav.svelte';
 import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
-import type { EntityDocument } from '$lib/components/crm/entity-documents.svelte';
+import type {
+	DocumentEntry,
+	EntityDocument
+} from '$lib/components/crm/entity-documents.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
 export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
@@ -104,6 +107,95 @@ export const sampleDocuments: EntityDocument[] = [
 	},
 	{
 		id: 'd3',
+		name: 'Kickoff deck.pdf',
+		category: 'other',
+		sizeLabel: '3.4 MB',
+		uploadedAt: 'Mar 14',
+		uploadedBy: 'Joe'
+	}
+];
+
+export const sampleContractDocuments: DocumentEntry[] = [
+	{
+		id: 'folder-signed',
+		kind: 'folder',
+		name: 'Signed',
+		itemCount: 1,
+		updatedAt: 'Feb 20'
+	},
+	{
+		id: 'c1',
+		kind: 'file',
+		name: 'MSA — Northwind.pdf',
+		category: 'contract',
+		sizeLabel: '240 KB',
+		uploadedAt: 'Jan 12',
+		uploadedBy: 'Joe'
+	},
+	{
+		id: 'c2',
+		kind: 'file',
+		name: 'DPA addendum.pdf',
+		category: 'contract',
+		sizeLabel: '120 KB',
+		uploadedAt: 'Feb 2',
+		uploadedBy: 'Maya'
+	}
+];
+
+export const sampleBillDocuments: DocumentEntry[] = [
+	{
+		id: 'folder-2026',
+		kind: 'folder',
+		name: '2026',
+		itemCount: 2,
+		updatedAt: 'Apr 1'
+	},
+	{
+		id: 'b1',
+		kind: 'file',
+		name: 'Vendor — Acme hosting.pdf',
+		category: 'invoice',
+		sizeLabel: '96 KB',
+		uploadedAt: 'Mar 28',
+		uploadedBy: 'Joe'
+	},
+	{
+		id: 'b2',
+		kind: 'file',
+		name: 'Office supplies receipt.pdf',
+		category: 'receipt',
+		sizeLabel: '40 KB',
+		uploadedAt: 'Apr 3',
+		uploadedBy: 'Maya'
+	}
+];
+
+export const sampleClientWorkspaceDocuments: DocumentEntry[] = [
+	{
+		id: 'folder-contracts',
+		kind: 'folder',
+		name: 'Contracts',
+		itemCount: 2,
+		updatedAt: 'Mar 1'
+	},
+	{
+		id: 'folder-bills',
+		kind: 'folder',
+		name: 'Bills',
+		itemCount: 1,
+		updatedAt: 'Apr 4'
+	},
+	{
+		id: 'folder-meetings',
+		kind: 'folder',
+		name: 'Meeting artifacts',
+		itemCount: 0,
+		updatedAt: '—'
+	},
+	{
+		id: 'cw1',
+		kind: 'file',
 		name: 'Kickoff deck.pdf',
 		category: 'other',
 		sizeLabel: '3.4 MB',

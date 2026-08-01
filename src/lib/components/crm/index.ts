@@ -116,7 +116,19 @@ export type { LeadConvertResult } from './lead-detail-page.svelte';
 export type { TaskBoardCard, TaskBoardStatus } from './tasks-board.svelte';
 export type { LineItemRow } from './line-items-table.svelte';
 export type { MoneySummaryItem } from './money-summary.svelte';
-export type { EntityDocument } from './entity-documents.svelte';
+export type {
+	DocumentBreadcrumb,
+	DocumentEntry,
+	DocumentFileEntry,
+	DocumentFolderEntry,
+	DocumentMoveTarget,
+	DocumentUploadItem,
+	DocumentUploadStatus,
+	DocumentViewMode,
+	DocumentWorkspaceView,
+	EntityDocument,
+	EntityDocumentsProps
+} from './entity-documents.svelte';
 export type { EmailTemplateRow } from './email-templates-columns.js';
 export type { DashboardTask } from './my-tasks-panel.svelte';
 export type { MeetingRow } from './meetings-columns.js';
