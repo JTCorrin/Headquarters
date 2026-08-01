@@ -11,6 +11,7 @@ import type {
 	ThemeOption,
 	ThemePreferenceOption
 } from '$lib/schemas/organisation.js';
+import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
 import type {
 	ApiContact,
 	ApiContactCreateBody,
@@ -20,6 +21,10 @@ import type {
 	ApiOrganisationCreateResult,
 	ApiOrganisationMembership,
 	ApiProfilePreferences,
+	ApiQuote,
+	ApiQuoteCreateBody,
+	ApiQuoteDocument,
+	ApiQuoteUpdateBody,
 	ApiTaxRate,
 	ApiTaxRateCreateBody
 } from './types.js';
@@ -192,4 +197,86 @@ export function toContactCreateBody(data: ContactFormData): ApiContactCreateBody
 
 export function toContactUpdateBody(data: ContactFormData): ApiContactUpdateBody {
 	return toContactCreateBody(data);
+}
+
+function partyNameFromSnapshot(snapshot: unknown): string {
+	if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return '—';
+	const record = snapshot as Record<string, unknown>;
+	for (const key of ['name', 'display_name', 'client_name', 'company_name'] as const) {
+		const value = record[key];
+		if (typeof value === 'string' && value.trim()) return value.trim();
+	}
+	const nested = record.client ?? record.party;
+	if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+		const nestedRecord = nested as Record<string, unknown>;
+		const name = nestedRecord.name ?? nestedRecord.display_name;
+		if (typeof name === 'string' && name.trim()) return name.trim();
+	}
+	return '—';
+}
+
+function formatMoney(cents: number, currency: string): string {
+	try {
+		return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(cents / 100);
+	} catch {
+		return `${(cents / 100).toFixed(2)} ${currency}`;
+	}
+}
+
+export function quoteStatusLabel(status: ApiQuote['status']): string {
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function toQuoteListItem(quote: ApiQuote): QuoteListItem {
+	return {
+		id: quote.id,
+		number: quote.number,
+		client: partyNameFromSnapshot(quote.party_snapshot),
+		total: formatMoney(quote.total_cents, quote.currency),
+		status: quoteStatusLabel(quote.status),
+		validUntil: quote.valid_until ?? '—'
+	};
+}
+
+export function toQuoteFormData(
+	quote: ApiQuote | ApiQuoteDocument,
+	clientNameFallback = ''
+): QuoteFormData {
+	const currency =
+		quote.currency === 'USD' || quote.currency === 'EUR' || quote.currency === 'GBP'
+			? quote.currency
+			: 'GBP';
+	const status =
+		quote.status === 'sent' ||
+		quote.status === 'accepted' ||
+		quote.status === 'rejected' ||
+		quote.status === 'expired' ||
+		quote.status === 'void' ||
+		quote.status === 'draft'
+			? quote.status
+			: 'draft';
+	return {
+		clientId: quote.client_id ?? '00000000-0000-4000-8000-000000000000',
+		clientName: partyNameFromSnapshot(quote.party_snapshot) || clientNameFallback,
+		title: quote.title,
+		currency,
+		status
+	};
+}
+
+export function toQuoteCreateBody(data: QuoteFormData): ApiQuoteCreateBody {
+	return {
+		title: data.title.trim(),
+		client_id: data.clientId,
+		currency: data.currency,
+		lines: []
+	};
+}
+
+export function toQuoteUpdateBody(data: QuoteFormData): ApiQuoteUpdateBody {
+	return {
+		title: data.title.trim(),
+		client_id: data.clientId,
+		currency: data.currency
+	};
 }

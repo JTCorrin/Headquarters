@@ -46,6 +46,8 @@
 		onArchiveTaxRate?: (taxRateId: string) => void;
 		onEditTaxRate?: (taxRateId: string) => void;
 		onAddTaxRate?: () => void;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 	}
 
 	let {
@@ -68,7 +70,8 @@
 		onSetDefaultTaxRate,
 		onArchiveTaxRate,
 		onEditTaxRate,
-		onAddTaxRate
+		onAddTaxRate,
+		showNav = true
 	}: SettingsConfigPageProps = $props();
 
 	const canEdit = $derived(canMutateOrgConfig(role));
@@ -96,8 +99,16 @@
 	}
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-svh', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0 self-stretch" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-8 px-6 py-6 md:px-8">
