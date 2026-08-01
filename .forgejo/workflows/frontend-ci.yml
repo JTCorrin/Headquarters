@@ -1,0 +1,68 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Vitest, SvelteKit build, Storybook
+    if: forgejo.event_name == 'workflow_dispatch' || forgejo.event.pull_request.head.repo.full_name == forgejo.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out pull request
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10 --activate
+
+      - name: Install dependencies (lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium for Vitest browser
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Assert no-override public env path
+        run: |
+          # Fresh checkout must not rely on a local .env declaring PUBLIC_API_BASE_URL.
+          if [ -f .env ]; then
+            echo "Unexpected .env present in CI checkout; removing for no-override coverage" >&2
+            rm -f .env
+          fi
+          unset PUBLIC_API_BASE_URL
+          test ! -f .env
+
+      - name: Full Vitest (no PUBLIC_API_BASE_URL)
+        env:
+          # Explicitly empty — composition root uses $env/dynamic/public for this optional override.
+          PUBLIC_API_BASE_URL: ''
+        run: |
+          # Serialize Vitest projects so client + storybook browser servers cannot race
+          # Vite/Rolldown optimizeDeps on a cold CI cache. All three projects = full 65-file suite.
+          pnpm exec vitest run --project server
+          pnpm exec vitest run --project client
+          pnpm exec vitest run --project storybook
+
+      - name: Production SvelteKit build (no PUBLIC_API_BASE_URL)
+        env:
+          PUBLIC_API_BASE_URL: ''
+        run: pnpm build
+
+      - name: Storybook build (no PUBLIC_API_BASE_URL)
+        env:
+          PUBLIC_API_BASE_URL: ''
+        run: pnpm build-storybook

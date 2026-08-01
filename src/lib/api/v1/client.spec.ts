@@ -1,45 +1,131 @@
 import { describe, expect, it, vi } from 'vitest';
+import { resolveApiV1BaseUrl } from './base-url.js';
 import { createApiV1Client } from './client.js';
 import { ApiClientError } from './errors.js';
 import { apiError, createMockFetch } from './mock-fetch.js';
 
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const ORG_B = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
+const CLIENT_ID = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
+const QUOTE_ID = '11111111-2222-4333-8444-555555555555';
+
+const sampleOrgMembership = {
+	membership: {
+		id: 'm1',
+		role: 'owner' as const,
+		status: 'active',
+		joined_at: '2026-01-01T00:00:00Z'
+	},
+	organisation: {
+		id: ORG_A,
+		name: 'Corrin Data',
+		slug: 'corrin-data',
+		logo_path: null,
+		default_currency: 'GBP',
+		timezone: 'Europe/London',
+		locale: 'en-GB',
+		country_code: 'GB',
+		theme_default: 'system' as const
+	}
+};
+
+const sampleConfig = {
+	id: ORG_A,
+	name: 'Corrin Data',
+	legal_name: null,
+	slug: 'corrin-data',
+	logo_path: null,
+	billing_email: null,
+	phone: null,
+	website_url: null,
+	tax_identifier: null,
+	registration_number: null,
+	default_currency: 'GBP',
+	timezone: 'Europe/London',
+	locale: 'en-GB',
+	country_code: 'GB',
+	theme_default: 'system' as const,
+	settings: {},
+	version: 3,
+	created_at: '2026-01-01T00:00:00Z',
+	updated_at: '2026-01-01T00:00:00Z',
+	deleted_at: null
+};
+
+const sampleQuoteDocument = {
+	id: QUOTE_ID,
+	org_id: ORG_A,
+	created_at: '2026-01-01T00:00:00Z',
+	updated_at: '2026-01-01T00:00:00Z',
+	created_by: null,
+	updated_by: null,
+	deleted_at: null,
+	version: 1,
+	number: 'Q-0001',
+	title: 'Pilot quote',
+	client_id: CLIENT_ID,
+	lead_id: null,
+	contact_id: null,
+	owner_membership_id: null,
+	status: 'draft' as const,
+	currency: 'GBP',
+	issue_on: '2026-01-01',
+	valid_until: null,
+	subtotal_cents: 1000,
+	discount_cents: 0,
+	tax_cents: 200,
+	total_cents: 1200,
+	party_snapshot: {},
+	terms: null,
+	notes: null,
+	internal_notes: null,
+	sent_at: null,
+	viewed_at: null,
+	accepted_at: null,
+	rejected_at: null,
+	converted_invoice_id: null,
+	lines: [
+		{
+			id: 'line-1',
+			org_id: ORG_A,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			version: 1,
+			quote_id: QUOTE_ID,
+			product_id: null,
+			sku_snapshot: null,
+			description: 'Consulting',
+			quantity: 1,
+			unit_price_cents: 1000,
+			discount_percent: 0,
+			tax_rate_percent: 20,
+			subtotal_cents: 1000,
+			tax_cents: 200,
+			total_cents: 1200,
+			position: 0
+		}
+	]
+};
 
 describe('createApiV1Client', () => {
 	it('lists organisations without X-Org-Id', async () => {
 		const fetchMock = createMockFetch({
 			'GET /api/v1/organisations': async (request) => {
 				expect(request.headers.get('x-org-id')).toBeNull();
-				return {
-					body: {
-						data: [
-							{
-								membership: {
-									id: 'm1',
-									role: 'owner',
-									status: 'active',
-									joined_at: '2026-01-01T00:00:00Z'
-								},
-								organisation: {
-									id: ORG_A,
-									name: 'Corrin Data',
-									slug: 'corrin-data',
-									logo_path: null,
-									default_currency: 'GBP',
-									timezone: 'Europe/London',
-									locale: 'en-GB',
-									country_code: 'GB',
-									theme_default: 'system'
-								}
-							}
-						]
-					}
-				};
+				expect(request.headers.get('authorization')).toBe('Bearer tok');
+				expect(request.headers.get('content-type')).toBeNull();
+				return { body: { data: [sampleOrgMembership] } };
 			}
 		});
 
-		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
-		const rows = await client.listOrganisations();
+		const client = createApiV1Client({
+			fetch: fetchMock,
+			getAccessToken: () => 'tok',
+			getOrgId: () => ORG_A
+		});
+		const rows = await client.organisations.list();
 		expect(rows).toHaveLength(1);
 		expect(rows[0]?.organisation.id).toBe(ORG_A);
 	});
@@ -50,36 +136,13 @@ describe('createApiV1Client', () => {
 				expect(request.headers.get('x-org-id')).toBe(ORG_A);
 				return {
 					headers: { etag: '"3"' },
-					body: {
-						data: {
-							id: ORG_A,
-							name: 'Corrin Data',
-							legal_name: null,
-							slug: 'corrin-data',
-							logo_path: null,
-							billing_email: null,
-							phone: null,
-							website_url: null,
-							tax_identifier: null,
-							registration_number: null,
-							default_currency: 'GBP',
-							timezone: 'Europe/London',
-							locale: 'en-GB',
-							country_code: 'GB',
-							theme_default: 'system',
-							settings: {},
-							version: 3,
-							created_at: '2026-01-01T00:00:00Z',
-							updated_at: '2026-01-01T00:00:00Z',
-							deleted_at: null
-						}
-					}
+					body: { data: sampleConfig }
 				};
 			}
 		});
 
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
-		const config = await client.getOrganisationConfiguration();
+		const config = await client.organisationConfig.get();
 		expect(config.version).toBe(3);
 	});
 
@@ -88,24 +151,76 @@ describe('createApiV1Client', () => {
 			fetch: vi.fn(),
 			getOrgId: () => null
 		});
-		await expect(client.listTaxRates()).rejects.toMatchObject({
+		await expect(client.taxRates.list()).rejects.toMatchObject({
 			code: 'ORG_CONTEXT_REQUIRED',
 			status: 400
 		});
 	});
 
-	it('maps 403 / 412 / 422 responses', async () => {
+	it('encodes list query params with URLSearchParams', async () => {
+		const fetchMock = createMockFetch({
+			'GET /api/v1/tax-rates': async (request) => {
+				const url = new URL(request.url);
+				expect(url.searchParams.get('limit')).toBe('25');
+				return { body: { data: [] } };
+			},
+			'GET /api/v1/quotes': async (request) => {
+				const url = new URL(request.url);
+				expect(url.searchParams.get('limit')).toBe('10');
+				expect(url.searchParams.get('cursor')).toBe('opaque-cursor');
+				expect(url.searchParams.get('status')).toBe('draft');
+				return {
+					body: {
+						data: [sampleQuoteDocument],
+						meta: { next_cursor: 'next-opaque' }
+					}
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		await client.taxRates.list({ limit: 25 });
+		const listed = await client.quotes.list({
+			limit: 10,
+			cursor: 'opaque-cursor',
+			status: 'draft'
+		});
+		expect(listed.data).toHaveLength(1);
+		expect(listed.meta?.next_cursor).toBe('next-opaque');
+	});
+
+	it('omits Content-Type when there is no body', async () => {
+		const fetchMock = createMockFetch({
+			'GET /api/v1/profile/preferences': async (request) => {
+				expect(request.headers.get('content-type')).toBeNull();
+				return {
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				};
+			},
+			'DELETE /api/v1/tax-rates/tax-1': async (request) => {
+				expect(request.headers.get('content-type')).toBeNull();
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return { status: 204 };
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		await client.profilePreferences.get();
+		await client.taxRates.delete('tax-1', 2);
+	});
+
+	it('maps 403 / 412 / 422 responses with structured fields', async () => {
 		const fetchMock = createMockFetch({
 			'PATCH /api/v1/organisation/configuration': async () =>
 				apiError(403, 'FORBIDDEN', 'Only owners and admins can update organisation configuration')
 		});
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
 		await expect(
-			client.patchOrganisationConfiguration({ timezone: 'UTC' }, 1)
+			client.organisationConfig.update({ timezone: 'UTC' }, 1)
 		).rejects.toBeInstanceOf(ApiClientError);
 		await expect(
-			client.patchOrganisationConfiguration({ timezone: 'UTC' }, 1)
-		).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+			client.organisationConfig.update({ timezone: 'UTC' }, 1)
+		).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN', requestId: 'test-request-id' });
 
 		const fetch412 = createMockFetch({
 			'PATCH /api/v1/tax-rates/tax-1': async (request) => {
@@ -115,7 +230,7 @@ describe('createApiV1Client', () => {
 		});
 		const client412 = createApiV1Client({ fetch: fetch412, getOrgId: () => ORG_A });
 		await expect(
-			client412.patchTaxRate('tax-1', { name: 'VAT' }, 1)
+			client412.taxRates.update('tax-1', { name: 'VAT' }, 1)
 		).rejects.toMatchObject({ status: 412, code: 'PRECONDITION_FAILED' });
 
 		const fetch422 = createMockFetch({
@@ -126,7 +241,7 @@ describe('createApiV1Client', () => {
 		});
 		const client422 = createApiV1Client({ fetch: fetch422, getOrgId: () => ORG_A });
 		try {
-			await client422.createTaxRate({ name: 'Bad', rate_percent: 200 });
+			await client422.taxRates.create({ name: 'Bad', rate_percent: 200 });
 			expect.unreachable('expected validation error');
 		} catch (error) {
 			expect(error).toBeInstanceOf(ApiClientError);
@@ -142,9 +257,20 @@ describe('createApiV1Client', () => {
 			},
 			getOrgId: () => null
 		});
-		await expect(client.listOrganisations()).rejects.toMatchObject({
+		await expect(client.organisations.list()).rejects.toMatchObject({
 			code: 'NETWORK_ERROR',
 			status: 0
+		});
+	});
+
+	it('rejects malformed success envelopes', async () => {
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: { meta: {} } })
+		});
+		const client = createApiV1Client({ fetch: fetchMock });
+		await expect(client.organisations.list()).rejects.toMatchObject({
+			code: 'INTERNAL_ERROR',
+			message: 'Response envelope was missing data'
 		});
 	});
 
@@ -153,43 +279,139 @@ describe('createApiV1Client', () => {
 			'PATCH /api/v1/organisation/configuration': async (request) => {
 				expect(request.headers.get('if-match')).toBe('"7"');
 				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				expect(request.headers.get('content-type')).toMatch(/application\/json/);
 				const body = await request.json();
 				expect(body).toEqual({ default_currency: 'USD' });
 				return {
 					headers: { etag: '"8"' },
 					body: {
 						data: {
-							id: ORG_A,
-							name: 'Corrin Data',
-							legal_name: null,
-							slug: 'corrin-data',
-							logo_path: null,
-							billing_email: null,
-							phone: null,
-							website_url: null,
-							tax_identifier: null,
-							registration_number: null,
+							...sampleConfig,
 							default_currency: 'USD',
 							timezone: 'UTC',
-							locale: 'en-GB',
-							country_code: 'GB',
 							theme_default: 'dark',
-							settings: {},
 							version: 8,
-							created_at: '2026-01-01T00:00:00Z',
-							updated_at: '2026-01-02T00:00:00Z',
-							deleted_at: null
+							updated_at: '2026-01-02T00:00:00Z'
 						}
 					}
 				};
 			}
 		});
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
-		const updated = await client.patchOrganisationConfiguration(
-			{ default_currency: 'USD' },
-			7
-		);
+		const updated = await client.organisationConfig.update({ default_currency: 'USD' }, 7);
 		expect(updated.version).toBe(8);
 		expect(updated.default_currency).toBe('USD');
+	});
+
+	it('supports quote draft CRUD with ETag / If-Match / 204', async () => {
+		const fetchMock = createMockFetch({
+			'POST /api/v1/quotes': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const body = await request.json();
+				expect(body.title).toBe('Pilot quote');
+				expect(body.client_id).toBe(CLIENT_ID);
+				expect(body.lines).toEqual([
+					{
+						description: 'Consulting',
+						quantity: 1,
+						unit_price_cents: 1000
+					}
+				]);
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: { data: sampleQuoteDocument }
+				};
+			},
+			[`GET /api/v1/quotes/${QUOTE_ID}`]: async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				return {
+					headers: { etag: '"1"' },
+					body: { data: sampleQuoteDocument }
+				};
+			},
+			[`PATCH /api/v1/quotes/${QUOTE_ID}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				const body = await request.json();
+				expect(body.title).toBe('Revised');
+				return {
+					headers: { etag: '"2"' },
+					body: {
+						data: { ...sampleQuoteDocument, title: 'Revised', version: 2 }
+					}
+				};
+			},
+			[`DELETE /api/v1/quotes/${QUOTE_ID}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(request.headers.get('content-type')).toBeNull();
+				return { status: 204 };
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const created = await client.quotes.create({
+			title: 'Pilot quote',
+			client_id: CLIENT_ID,
+			lines: [{ description: 'Consulting', quantity: 1, unit_price_cents: 1000 }]
+		});
+		expect(created.id).toBe(QUOTE_ID);
+		expect(created.client_id).toBe(CLIENT_ID);
+
+		const got = await client.quotes.get(QUOTE_ID);
+		expect(got.etag).toBe('"1"');
+		expect(got.data.number).toBe('Q-0001');
+
+		const updated = await client.quotes.update(QUOTE_ID, { title: 'Revised' }, 1);
+		expect(updated.version).toBe(2);
+
+		await client.quotes.delete(QUOTE_ID, 2);
+	});
+
+	it('retains initiating org when token resolve races with an org switch', async () => {
+		let selectedOrg = ORG_A;
+		let releaseToken!: (token: string) => void;
+		const deferredToken = new Promise<string>((resolve) => {
+			releaseToken = resolve;
+		});
+
+		const fetchMock = createMockFetch({
+			'PATCH /api/v1/organisation/configuration': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				expect(request.headers.get('authorization')).toBe('Bearer late-token');
+				return {
+					headers: { etag: '"4"' },
+					body: { data: { ...sampleConfig, version: 4 } }
+				};
+			}
+		});
+
+		const client = createApiV1Client({
+			fetch: fetchMock,
+			getOrgId: () => selectedOrg,
+			getAccessToken: () => deferredToken
+		});
+
+		const pending = client.organisationConfig.update({ timezone: 'UTC' }, 3);
+		selectedOrg = ORG_B;
+		releaseToken('late-token');
+		const updated = await pending;
+		expect(updated.version).toBe(4);
+	});
+
+	it('uses composition-root resolveApiV1BaseUrl + baseUrl so configured origin reaches requests', async () => {
+		const configured = resolveApiV1BaseUrl('https://api.example.test/');
+		expect(configured).toBe('https://api.example.test');
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async (request) => {
+				expect(request.url).toBe('https://api.example.test/api/v1/organisations');
+				return { body: { data: [] } };
+			}
+		});
+		const client = createApiV1Client({
+			baseUrl: configured,
+			fetch: fetchMock
+		});
+		await client.organisations.list();
 	});
 });
