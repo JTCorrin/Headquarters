@@ -1,6 +1,7 @@
--- Stabilize primary-link locking: discover→lock→revalidate via savepoint
--- retries; bump exactly the contacts demoted under those locks. Callers must
--- not pre-lock the subject before the helper (deadlock with cross-swaps).
+-- Stabilize primary-link locking: discover→lock→revalidate via nested
+-- BEGIN/EXCEPTION subtransaction retries; bump exactly the contacts demoted
+-- under those locks. Callers must not pre-lock the subject before the helper
+-- (deadlock with cross-swaps).
 
 drop function if exists private.set_contact_primary_client(uuid, uuid, uuid, uuid);
 
@@ -93,6 +94,9 @@ begin
   end if;
 
   -- Discover the lock set, take sorted row locks, revalidate; retry on drift.
+  -- Nested BEGIN/EXCEPTION is a PL/pgSQL subtransaction: a caught drift
+  -- exception rolls back that block (releasing its row locks); a clean EXIT
+  -- keeps the locks for the rest of the outer transaction.
   <<stabilize_locks>>
   loop
     attempt := attempt + 1;
@@ -101,69 +105,71 @@ begin
         using errcode = '40001';
     end if;
 
-    savepoint contact_primary_locks;
+    begin
+      select coalesce(
+        array_agg(lock_candidate order by lock_candidate),
+        array[p_contact_id]::uuid[]
+      )
+      into discovered_ids
+      from (
+        select p_contact_id as lock_candidate
+        union
+        select client_contacts.contact_id
+        from public.client_contacts
+        where client_contacts.org_id = p_org_id
+          and client_contacts.client_id = p_client_id
+          and client_contacts.contact_id is distinct from p_contact_id
+          and client_contacts.is_primary
+          and client_contacts.deleted_at is null
+      ) candidates;
 
-    select coalesce(
-      array_agg(lock_candidate order by lock_candidate),
-      array[p_contact_id]::uuid[]
-    )
-    into discovered_ids
-    from (
-      select p_contact_id as lock_candidate
-      union
-      select client_contacts.contact_id
-      from public.client_contacts
-      where client_contacts.org_id = p_org_id
-        and client_contacts.client_id = p_client_id
-        and client_contacts.contact_id is distinct from p_contact_id
-        and client_contacts.is_primary
-        and client_contacts.deleted_at is null
-    ) candidates;
+      subject_ok := false;
+      foreach lock_id in array discovered_ids
+      loop
+        perform contacts.id
+        from public.contacts
+        where contacts.id = lock_id
+          and contacts.org_id = p_org_id
+          and contacts.deleted_at is null
+        for update;
 
-    subject_ok := false;
-    foreach lock_id in array discovered_ids
-    loop
-      perform contacts.id
-      from public.contacts
-      where contacts.id = lock_id
-        and contacts.org_id = p_org_id
-        and contacts.deleted_at is null
-      for update;
+        if lock_id = p_contact_id then
+          subject_ok := found;
+        end if;
+      end loop;
 
-      if lock_id = p_contact_id then
-        subject_ok := found;
+      if not subject_ok then
+        raise exception 'Contact must be an active contact in the same organisation'
+          using errcode = '22023';
       end if;
-    end loop;
 
-    if not subject_ok then
-      raise exception 'Contact must be an active contact in the same organisation'
-        using errcode = '22023';
-    end if;
+      select coalesce(
+        array_agg(lock_candidate order by lock_candidate),
+        array[p_contact_id]::uuid[]
+      )
+      into revalidated_ids
+      from (
+        select p_contact_id as lock_candidate
+        union
+        select client_contacts.contact_id
+        from public.client_contacts
+        where client_contacts.org_id = p_org_id
+          and client_contacts.client_id = p_client_id
+          and client_contacts.contact_id is distinct from p_contact_id
+          and client_contacts.is_primary
+          and client_contacts.deleted_at is null
+      ) candidates;
 
-    select coalesce(
-      array_agg(lock_candidate order by lock_candidate),
-      array[p_contact_id]::uuid[]
-    )
-    into revalidated_ids
-    from (
-      select p_contact_id as lock_candidate
-      union
-      select client_contacts.contact_id
-      from public.client_contacts
-      where client_contacts.org_id = p_org_id
-        and client_contacts.client_id = p_client_id
-        and client_contacts.contact_id is distinct from p_contact_id
-        and client_contacts.is_primary
-        and client_contacts.deleted_at is null
-    ) candidates;
+      if revalidated_ids = discovered_ids then
+        exit stabilize_locks;
+      end if;
 
-    if revalidated_ids = discovered_ids then
-      release savepoint contact_primary_locks;
-      exit stabilize_locks;
-    end if;
-
-    -- Lock set drifted; drop row locks and rediscover.
-    rollback to savepoint contact_primary_locks;
+      raise exception 'contact primary lock set drifted'
+        using errcode = 'P0004';
+    exception
+      when sqlstate 'P0004' then
+        null; -- subtransaction rolled back; retry discover/lock
+    end;
   end loop;
 
   if p_expected_version is not null then
