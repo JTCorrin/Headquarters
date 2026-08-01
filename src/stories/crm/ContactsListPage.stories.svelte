@@ -16,7 +16,7 @@
 			name: 'Ava Chen',
 			email: 'ava@northwind.com',
 			company: 'Northwind',
-			status: 'Client',
+			status: 'Active',
 			owner: 'Joe'
 		},
 		{
@@ -24,14 +24,14 @@
 			name: 'Sam Ortiz',
 			email: 'sam@contoso.io',
 			company: 'Contoso',
-			status: 'Lead',
+			status: 'Inactive',
 			owner: 'Joe'
 		},
 		{
 			id: '3',
 			name: 'Riley Park',
 			email: 'riley@example.com',
-			status: 'Contact',
+			status: 'Archived',
 			owner: 'Maya'
 		}
 	];
@@ -49,7 +49,7 @@
 			phone: '',
 			company: '',
 			title: '',
-			status: 'contact'
+			status: 'active'
 		},
 		zod4(contactFormSchema)
 	);

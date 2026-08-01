@@ -1,5 +1,9 @@
 import type { ApiResult } from '../request.js';
 import type {
+	ApiContact,
+	ApiContactCreateBody,
+	ApiContactListParams,
+	ApiContactUpdateBody,
 	ApiDocumentBrowseParams,
 	ApiDocumentBrowseResult,
 	ApiDocumentDownloadResult,
@@ -76,6 +80,22 @@ export interface QuotesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiQuoteDocument>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface ContactsEndpoints {
+	list(
+		params?: ApiContactListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiContact[]>>;
+	create(body: ApiContactCreateBody, signal?: AbortSignal): Promise<ApiContact>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiContact>>;
+	update(
+		id: string,
+		body: ApiContactUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiContact>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 }
 

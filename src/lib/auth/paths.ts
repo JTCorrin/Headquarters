@@ -17,6 +17,17 @@ export function isOnboardingPath(pathname: string): boolean {
 }
 
 /**
+ * Org-scoped app routes that require a selected organisation (and auth).
+ * Keep in sync with `src/lib/org/nav.ts` as routes come online.
+ */
+export function requiresSelectedOrg(pathname: string): boolean {
+	if (pathname === '/select-org') return false;
+	if (pathname.startsWith('/org/')) return true;
+	if (pathname === '/contacts' || pathname.startsWith('/contacts/')) return true;
+	return false;
+}
+
+/**
  * Decide where a signed-in user should go after auth or from `/`.
  */
 export function postAuthDestination(options: {
