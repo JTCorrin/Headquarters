@@ -45,14 +45,42 @@ describe('createOrgSession', () => {
 					org_id: 'org-a',
 					org_name: 'A',
 					org_slug: 'a',
-					role: 'owner'
+					role: 'owner',
+					theme_default: 'system'
 				}
 			]
 		});
 		session.setMemberships([
-			{ org_id: 'org-b', org_name: 'B', org_slug: 'b', role: 'member' }
+			{
+				org_id: 'org-b',
+				org_name: 'B',
+				org_slug: 'b',
+				role: 'member',
+				theme_default: 'system'
+			}
 		]);
 		expect(session.selectedOrgId).toBeNull();
 		expect(session.cacheGeneration).toBe(1);
+	});
+
+	it('tracks theme preference and patches org theme_default', () => {
+		const session = createOrgSession({
+			storage: memoryStorage(),
+			initialOrgId: 'org-a',
+			initialMemberships: [
+				{
+					org_id: 'org-a',
+					org_name: 'A',
+					org_slug: 'a',
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+		expect(session.themePreference).toBe('org_default');
+		session.setThemePreference('dark');
+		expect(session.themePreference).toBe('dark');
+		session.patchOrgThemeDefault('org-a', 'dark');
+		expect(session.memberships[0]?.theme_default).toBe('dark');
 	});
 });
