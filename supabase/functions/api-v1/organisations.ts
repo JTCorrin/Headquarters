@@ -14,6 +14,9 @@ const ORG_CONFIG =
   'id,name,legal_name,slug,logo_path,billing_email,phone,website_url,tax_identifier,registration_number,default_currency,timezone,locale,country_code,theme_default,settings,version,created_at,updated_at,deleted_at'
 
 function isValidTimezone(value: string): boolean {
+  // V8's supportedValuesOf('timeZone') often omits the literal "UTC"
+  // (preferring Etc/UTC). Accept both — create_organisation defaults to UTC.
+  if (value === 'UTC' || value === 'Etc/UTC') return true
   try {
     // Deno / modern V8 expose IANA zones.
     const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
