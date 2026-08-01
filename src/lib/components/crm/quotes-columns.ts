@@ -1,18 +1,13 @@
 import type { ColumnDef } from '@tanstack/table-core';
+import type { QuoteListItem } from '$lib/schemas/quote.js';
 import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import QuoteNumberLink from './quote-number-link.svelte';
 
-export interface QuoteRow {
-	id: string;
-	number: string;
-	client: string;
-	total: string;
-	status: string;
-	validUntil: string;
-}
+export type QuoteRow = QuoteListItem;
 
 export const quoteColumns: ColumnDef<QuoteRow>[] = [
 	{
@@ -39,6 +34,11 @@ export const quoteColumns: ColumnDef<QuoteRow>[] = [
 			renderComponent(DataTableSortHeader, {
 				label: 'Number',
 				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) =>
+			renderComponent(QuoteNumberLink, {
+				id: row.original.id,
+				number: row.original.number
 			})
 	},
 	{

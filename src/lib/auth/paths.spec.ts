@@ -18,6 +18,8 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/org/config')).toBe(true);
 		expect(requiresSelectedOrg('/contacts')).toBe(true);
 		expect(requiresSelectedOrg('/contacts/abc')).toBe(true);
+		expect(requiresSelectedOrg('/quotes')).toBe(true);
+		expect(requiresSelectedOrg('/quotes/abc')).toBe(true);
 		expect(requiresSelectedOrg('/select-org')).toBe(false);
 		expect(requiresSelectedOrg('/login')).toBe(false);
 	});
