@@ -684,6 +684,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      soft_delete_product: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_product_id: string
+        }
+        Returns: undefined
+      }
       browse_entity_documents: {
         Args: {
           p_org_id: string
