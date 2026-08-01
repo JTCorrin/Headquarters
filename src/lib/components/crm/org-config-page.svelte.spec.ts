@@ -164,7 +164,8 @@ describe('OrgConfigPage integration', () => {
 					org_id: ORG_A,
 					org_name: 'Corrin Data',
 					org_slug: 'corrin-data',
-					role: 'owner'
+					role: 'owner',
+					theme_default: 'system'
 				}
 			]
 		});
@@ -193,7 +194,8 @@ describe('OrgConfigPage integration', () => {
 					org_id: ORG_A,
 					org_name: 'Corrin Data',
 					org_slug: 'corrin-data',
-					role: 'owner'
+					role: 'owner',
+					theme_default: 'system'
 				}
 			]
 		});
@@ -228,7 +230,8 @@ describe('OrgConfigPage integration', () => {
 				org_id: row.organisation.id,
 				org_name: row.organisation.name,
 				org_slug: row.organisation.slug,
-				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly'
+				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly',
+				theme_default: row.organisation.theme_default
 			}))
 		});
 		const api = createApiV1Client({
@@ -283,7 +286,8 @@ describe('OrgConfigPage integration', () => {
 				org_id: row.organisation.id,
 				org_name: row.organisation.name,
 				org_slug: row.organisation.slug,
-				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly'
+				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly',
+				theme_default: row.organisation.theme_default
 			}))
 		});
 		const api = createApiV1Client({
@@ -362,7 +366,8 @@ describe('OrgConfigPage integration', () => {
 				org_id: row.organisation.id,
 				org_name: row.organisation.name,
 				org_slug: row.organisation.slug,
-				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly'
+				role: row.membership.role as 'owner' | 'admin' | 'member' | 'billing' | 'readonly',
+				theme_default: row.organisation.theme_default
 			}))
 		});
 		const api = createApiV1Client({
@@ -436,7 +441,8 @@ describe('OrgConfigPage integration', () => {
 					org_id: ORG_A,
 					org_name: 'Corrin Data',
 					org_slug: 'corrin-data',
-					role: 'owner'
+					role: 'owner',
+					theme_default: 'system'
 				}
 			]
 		});

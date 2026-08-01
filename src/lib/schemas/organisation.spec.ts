@@ -38,6 +38,32 @@ describe('organisation schemas', () => {
 		expect(result.success).toBe(true);
 	});
 
+	it('preserves spaces in organisation names (no Zod trim transform)', () => {
+		const withSpace = organisationCreateSchema.safeParse({
+			name: 'Corrin Data ',
+			slug: 'corrin-data',
+			timezone: 'UTC',
+			currency: 'GBP',
+			locale: 'en-GB',
+			country: 'GB'
+		});
+		expect(withSpace.success).toBe(true);
+		if (withSpace.success) {
+			// Trailing space survives schema validation so Superforms can keep it while typing.
+			expect(withSpace.data.name).toBe('Corrin Data ');
+		}
+
+		const whitespaceOnly = organisationCreateSchema.safeParse({
+			name: '   ',
+			slug: 'corrin-data',
+			timezone: 'UTC',
+			currency: 'GBP',
+			locale: 'en-GB',
+			country: 'GB'
+		});
+		expect(whitespaceOnly.success).toBe(false);
+	});
+
 	it('validates timezones via Intl.DateTimeFormat', () => {
 		expect(isIanaTimezone('Europe/London')).toBe(true);
 		expect(isIanaTimezone('US/Eastern')).toBe(true);
