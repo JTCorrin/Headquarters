@@ -15,7 +15,7 @@
 		/** Hide stage when editing a converted (won) lead elsewhere. */
 		disableStage?: boolean;
 		/** Fired only after Superforms client validation succeeds. */
-		onValidSubmit?: () => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		class?: string;
 	}
 
@@ -31,6 +31,10 @@
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	let submitLock = false;
+	const busy = $derived($submitting || pendingSubmit);
 
 	const stageOptions = [
 		{ value: 'new', label: 'New' },
@@ -51,9 +55,19 @@
 	class={cn('space-y-4', className)}
 	data-testid="lead-form"
 	use:enhance={{
-		onUpdate({ form: validated }) {
+		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
-			onValidSubmit?.();
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
 		}
 	}}
 >
@@ -177,5 +191,5 @@
 		<Textarea id="lead-notes" name="notes" bind:value={$formData.notes} rows={3} />
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={busy}>{submitLabel}</Button>
 </form>
