@@ -34,8 +34,9 @@
 			{
 				name: '',
 				companyName: '',
+				clientId: '',
 				stage: 'new',
-				valueCents: '',
+				valueAmount: '',
 				currency: 'GBP',
 				probabilityPercent: '',
 				source: '',
@@ -48,7 +49,7 @@
 		{
 			validators: zod4(leadFormSchema),
 			SPA: true,
-		warnings: { duplicateId: false },
+			warnings: { duplicateId: false },
 			applyAction: false,
 			resetForm: false
 		}
@@ -60,6 +61,7 @@
 	{navGroups}
 	{leads}
 	{leadForm}
+	orgCurrency="GBP"
 	bind:drawerOpen
 	{viewState}
 	{onSelectLead}

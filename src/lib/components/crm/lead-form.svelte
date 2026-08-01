@@ -1,29 +1,38 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { LeadFormData } from '$lib/schemas/lead.js';
+	import type { LeadClientOption, LeadFormData } from '$lib/schemas/lead.js';
+	import { currencySymbol, resolveLeadCurrency } from '$lib/money.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import ClientPicker from './client-picker.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface LeadFormProps {
 		form: SuperForm<LeadFormData>;
+		clientOptions?: LeadClientOption[];
+		/** Organisation default currency used when no client is selected. */
+		orgCurrency?: string | null;
 		submitLabel?: string;
 		/** Hide stage when editing a converted (won) lead elsewhere. */
 		disableStage?: boolean;
 		/** Fired only after Superforms client validation succeeds. */
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onCreateClient?: () => void;
 		class?: string;
 	}
 
 	let {
 		form,
+		clientOptions = [],
+		orgCurrency = null,
 		submitLabel = 'Save lead',
 		disableStage = false,
 		onValidSubmit,
+		onCreateClient,
 		class: className
 	}: LeadFormProps = $props();
 
@@ -43,11 +52,28 @@
 		{ value: 'lost', label: 'Lost' }
 	] as const;
 
-	const currencyOptions = ['GBP', 'USD', 'EUR'] as const;
-
 	const stageLabel = $derived(
 		stageOptions.find((o) => o.value === $formData.stage)?.label ?? 'Stage'
 	);
+
+	const selectedClient = $derived(
+		clientOptions.find((c) => c.id === $formData.clientId) ?? null
+	);
+
+	const valueSymbol = $derived(currencySymbol($formData.currency || 'GBP'));
+
+	/** Keep currency resolved from client → org whenever the client link changes. */
+	$effect(() => {
+		const clientId = $formData.clientId;
+		const clientCurrency = clientOptions.find((c) => c.id === clientId)?.defaultCurrency;
+		const next = resolveLeadCurrency({
+			clientCurrency: clientId ? clientCurrency : null,
+			orgCurrency
+		});
+		if ($formData.currency !== next) {
+			$formData.currency = next;
+		}
+	});
 </script>
 
 <form
@@ -84,6 +110,32 @@
 	</div>
 
 	<div class="space-y-2">
+		<Label for="client-picker">Client</Label>
+		<input type="hidden" name="clientId" value={$formData.clientId ?? ''} />
+		<ClientPicker
+			id="client-picker"
+			value={$formData.clientId ?? ''}
+			options={clientOptions}
+			placeholder="Select client (optional)"
+			aria-invalid={!!$errors.clientId}
+			onValueChange={(id) => {
+				$formData.clientId = id;
+			}}
+			onCreateNew={onCreateClient}
+		/>
+		{#if selectedClient?.defaultCurrency}
+			<p class="text-muted-foreground text-[11px]">
+				Currency follows client default ({selectedClient.defaultCurrency}).
+			</p>
+		{:else if orgCurrency}
+			<p class="text-muted-foreground text-[11px]">
+				Currency follows organisation default ({orgCurrency}).
+			</p>
+		{/if}
+		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+	</div>
+
+	<div class="space-y-2">
 		<Label for="lead-company">Company</Label>
 		<Input
 			id="lead-company"
@@ -110,32 +162,34 @@
 			{#if $errors.stage}<p class="text-destructive text-xs">{$errors.stage}</p>{/if}
 		</div>
 		<div class="space-y-2">
-			<Label for="lead-currency">Currency</Label>
-			<Select.Root type="single" bind:value={$formData.currency} name="currency">
-				<Select.Trigger id="lead-currency" class="w-full">{$formData.currency}</Select.Trigger>
-				<Select.Content>
-					{#each currencyOptions as code (code)}
-						<Select.Item value={code} label={code}>{code}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-			{#if $errors.currency}<p class="text-destructive text-xs">{$errors.currency}</p>{/if}
+			<Label for="lead-value">Value</Label>
+			<input type="hidden" name="currency" value={$formData.currency} />
+			<div class="relative">
+				<span
+					class="text-muted-foreground pointer-events-none absolute top-0 left-3 flex h-9 items-center text-sm"
+					aria-hidden="true"
+				>
+					{valueSymbol}
+				</span>
+				<Input
+					id="lead-value"
+					name="valueAmount"
+					class="pl-8"
+					bind:value={$formData.valueAmount}
+					placeholder="0.00"
+					inputmode="decimal"
+					aria-invalid={!!$errors.valueAmount}
+					aria-describedby="lead-currency-hint"
+				/>
+			</div>
+			<p id="lead-currency-hint" class="text-muted-foreground text-[11px]">
+				{$formData.currency}
+			</p>
+			{#if $errors.valueAmount}<p class="text-destructive text-xs">{$errors.valueAmount}</p>{/if}
 		</div>
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="space-y-2">
-			<Label for="lead-value">Value (cents)</Label>
-			<Input
-				id="lead-value"
-				name="valueCents"
-				bind:value={$formData.valueCents}
-				placeholder="1800000"
-				inputmode="numeric"
-				aria-invalid={!!$errors.valueCents}
-			/>
-			{#if $errors.valueCents}<p class="text-destructive text-xs">{$errors.valueCents}</p>{/if}
-		</div>
 		<div class="space-y-2">
 			<Label for="lead-probability">Probability %</Label>
 			<Input
@@ -149,26 +203,24 @@
 				<p class="text-destructive text-xs">{$errors.probabilityPercent}</p>
 			{/if}
 		</div>
-	</div>
-
-	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="lead-source">Source</Label>
 			<Input id="lead-source" name="source" bind:value={$formData.source} placeholder="Referral" />
 		</div>
-		<div class="space-y-2">
-			<Label for="lead-close">Expected close</Label>
-			<Input
-				id="lead-close"
-				name="expectedCloseOn"
-				type="date"
-				bind:value={$formData.expectedCloseOn}
-				aria-invalid={!!$errors.expectedCloseOn}
-			/>
-			{#if $errors.expectedCloseOn}
-				<p class="text-destructive text-xs">{$errors.expectedCloseOn}</p>
-			{/if}
-		</div>
+	</div>
+
+	<div class="space-y-2">
+		<Label for="lead-close">Expected close</Label>
+		<Input
+			id="lead-close"
+			name="expectedCloseOn"
+			type="date"
+			bind:value={$formData.expectedCloseOn}
+			aria-invalid={!!$errors.expectedCloseOn}
+		/>
+		{#if $errors.expectedCloseOn}
+			<p class="text-destructive text-xs">{$errors.expectedCloseOn}</p>
+		{/if}
 	</div>
 
 	{#if $formData.stage === 'lost'}

@@ -6,18 +6,26 @@
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
+		toClientCreateBody,
 		toLeadCard,
 		toLeadCreateBody,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
+	import { resolveLeadCurrency } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import { leadFormSchema, type LeadFormData } from '$lib/schemas/lead.js';
+	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
+	import {
+		leadFormSchema,
+		type LeadClientOption,
+		type LeadFormData
+	} from '$lib/schemas/lead.js';
 	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import type { LeadCard } from './leads-board.svelte';
+	import type { LeadBoardMove, LeadCard } from './leads-board.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
+	import ClientFormDrawer from './client-form-drawer.svelte';
 	import LeadsBoardPage from './leads-board-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
@@ -43,17 +51,23 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let leads = $state<LeadCard[]>([]);
+	let clientOptions = $state<LeadClientOption[]>([]);
+	let orgCurrency = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let drawerOpen = $state(false);
+	let clientDrawerOpen = $state(false);
+	let moving = $state(false);
+	let boardError = $state<string | null>(null);
 
-	const emptyLeadForm = (): LeadFormData => ({
+	const emptyLeadForm = (currency = 'GBP'): LeadFormData => ({
 		name: '',
 		companyName: '',
+		clientId: '',
 		stage: 'new',
-		valueCents: '',
-		currency: 'GBP',
+		valueAmount: '',
+		currency,
 		probabilityPercent: '',
 		source: '',
 		expectedCloseOn: '',
@@ -61,8 +75,31 @@
 		notes: ''
 	});
 
+	const emptyClientForm = (): ClientFormData => ({
+		name: '',
+		status: 'active',
+		websiteUrl: '',
+		industry: '',
+		primaryEmail: '',
+		phone: '',
+		taxIdentifier: '',
+		registrationNumber: '',
+		defaultCurrency: '',
+		paymentTermsDays: '',
+		renewalOn: '',
+		notes: ''
+	});
+
 	const leadForm = superForm(defaults(emptyLeadForm(), zod4(leadFormSchema)), {
 		validators: zod4(leadFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
+
+	const clientForm = superForm(defaults(emptyClientForm(), zod4(clientFormSchema)), {
+		validators: zod4(clientFormSchema),
 		SPA: true,
 		warnings: { duplicateId: false },
 		applyAction: false,
@@ -114,7 +151,11 @@
 
 	function resetOrgScopedState() {
 		leads = [];
+		clientOptions = [];
+		orgCurrency = null;
 		drawerOpen = false;
+		clientDrawerOpen = false;
+		boardError = null;
 		viewState = { kind: 'loading' };
 	}
 
@@ -130,6 +171,7 @@
 
 		const epoch = captureEpoch();
 		viewState = { kind: 'loading' };
+		boardError = null;
 		try {
 			if (session.memberships.length === 0) {
 				const membershipRows = await api.organisations.list();
@@ -137,9 +179,21 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const listed = await api.leads.list({ limit: 100 });
+			const [listed, clientsListed, config] = await Promise.all([
+				api.leads.list({ limit: 100 }),
+				api.clients.list({ limit: 100 }),
+				api.organisationConfig.get()
+			]);
 			if (isStale(epoch)) return;
 
+			orgCurrency = config.default_currency ?? null;
+			clientOptions = clientsListed.data
+				.filter((c) => c.status !== 'archived')
+				.map((c) => ({
+					id: c.id,
+					name: c.name,
+					defaultCurrency: c.default_currency
+				}));
 			leads = listed.data.map(toLeadCard);
 			viewState =
 				leads.length === 0
@@ -165,7 +219,7 @@
 			if (isStale(epoch)) return false;
 			leads = [toLeadCard(created), ...leads];
 			viewState = { kind: 'ready' };
-			leadForm.form.set(emptyLeadForm());
+			leadForm.form.set(emptyLeadForm(resolveLeadCurrency({ orgCurrency })));
 			drawerOpen = false;
 			return true;
 		} catch (error) {
@@ -177,6 +231,72 @@
 			};
 			return false;
 		}
+	}
+
+	async function onCreateClientFromLead(): Promise<boolean> {
+		const epoch = captureEpoch();
+		try {
+			const created = await api.clients.create(toClientCreateBody(get(clientForm.form)));
+			if (isStale(epoch)) return false;
+			const option: LeadClientOption = {
+				id: created.id,
+				name: created.name,
+				defaultCurrency: created.default_currency
+			};
+			clientOptions = [option, ...clientOptions.filter((c) => c.id !== option.id)];
+			leadForm.form.update((current) => ({
+				...current,
+				clientId: option.id,
+				currency: resolveLeadCurrency({
+					clientCurrency: option.defaultCurrency,
+					orgCurrency
+				})
+			}));
+			clientForm.form.set(emptyClientForm());
+			clientDrawerOpen = false;
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not create client — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onMoveLead(move: LeadBoardMove) {
+		if (moving) return;
+		const previous = leads.map((l) => ({ ...l }));
+		const target = leads.find((l) => l.id === move.id);
+		if (!target || target.version == null) return;
+
+		leads = leads.map((l) =>
+			l.id === move.id ? { ...l, stage: move.stage, position: move.position } : l
+		);
+		boardError = null;
+		moving = true;
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.leads.update(
+				move.id,
+				{ stage: move.stage, position: move.position },
+				target.version
+			);
+			if (isStale(epoch)) return;
+			leads = leads.map((l) => (l.id === move.id ? toLeadCard(updated) : l));
+		} catch (error) {
+			if (isStale(epoch)) return;
+			leads = previous;
+			boardError = userMessage(error, 'Could not move lead — board restored.');
+		} finally {
+			moving = false;
+		}
+	}
+
+	function onMoveBlocked(message: string) {
+		boardError = message;
 	}
 
 	function onSwitchOrg(orgId: string) {
@@ -236,13 +356,33 @@
 					{navGroups}
 					{leads}
 					{leadForm}
+					{clientOptions}
+					{orgCurrency}
 					bind:drawerOpen
 					{viewState}
+					{boardError}
 					onReload={loadAll}
 					onValidSubmit={onCreateLead}
 					{onSelectLead}
+					{onMoveLead}
+					{onMoveBlocked}
+					onCreateClient={() => {
+						clientForm.form.set({
+							...emptyClientForm(),
+							defaultCurrency: orgCurrency ?? ''
+						});
+						clientDrawerOpen = true;
+					}}
 					showNav={false}
 					class="min-h-0 flex-1"
+				/>
+				<ClientFormDrawer
+					bind:open={clientDrawerOpen}
+					form={clientForm}
+					showTrigger={false}
+					title="New client"
+					description="Create a client and link it to this lead."
+					onValidSubmit={onCreateClientFromLead}
 				/>
 			</div>
 		</AppShell>

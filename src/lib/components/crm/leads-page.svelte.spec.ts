@@ -79,6 +79,35 @@ describe('LeadsPage integration', () => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				return { body: { data: [sampleLead()], meta: { next_cursor: null } } };
 			},
+			'GET /api/v1/clients': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/organisation/configuration': async () => ({
+				body: {
+					data: {
+						id: ORG_A,
+						name: 'Corrin Data',
+						legal_name: null,
+						slug: 'corrin-data',
+						logo_path: null,
+						billing_email: null,
+						phone: null,
+						website_url: null,
+						tax_identifier: null,
+						registration_number: null,
+						default_currency: 'GBP',
+						timezone: 'UTC',
+						locale: 'en-GB',
+						country_code: 'GB',
+						theme_default: 'system',
+						settings: {},
+						version: 1,
+						created_at: '2026-01-01T00:00:00Z',
+						updated_at: '2026-01-01T00:00:00Z',
+						deleted_at: null
+					}
+				}
+			}),
 			'POST /api/v1/leads': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				createBody = await request.json();
