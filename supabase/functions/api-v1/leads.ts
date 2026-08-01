@@ -316,6 +316,9 @@ export function decodeLeadCursor(value: string): LeadCursor {
 }
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('version conflict')) {
+    return new ApiError(412, 'PRECONDITION_FAILED', 'Lead version does not match If-Match')
+  }
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The lead conflicts with an existing record')
   }
@@ -522,25 +525,15 @@ async function deleteLead(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findLead(db, orgId, leadId, requestId)
-  if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Lead version does not match If-Match')
-  }
-
-  const { data, error } = await db
-    .from('leads')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('org_id', orgId)
-    .eq('id', leadId)
-    .eq('version', version)
-    .is('deleted_at', null)
-    .select('id')
-    .maybeSingle()
+  // Direct UPDATE ... deleted_at hits RLS 42501 for authenticated callers on
+  // staging; mutate through the security-definer RPC (same pattern as contacts).
+  const { error } = await db.rpc('soft_delete_lead', {
+    p_lead_id: leadId,
+    p_org_id: orgId,
+    p_expected_version: version,
+  })
 
   if (error) throw databaseError(error, requestId)
-  if (!data) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Lead changed during this request')
-  }
 
   return new Response(null, {
     status: 204,
