@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Two-session concurrency proof for contact primary takeover / cross-swap.
+#
+# (1) Deadlock-free cross-swap via privileged private.set_contact_primary_client
+#     with no expected versions — both sessions must complete.
+# (2) Concurrent public.update_contact_with_primary_client takeover with the
+#     same expected version — exactly one success and one P0001 conflict.
+#
 # Usage: contact_primary_takeover_concurrency.sh <supabase_db_container_name>
 set -euo pipefail
 
@@ -130,17 +136,45 @@ set local role authenticated;
 SQL
 }
 
-# Cross-swap in two real sessions: A→client_2 and B→client_1.
+assert_one_primary_invariants() {
+  local label="$1"
+  local primary_counts
+  primary_counts="$(sql_scalar "
+    select
+      (select count(*)::text from public.client_contacts
+        where client_id = '${client_1}'::uuid and is_primary and deleted_at is null) || E'\t' ||
+      (select count(*)::text from public.client_contacts
+        where client_id = '${client_2}'::uuid and is_primary and deleted_at is null) || E'\t' ||
+      (select count(*)::text from public.client_contacts
+        where contact_id = '${contact_a}'::uuid and is_primary and deleted_at is null) || E'\t' ||
+      (select count(*)::text from public.client_contacts
+        where contact_id = '${contact_b}'::uuid and is_primary and deleted_at is null);
+  ")"
+  primary_counts="$(printf '%s' "${primary_counts}" | tr -d '\r')"
+
+  local c1_primaries c2_primaries a_primaries b_primaries
+  c1_primaries="$(printf '%s' "${primary_counts}" | cut -f1)"
+  c2_primaries="$(printf '%s' "${primary_counts}" | cut -f2)"
+  a_primaries="$(printf '%s' "${primary_counts}" | cut -f3)"
+  b_primaries="$(printf '%s' "${primary_counts}" | cut -f4)"
+
+  if [[ "${c1_primaries}" != "1" || "${c2_primaries}" != "1" || "${a_primaries}" != "1" || "${b_primaries}" != "1" ]]; then
+    echo "${label}: primary counts invalid: clients=${c1_primaries}/${c2_primaries} contacts=${a_primaries}/${b_primaries}" >&2
+    exit 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# (1) Deadlock-free cross-swap without expected versions (private helper).
+# ---------------------------------------------------------------------------
 psql_db >"${t1_log}" 2>&1 <<SQL &
 begin;
-$(auth_prefix "${owner_id}")
-select public.update_contact_with_primary_client(
-  '${contact_a}'::uuid,
+select private.set_contact_primary_client(
   '${org_id}'::uuid,
-  ${version_a},
-  '{}'::jsonb,
+  '${contact_a}'::uuid,
   '${client_2}'::uuid,
-  true
+  '${owner_id}'::uuid,
+  null
 );
 commit;
 SQL
@@ -148,14 +182,12 @@ t1_pid=$!
 
 psql_db >"${t2_log}" 2>&1 <<SQL &
 begin;
-$(auth_prefix "${owner_id}")
-select public.update_contact_with_primary_client(
-  '${contact_b}'::uuid,
+select private.set_contact_primary_client(
   '${org_id}'::uuid,
-  ${version_b},
-  '{}'::jsonb,
+  '${contact_b}'::uuid,
   '${client_1}'::uuid,
-  true
+  '${owner_id}'::uuid,
+  null
 );
 commit;
 SQL
@@ -171,33 +203,28 @@ t1_pid=""
 t2_pid=""
 
 if [[ "${t1_status}" -ne 0 || "${t2_status}" -ne 0 ]]; then
-  echo "cross-swap sessions failed (t1=${t1_status} t2=${t2_status}) — possible deadlock or error" >&2
+  echo "private-helper cross-swap failed (t1=${t1_status} t2=${t2_status}) — possible deadlock or error" >&2
   cat "${t1_log}" >&2 || true
   cat "${t2_log}" >&2 || true
   exit 1
 fi
 
-# Invariants after swap
-primary_counts="$(sql_scalar "
-  select
-    (select count(*)::text from public.client_contacts
-      where client_id = '${client_1}'::uuid and is_primary and deleted_at is null) || E'\t' ||
-    (select count(*)::text from public.client_contacts
-      where client_id = '${client_2}'::uuid and is_primary and deleted_at is null) || E'\t' ||
-    (select count(*)::text from public.client_contacts
-      where contact_id = '${contact_a}'::uuid and is_primary and deleted_at is null) || E'\t' ||
-    (select count(*)::text from public.client_contacts
-      where contact_id = '${contact_b}'::uuid and is_primary and deleted_at is null);
+assert_one_primary_invariants "post-swap"
+
+# After a completed cross-swap, A is primary on client_2 and B on client_1.
+swap_a_client="$(sql_scalar "
+  select client_id::text from public.client_contacts
+  where contact_id = '${contact_a}'::uuid and is_primary and deleted_at is null;
 ")"
-primary_counts="$(printf '%s' "${primary_counts}" | tr -d '\r')"
+swap_b_client="$(sql_scalar "
+  select client_id::text from public.client_contacts
+  where contact_id = '${contact_b}'::uuid and is_primary and deleted_at is null;
+")"
+swap_a_client="$(printf '%s' "${swap_a_client}" | tr -d '\r')"
+swap_b_client="$(printf '%s' "${swap_b_client}" | tr -d '\r')"
 
-c1_primaries="$(printf '%s' "${primary_counts}" | cut -f1)"
-c2_primaries="$(printf '%s' "${primary_counts}" | cut -f2)"
-a_primaries="$(printf '%s' "${primary_counts}" | cut -f3)"
-b_primaries="$(printf '%s' "${primary_counts}" | cut -f4)"
-
-if [[ "${c1_primaries}" != "1" || "${c2_primaries}" != "1" || "${a_primaries}" != "1" || "${b_primaries}" != "1" ]]; then
-  echo "post-swap primary counts invalid: clients=${c1_primaries}/${c2_primaries} contacts=${a_primaries}/${b_primaries}" >&2
+if [[ "${swap_a_client}" != "${client_2}" || "${swap_b_client}" != "${client_1}" ]]; then
+  echo "post-swap primaries not swapped: A->${swap_a_client} B->${swap_b_client}" >&2
   exit 1
 fi
 
@@ -205,11 +232,15 @@ new_version_a="$(sql_scalar "select version from public.contacts where id = '${c
 new_version_b="$(sql_scalar "select version from public.contacts where id = '${contact_b}'::uuid;")"
 
 if [[ "${new_version_a}" -le "${version_a}" || "${new_version_b}" -le "${version_b}" ]]; then
-  echo "expected both contact versions to advance after swap; A ${version_a}->${new_version_a} B ${version_b}->${new_version_b}" >&2
+  echo "expected both contact versions to advance after private swap; A ${version_a}->${new_version_a} B ${version_b}->${new_version_b}" >&2
   exit 1
 fi
 
-# Takeover race: reset so A is primary on client_1; B has non-primary link only.
+echo "ok - private-helper cross-swap completed without deadlock"
+
+# ---------------------------------------------------------------------------
+# (2) Concurrent API takeover with expected versions: 1 success + 1 P0001.
+# ---------------------------------------------------------------------------
 psql_db >/dev/null <<SQL
 update public.client_contacts
 set is_primary = false, role = 'billing'
@@ -219,6 +250,11 @@ update public.client_contacts
 set is_primary = true, role = 'primary'
 where client_id = '${client_1}'::uuid and contact_id = '${contact_a}'::uuid;
 
+-- Ensure B still has an active non-primary link on client_1 for promotion.
+update public.client_contacts
+set is_primary = false, role = 'billing', deleted_at = null
+where client_id = '${client_1}'::uuid and contact_id = '${contact_b}'::uuid;
+
 update public.contacts set updated_by = '${owner_id}'::uuid
 where id in ('${contact_a}'::uuid, '${contact_b}'::uuid);
 SQL
@@ -226,7 +262,6 @@ SQL
 version_a="$(sql_scalar "select version from public.contacts where id = '${contact_a}'::uuid;")"
 version_b="$(sql_scalar "select version from public.contacts where id = '${contact_b}'::uuid;")"
 
-# Concurrent takeovers of the same client by B (twice) should leave one primary and bump A.
 psql_db >"${t1_log}" 2>&1 <<SQL &
 begin;
 $(auth_prefix "${owner_id}")
@@ -242,8 +277,6 @@ commit;
 SQL
 t1_pid=$!
 
-# Second session uses the same expected version; one may hit version conflict if
-# the first bumps B first — both outcomes are acceptable if invariants hold.
 psql_db >"${t2_log}" 2>&1 <<SQL &
 begin;
 $(auth_prefix "${owner_id}")
@@ -268,10 +301,45 @@ set -e
 t1_pid=""
 t2_pid=""
 
-if [[ "${t1_status}" -ne 0 && "${t2_status}" -ne 0 ]]; then
-  echo "both takeover sessions failed" >&2
+if [[ "${t1_status}" -eq 0 && "${t2_status}" -eq 0 ]]; then
+  echo "expected exactly one API takeover to fail with version conflict; both succeeded" >&2
   cat "${t1_log}" >&2 || true
   cat "${t2_log}" >&2 || true
+  exit 1
+fi
+
+if [[ "${t1_status}" -ne 0 && "${t2_status}" -ne 0 ]]; then
+  echo "expected exactly one API takeover success; both failed" >&2
+  cat "${t1_log}" >&2 || true
+  cat "${t2_log}" >&2 || true
+  exit 1
+fi
+
+conflict_log="${t1_log}"
+if [[ "${t2_status}" -ne 0 ]]; then
+  conflict_log="${t2_log}"
+fi
+
+if ! grep -qi 'version conflict\|P0001' "${conflict_log}"; then
+  echo "losing API takeover did not report P0001/version conflict:" >&2
+  cat "${conflict_log}" >&2 || true
+  exit 1
+fi
+
+# At-most-one / exact primary after the successful takeover.
+client1_primary_count="$(sql_scalar "
+  select count(*)::text from public.client_contacts
+  where client_id = '${client_1}'::uuid and is_primary and deleted_at is null;
+")"
+contact_b_primary_count="$(sql_scalar "
+  select count(*)::text from public.client_contacts
+  where contact_id = '${contact_b}'::uuid and is_primary and deleted_at is null;
+")"
+client1_primary_count="$(printf '%s' "${client1_primary_count}" | tr -d '\r')"
+contact_b_primary_count="$(printf '%s' "${contact_b_primary_count}" | tr -d '\r')"
+
+if [[ "${client1_primary_count}" != "1" || "${contact_b_primary_count}" != "1" ]]; then
+  echo "takeover broke at-most-one invariants: client_1=${client1_primary_count} B=${contact_b_primary_count}" >&2
   exit 1
 fi
 
@@ -329,4 +397,5 @@ if ! printf '%s' "${stale_out}" | grep -qi 'version conflict\|P0001'; then
   exit 1
 fi
 
-echo "ok - two-session primary cross-swap + takeover preserved invariants and bumped displaced ETags"
+echo "ok - API takeover serialization: one success + one P0001; displaced ETag invalidated"
+echo "ok - two-session primary concurrency proofs passed"
