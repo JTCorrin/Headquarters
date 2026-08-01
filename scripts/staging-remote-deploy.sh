@@ -168,4 +168,15 @@ else
 	log "auth curl proof script missing — skipped"
 fi
 
+# Contacts CRUD + quotes draft smoke (JWT + X-Org-Id).
+if [[ -x scripts/contacts_quotes_staging_curl_proof.sh ]]; then
+	log "running contacts + quotes draft curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/contacts_quotes_staging_curl_proof.sh
+else
+	log "contacts/quotes curl proof script missing — skipped"
+fi
+
 log "done"
