@@ -2,7 +2,8 @@
 .branches
 .temp
 
-# dotenvx
+# dotenvx / local Edge secrets (staging deploy writes API_CORS_ORIGIN here)
+.env
 .env.keys
 .env.local
 .env.*.local
