@@ -1,6 +1,6 @@
 begin;
 
-select plan(14);
+select plan(18);
 
 select ok(
   has_function_privilege(
@@ -39,6 +39,8 @@ create temporary table _primary_link_fixture (
   foreign_client uuid,
   contact_id uuid,
   contact_version integer,
+  displaced_contact_id uuid,
+  displaced_version integer,
   secondary_link_id uuid
 ) on commit drop;
 
@@ -196,7 +198,43 @@ select ok(
   'failed create with bad client_id does not leave an orphan contact'
 );
 
--- Happy create + primary link
+select ok(
+  exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname = 'client_contacts_one_primary_per_contact_uidx'
+  ),
+  'partial unique index enforces one active primary client per contact'
+);
+
+-- Seed a contact already primary on client A so create can displace them.
+with displaced as (
+  insert into public.contacts (
+    org_id, display_name, primary_email, created_by, updated_by
+  )
+  select
+    org_id,
+    'Displaced Contact',
+    'displaced@example.test',
+    owner_id,
+    owner_id
+  from _primary_link_fixture
+  returning id, version
+)
+update _primary_link_fixture
+set
+  displaced_contact_id = displaced.id,
+  displaced_version = displaced.version
+from displaced;
+
+insert into public.client_contacts (
+  org_id, client_id, contact_id, role, is_primary, created_by, updated_by
+)
+select org_id, client_a, displaced_contact_id, 'primary', true, owner_id, owner_id
+from _primary_link_fixture;
+
+-- Happy create + primary link (displaces the seeded primary)
 select pg_temp.as_user((select owner_id from _primary_link_fixture));
 set local role authenticated;
 
@@ -210,8 +248,12 @@ set
       true
     ) -> 'contact' ->> 'id')::uuid
     from _primary_link_fixture
-  ),
-  contact_version = 1;
+  );
+
+update _primary_link_fixture
+set contact_version = (
+  select version from public.contacts where id = contact_id
+);
 
 reset role;
 
@@ -226,6 +268,56 @@ select ok(
       and client_contacts.deleted_at is null
   ),
   'create_contact_with_primary_client writes the primary client_contacts link'
+);
+
+select ok(
+  (
+    select version > f.displaced_version
+    from public.contacts
+    join _primary_link_fixture f on f.displaced_contact_id = contacts.id
+  ),
+  'displacing a client primary bumps the displaced contact version'
+);
+
+select pg_temp.as_user((select owner_id from _primary_link_fixture));
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.update_contact_with_primary_client(
+      (select displaced_contact_id from _primary_link_fixture),
+      (select org_id from _primary_link_fixture),
+      (select displaced_version from _primary_link_fixture),
+      jsonb_build_object('display_name', 'Stale Displaced'),
+      null,
+      false
+    )
+  $$,
+  'P0001',
+  null,
+  'displaced contact rejects stale If-Match after primary takeover'
+);
+
+reset role;
+
+-- Refresh displaced version after the bump for later assertions
+update _primary_link_fixture
+set displaced_version = (
+  select version from public.contacts where id = displaced_contact_id
+);
+
+-- Direct insert cannot create a second active primary for the same contact
+select throws_ok(
+  $$
+    insert into public.client_contacts (
+      org_id, client_id, contact_id, role, is_primary, created_by, updated_by
+    )
+    select org_id, client_b, contact_id, 'primary', true, owner_id, owner_id
+    from _primary_link_fixture
+  $$,
+  '23505',
+  null,
+  'unique index rejects a second active primary client for one contact'
 );
 
 -- Seed an unrelated secondary link to client B (simulates prior M2M membership)
