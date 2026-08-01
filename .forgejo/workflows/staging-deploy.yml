@@ -29,9 +29,33 @@ jobs:
           test -n "${DEPLOY_SSH_KEY}"
           test -n "${DEPLOY_HOST}"
           install -m 700 -d "${HOME}/.ssh"
-          # Secrets may store either real newlines or literal \n sequences.
-          printf '%s\n' "${DEPLOY_SSH_KEY}" | sed 's/\r$//' | sed 's/\\n/\n/g' > "${HOME}/.ssh/deploy_key"
-          chmod 600 "${HOME}/.ssh/deploy_key"
+          # Forgejo secret UIs sometimes flatten PEM to one line or store literal \n.
+          # Rebuild a valid OpenSSH private key and fail fast if libcrypto rejects it.
+          python3 - <<'PY'
+          import os, re, pathlib
+          raw = os.environ["DEPLOY_SSH_KEY"]
+          raw = raw.replace("\r\n", "\n").replace("\r", "\n").strip()
+          if "\\n" in raw and raw.count("\n") < 3:
+              raw = raw.replace("\\n", "\n")
+          m = re.search(
+              r"-----BEGIN OPENSSH PRIVATE KEY-----\s*(.*?)\s*-----END OPENSSH PRIVATE KEY-----",
+              raw,
+              re.S,
+          )
+          if not m:
+              raise SystemExit("DEPLOY_SSH_KEY is not an OpenSSH private key PEM")
+          body = re.sub(r"\s+", "", m.group(1))
+          lines = [body[i : i + 70] for i in range(0, len(body), 70)]
+          key = (
+              "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+              + "\n".join(lines)
+              + "\n-----END OPENSSH PRIVATE KEY-----\n"
+          )
+          path = pathlib.Path.home() / ".ssh" / "deploy_key"
+          path.write_text(key)
+          path.chmod(0o600)
+          PY
+          ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
           ssh-keyscan -H "${DEPLOY_HOST}" >> "${HOME}/.ssh/known_hosts"
 
       - name: Sync deploy script and run remote staging deploy

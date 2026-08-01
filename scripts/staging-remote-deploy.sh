@@ -19,7 +19,23 @@ mkdir -p "$(dirname "$APP_DIR")"
 
 if [[ ! -d "$APP_DIR/.git" ]]; then
 	log "cloning ${REPO_URL} → ${APP_DIR}"
-	git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
+	# Allow a pre-created app dir (e.g. scripts/ dropped by CI) without failing clone.
+	if [[ -d "$APP_DIR" ]] && [[ -n "$(ls -A "$APP_DIR" 2>/dev/null || true)" ]]; then
+		tmp_clone="$(mktemp -d /tmp/hq-clone.XXXXXX)"
+		git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$tmp_clone"
+		# Preserve an existing deploy.log if present.
+		if [[ -f "$APP_DIR/deploy.log" ]]; then
+			cp -a "$APP_DIR/deploy.log" "$tmp_clone/deploy.log" || true
+		fi
+		find "$APP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+		shopt -s dotglob
+		mv "$tmp_clone"/* "$APP_DIR"/
+		shopt -u dotglob
+		rmdir "$tmp_clone" 2>/dev/null || rm -rf "$tmp_clone"
+	else
+		mkdir -p "$(dirname "$APP_DIR")"
+		git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
+	fi
 else
 	log "fetching ${BRANCH} in ${APP_DIR}"
 	git -C "$APP_DIR" remote set-url origin "$REPO_URL"
