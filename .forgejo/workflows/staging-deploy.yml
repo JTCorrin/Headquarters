@@ -1,0 +1,64 @@
+name: Staging Deploy
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to deploy-svelte
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out staging
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "${DEPLOY_SSH_KEY}"
+          test -n "${DEPLOY_HOST}"
+          install -m 700 -d "${HOME}/.ssh"
+          # Secrets may store either real newlines or literal \n sequences.
+          printf '%s\n' "${DEPLOY_SSH_KEY}" | sed 's/\r$//' | sed 's/\\n/\n/g' > "${HOME}/.ssh/deploy_key"
+          chmod 600 "${HOME}/.ssh/deploy_key"
+          ssh-keyscan -H "${DEPLOY_HOST}" >> "${HOME}/.ssh/known_hosts"
+
+      - name: Sync deploy script and run remote staging deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          test -n "${DEPLOY_HOST}"
+          test -n "${DEPLOY_USER}"
+          REMOTE_APP="/home/deploy/apps/headquarters"
+          ssh -i "${HOME}/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "mkdir -p '${REMOTE_APP}/scripts'"
+          scp -i "${HOME}/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            scripts/staging-remote-deploy.sh \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE_APP}/scripts/staging-remote-deploy.sh"
+          ssh -i "${HOME}/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "chmod +x '${REMOTE_APP}/scripts/staging-remote-deploy.sh' && \
+             APP_DIR='${REMOTE_APP}' \
+             BRANCH='staging' \
+             APP_HOST='${DEPLOY_HOST}' \
+             '${REMOTE_APP}/scripts/staging-remote-deploy.sh'"
