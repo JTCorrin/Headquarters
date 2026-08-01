@@ -71,12 +71,14 @@
 		}
 	}}
 >
+	<!-- bits-ui Select is not a native control; keep FormData in sync for Superforms SPA. -->
+	<input type="hidden" name="themePreference" value={$formData.themePreference} />
+
 	<div class="space-y-2">
 		<Label for="profile-theme">Personal theme</Label>
 		<Select.Root
 			type="single"
 			bind:value={$formData.themePreference}
-			name="themePreference"
 			disabled={busy}
 		>
 			<Select.Trigger

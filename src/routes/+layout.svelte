@@ -4,7 +4,10 @@
 	import { env } from '$env/dynamic/public';
 	import { resolveApiV1BaseUrl } from '$lib/api/v1/base-url.js';
 	import { createApiV1Client, setApiV1Client } from '$lib/api/v1/index.js';
-	import { toOrgMembershipSummary } from '$lib/api/v1/mappers.js';
+	import {
+		themePreferenceFromApi,
+		toOrgMembershipSummary
+	} from '$lib/api/v1/mappers.js';
 	import {
 		createAuthSession,
 		createSupabaseBrowserClient,
@@ -15,6 +18,7 @@
 		setAuthSession
 	} from '$lib/auth/index.js';
 	import { createOrgSession, setOrgSession } from '$lib/org/index.js';
+	import { applyResolvedTheme, resolveThemeChoice, subscribePrefersDark } from '$lib/theme/index.js';
 	import favicon from '$lib/assets/favicon.svg';
 	import './layout.css';
 
@@ -50,9 +54,15 @@
 	async function refreshMemberships(token: string): Promise<void> {
 		membershipsError = null;
 		try {
-			const rows = await api.organisations.list();
+			const [rows, prefs] = await Promise.all([
+				api.organisations.list(),
+				api.profilePreferences.get().catch(() => null)
+			]);
 			const memberships = rows.map(toOrgMembershipSummary);
 			orgSession.setMemberships(memberships);
+			if (prefs) {
+				orgSession.setThemePreference(themePreferenceFromApi(prefs.theme_preference));
+			}
 			if (
 				orgSession.selectedOrgId &&
 				!memberships.some((m) => m.org_id === orgSession.selectedOrgId)
@@ -79,11 +89,28 @@
 			membershipsReady = true;
 			lastTokenForMemberships = null;
 			orgSession.setMemberships([]);
+			orgSession.setThemePreference('org_default');
+			applyResolvedTheme('org_default', 'system');
 			return;
 		}
 		if (token === lastTokenForMemberships) return;
 		membershipsReady = false;
 		void refreshMemberships(token);
+	});
+
+	// Apply organisation / personal theme to <html class="dark">.
+	$effect(() => {
+		const personal = orgSession.themePreference;
+		const orgDefault =
+			orgSession.memberships.find((m) => m.org_id === orgSession.selectedOrgId)
+				?.theme_default ?? 'system';
+		applyResolvedTheme(personal, orgDefault);
+
+		const choice = resolveThemeChoice(personal, orgDefault);
+		if (choice !== 'system') return;
+		return subscribePrefersDark(() => {
+			applyResolvedTheme(personal, orgDefault);
+		});
 	});
 
 	$effect(() => {

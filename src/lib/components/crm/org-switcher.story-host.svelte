@@ -96,7 +96,8 @@
 			org_id: orgId,
 			org_name: snapshot.name,
 			org_slug: snapshot.slug,
-			role: 'owner'
+			role: 'owner',
+			theme_default: 'system'
 		};
 		memberships = [...memberships, created];
 		currentOrgId = orgId;
