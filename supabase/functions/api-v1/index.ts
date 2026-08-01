@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
 import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
+import { handleDocuments } from './documents.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
 import { handleLeads } from './leads.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
@@ -189,6 +190,21 @@ export default {
         if (path === '/api/v1/quotes' || path.startsWith('/api/v1/quotes/')) {
           assertCanAccessQuotes(membership.role, req.method)
           return await handleQuotes(req, db, path, orgId, requestId)
+        }
+
+        if (
+          path.startsWith('/api/v1/entities/') ||
+          path.startsWith('/api/v1/documents/') ||
+          path.startsWith('/api/v1/document-folders/')
+        ) {
+          return handleDocuments(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
         }
 
         throw new ApiError(404, 'NOT_FOUND', 'Route not found')

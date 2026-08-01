@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, validateContactBody } from './contacts.ts'
+import { validateFolderCreateBody, validateUploadIntentBody } from './documents.ts'
 import {
   ApiError,
   apiPath,
@@ -578,4 +579,48 @@ Deno.test('tax rate and profile preference validation', () => {
     () => validateProfilePreferencesBody({ theme_preference: 'neon' }),
     ApiError,
   )
+})
+
+Deno.test('document upload intent validation defaults and rejects bad digests/sizes', () => {
+  const ok = validateUploadIntentBody({
+    name: ' contract.pdf ',
+    category: 'contract',
+    mime_type: 'application/pdf',
+    size_bytes: 1024,
+    sha256: 'a'.repeat(64),
+    folder_id: null,
+  })
+  assertEquals(ok.name, 'contract.pdf')
+  assertEquals(ok.sha256, 'a'.repeat(64))
+
+  assertThrows(
+    () =>
+      validateUploadIntentBody({
+        name: 'x',
+        category: 'contract',
+        mime_type: 'application/pdf',
+        size_bytes: 1024,
+        sha256: 'nope',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateUploadIntentBody({
+        name: 'x',
+        category: 'contract',
+        mime_type: 'application/pdf',
+        size_bytes: 60_000_000,
+        sha256: 'a'.repeat(64),
+        storage_path: 'evil',
+      }),
+    ApiError,
+  )
+})
+
+Deno.test('document folder create validation trims name and allows null parent', () => {
+  const ok = validateFolderCreateBody({ name: ' Contracts ', parent_id: null })
+  assertEquals(ok.name, 'Contracts')
+  assertEquals(ok.parent_id, null)
+  assertThrows(() => validateFolderCreateBody({ name: '' }), ApiError)
 })
