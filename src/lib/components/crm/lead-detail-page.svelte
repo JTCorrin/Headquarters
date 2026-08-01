@@ -30,8 +30,10 @@
 		convertOpen?: boolean;
 		converting?: boolean;
 		lastConvertResult?: LeadConvertResult | null;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
-		onSave?: () => void;
+		onSave?: () => boolean | void | Promise<boolean | void>;
 		onConvert?: () => void;
 		onOpenClient?: (clientId: string) => void;
 		onReload?: () => void;
@@ -47,6 +49,7 @@
 		convertOpen = $bindable(false),
 		converting = false,
 		lastConvertResult = null,
+		showNav = true,
 		class: className,
 		onSave,
 		onConvert,
@@ -61,8 +64,16 @@
 	);
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">

@@ -1,11 +1,19 @@
 import type { ApiResult } from '../request.js';
 import type {
 	ApiClient,
+	ApiClientCreateBody,
 	ApiClientListParams,
+	ApiClientUpdateBody,
 	ApiContact,
 	ApiContactCreateBody,
 	ApiContactListParams,
 	ApiContactUpdateBody,
+	ApiLead,
+	ApiLeadConvertBody,
+	ApiLeadConvertResult,
+	ApiLeadCreateBody,
+	ApiLeadListParams,
+	ApiLeadUpdateBody,
 	ApiDocumentBrowseParams,
 	ApiDocumentBrowseResult,
 	ApiDocumentDownloadResult,
@@ -106,6 +114,33 @@ export interface ClientsEndpoints {
 		params?: ApiClientListParams,
 		signal?: AbortSignal
 	): Promise<ApiResult<ApiClient[]>>;
+	create(body: ApiClientCreateBody, signal?: AbortSignal): Promise<ApiClient>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiClient>>;
+	update(
+		id: string,
+		body: ApiClientUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiClient>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface LeadsEndpoints {
+	list(params?: ApiLeadListParams, signal?: AbortSignal): Promise<ApiResult<ApiLead[]>>;
+	create(body: ApiLeadCreateBody, signal?: AbortSignal): Promise<ApiLead>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiLead>>;
+	update(
+		id: string,
+		body: ApiLeadUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiLead>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	convert(
+		id: string,
+		body?: ApiLeadConvertBody,
+		signal?: AbortSignal
+	): Promise<ApiLeadConvertResult>;
 }
 
 export interface DocumentsEndpoints {

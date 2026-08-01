@@ -18,9 +18,12 @@
 		leadForm: SuperForm<LeadFormData>;
 		drawerOpen?: boolean;
 		viewState?: ResourceViewState;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
 		onSelectLead?: (id: string) => void;
 		onReload?: () => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -30,14 +33,24 @@
 		leadForm,
 		drawerOpen = $bindable(false),
 		viewState = { kind: 'ready' },
+		showNav = true,
 		class: className,
 		onSelectLead,
-		onReload
+		onReload,
+		onValidSubmit
 	}: LeadsBoardPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -48,11 +61,12 @@
 			>
 				{#snippet actions()}
 					<Button variant="outline" size="sm">Table view</Button>
-					<LeadFormDrawer bind:open={drawerOpen} form={leadForm}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">New lead</Button>
-						{/snippet}
-					</LeadFormDrawer>
+					<LeadFormDrawer
+						bind:open={drawerOpen}
+						form={leadForm}
+						{onValidSubmit}
+						triggerLabel="New lead"
+					/>
 				{/snippet}
 			</PageHeader>
 

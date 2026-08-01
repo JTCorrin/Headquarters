@@ -20,6 +20,10 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/contacts/abc')).toBe(true);
 		expect(requiresSelectedOrg('/quotes')).toBe(true);
 		expect(requiresSelectedOrg('/quotes/abc')).toBe(true);
+		expect(requiresSelectedOrg('/leads')).toBe(true);
+		expect(requiresSelectedOrg('/leads/abc')).toBe(true);
+		expect(requiresSelectedOrg('/clients')).toBe(true);
+		expect(requiresSelectedOrg('/clients/abc')).toBe(true);
 		expect(requiresSelectedOrg('/select-org')).toBe(false);
 		expect(requiresSelectedOrg('/login')).toBe(false);
 	});
