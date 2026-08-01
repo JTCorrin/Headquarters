@@ -74,7 +74,7 @@
 </script>
 
 <div
-	class={cn('bg-background text-foreground flex h-full min-h-[720px] flex-col', className)}
+	class={cn('bg-background text-foreground flex min-h-svh flex-col', className)}
 	data-testid="app-shell"
 >
 	<header
@@ -110,7 +110,7 @@
 			{/if}
 		</div>
 	</header>
-	<main class="min-h-0 flex-1 overflow-auto" data-testid="app-shell-main">
+	<main class="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="app-shell-main">
 		{#if children}
 			{@render children()}
 		{/if}

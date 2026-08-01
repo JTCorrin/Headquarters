@@ -24,7 +24,7 @@
 			phone: '',
 			company: '',
 			title: '',
-			status: 'contact'
+			status: 'active'
 		},
 		zod4(contactFormSchema)
 	);

@@ -15,6 +15,7 @@
 		isOnboardingPath,
 		postAuthDestination,
 		readPublicSupabaseConfig,
+		requiresSelectedOrg,
 		setAuthSession
 	} from '$lib/auth/index.js';
 	import { createOrgSession, setOrgSession } from '$lib/org/index.js';
@@ -151,16 +152,7 @@
 			return;
 		}
 
-		if (
-			orgSession.memberships.length > 1 &&
-			!orgSession.selectedOrgId &&
-			path.startsWith('/org/')
-		) {
-			void goto('/select-org');
-			return;
-		}
-
-		if (path.startsWith('/org/') && !orgSession.selectedOrgId && path !== '/select-org') {
+		if (requiresSelectedOrg(path) && !orgSession.selectedOrgId) {
 			void goto('/select-org');
 		}
 	});

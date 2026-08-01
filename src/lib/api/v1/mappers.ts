@@ -1,3 +1,4 @@
+import type { ContactFormData, ContactListItem } from '$lib/schemas/contact.js';
 import type {
 	MembershipRole,
 	OrganisationConfigData,
@@ -11,6 +12,9 @@ import type {
 	ThemePreferenceOption
 } from '$lib/schemas/organisation.js';
 import type {
+	ApiContact,
+	ApiContactCreateBody,
+	ApiContactUpdateBody,
 	ApiOrganisationConfiguration,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
@@ -141,4 +145,51 @@ export function roleFromMemberships(
 ): MembershipRole | null {
 	if (!orgId) return null;
 	return memberships.find((m) => m.org_id === orgId)?.role ?? null;
+}
+
+function emptyToNull(value: string | undefined): string | null {
+	if (value === undefined) return null;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+export function contactLifecycleLabel(status: ApiContact['lifecycle_status']): string {
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function toContactListItem(contact: ApiContact): ContactListItem {
+	return {
+		id: contact.id,
+		name: contact.display_name,
+		email: contact.primary_email ?? '',
+		company: contact.company_name ?? undefined,
+		status: contactLifecycleLabel(contact.lifecycle_status),
+		owner: undefined
+	};
+}
+
+export function toContactFormData(contact: ApiContact): ContactFormData {
+	return {
+		name: contact.display_name,
+		email: contact.primary_email ?? '',
+		phone: contact.primary_phone ?? '',
+		company: contact.company_name ?? '',
+		title: contact.job_title ?? '',
+		status: contact.lifecycle_status
+	};
+}
+
+export function toContactCreateBody(data: ContactFormData): ApiContactCreateBody {
+	return {
+		display_name: data.name.trim(),
+		primary_email: emptyToNull(data.email),
+		primary_phone: emptyToNull(data.phone),
+		company_name: emptyToNull(data.company),
+		job_title: emptyToNull(data.title),
+		lifecycle_status: data.status
+	};
+}
+
+export function toContactUpdateBody(data: ContactFormData): ApiContactUpdateBody {
+	return toContactCreateBody(data);
 }
