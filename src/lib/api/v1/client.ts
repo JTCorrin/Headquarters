@@ -1,21 +1,26 @@
 import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
+import { createOrganisationsEndpoints } from './endpoints/organisations.js';
+import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
+import { createQuotesEndpoints } from './endpoints/quotes.js';
+import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
 import type {
-	ApiEnvelope,
-	ApiErrorBody,
-	ApiOrganisationConfiguration,
-	ApiOrganisationConfigurationPatch,
-	ApiOrganisationCreateBody,
-	ApiOrganisationCreateResult,
-	ApiOrganisationMembership,
-	ApiProfilePreferences,
-	ApiProfilePreferencesPatch,
-	ApiTaxRate,
-	ApiTaxRateCreateBody,
-	ApiTaxRatePatchBody
-} from './types.js';
+	OrganisationConfigEndpoints,
+	OrganisationsEndpoints,
+	ProfilePreferencesEndpoints,
+	QuotesEndpoints,
+	TaxRatesEndpoints
+} from './endpoints/types.js';
+import type { ApiRequestFn, ApiRequestOptions, ApiResult } from './request.js';
+import type { ApiEnvelope, ApiErrorBody } from './types.js';
+
+export type { ApiRequestFn, ApiRequestOptions, ApiResult } from './request.js';
 
 export interface ApiV1ClientOptions {
-	/** API origin or absolute prefix. Defaults to empty (same-origin `/api/v1/...`). */
+	/**
+	 * API origin or absolute prefix. Defaults to `PUBLIC_API_BASE_URL` (Vite/SvelteKit
+	 * public env) when set, otherwise empty (same-origin `/api/v1/...` paths).
+	 */
 	baseUrl?: string;
 	fetch?: typeof fetch;
 	getAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
@@ -25,32 +30,13 @@ export interface ApiV1ClientOptions {
 	createRequestId?: () => string;
 }
 
-export interface ApiRequestOptions {
-	method?: string;
-	body?: unknown;
-	/** When true (default for org helpers), requires and sends `X-Org-Id`. */
-	orgScoped?: boolean;
-	/** Optimistic concurrency token → `If-Match: "<version>"`. */
-	ifMatchVersion?: number;
-	headers?: HeadersInit;
-	signal?: AbortSignal;
-}
-
 export interface ApiV1Client {
-	request<T>(path: string, options?: ApiRequestOptions): Promise<{ data: T; etag: string | null; status: number }>;
-	listOrganisations(): Promise<ApiOrganisationMembership[]>;
-	createOrganisation(body: ApiOrganisationCreateBody): Promise<ApiOrganisationCreateResult>;
-	getOrganisationConfiguration(): Promise<ApiOrganisationConfiguration>;
-	patchOrganisationConfiguration(
-		body: ApiOrganisationConfigurationPatch,
-		version: number
-	): Promise<ApiOrganisationConfiguration>;
-	listTaxRates(limit?: number): Promise<ApiTaxRate[]>;
-	createTaxRate(body: ApiTaxRateCreateBody): Promise<ApiTaxRate>;
-	patchTaxRate(id: string, body: ApiTaxRatePatchBody, version: number): Promise<ApiTaxRate>;
-	deleteTaxRate(id: string, version: number): Promise<void>;
-	getProfilePreferences(): Promise<ApiProfilePreferences>;
-	patchProfilePreferences(body: ApiProfilePreferencesPatch): Promise<ApiProfilePreferences>;
+	request: ApiRequestFn;
+	organisations: OrganisationsEndpoints;
+	organisationConfig: OrganisationConfigEndpoints;
+	taxRates: TaxRatesEndpoints;
+	profilePreferences: ProfilePreferencesEndpoints;
+	quotes: QuotesEndpoints;
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
@@ -58,10 +44,29 @@ function normalizeBaseUrl(baseUrl: string | undefined): string {
 	return baseUrl.replace(/\/+$/, '');
 }
 
+function defaultBaseUrl(): string {
+	// Public Vite/SvelteKit env — inlined at build for SSR + client. Prefer this over
+	// `$env/dynamic/public`, which Storybook/vitest browser harnesses do not always provide.
+	const fromEnv = (import.meta.env.PUBLIC_API_BASE_URL as string | undefined)?.trim();
+	return normalizeBaseUrl(fromEnv || undefined);
+}
+
 function resolvePath(baseUrl: string, path: string): string {
 	if (path.startsWith('http://') || path.startsWith('https://')) return path;
 	const normalized = path.startsWith('/') ? path : `/${path}`;
 	return `${baseUrl}${normalized}`;
+}
+
+function appendQuery(path: string, query: ApiRequestOptions['query']): string {
+	if (!query) return path;
+	const params = new URLSearchParams();
+	for (const [key, value] of Object.entries(query)) {
+		if (value === undefined || value === null) continue;
+		params.set(key, String(value));
+	}
+	const encoded = params.toString();
+	if (!encoded) return path;
+	return path.includes('?') ? `${path}&${encoded}` : `${path}?${encoded}`;
 }
 
 function parseErrorCode(value: string | undefined): ApiErrorCode {
@@ -96,7 +101,9 @@ async function readJson(response: Response): Promise<unknown> {
 }
 
 export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client {
-	const baseUrl = normalizeBaseUrl(options.baseUrl);
+	const baseUrl = normalizeBaseUrl(
+		options.baseUrl !== undefined ? options.baseUrl : defaultBaseUrl()
+	);
 	const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
 	const createRequestId =
 		options.createRequestId ??
@@ -105,10 +112,10 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 				? crypto.randomUUID()
 				: `req-${Date.now()}`);
 
-	async function request<T>(
+	const request: ApiRequestFn = async <T>(
 		path: string,
 		requestOptions: ApiRequestOptions = {}
-	): Promise<{ data: T; etag: string | null; status: number }> {
+	): Promise<ApiResult<T>> => {
 		const orgScoped = requestOptions.orgScoped ?? false;
 		const headers = new Headers(requestOptions.headers);
 		headers.set('Accept', 'application/json');
@@ -143,9 +150,11 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 			body = JSON.stringify(requestOptions.body);
 		}
 
+		const url = resolvePath(baseUrl, appendQuery(path, requestOptions.query));
+
 		let response: Response;
 		try {
-			response = await fetchImpl(resolvePath(baseUrl, path), {
+			response = await fetchImpl(url, {
 				method: requestOptions.method ?? 'GET',
 				headers,
 				body,
@@ -178,8 +187,8 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 			});
 		}
 
-		const data = (payload as ApiEnvelope<T> | null)?.data;
-		if (data === undefined) {
+		const envelope = payload as ApiEnvelope<T> | null;
+		if (envelope?.data === undefined) {
 			throw new ApiClientError({
 				status: response.status,
 				code: 'INTERNAL_ERROR',
@@ -188,87 +197,20 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 			});
 		}
 
-		return { data, etag, status: response.status };
-	}
+		return {
+			data: envelope.data,
+			meta: envelope.meta,
+			etag,
+			status: response.status
+		};
+	};
 
 	return {
 		request,
-		listOrganisations: async () => {
-			const { data } = await request<ApiOrganisationMembership[]>('/api/v1/organisations', {
-				orgScoped: false
-			});
-			return data;
-		},
-		createOrganisation: async (body) => {
-			const { data } = await request<ApiOrganisationCreateResult>('/api/v1/organisations', {
-				method: 'POST',
-				body,
-				orgScoped: false
-			});
-			return data;
-		},
-		getOrganisationConfiguration: async () => {
-			const { data } = await request<ApiOrganisationConfiguration>(
-				'/api/v1/organisation/configuration',
-				{ orgScoped: true }
-			);
-			return data;
-		},
-		patchOrganisationConfiguration: async (body, version) => {
-			const { data } = await request<ApiOrganisationConfiguration>(
-				'/api/v1/organisation/configuration',
-				{
-					method: 'PATCH',
-					body,
-					orgScoped: true,
-					ifMatchVersion: version
-				}
-			);
-			return data;
-		},
-		listTaxRates: async (limit = 50) => {
-			const { data } = await request<ApiTaxRate[]>(`/api/v1/tax-rates?limit=${limit}`, {
-				orgScoped: true
-			});
-			return data;
-		},
-		createTaxRate: async (body) => {
-			const { data } = await request<ApiTaxRate>('/api/v1/tax-rates', {
-				method: 'POST',
-				body,
-				orgScoped: true
-			});
-			return data;
-		},
-		patchTaxRate: async (id, body, version) => {
-			const { data } = await request<ApiTaxRate>(`/api/v1/tax-rates/${id}`, {
-				method: 'PATCH',
-				body,
-				orgScoped: true,
-				ifMatchVersion: version
-			});
-			return data;
-		},
-		deleteTaxRate: async (id, version) => {
-			await request<undefined>(`/api/v1/tax-rates/${id}`, {
-				method: 'DELETE',
-				orgScoped: true,
-				ifMatchVersion: version
-			});
-		},
-		getProfilePreferences: async () => {
-			const { data } = await request<ApiProfilePreferences>('/api/v1/profile/preferences', {
-				orgScoped: false
-			});
-			return data;
-		},
-		patchProfilePreferences: async (body) => {
-			const { data } = await request<ApiProfilePreferences>('/api/v1/profile/preferences', {
-				method: 'PATCH',
-				body,
-				orgScoped: false
-			});
-			return data;
-		}
+		organisations: createOrganisationsEndpoints(request),
+		organisationConfig: createOrganisationConfigEndpoints(request),
+		taxRates: createTaxRatesEndpoints(request),
+		profilePreferences: createProfilePreferencesEndpoints(request),
+		quotes: createQuotesEndpoints(request)
 	};
 }
