@@ -414,4 +414,378 @@ describe('createApiV1Client', () => {
 		});
 		await client.organisations.list();
 	});
+
+	it('covers document browse, folder CRUD, upload-intent, finalize, download, rename/move/delete/restore', async () => {
+		const folderId = '11111111-2222-4333-8444-555555555555';
+		const documentId = '22222222-3333-4444-8555-666666666666';
+		const sha = 'a'.repeat(64);
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/entities/client/${CLIENT_ID}/documents`]: async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const url = new URL(request.url);
+				expect(url.searchParams.get('folder_id')).toBe(folderId);
+				return {
+					body: {
+						data: {
+							folders: [],
+							documents: []
+						}
+					}
+				};
+			},
+			[`POST /api/v1/entities/client/${CLIENT_ID}/folders`]: async (request) => {
+				expect(await request.json()).toEqual({ name: 'Contracts', parent_id: null });
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: {
+						data: {
+							folder: {
+								id: folderId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 1,
+								entity_type: 'client',
+								entity_id: CLIENT_ID,
+								parent_id: null,
+								name: 'Contracts'
+							}
+						}
+					}
+				};
+			},
+			[`PATCH /api/v1/document-folders/${folderId}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				expect(await request.json()).toEqual({ name: 'Legal' });
+				return {
+					headers: { etag: '"2"' },
+					body: {
+						data: {
+							folder: {
+								id: folderId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 2,
+								entity_type: 'client',
+								entity_id: CLIENT_ID,
+								parent_id: null,
+								name: 'Legal'
+							}
+						}
+					}
+				};
+			},
+			[`DELETE /api/v1/document-folders/${folderId}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return { status: 204 };
+			},
+			[`POST /api/v1/document-folders/${folderId}/restore`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return {
+					body: {
+						data: {
+							folder: {
+								id: folderId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 3,
+								entity_type: 'client',
+								entity_id: CLIENT_ID,
+								parent_id: null,
+								name: 'Legal'
+							}
+						}
+					}
+				};
+			},
+			[`POST /api/v1/entities/client/${CLIENT_ID}/documents/upload-intent`]: async (
+				request
+			) => {
+				expect(await request.json()).toEqual({
+					name: 'msa.pdf',
+					category: 'contract',
+					mime_type: 'application/pdf',
+					size_bytes: 10,
+					sha256: sha,
+					folder_id: folderId
+				});
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: {
+						data: {
+							document: {
+								id: documentId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 1,
+								name: 'msa.pdf',
+								category: 'contract',
+								notes: null,
+								bucket: 'org-documents',
+								storage_path: `${ORG_A}/msa.pdf`,
+								storage_version: null,
+								mime_type: 'application/pdf',
+								size_bytes: 10,
+								sha256: sha,
+								uploaded_by: null,
+								uploaded_at: null,
+								scan_status: 'pending',
+								metadata: {},
+								status: 'pending_upload',
+								upload_expires_at: '2026-08-01T02:00:00Z'
+							},
+							link: {
+								id: '33333333-4444-4555-8666-777777777777',
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 1,
+								document_id: documentId,
+								entity_type: 'client',
+								entity_id: CLIENT_ID,
+								folder_id: folderId
+							},
+							upload: {
+								signed_url: 'https://storage.example.test/put',
+								token: 'upload-token',
+								path: `${ORG_A}/msa.pdf`,
+								expires_in: 3600
+							}
+						}
+					}
+				};
+			},
+			[`POST /api/v1/documents/${documentId}/finalize`]: async (request) => {
+				expect(await request.json()).toEqual({
+					expected_size_bytes: 10,
+					expected_sha256: sha
+				});
+				return {
+					headers: { etag: '"2"' },
+					body: {
+						data: {
+							document: {
+								id: documentId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 2,
+								name: 'msa.pdf',
+								category: 'contract',
+								notes: null,
+								bucket: 'org-documents',
+								storage_path: `${ORG_A}/msa.pdf`,
+								storage_version: null,
+								mime_type: 'application/pdf',
+								size_bytes: 10,
+								sha256: sha,
+								uploaded_by: null,
+								uploaded_at: '2026-08-01T01:00:00Z',
+								scan_status: 'pending',
+								metadata: {},
+								status: 'ready',
+								upload_expires_at: null
+							}
+						}
+					}
+				};
+			},
+			[`GET /api/v1/documents/${documentId}/download`]: async () => ({
+				body: {
+					data: {
+						document_id: documentId,
+						signed_url: 'https://storage.example.test/get',
+						expires_in: 300,
+						mime_type: 'application/pdf',
+						name: 'msa.pdf'
+					}
+				}
+			}),
+			[`PATCH /api/v1/documents/${documentId}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(await request.json()).toEqual({ name: 'msa-v2.pdf' });
+				return {
+					headers: { etag: '"3"' },
+					body: {
+						data: {
+							document: {
+								id: documentId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 3,
+								name: 'msa-v2.pdf',
+								category: 'contract',
+								notes: null,
+								bucket: 'org-documents',
+								storage_path: `${ORG_A}/msa.pdf`,
+								storage_version: null,
+								mime_type: 'application/pdf',
+								size_bytes: 10,
+								sha256: sha,
+								uploaded_by: null,
+								uploaded_at: '2026-08-01T01:00:00Z',
+								scan_status: 'pending',
+								metadata: {},
+								status: 'ready',
+								upload_expires_at: null
+							}
+						}
+					}
+				};
+			},
+			[`POST /api/v1/documents/${documentId}/move`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				expect(await request.json()).toEqual({
+					entity_type: 'client',
+					entity_id: CLIENT_ID,
+					folder_id: null
+				});
+				return {
+					headers: { etag: '"2"' },
+					body: {
+						data: {
+							link: {
+								id: '33333333-4444-4555-8666-777777777777',
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 2,
+								document_id: documentId,
+								entity_type: 'client',
+								entity_id: CLIENT_ID,
+								folder_id: null
+							}
+						}
+					}
+				};
+			},
+			[`DELETE /api/v1/documents/${documentId}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"3"');
+				return { status: 204 };
+			},
+			[`POST /api/v1/documents/${documentId}/restore`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"3"');
+				return {
+					headers: { etag: '"4"' },
+					body: {
+						data: {
+							document: {
+								id: documentId,
+								org_id: ORG_A,
+								created_at: '2026-08-01T00:00:00Z',
+								updated_at: '2026-08-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 4,
+								name: 'msa-v2.pdf',
+								category: 'contract',
+								notes: null,
+								bucket: 'org-documents',
+								storage_path: `${ORG_A}/msa.pdf`,
+								storage_version: null,
+								mime_type: 'application/pdf',
+								size_bytes: 10,
+								sha256: sha,
+								uploaded_by: null,
+								uploaded_at: '2026-08-01T01:00:00Z',
+								scan_status: 'pending',
+								metadata: {},
+								status: 'ready',
+								upload_expires_at: null
+							}
+						}
+					}
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+
+		const browse = await client.documents.browse('client', CLIENT_ID, {
+			folder_id: folderId
+		});
+		expect(browse.folders).toEqual([]);
+
+		const createdFolder = await client.documents.createFolder('client', CLIENT_ID, {
+			name: 'Contracts',
+			parent_id: null
+		});
+		expect(createdFolder.folder.id).toBe(folderId);
+
+		const renamedFolder = await client.documents.updateFolder(
+			folderId,
+			{ name: 'Legal' },
+			1
+		);
+		expect(renamedFolder.folder.version).toBe(2);
+
+		await client.documents.deleteFolder(folderId, 2);
+		const restoredFolder = await client.documents.restoreFolder(folderId, 2);
+		expect(restoredFolder.folder.version).toBe(3);
+
+		const intent = await client.documents.createUploadIntent('client', CLIENT_ID, {
+			name: 'msa.pdf',
+			category: 'contract',
+			mime_type: 'application/pdf',
+			size_bytes: 10,
+			sha256: sha,
+			folder_id: folderId
+		});
+		expect(intent.upload.signed_url).toContain('storage.example.test');
+
+		const finalized = await client.documents.finalize(documentId, {
+			expected_size_bytes: 10,
+			expected_sha256: sha
+		});
+		expect(finalized.document.status).toBe('ready');
+
+		const download = await client.documents.download(documentId);
+		expect(download.signed_url).toContain('/get');
+
+		const renamed = await client.documents.rename(documentId, { name: 'msa-v2.pdf' }, 2);
+		expect(renamed.document.name).toBe('msa-v2.pdf');
+
+		const moved = await client.documents.move(
+			documentId,
+			{ entity_type: 'client', entity_id: CLIENT_ID, folder_id: null },
+			1
+		);
+		expect(moved.link.folder_id).toBeNull();
+
+		await client.documents.delete(documentId, 3);
+		const restored = await client.documents.restore(documentId, 3);
+		expect(restored.document.version).toBe(4);
+	});
 });

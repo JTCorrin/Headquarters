@@ -1,10 +1,12 @@
 import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { createDocumentsEndpoints } from './endpoints/documents.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
 import type {
+	DocumentsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
 	ProfilePreferencesEndpoints,
@@ -37,6 +39,7 @@ export interface ApiV1Client {
 	taxRates: TaxRatesEndpoints;
 	profilePreferences: ProfilePreferencesEndpoints;
 	quotes: QuotesEndpoints;
+	documents: DocumentsEndpoints;
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
@@ -204,6 +207,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		organisationConfig: createOrganisationConfigEndpoints(request),
 		taxRates: createTaxRatesEndpoints(request),
 		profilePreferences: createProfilePreferencesEndpoints(request),
-		quotes: createQuotesEndpoints(request)
+		quotes: createQuotesEndpoints(request),
+		documents: createDocumentsEndpoints(request)
 	};
 }
