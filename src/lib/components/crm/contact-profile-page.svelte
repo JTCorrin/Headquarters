@@ -56,8 +56,8 @@
 	];
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div class={cn('bg-background text-foreground flex h-full min-h-svh', className)}>
+	<AppNav {orgName} groups={navGroups} class="shrink-0 self-stretch" />
 
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
 		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">

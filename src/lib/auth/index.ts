@@ -15,6 +15,7 @@ export {
 	AUTH_PUBLIC_PATHS,
 	isAuthPublicPath,
 	isOnboardingPath,
-	postAuthDestination
+	postAuthDestination,
+	requiresSelectedOrg
 } from './paths.js';
 export { createSupabaseBrowserClient, readPublicSupabaseConfig } from './supabase.js';
