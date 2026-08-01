@@ -60,7 +60,8 @@ describe('api mappers', () => {
 			org_name: 'Acme',
 			org_slug: 'acme',
 			logo_url: '/logo.png',
-			role: 'admin'
+			role: 'admin',
+			theme_default: 'light'
 		});
 	});
 });

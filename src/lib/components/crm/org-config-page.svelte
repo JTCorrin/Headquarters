@@ -7,6 +7,7 @@
 	import {
 		membershipFromCreateResult,
 		roleFromMemberships,
+		themePreferenceFromApi,
 		themePreferenceToApi,
 		toOrganisationConfigFormData,
 		toOrganisationConfigPatch,
@@ -202,6 +203,10 @@
 			taxRates = rates.map(toTaxRateResource);
 			configForm.form.set(toOrganisationConfigFormData(config));
 			preferencesForm.form.set(toProfilePreferencesFormData(prefs));
+			session.setThemePreference(themePreferenceFromApi(prefs.theme_preference));
+			if (session.selectedOrgId) {
+				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
+			}
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -240,6 +245,9 @@
 			}
 			configuration = toOrganisationConfigResource(updated);
 			configForm.form.set(toOrganisationConfigFormData(updated));
+			if (session.selectedOrgId) {
+				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
+			}
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -284,6 +292,7 @@
 				return false;
 			}
 			preferencesForm.form.set(toProfilePreferencesFormData(updated));
+			session.setThemePreference(themePreferenceFromApi(updated.theme_preference));
 		} catch (error) {
 			if (isStale(epoch)) {
 				void loadAll();
