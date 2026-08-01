@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { resolveApiV1BaseUrl } from './base-url.js';
 import { createApiV1Client } from './client.js';
 import { ApiClientError } from './errors.js';
 import { apiError, createMockFetch } from './mock-fetch.js';
 
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const ORG_B = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
+const CLIENT_ID = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
 const QUOTE_ID = '11111111-2222-4333-8444-555555555555';
 
 const sampleOrgMembership = {
@@ -60,7 +63,7 @@ const sampleQuoteDocument = {
 	version: 1,
 	number: 'Q-0001',
 	title: 'Pilot quote',
-	client_id: null,
+	client_id: CLIENT_ID,
 	lead_id: null,
 	contact_id: null,
 	owner_membership_id: null,
@@ -306,7 +309,14 @@ describe('createApiV1Client', () => {
 				expect(request.headers.get('x-org-id')).toBe(ORG_A);
 				const body = await request.json();
 				expect(body.title).toBe('Pilot quote');
-				expect(body.lines).toHaveLength(1);
+				expect(body.client_id).toBe(CLIENT_ID);
+				expect(body.lines).toEqual([
+					{
+						description: 'Consulting',
+						quantity: 1,
+						unit_price_cents: 1000
+					}
+				]);
 				return {
 					status: 201,
 					headers: { etag: '"1"' },
@@ -341,9 +351,11 @@ describe('createApiV1Client', () => {
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
 		const created = await client.quotes.create({
 			title: 'Pilot quote',
-			lines: [{ quantity: 1, unit_price_cents: 1000, description: 'Consulting' }]
+			client_id: CLIENT_ID,
+			lines: [{ description: 'Consulting', quantity: 1, unit_price_cents: 1000 }]
 		});
 		expect(created.id).toBe(QUOTE_ID);
+		expect(created.client_id).toBe(CLIENT_ID);
 
 		const got = await client.quotes.get(QUOTE_ID);
 		expect(got.etag).toBe('"1"');
@@ -355,15 +367,49 @@ describe('createApiV1Client', () => {
 		await client.quotes.delete(QUOTE_ID, 2);
 	});
 
-	it('uses an explicit baseUrl override when provided', async () => {
+	it('retains initiating org when token resolve races with an org switch', async () => {
+		let selectedOrg = ORG_A;
+		let releaseToken!: (token: string) => void;
+		const deferredToken = new Promise<string>((resolve) => {
+			releaseToken = resolve;
+		});
+
+		const fetchMock = createMockFetch({
+			'PATCH /api/v1/organisation/configuration': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				expect(request.headers.get('authorization')).toBe('Bearer late-token');
+				return {
+					headers: { etag: '"4"' },
+					body: { data: { ...sampleConfig, version: 4 } }
+				};
+			}
+		});
+
+		const client = createApiV1Client({
+			fetch: fetchMock,
+			getOrgId: () => selectedOrg,
+			getAccessToken: () => deferredToken
+		});
+
+		const pending = client.organisationConfig.update({ timezone: 'UTC' }, 3);
+		selectedOrg = ORG_B;
+		releaseToken('late-token');
+		const updated = await pending;
+		expect(updated.version).toBe(4);
+	});
+
+	it('uses composition-root resolveApiV1BaseUrl + baseUrl so configured origin reaches requests', async () => {
+		const configured = resolveApiV1BaseUrl('https://api.example.test/');
+		expect(configured).toBe('https://api.example.test');
+
 		const fetchMock = createMockFetch({
 			'GET /api/v1/organisations': async (request) => {
-				expect(new URL(request.url).origin).toBe('https://api.example.test');
+				expect(request.url).toBe('https://api.example.test/api/v1/organisations');
 				return { body: { data: [] } };
 			}
 		});
 		const client = createApiV1Client({
-			baseUrl: 'https://api.example.test',
+			baseUrl: configured,
 			fetch: fetchMock
 		});
 		await client.organisations.list();

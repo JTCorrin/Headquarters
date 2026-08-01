@@ -1,3 +1,4 @@
+export { resolveApiV1BaseUrl } from './base-url.js';
 export {
 	createApiV1Client,
 	type ApiRequestFn,
