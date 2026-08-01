@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidAmountString } from '$lib/money.js';
 
 /** Writable lead stages via PATCH/POST — `won` only through convert. */
 export const leadWritableStages = ['new', 'qualified', 'proposal', 'lost'] as const;
@@ -25,15 +26,14 @@ export const leadFormSchema = z
 	.object({
 		name: z.string().trim().min(1, 'Name is required').max(200),
 		companyName: z.string().max(200).optional().or(z.literal('')),
+		clientId: z.string().uuid().optional().or(z.literal('')),
 		stage: z.enum(leadWritableStages),
-		valueCents: z
+		/** Decimal major units for display — converted to/from cents at the API boundary. */
+		valueAmount: z
 			.string()
 			.optional()
 			.or(z.literal(''))
-			.refine(
-				(v) => v === undefined || v === '' || (/^\d+$/.test(v) && Number.isSafeInteger(Number(v))),
-				'Must be a non-negative whole number of cents'
-			),
+			.refine((v) => v === undefined || v === '' || isValidAmountString(v), 'Enter a valid amount'),
 		currency: z
 			.string()
 			.regex(/^[A-Z]{3}$/, 'Use a 3-letter uppercase currency code'),
@@ -92,4 +92,10 @@ export interface LeadResource {
 	client_id?: string | null;
 	notes?: string | null;
 	owner_label?: string | null;
+}
+
+export interface LeadClientOption {
+	id: string;
+	name: string;
+	defaultCurrency?: string | null;
 }

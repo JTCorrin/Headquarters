@@ -6,6 +6,7 @@
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
+		toClientCreateBody,
 		toClientResource,
 		toLeadConvertBody,
 		toLeadFormData,
@@ -15,11 +16,14 @@
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiLead } from '$lib/api/v1/types.js';
+	import { resolveLeadCurrency } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
 	import {
 		convertLeadFormSchema,
 		leadFormSchema,
+		type LeadClientOption,
 		type LeadFormData,
 		type LeadResource
 	} from '$lib/schemas/lead.js';
@@ -27,6 +31,7 @@
 	import type { LeadConvertResult } from './lead-detail-page.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
+	import ClientFormDrawer from './client-form-drawer.svelte';
 	import LeadDetailPage from './lead-detail-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
@@ -54,23 +59,42 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let lead = $state<ApiLead | null>(null);
+	let clientOptions = $state<LeadClientOption[]>([]);
+	let orgCurrency = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let convertOpen = $state(false);
 	let converting = $state(false);
+	let clientDrawerOpen = $state(false);
 	let lastConvertResult = $state<LeadConvertResult | null>(null);
 
-	const emptyLeadForm = (): LeadFormData => ({
+	const emptyLeadForm = (currency = 'GBP'): LeadFormData => ({
 		name: '',
 		companyName: '',
+		clientId: '',
 		stage: 'new',
-		valueCents: '',
-		currency: 'GBP',
+		valueAmount: '',
+		currency,
 		probabilityPercent: '',
 		source: '',
 		expectedCloseOn: '',
 		lostReason: '',
+		notes: ''
+	});
+
+	const emptyClientForm = (): ClientFormData => ({
+		name: '',
+		status: 'active',
+		websiteUrl: '',
+		industry: '',
+		primaryEmail: '',
+		phone: '',
+		taxIdentifier: '',
+		registrationNumber: '',
+		defaultCurrency: '',
+		paymentTermsDays: '',
+		renewalOn: '',
 		notes: ''
 	});
 
@@ -92,6 +116,14 @@
 			resetForm: false
 		}
 	);
+
+	const clientForm = superForm(defaults(emptyClientForm(), zod4(clientFormSchema)), {
+		validators: zod4(clientFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -151,8 +183,11 @@
 
 	function resetOrgScopedState() {
 		lead = null;
+		clientOptions = [];
+		orgCurrency = null;
 		lastConvertResult = null;
 		convertOpen = false;
+		clientDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
 
@@ -175,9 +210,21 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const result = await api.leads.get(leadId);
+			const [result, clientsListed, config] = await Promise.all([
+				api.leads.get(leadId),
+				api.clients.list({ limit: 100 }),
+				api.organisationConfig.get()
+			]);
 			if (isStale(epoch)) return;
 
+			orgCurrency = config.default_currency ?? null;
+			clientOptions = clientsListed.data
+				.filter((c) => c.status !== 'archived')
+				.map((c) => ({
+					id: c.id,
+					name: c.name,
+					defaultCurrency: c.default_currency
+				}));
 			lead = result.data;
 			leadForm.form.set(toLeadFormData(result.data));
 			viewState = { kind: 'ready' };
@@ -252,6 +299,39 @@
 		}
 	}
 
+	async function onCreateClientFromLead(): Promise<boolean> {
+		const epoch = captureEpoch();
+		try {
+			const created = await api.clients.create(toClientCreateBody(get(clientForm.form)));
+			if (isStale(epoch)) return false;
+			const option: LeadClientOption = {
+				id: created.id,
+				name: created.name,
+				defaultCurrency: created.default_currency
+			};
+			clientOptions = [option, ...clientOptions.filter((c) => c.id !== option.id)];
+			leadForm.form.update((current) => ({
+				...current,
+				clientId: option.id,
+				currency: resolveLeadCurrency({
+					clientCurrency: option.defaultCurrency,
+					orgCurrency
+				})
+			}));
+			clientForm.form.set(emptyClientForm());
+			clientDrawerOpen = false;
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not create client — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -311,6 +391,8 @@
 						lead={leadResource}
 						{leadForm}
 						{convertForm}
+						{clientOptions}
+						{orgCurrency}
 						{viewState}
 						bind:convertOpen
 						{converting}
@@ -318,9 +400,24 @@
 						{onSave}
 						{onConvert}
 						{onOpenClient}
+						onCreateClient={() => {
+							clientForm.form.set({
+								...emptyClientForm(),
+								defaultCurrency: orgCurrency ?? ''
+							});
+							clientDrawerOpen = true;
+						}}
 						onReload={loadAll}
 						showNav={false}
 						class="min-h-0 flex-1"
+					/>
+					<ClientFormDrawer
+						bind:open={clientDrawerOpen}
+						form={clientForm}
+						showTrigger={false}
+						title="New client"
+						description="Create a client and link it to this lead."
+						onValidSubmit={onCreateClientFromLead}
 					/>
 				{/if}
 			</div>

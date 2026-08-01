@@ -2,14 +2,17 @@
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { ContactFormData } from '$lib/schemas/contact.js';
+	import type { LeadClientOption } from '$lib/schemas/lead.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import ClientPicker from './client-picker.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface ContactFormProps {
 		form: SuperForm<ContactFormData>;
+		clientOptions?: LeadClientOption[];
 		submitLabel?: string;
 		class?: string;
 		/**
@@ -17,13 +20,16 @@
 		 * Return `false` (or reject) to signal failure; may be async.
 		 */
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onCreateClient?: () => void;
 	}
 
 	let {
 		form,
+		clientOptions = [],
 		submitLabel = 'Save contact',
 		class: className,
-		onValidSubmit
+		onValidSubmit,
+		onCreateClient
 	}: ContactFormProps = $props();
 
 	// SuperForm instance is stable; stores inside are the reactive surface.
@@ -78,6 +84,26 @@
 			aria-invalid={!!$errors.name}
 		/>
 		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+	</div>
+
+	<div class="space-y-2">
+		<Label for="contact-client-picker">Client</Label>
+		<input type="hidden" name="clientId" value={$formData.clientId ?? ''} />
+		<ClientPicker
+			id="contact-client-picker"
+			value={$formData.clientId ?? ''}
+			options={clientOptions}
+			placeholder="Select client (optional)"
+			aria-invalid={!!$errors.clientId}
+			onValueChange={(id) => {
+				$formData.clientId = id;
+			}}
+			onCreateNew={onCreateClient}
+		/>
+		<p class="text-muted-foreground text-[11px]">
+			Links via the primary client relationship — not a contact column.
+		</p>
+		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
 	</div>
 
 	<div class="space-y-2">

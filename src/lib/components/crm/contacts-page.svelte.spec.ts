@@ -74,6 +74,9 @@ describe('ContactsPage integration', () => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				return { body: { data: [sampleContact()], meta: { next_cursor: null } } };
 			},
+			'GET /api/v1/clients': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			'POST /api/v1/contacts': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				createBody = await request.json();

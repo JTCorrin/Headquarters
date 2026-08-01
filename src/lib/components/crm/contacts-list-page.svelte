@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { ContactFormData } from '$lib/schemas/contact.js';
+	import type { LeadClientOption } from '$lib/schemas/lead.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ContactsTable from './contacts-table.svelte';
@@ -13,11 +14,13 @@
 		navGroups: AppNavGroup[];
 		rows: ContactRow[];
 		form: SuperForm<ContactFormData>;
+		clientOptions?: LeadClientOption[];
 		drawerOpen?: boolean;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onCreateClient?: () => void;
 	}
 
 	let {
@@ -25,10 +28,12 @@
 		navGroups,
 		rows,
 		form,
+		clientOptions = [],
 		drawerOpen = $bindable(false),
 		showNav = true,
 		class: className,
-		onValidSubmit
+		onValidSubmit,
+		onCreateClient
 	}: ContactsListPageProps = $props();
 </script>
 
@@ -54,7 +59,9 @@
 					<ContactFormDrawer
 						bind:open={drawerOpen}
 						{form}
+						{clientOptions}
 						{onValidSubmit}
+						{onCreateClient}
 						triggerLabel="New contact"
 					/>
 				{/snippet}

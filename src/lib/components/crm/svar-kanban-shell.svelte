@@ -5,9 +5,16 @@
 		WillowDark,
 		type KanbanCard,
 		type CardShape,
-		type ColumnConfig
+		type ColumnConfig,
+		type KanbanInstanceApi
 	} from '@svar-ui/svelte-kanban';
 	import { cn } from '$lib/utils.js';
+
+	export interface MoveCardEvent {
+		id: string | number;
+		column?: string | number;
+		before?: string | number | null;
+	}
 
 	export interface SvarKanbanShellProps {
 		cards: KanbanCard[];
@@ -15,6 +22,8 @@
 		card?: CardShape;
 		readonly?: boolean;
 		class?: string;
+		onMoveCard?: (event: MoveCardEvent) => void;
+		onInit?: (api: KanbanInstanceApi) => void;
 	}
 
 	let {
@@ -32,7 +41,9 @@
 			menu: false
 		},
 		readonly = false,
-		class: className
+		class: className,
+		onMoveCard,
+		onInit
 	}: SvarKanbanShellProps = $props();
 
 	let dark = $state(false);
@@ -47,6 +58,10 @@
 		observer.observe(root, { attributes: true, attributeFilter: ['class'] });
 		return () => observer.disconnect();
 	});
+
+	function handleInit(api: KanbanInstanceApi) {
+		onInit?.(api);
+	}
 </script>
 
 <div
@@ -55,13 +70,27 @@
 	{#if dark}
 		<WillowDark>
 			<div class="crm-svar-kanban-theme h-full">
-				<Kanban {cards} {columns} {card} {readonly} />
+				<Kanban
+					{cards}
+					{columns}
+					{card}
+					{readonly}
+					init={handleInit}
+					onmovecard={onMoveCard}
+				/>
 			</div>
 		</WillowDark>
 	{:else}
 		<Willow>
 			<div class="crm-svar-kanban-theme h-full">
-				<Kanban {cards} {columns} {card} {readonly} />
+				<Kanban
+					{cards}
+					{columns}
+					{card}
+					{readonly}
+					init={handleInit}
+					onmovecard={onMoveCard}
+				/>
 			</div>
 		</Willow>
 	{/if}

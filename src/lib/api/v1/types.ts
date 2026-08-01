@@ -342,6 +342,7 @@ export interface ApiLeadCreateBody {
 	name: string;
 	company_name?: string | null;
 	contact_id?: string | null;
+	client_id?: string | null;
 	stage?: ApiLeadWritableStage;
 	value_cents?: number | null;
 	currency?: string;
@@ -408,6 +409,8 @@ export interface ApiContactCreateBody {
 	primary_phone?: string | null;
 	job_title?: string | null;
 	company_name?: string | null;
+	/** Primary client link via `client_contacts` (server-maintained relation). */
+	client_id?: string | null;
 	owner_membership_id?: string | null;
 	lifecycle_status?: ApiContactLifecycleStatus;
 	source?: string | null;
