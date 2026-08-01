@@ -294,6 +294,62 @@ export type QuoteRow = {
   converted_invoice_id: string | null
 }
 
+export type DocumentRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  category: string
+  notes: string | null
+  bucket: string
+  storage_path: string
+  storage_version: string | null
+  mime_type: string
+  size_bytes: number
+  sha256: string
+  uploaded_by: string | null
+  uploaded_at: string | null
+  scan_status: 'pending' | 'clean' | 'infected' | 'failed'
+  metadata: Json
+  status: 'pending_upload' | 'ready' | 'orphan' | 'failed'
+  upload_expires_at: string | null
+}
+
+export type DocumentFolderRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  entity_type: string
+  entity_id: string
+  parent_id: string | null
+  name: string
+}
+
+export type DocumentLinkRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  document_id: string
+  entity_type: string
+  entity_id: string
+  folder_id: string | null
+}
+
 export type QuoteLineRow = {
   id: string
   org_id: string
@@ -506,6 +562,24 @@ export type Database = {
         Update: Partial<QuoteLineInsert>
         Relationships: []
       }
+      documents: {
+        Row: DocumentRow
+        Insert: Partial<DocumentRow>
+        Update: Partial<DocumentRow>
+        Relationships: []
+      }
+      document_folders: {
+        Row: DocumentFolderRow
+        Insert: Partial<DocumentFolderRow>
+        Update: Partial<DocumentFolderRow>
+        Relationships: []
+      }
+      document_links: {
+        Row: DocumentLinkRow
+        Insert: Partial<DocumentLinkRow>
+        Update: Partial<DocumentLinkRow>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -584,6 +658,122 @@ export type Database = {
           p_org_id: string
           p_quote_id: string
         }
+        Returns: Json
+      }
+      browse_entity_documents: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_folder_id?: string | null
+        }
+        Returns: Json
+      }
+      create_document_folder: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_name: string
+          p_parent_id?: string | null
+        }
+        Returns: Json
+      }
+      rename_document_folder: {
+        Args: {
+          p_org_id: string
+          p_folder_id: string
+          p_expected_version: number
+          p_name: string
+        }
+        Returns: Json
+      }
+      move_document_folder: {
+        Args: {
+          p_org_id: string
+          p_folder_id: string
+          p_expected_version: number
+          p_parent_id?: string | null
+        }
+        Returns: Json
+      }
+      soft_delete_document_folder: {
+        Args: {
+          p_org_id: string
+          p_folder_id: string
+          p_expected_version: number
+        }
+        Returns: Json
+      }
+      restore_document_folder: {
+        Args: {
+          p_org_id: string
+          p_folder_id: string
+          p_expected_version: number
+        }
+        Returns: Json
+      }
+      create_document_upload_intent: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_folder_id?: string | null
+          p_name: string
+          p_category: string
+          p_mime_type: string
+          p_size_bytes: number
+          p_sha256: string
+        }
+        Returns: Json
+      }
+      finalize_document_upload: {
+        Args: {
+          p_org_id: string
+          p_document_id: string
+          p_expected_size_bytes?: number | null
+          p_expected_sha256?: string | null
+        }
+        Returns: Json
+      }
+      soft_delete_document: {
+        Args: {
+          p_org_id: string
+          p_document_id: string
+          p_expected_version: number
+        }
+        Returns: Json
+      }
+      restore_document: {
+        Args: {
+          p_org_id: string
+          p_document_id: string
+          p_expected_version: number
+        }
+        Returns: Json
+      }
+      rename_document: {
+        Args: {
+          p_org_id: string
+          p_document_id: string
+          p_expected_version: number
+          p_name: string
+        }
+        Returns: Json
+      }
+      move_document_link: {
+        Args: {
+          p_org_id: string
+          p_document_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_expected_version: number
+          p_folder_id?: string | null
+        }
+        Returns: Json
+      }
+      reap_expired_document_uploads: {
+        Args: Record<string, never>
         Returns: Json
       }
     }
