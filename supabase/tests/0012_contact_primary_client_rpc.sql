@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(14);
 
 select ok(
   has_function_privilege(
@@ -276,6 +276,7 @@ select ok(
      and f.contact_id = client_contacts.contact_id
     where client_contacts.deleted_at is null
       and client_contacts.is_primary = false
+      and client_contacts.role <> 'primary'
   )
   and exists (
     select 1
@@ -285,6 +286,7 @@ select ok(
      and f.contact_id = client_contacts.contact_id
     where client_contacts.deleted_at is null
       and client_contacts.is_primary
+      and client_contacts.role = 'primary'
   )
   and exists (
     select 1
@@ -293,6 +295,19 @@ select ok(
       and deleted_at is null
   ),
   'primary reassignment demotes prior primary and preserves secondary client_contacts'
+);
+
+select ok(
+  (
+    select role = 'other'
+      and is_primary = false
+    from public.client_contacts
+    join _primary_link_fixture f
+      on f.client_a = client_contacts.client_id
+     and f.contact_id = client_contacts.contact_id
+    where client_contacts.deleted_at is null
+  ),
+  'demoted primary clears is_primary and role=primary together (role becomes other)'
 );
 
 select ok(

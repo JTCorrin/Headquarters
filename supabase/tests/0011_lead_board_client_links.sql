@@ -1,6 +1,6 @@
 begin;
 
-select plan(10);
+select plan(13);
 
 select ok(
   exists (
@@ -43,6 +43,7 @@ create temporary table _link_fixture (
   org_id uuid,
   other_org_id uuid,
   contact_id uuid,
+  prior_primary_contact_id uuid,
   client_id uuid,
   other_client_id uuid,
   lead_id uuid
@@ -292,7 +293,44 @@ select throws_ok(
   'lead client_id must be an active client in the same organisation'
 );
 
--- convert_lead reuses the pre-linked client and links the contact as primary
+-- Seed: another contact is already primary; lead contact is a non-primary link.
+-- convert_lead must promote the lead contact (not skip because a link exists).
+with prior_contact as (
+  insert into public.contacts (
+    org_id,
+    display_name,
+    primary_email,
+    created_by,
+    updated_by
+  )
+  select
+    org_id,
+    'Prior Primary Contact',
+    'prior-primary@example.test',
+    owner_id,
+    owner_id
+  from _link_fixture
+  returning id
+)
+update _link_fixture
+set prior_primary_contact_id = prior_contact.id
+from prior_contact;
+
+insert into public.client_contacts (
+  org_id, client_id, contact_id, role, is_primary, created_by, updated_by
+)
+select
+  org_id, client_id, prior_primary_contact_id, 'primary', true, owner_id, owner_id
+from _link_fixture;
+
+insert into public.client_contacts (
+  org_id, client_id, contact_id, role, is_primary, created_by, updated_by
+)
+select
+  org_id, client_id, contact_id, 'billing', false, owner_id, owner_id
+from _link_fixture;
+
+-- convert_lead reuses the pre-linked client and promotes the contact to primary
 select ok(
   (
     select (public.convert_lead(lead_id) -> 'client' ->> 'id')::uuid = client_id
@@ -335,7 +373,73 @@ select ok(
       and client_contacts.role = 'primary'
       and client_contacts.deleted_at is null
   ),
-  'convert_lead links the lead contact as the primary client contact'
+  'convert_lead promotes an existing non-primary link to primary'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.client_contacts
+    join _link_fixture
+      on _link_fixture.client_id = client_contacts.client_id
+     and _link_fixture.prior_primary_contact_id = client_contacts.contact_id
+    where client_contacts.deleted_at is null
+      and client_contacts.is_primary = false
+      and client_contacts.role <> 'primary'
+  ),
+  'convert_lead demotes prior primary with is_primary and role kept consistent'
+);
+
+-- Corrupt primary after conversion; idempotent retry must repair it.
+update public.client_contacts
+set
+  is_primary = false,
+  role = 'billing'
+where client_id = (select client_id from _link_fixture)
+  and contact_id = (select contact_id from _link_fixture);
+
+update public.client_contacts
+set
+  is_primary = true,
+  role = 'primary'
+where client_id = (select client_id from _link_fixture)
+  and contact_id = (select prior_primary_contact_id from _link_fixture);
+
+select pg_temp.as_user((select owner_id from _link_fixture));
+set local role authenticated;
+
+select ok(
+  (
+    select (public.convert_lead(lead_id) ->> 'idempotent')::boolean
+    from _link_fixture
+  ),
+  'convert_lead idempotent retry returns idempotent=true for a won lead'
+);
+
+reset role;
+
+select ok(
+  exists (
+    select 1
+    from public.client_contacts
+    join _link_fixture
+      on _link_fixture.client_id = client_contacts.client_id
+     and _link_fixture.contact_id = client_contacts.contact_id
+    where client_contacts.is_primary
+      and client_contacts.role = 'primary'
+      and client_contacts.deleted_at is null
+  )
+  and exists (
+    select 1
+    from public.client_contacts
+    join _link_fixture
+      on _link_fixture.client_id = client_contacts.client_id
+     and _link_fixture.prior_primary_contact_id = client_contacts.contact_id
+    where client_contacts.deleted_at is null
+      and client_contacts.is_primary = false
+      and client_contacts.role <> 'primary'
+  ),
+  'idempotent convert_lead repairs/confirms the intended primary relation'
 );
 
 select * from finish();
