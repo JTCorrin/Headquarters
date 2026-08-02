@@ -292,6 +292,17 @@ else
 	log "tasks curl proof script missing — skipped"
 fi
 
+# Recurring invoices foundation: schedule CRUD + lifecycle + run-now draft invoice.
+if [[ -x scripts/recurring_invoices_staging_curl_proof.sh ]]; then
+	log "running recurring invoices foundation curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/recurring_invoices_staging_curl_proof.sh
+else
+	log "recurring invoices curl proof script missing — skipped"
+fi
+
 # Product → quote line → accept → from-quote (product_id + SKU/price/tax snapshots).
 if [[ -x scripts/product_quote_invoice_staging_curl_proof.sh ]]; then
 	log "running product→quote→invoice convert curl proof"
