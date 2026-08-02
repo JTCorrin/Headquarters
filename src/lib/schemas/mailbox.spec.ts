@@ -2,10 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
 	applyMailboxPreset,
 	emptyMailboxFormData,
-	mailboxFormSchema
+	mailboxFormSchema,
+	mailboxPresetDefaults,
+	mailboxSecurityOptions
 } from './mailbox.js';
 
 describe('mailbox schema', () => {
+	it('wires security as tls | starttls | none (API/DB enum)', () => {
+		expect(mailboxSecurityOptions).toEqual(['tls', 'starttls', 'none']);
+		expect(mailboxPresetDefaults.gmail.imapSecurity).toBe('tls');
+		expect(mailboxPresetDefaults.gmail.smtpSecurity).toBe('tls');
+		expect(mailboxPresetDefaults.custom.imapSecurity).toBe('tls');
+		expect(mailboxPresetDefaults.outlook.imapSecurity).toBe('tls');
+		expect(mailboxPresetDefaults.outlook.smtpSecurity).toBe('starttls');
+	});
+
 	it('accepts a gmail-shaped form with password', () => {
 		const data = {
 			...emptyMailboxFormData('gmail'),
@@ -15,6 +26,8 @@ describe('mailbox schema', () => {
 			fromName: 'Joe'
 		};
 		expect(mailboxFormSchema.safeParse(data).success).toBe(true);
+		expect(data.imapSecurity).toBe('tls');
+		expect(data.smtpSecurity).toBe('tls');
 	});
 
 	it('applies outlook host defaults from preset', () => {
@@ -22,6 +35,16 @@ describe('mailbox schema', () => {
 		expect(next.imapHost).toBe('outlook.office365.com');
 		expect(next.smtpPort).toBe('587');
 		expect(next.smtpSecurity).toBe('starttls');
+	});
+
+	it('rejects legacy ssl wire value', () => {
+		const data = {
+			...emptyMailboxFormData('gmail'),
+			emailAddress: 'joe@acme.test',
+			imapSecurity: 'ssl',
+			smtpSecurity: 'ssl'
+		} as unknown as Parameters<typeof mailboxFormSchema.safeParse>[0];
+		expect(mailboxFormSchema.safeParse(data).success).toBe(false);
 	});
 
 	it('rejects invalid ports', () => {
