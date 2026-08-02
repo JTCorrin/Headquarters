@@ -3,6 +3,7 @@ import type {
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
+	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
 	ApiEntityEmailType
 } from '../types.js';
@@ -23,10 +24,10 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 			);
 			return data;
 		},
-		share: async (messageId: string, signal) => {
+		share: async (messageId: string, body: ApiEmailMessageShareBody, signal) => {
 			const { data } = await request<ApiEmailMessageShareResult>(
 				`/api/v1/email-messages/${messageId}/share`,
-				{ method: 'POST', orgScoped: true, signal }
+				{ method: 'POST', body, orgScoped: true, signal }
 			);
 			return data;
 		},

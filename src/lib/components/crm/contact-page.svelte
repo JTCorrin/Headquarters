@@ -183,7 +183,10 @@
 	async function onAddToTimeline(payload: { messageId: string }) {
 		sharingId = payload.messageId;
 		try {
-			await api.emailMessages.share(payload.messageId);
+			await api.emailMessages.share(payload.messageId, {
+				entity_type: 'contact',
+				entity_id: contactId
+			});
 			emailTab = await loadEntityEmailTab(api, 'contact', contactId);
 		} finally {
 			sharingId = null;
