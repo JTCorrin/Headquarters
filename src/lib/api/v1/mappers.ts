@@ -2,6 +2,8 @@ import type { ClientFormData, ClientResource } from '$lib/schemas/client.js';
 import type { ContactFormData, ContactListItem } from '$lib/schemas/contact.js';
 import type { ConvertLeadFormData, LeadFormData, LeadResource } from '$lib/schemas/lead.js';
 import { leadWritableStages } from '$lib/schemas/lead.js';
+import type { AiIntegrationResource } from '$lib/schemas/integration.js';
+import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
 import { amountStringToCents, centsToAmountString } from '$lib/money.js';
 import type {
 	MembershipRole,
@@ -26,6 +28,7 @@ import type { ClientRow } from '$lib/components/crm/clients-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
 import type { ProductRow } from '$lib/components/crm/products-columns.js';
 import type {
+	ApiAiIntegration,
 	ApiClient,
 	ApiClientCreateBody,
 	ApiClientUpdateBody,
@@ -41,6 +44,8 @@ import type {
 	ApiLeadConvertBody,
 	ApiLeadCreateBody,
 	ApiLeadUpdateBody,
+	ApiMailboxAccount,
+	ApiMailboxPutBody,
 	ApiOrganisationConfiguration,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
@@ -752,4 +757,53 @@ export function toLeadConvertBody(data: ConvertLeadFormData): ApiLeadConvertBody
 	const name = emptyToNull(data.clientName);
 	if (name) body.client_name = name;
 	return body;
+}
+
+export function toMailboxAccountResource(
+	account: ApiMailboxAccount | null | undefined
+): MailboxAccountResource | null {
+	if (!account) return null;
+	return {
+		id: account.id,
+		email_address: account.email_address,
+		username: account.username,
+		from_name: account.from_name,
+		imap_host: account.imap_host,
+		imap_port: account.imap_port,
+		imap_security: account.imap_security,
+		smtp_host: account.smtp_host,
+		smtp_port: account.smtp_port,
+		smtp_security: account.smtp_security,
+		credentials_configured: account.credentials_configured,
+		status: account.status,
+		last_checked_at: account.last_checked_at,
+		last_error_code: account.last_error_code
+	};
+}
+
+export function toMailboxPutBody(data: MailboxFormData): ApiMailboxPutBody {
+	const body: ApiMailboxPutBody = {
+		email_address: data.emailAddress.trim(),
+		username: (data.username.trim() || data.emailAddress.trim()),
+		from_name: emptyToNull(data.fromName),
+		imap_host: data.imapHost.trim(),
+		imap_port: Number(data.imapPort),
+		imap_security: data.imapSecurity,
+		smtp_host: data.smtpHost.trim(),
+		smtp_port: Number(data.smtpPort),
+		smtp_security: data.smtpSecurity
+	};
+	const password = data.password.trim();
+	if (password) body.password = password;
+	return body;
+}
+
+export function toAiIntegrationResource(item: ApiAiIntegration): AiIntegrationResource {
+	return {
+		provider: item.provider,
+		credentials_configured: item.credentials_configured,
+		status: item.status,
+		last_verified_at: item.last_verified_at,
+		last_error_code: item.last_error_code
+	};
 }
