@@ -16,6 +16,11 @@ import {
 	toInvoiceCreateBody,
 	toInvoiceLineInput,
 	lineItemRowsToInvoiceLineInputs,
+	lineItemRowsToQuoteLineInputs,
+	toCatalogProductOption,
+	toProductCreateBody,
+	toProductRow,
+	toQuoteLineInput,
 	toInvoiceListItem,
 	toLeadCard,
 	toLeadCreateBody,
@@ -315,6 +320,127 @@ describe('api mappers', () => {
 				position: 0
 			}
 		]);
+		expect(
+			toQuoteLineInput({
+				productId: 'dddddddd-dddd-4eee-8fff-000000000001',
+				description: 'Catalog line',
+				qty: '3',
+				unitPrice: '12.00'
+			})
+		).toEqual({
+			product_id: 'dddddddd-dddd-4eee-8fff-000000000001',
+			description: 'Catalog line',
+			quantity: 3,
+			unit_price_cents: 1200
+		});
+		expect(
+			lineItemRowsToQuoteLineInputs([
+				{
+					productId: 'dddddddd-dddd-4eee-8fff-000000000001',
+					description: 'Catalog line',
+					qty: '3',
+					unitPrice: '12.00',
+					discountPercent: 0,
+					taxRatePercent: 20
+				}
+			])
+		).toEqual([
+			{
+				product_id: 'dddddddd-dddd-4eee-8fff-000000000001',
+				description: 'Catalog line',
+				quantity: 3,
+				unit_price_cents: 1200,
+				discount_percent: 0,
+				tax_rate_percent: 20,
+				position: 0
+			}
+		]);
+		expect(
+			toProductCreateBody({
+				sku: 'WID-1',
+				name: 'Widget',
+				description: '',
+				unitPrice: '25.00',
+				trackStock: true,
+				stockQty: '4',
+				status: 'active'
+			})
+		).toEqual({
+			sku: 'WID-1',
+			name: 'Widget',
+			description: null,
+			product_type: 'product',
+			unit_price_cents: 2500,
+			currency: 'GBP',
+			track_stock: true,
+			status: 'active'
+		});
+		expect(
+			toProductRow({
+				id: 'dddddddd-dddd-4eee-8fff-000000000001',
+				org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+				created_at: '2026-01-01T00:00:00Z',
+				updated_at: '2026-01-01T00:00:00Z',
+				created_by: null,
+				updated_by: null,
+				deleted_at: null,
+				version: 1,
+				sku: 'WID-1',
+				name: 'Widget',
+				description: null,
+				category_id: null,
+				product_type: 'product',
+				unit_name: null,
+				unit_price_cents: 2500,
+				cost_price_cents: null,
+				currency: 'GBP',
+				tax_rate_id: null,
+				track_stock: true,
+				stock_qty: 4,
+				low_stock_at: 2,
+				status: 'active',
+				metadata: {}
+			})
+		).toMatchObject({
+			id: 'dddddddd-dddd-4eee-8fff-000000000001',
+			sku: 'WID-1',
+			name: 'Widget',
+			stock: 4,
+			lowStockAt: 2,
+			status: 'Active'
+		});
+		expect(
+			toCatalogProductOption({
+				id: 'dddddddd-dddd-4eee-8fff-000000000001',
+				org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+				created_at: '2026-01-01T00:00:00Z',
+				updated_at: '2026-01-01T00:00:00Z',
+				created_by: null,
+				updated_by: null,
+				deleted_at: null,
+				version: 1,
+				sku: 'WID-1',
+				name: 'Widget',
+				description: null,
+				category_id: null,
+				product_type: 'product',
+				unit_name: null,
+				unit_price_cents: 2500,
+				cost_price_cents: null,
+				currency: 'GBP',
+				tax_rate_id: null,
+				track_stock: false,
+				stock_qty: 0,
+				low_stock_at: null,
+				status: 'active',
+				metadata: {}
+			})
+		).toEqual({
+			id: 'dddddddd-dddd-4eee-8fff-000000000001',
+			sku: 'WID-1',
+			name: 'Widget',
+			unitPrice: '25'
+		});
 	});
 
 	it('maps leads between API and form/board shapes', () => {

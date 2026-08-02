@@ -53,6 +53,16 @@ export function createQuotesEndpoints(request: ApiRequestFn): QuotesEndpoints {
 				ifMatchVersion: version,
 				signal
 			});
+		},
+		accept: async (id, version, signal) => {
+			const { data } = await request<ApiQuoteDocument>(`/api/v1/quotes/${id}/accept`, {
+				method: 'POST',
+				body: {},
+				orgScoped: true,
+				ifMatchVersion: version,
+				signal
+			});
+			return data;
 		}
 	};
 }
