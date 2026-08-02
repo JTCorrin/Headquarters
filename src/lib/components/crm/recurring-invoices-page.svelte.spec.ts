@@ -256,6 +256,9 @@ describe('RecurringInvoicePage integration', () => {
 			'GET /api/v1/products': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
+			'GET /api/v1/invoices': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`GET /api/v1/recurring-invoice-schedules/${SCHEDULE_ID}/runs`]: async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
@@ -301,6 +304,9 @@ describe('RecurringInvoicePage integration', () => {
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/invoices': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			[`GET /api/v1/recurring-invoice-schedules/${SCHEDULE_ID}/runs`]: async () => ({
