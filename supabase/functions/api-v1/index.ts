@@ -10,6 +10,8 @@ import { handleAiSuggestions } from './ai-suggestions.ts'
 import { handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
+import { handleBills } from './bills.ts'
+import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleMailbox, listEntityEmailMessages } from './mailbox.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
@@ -26,13 +28,16 @@ type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 function assertCanAccessPipeline(
   role: MembershipRole,
   method: string,
-  resource: 'leads' | 'clients',
+  resource: 'leads' | 'clients' | 'vendors',
 ): void {
   if (resource === 'leads' && role === 'billing') {
     throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access leads')
   }
   if (resource === 'clients' && role === 'billing' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read clients')
+  }
+  if (resource === 'vendors' && role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read vendors')
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
@@ -64,6 +69,15 @@ function assertCanAccessInvoices(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify invoices')
+  }
+}
+
+function assertCanAccessBills(role: MembershipRole, method: string): void {
+  if (role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read bills')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify bills')
   }
 }
 
@@ -275,6 +289,11 @@ export default {
           return await handleClients(req, db, path, orgId, requestId)
         }
 
+        if (path === '/api/v1/vendors' || path.startsWith('/api/v1/vendors/')) {
+          assertCanAccessPipeline(membership.role, req.method, 'vendors')
+          return await handleVendors(req, db, path, orgId, requestId)
+        }
+
         if (
           path === '/api/v1/product-categories' ||
           path.startsWith('/api/v1/product-categories/')
@@ -311,6 +330,11 @@ export default {
         if (path === '/api/v1/invoices' || path.startsWith('/api/v1/invoices/')) {
           assertCanAccessInvoices(membership.role, req.method)
           return await handleInvoices(req, db, path, orgId, requestId)
+        }
+
+        if (path === '/api/v1/bills' || path.startsWith('/api/v1/bills/')) {
+          assertCanAccessBills(membership.role, req.method)
+          return await handleBills(req, db, path, orgId, requestId)
         }
 
         if (
