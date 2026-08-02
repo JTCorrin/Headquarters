@@ -24,7 +24,10 @@ import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
 import { validateBillBody } from './bills.ts'
 import { validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
-import { validateRecurringScheduleBody } from './recurring-invoices.ts'
+import {
+  recurringLifecycleIdempotencyPayload,
+  validateRecurringScheduleBody,
+} from './recurring-invoices.ts'
 import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -1088,4 +1091,29 @@ Deno.test('recurring schedule validation defaults and frequency fields', () => {
       }, false),
     ApiError,
   )
+})
+
+Deno.test('run-now idempotency payload omits expected_version', async () => {
+  const scheduleId = '11111111-1111-4111-8111-111111111111'
+  assertEquals(recurringLifecycleIdempotencyPayload('run-now', scheduleId, 1), {
+    schedule_id: scheduleId,
+  })
+  assertEquals(recurringLifecycleIdempotencyPayload('run-now', scheduleId, 99), {
+    schedule_id: scheduleId,
+  })
+  assertEquals(recurringLifecycleIdempotencyPayload('activate', scheduleId, 3), {
+    schedule_id: scheduleId,
+    expected_version: 3,
+  })
+
+  const route = `/api/v1/recurring-invoice-schedules/${scheduleId}/run-now`
+  const hashV1 = await hashIdempotencyRequest(
+    route,
+    recurringLifecycleIdempotencyPayload('run-now', scheduleId, 1),
+  )
+  const hashV2 = await hashIdempotencyRequest(
+    route,
+    recurringLifecycleIdempotencyPayload('run-now', scheduleId, 2),
+  )
+  assertEquals(hashV1, hashV2)
 })
