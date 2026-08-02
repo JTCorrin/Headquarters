@@ -51,11 +51,15 @@ export { default as OrganisationCreateForm } from './organisation-create-form.sv
 export { default as OrganisationCreateDrawer } from './organisation-create-drawer.svelte';
 export { default as OrganisationConfigForm } from './organisation-config-form.svelte';
 export { default as ProfilePreferencesForm } from './profile-preferences-form.svelte';
+export { default as ProfileMailboxForm } from './profile-mailbox-form.svelte';
 export { default as TaxRateForm } from './tax-rate-form.svelte';
 export { default as SettingsConfigPage } from './settings-config-page.svelte';
 export { default as AppShell } from './app-shell.svelte';
 export { default as SelectOrgPage } from './select-org-page.svelte';
 export { default as OrgConfigPage } from './org-config-page.svelte';
+export { default as OrgIntegrationsPage } from './org-integrations-page.svelte';
+export { default as OrgIntegrationsController } from './org-integrations-controller.svelte';
+export { default as AiProviderConnectDrawer } from './ai-provider-connect-drawer.svelte';
 export { default as DashboardPage } from './dashboard-page.svelte';
 export { default as QuoteForm } from './quote-form.svelte';
 export { default as QuoteFormDrawer } from './quote-form-drawer.svelte';

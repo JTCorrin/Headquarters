@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { MembershipRole } from '$lib/schemas/organisation.js';
+	import { draftResponseGateCopy } from '$lib/schemas/integration.js';
 	import { cn } from '$lib/utils.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -17,10 +19,23 @@
 		unread?: boolean;
 	}
 
+	/** Wave A empty states — three different stories, not one generic message. */
+	export type EntityEmailEmptyState = 'no_mailbox' | 'no_matches' | 'teammate_nothing_shared';
+
 	export interface EntityEmailInboxProps {
 		messages: EmailMessage[];
 		selectedId?: string;
+		/** @deprecated Prefer `emptyState` for Wave A stories. */
 		emptyMessage?: string;
+		emptyState?: EntityEmailEmptyState;
+		mailboxConnected?: boolean;
+		aiProviderConnected?: boolean;
+		smtpReady?: boolean;
+		role?: MembershipRole;
+		mailSettingsHref?: string;
+		integrationsHref?: string;
+		/** Forward stays hidden until a real forward path exists. */
+		showForward?: boolean;
 		/** Optional mock delay (ms) for Draft response in Storybook. */
 		draftDelayMs?: number;
 		class?: string;
@@ -30,7 +45,15 @@
 	let {
 		messages,
 		selectedId = $bindable<string | undefined>(undefined),
-		emptyMessage = 'No messages for this entity yet.',
+		emptyMessage,
+		emptyState = 'no_matches',
+		mailboxConnected = false,
+		aiProviderConnected = false,
+		smtpReady = false,
+		role = 'member',
+		mailSettingsHref = '/org/config#mail',
+		integrationsHref = '/org/integrations',
+		showForward = false,
 		draftDelayMs = 700,
 		class: className,
 		onSendReply
@@ -38,6 +61,7 @@
 
 	let composing = $state(false);
 	let replyBody = $state('');
+	let suggestionBody = $state('');
 	let aiStatus = $state<AiSuggestionStatus>('idle');
 	let tone = $state<'warm' | 'neutral' | 'firm'>('warm');
 
@@ -48,6 +72,43 @@
 	});
 
 	const selected = $derived(messages.find((m) => m.id === selectedId));
+	const draftGate = $derived(draftResponseGateCopy(role));
+	const draftDisabled = $derived(!aiProviderConnected);
+	const sendDisabled = $derived(!smtpReady || !replyBody.trim());
+
+	const emptyCopy = $derived.by(() => {
+		if (emptyMessage) {
+			return { title: emptyMessage, detail: null as string | null, ctaHref: null as string | null, ctaLabel: null as string | null };
+		}
+		switch (emptyState) {
+			case 'no_mailbox':
+				return {
+					title: 'Connect your mailbox to see email here',
+					detail:
+						'Personal IMAP/SMTP lives under Config → Mail. Organisation Email sending is a separate plane.',
+					ctaHref: mailSettingsHref,
+					ctaLabel: 'Open Mail settings'
+				};
+			case 'teammate_nothing_shared':
+				return {
+					title: 'No shared emails yet',
+					detail:
+						'Teammates only see mail that was added to the timeline — private inbox matches stay private.',
+					ctaHref: null,
+					ctaLabel: null
+				};
+			case 'no_matches':
+			default:
+				return {
+					title: 'No mail matched this person yet',
+					detail: mailboxConnected
+						? 'When sync finds messages to or from their address, they will appear here.'
+						: 'Connect a mailbox to start matching messages.',
+					ctaHref: mailboxConnected ? null : mailSettingsHref,
+					ctaLabel: mailboxConnected ? null : 'Open Mail settings'
+				};
+		}
+	});
 
 	function setTone(id: string) {
 		if (id === 'warm' || id === 'neutral' || id === 'firm') tone = id;
@@ -56,12 +117,14 @@
 	function startReply() {
 		composing = true;
 		replyBody = '';
+		suggestionBody = '';
 		aiStatus = 'idle';
 	}
 
 	function cancelReply() {
 		composing = false;
 		replyBody = '';
+		suggestionBody = '';
 		aiStatus = 'idle';
 	}
 
@@ -78,17 +141,28 @@
 	}
 
 	async function draftResponse() {
-		if (!selected) return;
+		if (!selected || draftDisabled) return;
 		aiStatus = 'generating';
 		const message = selected;
 		const draftTone = tone;
 		await new Promise((r) => setTimeout(r, draftDelayMs));
-		replyBody = buildDraft(message, draftTone);
+		suggestionBody = buildDraft(message, draftTone);
 		aiStatus = 'ready';
 	}
 
+	function useSuggestion() {
+		replyBody = suggestionBody;
+		suggestionBody = '';
+		aiStatus = 'idle';
+	}
+
+	function discardSuggestion() {
+		suggestionBody = '';
+		aiStatus = 'idle';
+	}
+
 	function sendReply() {
-		if (!selected || !replyBody.trim()) return;
+		if (!selected || sendDisabled) return;
 		onSendReply?.({ messageId: selected.id, body: replyBody.trim() });
 		cancelReply();
 	}
@@ -100,6 +174,8 @@
 		'grid h-full min-h-0 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]',
 		className
 	)}
+	data-testid="entity-email-inbox"
+	data-empty-state={messages.length === 0 ? emptyState : undefined}
 >
 	<aside class="border-border/80 flex min-h-0 flex-col border-b lg:border-r lg:border-b-0">
 		<div class="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
@@ -140,7 +216,9 @@
 					</button>
 				</li>
 			{:else}
-				<li class="text-muted-foreground px-4 py-10 text-center text-sm">{emptyMessage}</li>
+				<li class="text-muted-foreground px-4 py-10 text-center text-xs" data-testid="entity-email-list-empty">
+					Inbox empty
+				</li>
 			{/each}
 		</ul>
 	</aside>
@@ -160,7 +238,11 @@
 					<div class="flex gap-2">
 						{#if !composing}
 							<Button variant="outline" size="sm" onclick={startReply}>Reply</Button>
-							<Button size="sm">Forward</Button>
+							{#if showForward}
+								<Button size="sm">Forward</Button>
+							{:else}
+								<Button size="sm" disabled title="Forward lands in a later wave">Forward</Button>
+							{/if}
 						{:else}
 							<Button variant="ghost" size="sm" onclick={cancelReply}>Cancel</Button>
 						{/if}
@@ -204,10 +286,46 @@
 								<AiAssistAction
 									label="Draft response"
 									busy={aiStatus === 'generating'}
+									disabled={draftDisabled}
 									onclick={draftResponse}
 								/>
 							</div>
 						</div>
+
+						{#if draftDisabled}
+							<p class="text-muted-foreground text-xs" data-testid="draft-response-gate">
+								{draftGate.hint}
+								<a
+									href={integrationsHref}
+									class="text-foreground font-medium underline underline-offset-2"
+								>
+									{draftGate.linkLabel}
+								</a>
+							</p>
+						{/if}
+
+						{#if aiStatus === 'ready'}
+							<div
+								class="bg-muted/40 space-y-2 rounded-2xl px-3 py-3"
+								data-testid="draft-suggestion-panel"
+							>
+								<p class="text-xs font-medium">AI suggestion — edit before you send.</p>
+								<pre class="text-muted-foreground whitespace-pre-wrap font-sans text-xs leading-relaxed">{suggestionBody}</pre>
+								<div class="flex justify-end gap-2">
+									<Button type="button" size="sm" variant="ghost" onclick={discardSuggestion}>
+										Discard
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										onclick={useSuggestion}
+										data-testid="use-suggestion"
+									>
+										Use suggestion
+									</Button>
+								</div>
+							</div>
+						{/if}
 
 						<Textarea
 							bind:value={replyBody}
@@ -216,25 +334,49 @@
 							class="min-h-[140px] resize-y text-sm"
 						/>
 
-						<div class="flex justify-end gap-2">
-							<Button type="button" size="sm" variant="outline" onclick={cancelReply}>
-								Discard
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={!replyBody.trim()}
-								onclick={sendReply}
-							>
-								Send
-							</Button>
+						<div class="flex flex-col items-end gap-1">
+							<div class="flex justify-end gap-2">
+								<Button type="button" size="sm" variant="outline" onclick={cancelReply}>
+									Discard
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									disabled={sendDisabled}
+									onclick={sendReply}
+									data-testid="email-send"
+									title={smtpReady ? undefined : 'Connect mailbox in Settings'}
+								>
+									Send
+								</Button>
+							</div>
+							{#if !smtpReady}
+								<p class="text-muted-foreground text-xs" data-testid="email-send-gate">
+									Connect mailbox in Settings before sending.
+								</p>
+							{/if}
 						</div>
 					</div>
 				{/if}
 			</div>
 		{:else}
-			<div class="text-muted-foreground flex flex-1 items-center justify-center px-6 text-sm">
-				{emptyMessage}
+			<div
+				class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center"
+				data-testid="entity-email-empty-pane"
+			>
+				<p class="text-sm font-medium">{emptyCopy.title}</p>
+				{#if emptyCopy.detail}
+					<p class="text-muted-foreground max-w-sm text-xs leading-relaxed">{emptyCopy.detail}</p>
+				{/if}
+				{#if emptyCopy.ctaHref && emptyCopy.ctaLabel}
+					<a
+						href={emptyCopy.ctaHref}
+						class="text-foreground text-xs font-medium underline underline-offset-2"
+						data-testid="entity-email-empty-cta"
+					>
+						{emptyCopy.ctaLabel}
+					</a>
+				{/if}
 			</div>
 		{/if}
 	</section>

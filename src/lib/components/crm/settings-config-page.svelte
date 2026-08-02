@@ -9,6 +9,7 @@
 		TaxRateResource
 	} from '$lib/schemas/organisation.js';
 	import { canMutateOrgConfig, roleLabel } from '$lib/schemas/organisation.js';
+	import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ResourceStateBanner, {
@@ -16,6 +17,7 @@
 	} from './resource-state-banner.svelte';
 	import OrganisationConfigForm from './organisation-config-form.svelte';
 	import ProfilePreferencesForm from './profile-preferences-form.svelte';
+	import ProfileMailboxForm from './profile-mailbox-form.svelte';
 	import TaxRateForm from './tax-rate-form.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
@@ -31,6 +33,8 @@
 		configForm: SuperForm<OrganisationConfigData>;
 		preferencesForm: SuperForm<ProfilePreferencesData>;
 		taxRateForm: SuperForm<TaxRateFormData>;
+		mailboxForm?: SuperForm<MailboxFormData>;
+		mailboxAccount?: MailboxAccountResource | null;
 		taxDrawerOpen?: boolean;
 		editingTaxRateId?: string | null;
 		viewState?: ResourceViewState;
@@ -38,6 +42,9 @@
 		onReload?: () => void;
 		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
+		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
+		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
+		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		/**
 		 * Return `false` (or reject) to keep the tax drawer open after a failed save.
 		 */
@@ -59,6 +66,8 @@
 		configForm,
 		preferencesForm,
 		taxRateForm,
+		mailboxForm,
+		mailboxAccount = null,
 		taxDrawerOpen = $bindable(false),
 		editingTaxRateId = null,
 		viewState = { kind: 'ready' },
@@ -66,6 +75,9 @@
 		onReload,
 		onSaveConfig,
 		onSavePreferences,
+		onSaveMailbox,
+		onTestMailbox,
+		onDisconnectMailbox,
 		onSaveTaxRate,
 		onSetDefaultTaxRate,
 		onArchiveTaxRate,
@@ -115,7 +127,7 @@
 			<PageHeader
 				breadcrumb="Organisation · Settings"
 				title="Config"
-				description="Organisation defaults, named tax rates, and your personal theme override."
+				description="Organisation defaults, named tax rates, your personal theme, and personal mailbox."
 			>
 				{#snippet actions()}
 					<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
@@ -247,6 +259,25 @@
 						onValidSubmit={onSavePreferences}
 					/>
 				</section>
+
+				{#if mailboxForm}
+					<section class="space-y-4 scroll-mt-6" id="mail" data-testid="personal-mail-section">
+						<div>
+							<h2 class="text-lg font-semibold tracking-tight">Mail</h2>
+							<p class="text-muted-foreground text-sm">
+								Your personal IMAP/SMTP for this organisation membership — not the org Email sending
+								integration used for quotes and campaigns.
+							</p>
+						</div>
+						<ProfileMailboxForm
+							form={mailboxForm}
+							account={mailboxAccount}
+							onValidSubmit={onSaveMailbox}
+							onTest={onTestMailbox}
+							onDisconnect={onDisconnectMailbox}
+						/>
+					</section>
+				{/if}
 			{:else if showContent && !configuration && viewState.kind === 'ready'}
 				<p class="text-muted-foreground text-sm">Configuration unavailable.</p>
 			{/if}

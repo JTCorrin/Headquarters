@@ -18,6 +18,9 @@
 		viewState?: ResourceViewState;
 		lastConvertResult?: LeadConvertResult | null;
 		converting?: boolean;
+		emailEmptyState?: 'no_mailbox' | 'no_matches' | 'teammate_nothing_shared';
+		mailboxConnected?: boolean;
+		aiProviderConnected?: boolean;
 		class?: string;
 		onConvert?: () => void;
 		onReload?: () => void;
@@ -30,6 +33,9 @@
 		viewState = { kind: 'ready' },
 		lastConvertResult = null,
 		converting = false,
+		emailEmptyState = 'no_mailbox',
+		mailboxConnected = false,
+		aiProviderConnected = false,
 		class: className,
 		onConvert,
 		onReload
@@ -89,6 +95,10 @@
 	{viewState}
 	{lastConvertResult}
 	{converting}
+	{emailEmptyState}
+	{mailboxConnected}
+	{aiProviderConnected}
+	role="owner"
 	{onConvert}
 	{onReload}
 	class={className}

@@ -40,6 +40,22 @@ const taxRates: TaxRateResource[] = [
 ];
 
 describe('SettingsConfigPage', () => {
+	it('shows personal Mail section next to theme', async () => {
+		render(SettingsConfigPageTestHost, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Config'),
+			role: 'owner',
+			configuration,
+			taxRates
+		});
+
+		await expect.element(page.getByTestId('personal-mail-section')).toBeInTheDocument();
+		await expect
+			.element(page.getByText(/not the org Email sending/i))
+			.toBeInTheDocument();
+		await expect.element(page.getByTestId('profile-mailbox-form')).toBeInTheDocument();
+	});
+
 	it('recovers from 412 conflict via reload', async () => {
 		const onReload = vi.fn();
 		render(SettingsConfigPageTestHost, {
@@ -126,7 +142,7 @@ describe('SettingsConfigPage', () => {
 
 		await page.getByTestId('tax-rate-add').click();
 		await expect.element(page.getByTestId('tax-rate-drawer')).toBeInTheDocument();
-		await page.getByLabelText('Name').fill('Reduced 5%');
+		await page.getByTestId('tax-rate-drawer').getByLabelText('Name').fill('Reduced 5%');
 		const submit = page.getByTestId('tax-rate-submit');
 		await submit.click();
 
