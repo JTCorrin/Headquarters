@@ -202,9 +202,9 @@ select throws_ok(
   join public.memberships m on m.org_id = f.other_org_id
   limit 1;
   $$,
-  '23503',
+  '23514',
   null,
-  'assignee membership must belong to same organisation (FK)'
+  'assignee membership must be active in the same organisation (validate trigger before FK)'
 );
 
 select throws_ok(
