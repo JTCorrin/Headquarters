@@ -112,6 +112,7 @@ describe('api mappers', () => {
 			org_slug: 'acme',
 			logo_url: '/logo.png',
 			role: 'admin',
+			membership_id: 'm1',
 			theme_default: 'light'
 		});
 	});

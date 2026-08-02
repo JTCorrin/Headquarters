@@ -1,37 +1,134 @@
 <script lang="ts">
+	import type { SuperForm } from 'sveltekit-superforms';
+	import type { TaskAssigneeOption, TaskFormData } from '$lib/schemas/task.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import TasksTable from './tasks-table.svelte';
+	import TasksBoard from './tasks-board.svelte';
+	import type { TaskBoardCard } from './tasks-board.svelte';
+	import TaskFormDrawer from './task-form-drawer.svelte';
 	import type { TaskRow } from './tasks-columns.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+
+	export type TasksViewMode = 'list' | 'board';
 
 	export interface TasksListPageProps {
 		orgName: string;
 		navGroups: AppNavGroup[];
 		rows: TaskRow[];
+		boardTasks?: TaskBoardCard[];
+		viewMode?: TasksViewMode;
+		form?: SuperForm<TaskFormData>;
+		editForm?: SuperForm<TaskFormData>;
+		assigneeOptions?: TaskAssigneeOption[];
+		drawerOpen?: boolean;
+		editDrawerOpen?: boolean;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onValidEdit?: () => boolean | void | Promise<boolean | void>;
+		onEditTask?: (id: string) => void;
+		onViewModeChange?: (mode: TasksViewMode) => void;
 	}
 
-	let { orgName, navGroups, rows, class: className }: TasksListPageProps = $props();
+	let {
+		orgName,
+		navGroups,
+		rows,
+		boardTasks = [],
+		viewMode = 'list',
+		form,
+		editForm,
+		assigneeOptions = [],
+		drawerOpen = $bindable(false),
+		editDrawerOpen = $bindable(false),
+		showNav = true,
+		class: className,
+		onValidSubmit,
+		onValidEdit,
+		onEditTask,
+		onViewModeChange
+	}: TasksListPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Work"
-				title="Tasks"
-				description="Follow-ups from meetings, emails, and pipeline stages."
-			>
-				{#snippet actions()}
-					<Button type="button" size="sm">New task</Button>
-				{/snippet}
-			</PageHeader>
+		<div
+			class={cn(
+				'space-y-6 px-6 py-6 md:px-8',
+				viewMode === 'board' && 'flex min-h-0 flex-1 flex-col gap-6'
+			)}
+		>
+			<div class={cn(viewMode === 'board' && 'shrink-0')}>
+				<PageHeader
+					breadcrumb="Work"
+					title={viewMode === 'board' ? 'Tasks board' : 'Tasks'}
+					description="Follow-ups from meetings, emails, and pipeline stages."
+				>
+					{#snippet actions()}
+						{#if viewMode === 'board'}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onclick={() => onViewModeChange?.('list')}
+							>
+								Table view
+							</Button>
+						{:else}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onclick={() => onViewModeChange?.('board')}
+							>
+								Board view
+							</Button>
+						{/if}
+						{#if form}
+							<TaskFormDrawer
+								bind:open={drawerOpen}
+								{form}
+								{assigneeOptions}
+								{onValidSubmit}
+							/>
+						{:else}
+							<Button type="button" size="sm">New task</Button>
+						{/if}
+					{/snippet}
+				</PageHeader>
+			</div>
 
-			<TasksTable {rows} />
+			{#if viewMode === 'board'}
+				<TasksBoard tasks={boardTasks} class="min-h-0 flex-1" />
+			{:else}
+				<TasksTable {rows} {onEditTask} />
+			{/if}
 		</div>
 	</main>
 </div>
+
+{#if editForm}
+	<TaskFormDrawer
+		bind:open={editDrawerOpen}
+		form={editForm}
+		{assigneeOptions}
+		showTrigger={false}
+		title="Edit task"
+		description="Update task details. Changes use If-Match versioning."
+		submitLabel="Save changes"
+		onValidSubmit={onValidEdit}
+	/>
+{/if}

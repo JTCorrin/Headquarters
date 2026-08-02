@@ -605,6 +605,61 @@ export interface ApiBillListParams {
 	status?: ApiBillStatus;
 }
 
+export type ApiTaskPriority = 'p1' | 'p2' | 'p3' | 'p4';
+export type ApiTaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'cancelled';
+export type ApiTaskSource = 'manual' | 'meeting' | 'email' | 'workflow' | 'agent';
+export type ApiTaskEntityType = 'contact' | 'client' | 'lead' | 'project';
+
+export interface ApiTask {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	title: string;
+	description: string | null;
+	priority: ApiTaskPriority;
+	status: ApiTaskStatus;
+	assignee_membership_id: string | null;
+	assignee_agent_id: string | null;
+	due_at: string | null;
+	started_at: string | null;
+	completed_at: string | null;
+	blocked_reason: string | null;
+	source: ApiTaskSource;
+	entity_type: ApiTaskEntityType | null;
+	entity_id: string | null;
+	meeting_id: string | null;
+	project_card_id: string | null;
+	position: number;
+	metadata: Record<string, unknown>;
+}
+
+export interface ApiTaskListParams {
+	limit?: number;
+	cursor?: string;
+	status?: ApiTaskStatus;
+	assignee?: 'me';
+}
+
+export interface ApiTaskCreateBody {
+	title: string;
+	description?: string | null;
+	priority?: ApiTaskPriority;
+	status?: ApiTaskStatus;
+	assignee_membership_id?: string | null;
+	due_at?: string | null;
+	entity_type?: ApiTaskEntityType | null;
+	entity_id?: string | null;
+	source?: ApiTaskSource;
+	position?: number;
+}
+
+export type ApiTaskUpdateBody = Partial<ApiTaskCreateBody>;
+
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
 export interface ApiClient {
