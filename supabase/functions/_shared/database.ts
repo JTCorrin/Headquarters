@@ -345,6 +345,81 @@ export type InvoiceRow = {
   void_reason: string | null
 }
 
+export type VendorRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  status: 'active' | 'inactive' | 'archived'
+  primary_email: string | null
+  phone: string | null
+  website_url: string | null
+  tax_identifier: string | null
+  default_currency: string | null
+  payment_terms_days: number | null
+  notes: string | null
+  metadata: Json
+}
+
+export type BillRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  vendor_id: string
+  number: string
+  internal_reference: string | null
+  status: 'draft' | 'received' | 'scheduled' | 'partial' | 'paid' | 'void'
+  currency: string
+  issue_on: string | null
+  received_on: string | null
+  due_on: string
+  scheduled_payment_on: string | null
+  subtotal_cents: number
+  discount_cents: number
+  tax_cents: number
+  total_cents: number
+  paid_cents: number
+  balance_due_cents: number
+  party_snapshot: Json
+  notes: string | null
+  attachment_document_id: string | null
+  paid_at: string | null
+  voided_at: string | null
+  void_reason: string | null
+}
+
+export type BillLineRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  bill_id: string
+  product_id: string | null
+  sku_snapshot: string | null
+  description: string
+  quantity: number
+  unit_price_cents: number
+  discount_percent: number
+  tax_rate_percent: number
+  subtotal_cents: number
+  tax_cents: number
+  total_cents: number
+  position: number
+}
+
 export type InvoiceLineRow = {
   id: string
   org_id: string
@@ -625,6 +700,41 @@ type QuoteLineInsert =
     >
   >
 
+type VendorInsert =
+  & Pick<VendorRow, 'name' | 'org_id'>
+  & Partial<Omit<VendorRow, 'id' | 'name' | 'org_id'>>
+type BillInsert =
+  & Pick<BillRow, 'currency' | 'due_on' | 'number' | 'org_id' | 'vendor_id'>
+  & Partial<Omit<BillRow, 'currency' | 'due_on' | 'id' | 'number' | 'org_id' | 'vendor_id'>>
+type BillLineInsert =
+  & Pick<
+    BillLineRow,
+    | 'bill_id'
+    | 'description'
+    | 'org_id'
+    | 'position'
+    | 'quantity'
+    | 'subtotal_cents'
+    | 'tax_cents'
+    | 'total_cents'
+    | 'unit_price_cents'
+  >
+  & Partial<
+    Omit<
+      BillLineRow,
+      | 'bill_id'
+      | 'description'
+      | 'id'
+      | 'org_id'
+      | 'position'
+      | 'quantity'
+      | 'subtotal_cents'
+      | 'tax_cents'
+      | 'total_cents'
+      | 'unit_price_cents'
+    >
+  >
+
 export type Database = {
   public: {
     Tables: {
@@ -734,6 +844,25 @@ export type Database = {
         Row: InvoiceLineRow
         Insert: InvoiceLineInsert
         Update: Partial<InvoiceLineInsert>
+        Relationships: []
+      }
+
+      vendors: {
+        Row: VendorRow
+        Insert: VendorInsert
+        Update: Partial<VendorInsert>
+        Relationships: []
+      }
+      bills: {
+        Row: BillRow
+        Insert: BillInsert
+        Update: Partial<BillInsert>
+        Relationships: []
+      }
+      bill_lines: {
+        Row: BillLineRow
+        Insert: BillLineInsert
+        Update: Partial<BillLineInsert>
         Relationships: []
       }
       documents: {
@@ -903,6 +1032,65 @@ export type Database = {
           p_void_reason: string
         }
         Returns: Json
+      }
+
+      create_bill_draft: {
+        Args: {
+          p_lines?: Json
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      save_bill_draft: {
+        Args: {
+          p_bill_id: string
+          p_expected_version: number
+          p_lines?: Json | null
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      get_bill_document: {
+        Args: {
+          p_bill_id: string
+          p_org_id: string
+        }
+        Returns: Json
+      }
+      soft_delete_bill_draft: {
+        Args: {
+          p_bill_id: string
+          p_expected_version: number
+          p_org_id: string
+        }
+        Returns: Json
+      }
+      receive_bill: {
+        Args: {
+          p_bill_id: string
+          p_expected_version: number
+          p_org_id: string
+        }
+        Returns: Json
+      }
+      void_bill: {
+        Args: {
+          p_bill_id: string
+          p_expected_version: number
+          p_org_id: string
+          p_void_reason: string
+        }
+        Returns: Json
+      }
+      soft_delete_vendor: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_vendor_id: string
+        }
+        Returns: undefined
       }
       create_invoice_from_quote: {
         Args: {
