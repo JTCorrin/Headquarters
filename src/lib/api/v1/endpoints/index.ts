@@ -12,6 +12,7 @@ export { createOrganisationsEndpoints } from './organisations.js';
 export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
+export { createTasksEndpoints } from './tasks.js';
 export { createTaxRatesEndpoints } from './tax-rates.js';
 export { createVendorsEndpoints } from './vendors.js';
 export type {
@@ -30,5 +31,6 @@ export type {
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
 	TaxRatesEndpoints,
+	TasksEndpoints,
 	VendorsEndpoints
 } from './types.js';

@@ -1,20 +1,23 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
-	import { taskColumns, type TaskRow } from './tasks-columns.js';
+	import { createTaskColumns, type TaskRow } from './tasks-columns.js';
 
 	export type { TaskRow };
 
 	export interface TasksTableProps {
 		rows: TaskRow[];
+		onEditTask?: (id: string) => void;
 		class?: string;
 	}
 
-	let { rows, class: className }: TasksTableProps = $props();
+	let { rows, onEditTask, class: className }: TasksTableProps = $props();
+
+	const columns = $derived(createTaskColumns({ onEdit: onEditTask }));
 </script>
 
 <DataTableShell
 	data={rows}
-	columns={taskColumns}
+	{columns}
 	filterColumn="title"
 	filterPlaceholder="Filter tasks…"
 	emptyMessage="No tasks yet."

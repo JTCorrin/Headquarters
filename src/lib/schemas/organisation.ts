@@ -147,6 +147,8 @@ export interface OrgMembershipSummary {
 	org_slug: string;
 	logo_url?: string | null;
 	role: MembershipRole;
+	/** Active membership row id for the current user in this org (from discovery). */
+	membership_id?: string;
 	/** Organisation default theme — used to apply appearance when personal pref is org_default. */
 	theme_default: ThemeOption;
 }
