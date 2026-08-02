@@ -294,6 +294,68 @@ export type QuoteRow = {
   converted_invoice_id: string | null
 }
 
+export type InvoiceRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  number: string
+  client_id: string
+  contact_id: string | null
+  quote_id: string | null
+  owner_membership_id: string | null
+  source: 'manual' | 'quote' | 'recurring'
+  recurring_run_id: string | null
+  billing_period_start: string | null
+  billing_period_end: string | null
+  status: 'draft' | 'sent' | 'partial' | 'paid' | 'void'
+  currency: string
+  issue_on: string
+  due_on: string
+  purchase_order_number: string | null
+  subtotal_cents: number
+  discount_cents: number
+  tax_cents: number
+  total_cents: number
+  paid_cents: number
+  balance_due_cents: number
+  party_snapshot: Json
+  payment_terms: string | null
+  notes: string | null
+  internal_notes: string | null
+  sent_at: string | null
+  viewed_at: string | null
+  paid_at: string | null
+  voided_at: string | null
+  void_reason: string | null
+}
+
+export type InvoiceLineRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  invoice_id: string
+  product_id: string | null
+  sku_snapshot: string | null
+  description: string
+  quantity: number
+  unit_price_cents: number
+  discount_percent: number
+  tax_rate_percent: number
+  subtotal_cents: number
+  tax_cents: number
+  total_cents: number
+  position: number
+}
+
 export type DocumentRow = {
   id: string
   org_id: string
@@ -440,6 +502,37 @@ type ApiIdempotencyKeyInsert =
 type QuoteInsert =
   & Pick<QuoteRow, 'number' | 'org_id' | 'title' | 'currency'>
   & Partial<Omit<QuoteRow, 'id' | 'number' | 'org_id' | 'title' | 'currency'>>
+type InvoiceInsert =
+  & Pick<InvoiceRow, 'client_id' | 'currency' | 'due_on' | 'number' | 'org_id'>
+  & Partial<Omit<InvoiceRow, 'client_id' | 'currency' | 'due_on' | 'id' | 'number' | 'org_id'>>
+type InvoiceLineInsert =
+  & Pick<
+    InvoiceLineRow,
+    | 'description'
+    | 'invoice_id'
+    | 'org_id'
+    | 'position'
+    | 'quantity'
+    | 'subtotal_cents'
+    | 'tax_cents'
+    | 'total_cents'
+    | 'unit_price_cents'
+  >
+  & Partial<
+    Omit<
+      InvoiceLineRow,
+      | 'description'
+      | 'id'
+      | 'invoice_id'
+      | 'org_id'
+      | 'position'
+      | 'quantity'
+      | 'subtotal_cents'
+      | 'tax_cents'
+      | 'total_cents'
+      | 'unit_price_cents'
+    >
+  >
 type QuoteLineInsert =
   & Pick<
     QuoteLineRow,
@@ -562,6 +655,18 @@ export type Database = {
         Update: Partial<QuoteLineInsert>
         Relationships: []
       }
+      invoices: {
+        Row: InvoiceRow
+        Insert: InvoiceInsert
+        Update: Partial<InvoiceInsert>
+        Relationships: []
+      }
+      invoice_lines: {
+        Row: InvoiceLineRow
+        Insert: InvoiceLineInsert
+        Update: Partial<InvoiceLineInsert>
+        Relationships: []
+      }
       documents: {
         Row: DocumentRow
         Insert: Partial<DocumentRow>
@@ -655,6 +760,71 @@ export type Database = {
       soft_delete_quote_draft: {
         Args: {
           p_expected_version: number
+          p_org_id: string
+          p_quote_id: string
+        }
+        Returns: Json
+      }
+      accept_quote: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_quote_id: string
+        }
+        Returns: Json
+      }
+      create_invoice_draft: {
+        Args: {
+          p_lines?: Json
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      save_invoice_draft: {
+        Args: {
+          p_expected_version: number
+          p_invoice_id: string
+          p_lines?: Json | null
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      get_invoice_document: {
+        Args: {
+          p_invoice_id: string
+          p_org_id: string
+        }
+        Returns: Json
+      }
+      soft_delete_invoice_draft: {
+        Args: {
+          p_expected_version: number
+          p_invoice_id: string
+          p_org_id: string
+        }
+        Returns: Json
+      }
+      send_invoice: {
+        Args: {
+          p_expected_version: number
+          p_invoice_id: string
+          p_org_id: string
+        }
+        Returns: Json
+      }
+      void_invoice: {
+        Args: {
+          p_expected_version: number
+          p_invoice_id: string
+          p_org_id: string
+          p_void_reason: string
+        }
+        Returns: Json
+      }
+      create_invoice_from_quote: {
+        Args: {
           p_org_id: string
           p_quote_id: string
         }
