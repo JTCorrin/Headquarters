@@ -4,16 +4,9 @@ import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import type { PaymentListItem } from '$lib/schemas/payment.js';
 
-export interface PaymentRow {
-	id: string;
-	client: string;
-	invoiceNumber?: string;
-	amount: string;
-	method: string;
-	status: string;
-	receivedOn: string;
-}
+export type PaymentRow = PaymentListItem;
 
 export const paymentColumns: ColumnDef<PaymentRow>[] = [
 	{
@@ -35,29 +28,36 @@ export const paymentColumns: ColumnDef<PaymentRow>[] = [
 		enableHiding: false
 	},
 	{
-		accessorKey: 'receivedOn',
+		accessorKey: 'occurredOn',
 		header: ({ column }) =>
 			renderComponent(DataTableSortHeader, {
-				label: 'Received',
+				label: 'Date',
 				onclick: column.getToggleSortingHandler()
 			})
 	},
 	{
-		accessorKey: 'client',
+		accessorKey: 'direction',
 		header: ({ column }) =>
 			renderComponent(DataTableSortHeader, {
-				label: 'Client',
+				label: 'Direction',
 				onclick: column.getToggleSortingHandler()
 			})
 	},
 	{
-		accessorKey: 'invoiceNumber',
+		accessorKey: 'party',
 		header: ({ column }) =>
 			renderComponent(DataTableSortHeader, {
-				label: 'Invoice',
+				label: 'Party',
 				onclick: column.getToggleSortingHandler()
-			}),
-		cell: ({ row }) => row.original.invoiceNumber ?? '—'
+			})
+	},
+	{
+		accessorKey: 'allocationsSummary',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Allocation',
+				onclick: column.getToggleSortingHandler()
+			})
 	},
 	{
 		accessorKey: 'amount',

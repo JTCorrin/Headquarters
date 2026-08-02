@@ -14,7 +14,9 @@
 		toInvoiceLineInput,
 		toInvoiceUpdateBody,
 		toOrganisationCreateBody,
-		toOrgMembershipSummary
+		toOrgMembershipSummary,
+		toPaymentCreateBody,
+		toPaymentListItem
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiInvoiceDocument } from '$lib/api/v1/types.js';
 	import { centsToAmountString } from '$lib/money.js';
@@ -31,6 +33,10 @@
 		type InvoiceContactOption,
 		type InvoiceFormData
 	} from '$lib/schemas/invoice.js';
+	import {
+		paymentFormSchema,
+		type PaymentListItem
+	} from '$lib/schemas/payment.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -65,12 +71,26 @@
 	let contactOptions = $state<InvoiceContactOption[]>([]);
 	let products = $state<CatalogProductOption[]>([]);
 	let lines = $state<LineItemRow[]>([]);
+	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
+	let paymentDrawerOpen = $state(false);
+
+	function todayIso(): string {
+		return new Date().toISOString().slice(0, 10);
+	}
+
+	function formatCents(cents: number, currency: string): string {
+		try {
+			return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(cents / 100);
+		} catch {
+			return `${(cents / 100).toFixed(2)} ${currency}`;
+		}
+	}
 
 	const invoiceForm = superForm(
 		defaults(
@@ -100,6 +120,34 @@
 		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
 		{
 			validators: zod4(lineItemFormSchema),
+			SPA: true,
+			warnings: { duplicateId: false },
+			applyAction: false,
+			resetForm: false
+		}
+	);
+
+	const paymentForm = superForm(
+		defaults(
+			{
+				direction: 'inbound' as const,
+				clientId: '',
+				clientName: '',
+				vendorId: '',
+				vendorName: '',
+				invoiceId: '',
+				billId: '',
+				amount: '',
+				currency: 'GBP' as const,
+				method: 'bank' as const,
+				occurredOn: todayIso(),
+				reference: '',
+				notes: ''
+			},
+			zod4(paymentFormSchema)
+		),
+		{
+			validators: zod4(paymentFormSchema),
 			SPA: true,
 			warnings: { duplicateId: false },
 			applyAction: false,
@@ -200,11 +248,38 @@
 	function resetOrgScopedState() {
 		invoice = null;
 		lines = [];
+		paymentRows = [];
 		clientOptions = [];
 		contactOptions = [];
 		products = [];
 		savedFingerprint = '';
+		paymentDrawerOpen = false;
 		viewState = { kind: 'loading' };
+	}
+
+	function syncPaymentForm(document: ApiInvoiceDocument) {
+		const clientName = clientOptions.find((c) => c.id === document.client_id)?.name ?? '';
+		paymentForm.form.set({
+			direction: 'inbound',
+			clientId: document.client_id,
+			clientName,
+			vendorId: '',
+			vendorName: '',
+			invoiceId: document.id,
+			billId: '',
+			amount:
+				document.balance_due_cents > 0
+					? centsToAmountString(document.balance_due_cents) || ''
+					: '',
+			currency:
+				document.currency === 'USD' || document.currency === 'EUR' || document.currency === 'GBP'
+					? document.currency
+					: 'GBP',
+			method: 'bank',
+			occurredOn: todayIso(),
+			reference: '',
+			notes: ''
+		});
 	}
 
 	function mapLines(document: ApiInvoiceDocument): LineItemRow[] {
@@ -260,6 +335,31 @@
 			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
 			products = catalog.data.map(toCatalogProductOption);
+
+			const listedPayments = await api.payments.list({
+				limit: 50,
+				direction: 'inbound',
+				client_id: result.data.client_id
+			});
+			if (isStale(epoch)) return;
+			const paymentDocs = await Promise.all(
+				listedPayments.data.slice(0, 20).map((payment) => api.payments.get(payment.id))
+			);
+			if (isStale(epoch)) return;
+			paymentRows = paymentDocs
+				.map((got) => got.data)
+				.filter((payment) =>
+					payment.allocations.some(
+						(allocation) =>
+							allocation.invoice_id === invoiceId && !allocation.reversed_at
+					)
+				)
+				.map((payment) =>
+					toPaymentListItem(payment, {
+						clientName: clients.data.find((c) => c.id === payment.client_id)?.name
+					})
+				);
+			syncPaymentForm(result.data);
 			const options: InvoiceContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
@@ -493,6 +593,83 @@
 		}
 	}
 
+	async function onRecordPayment(): Promise<boolean> {
+		if (!invoice) return false;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			const created = await api.payments.create(toPaymentCreateBody(get(paymentForm.form)));
+			if (isStale(epoch)) return false;
+			paymentRows = [
+				toPaymentListItem(created, {
+					clientName: clientOptions.find((c) => c.id === created.client_id)?.name
+				}),
+				...paymentRows
+			];
+			const refreshed = await api.invoices.get(invoice.id);
+			if (isStale(epoch)) return false;
+			applyDocument(refreshed.data);
+			syncPaymentForm(refreshed.data);
+			paymentDrawerOpen = false;
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Payment changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not record payment — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		} finally {
+			actionPending = false;
+		}
+	}
+
+	async function onReversePayment(paymentId: string) {
+		const epoch = captureEpoch();
+		const row = paymentRows.find((r) => r.id === paymentId);
+		if (!row || !invoice) return;
+		const reason = window.prompt('Reason for reversing this payment?', 'Correction');
+		if (!reason?.trim()) return;
+		actionPending = true;
+		try {
+			const reversed = await api.payments.reverse(
+				paymentId,
+				{ reason: reason.trim() },
+				row.version
+			);
+			if (isStale(epoch)) return;
+			paymentRows = paymentRows.map((r) =>
+				r.id === paymentId
+					? toPaymentListItem(reversed, {
+							clientName: clientOptions.find((c) => c.id === reversed.client_id)?.name
+						})
+					: r
+			);
+			const refreshed = await api.invoices.get(invoice.id);
+			if (isStale(epoch)) return;
+			applyDocument(refreshed.data);
+			syncPaymentForm(refreshed.data);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not reverse payment — try again.')
+			};
+		} finally {
+			actionPending = false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -565,6 +742,23 @@
 							taxCents: invoice.tax_cents,
 							totalCents: invoice.total_cents
 						}}
+						{paymentForm}
+						{paymentRows}
+						paymentClientOptions={clientOptions}
+						paymentInvoiceOptions={[
+							{
+								id: invoice.id,
+								number: invoice.number,
+								clientId: invoice.client_id,
+								currency: invoice.currency,
+								balanceDueCents: invoice.balance_due_cents,
+								status: invoice.status
+							}
+						]}
+						bind:paymentDrawerOpen
+						paidLabel={formatCents(invoice.paid_cents, invoice.currency)}
+						balanceLabel={formatCents(invoice.balance_due_cents, invoice.currency)}
+						canRecordPayment={['sent', 'partial', 'paid'].includes(invoice.status)}
 						bind:lines
 						bind:lineDrawerOpen
 						onSaveInvoice={onSaveInvoice}
@@ -573,6 +767,8 @@
 						onSend={onSend}
 						onVoid={onVoid}
 						onDelete={onDelete}
+						onRecordPayment={onRecordPayment}
+						onReversePayment={onReversePayment}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>
