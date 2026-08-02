@@ -103,7 +103,7 @@ describe('ContactsPage integration', () => {
 		await page.getByRole('button', { name: 'New contact' }).click();
 		await page.getByLabelText('Name').fill('Sam Ortiz');
 		await page.getByLabelText('Email').fill('sam@contoso.io');
-		await page.getByLabelText('Company').fill('Contoso');
+		await page.getByLabelText('Employer / company').fill('Contoso');
 		await page.getByTestId('contact-form').getByRole('button', { name: 'Save contact' }).click();
 
 		await expect.element(page.getByRole('link', { name: 'Sam Ortiz' })).toBeInTheDocument();
