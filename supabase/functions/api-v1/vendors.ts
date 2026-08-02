@@ -27,6 +27,7 @@ const WRITABLE_FIELDS = new Set([
 ])
 
 const NULLABLE_TEXT_FIELDS = [
+  'primary_email',
   'phone',
   'website_url',
   'tax_identifier',
@@ -34,6 +35,7 @@ const NULLABLE_TEXT_FIELDS = [
 ] as const
 
 const TEXT_LIMITS: Record<(typeof NULLABLE_TEXT_FIELDS)[number], number> = {
+  primary_email: 320,
   phone: 40,
   website_url: 500,
   tax_identifier: 64,
