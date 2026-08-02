@@ -1,6 +1,6 @@
 begin;
 
-select plan(11);
+select plan(12);
 
 select has_table('public', 'recurring_invoice_schedules', 'schedules table exists');
 select has_table('public', 'recurring_invoice_lines', 'lines table exists');
