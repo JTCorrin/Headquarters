@@ -338,27 +338,14 @@
 
 			const listedPayments = await api.payments.list({
 				limit: 50,
-				direction: 'inbound',
-				client_id: result.data.client_id
+				invoice_id: invoiceId
 			});
 			if (isStale(epoch)) return;
-			const paymentDocs = await Promise.all(
-				listedPayments.data.slice(0, 20).map((payment) => api.payments.get(payment.id))
+			paymentRows = listedPayments.data.map((payment) =>
+				toPaymentListItem(payment, {
+					clientName: clients.data.find((c) => c.id === payment.client_id)?.name
+				})
 			);
-			if (isStale(epoch)) return;
-			paymentRows = paymentDocs
-				.map((got) => got.data)
-				.filter((payment) =>
-					payment.allocations.some(
-						(allocation) =>
-							allocation.invoice_id === invoiceId && !allocation.reversed_at
-					)
-				)
-				.map((payment) =>
-					toPaymentListItem(payment, {
-						clientName: clients.data.find((c) => c.id === payment.client_id)?.name
-					})
-				);
 			syncPaymentForm(result.data);
 			const options: InvoiceContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
