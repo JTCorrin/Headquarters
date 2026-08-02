@@ -39,13 +39,18 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
   return new ApiError(500, 'INTERNAL_ERROR', 'The integration operation failed')
 }
 
-function assertNoSecretEcho(payload: unknown): void {
+/** True when payload JSON includes forbidden secret *keys* (not values like auth_mode). */
+export function payloadHasForbiddenSecretKey(payload: unknown): boolean {
   const text = JSON.stringify(payload)
-  if (
-    text.includes('"secret_ref"') ||
-    text.includes('"password"') ||
-    text.includes('"api_key"')
-  ) {
+  return (
+    /"secret_ref"\s*:/.test(text) ||
+    /"password"\s*:/.test(text) ||
+    /"api_key"\s*:/.test(text)
+  )
+}
+
+function assertNoSecretEcho(payload: unknown): void {
+  if (payloadHasForbiddenSecretKey(payload)) {
     throw new ApiError(
       500,
       'INTERNAL_ERROR',
