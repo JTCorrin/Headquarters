@@ -1,6 +1,11 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { InvoiceFormData } from '$lib/schemas/invoice.js';
+	import type {
+		InvoiceClientOption,
+		InvoiceContactOption,
+		InvoiceFormData,
+		InvoiceQuoteOption
+	} from '$lib/schemas/invoice.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import InvoiceForm from './invoice-form.svelte';
@@ -14,19 +19,27 @@
 		description?: string;
 		submitLabel?: string;
 		triggerLabel?: string;
+		clientOptions?: InvoiceClientOption[];
+		contactOptions?: InvoiceContactOption[];
+		quoteOptions?: InvoiceQuoteOption[];
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
 		form,
 		open = $bindable(false),
 		title = 'New invoice',
-		description = 'Create the invoice header. Add product-linked line items on the invoice page.',
+		description = 'Create a blank draft or convert an accepted quote. Add line items on the invoice page.',
 		submitLabel = 'Save invoice',
 		triggerLabel = 'New invoice',
+		clientOptions = [],
+		contactOptions = [],
+		quoteOptions = [],
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: InvoiceFormDrawerProps = $props();
 </script>
 
@@ -37,7 +50,9 @@
 		</Drawer.Trigger>
 	{:else}
 		<Drawer.Trigger>
-			<Button type="button">{triggerLabel}</Button>
+			{#snippet child({ props })}
+				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+			{/snippet}
 		</Drawer.Trigger>
 	{/if}
 
@@ -47,7 +62,16 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<InvoiceForm {form} {submitLabel} />
+			<InvoiceForm
+				{form}
+				{submitLabel}
+				{clientOptions}
+				{contactOptions}
+				{quoteOptions}
+				showQuotePrefill
+				{onValidSubmit}
+				class="max-w-none"
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

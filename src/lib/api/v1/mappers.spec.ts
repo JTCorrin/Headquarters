@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	clientStatusLabel,
 	contactLifecycleLabel,
+	invoiceStatusLabel,
 	leadStageLabel,
 	quoteStatusLabel,
 	themePreferenceFromApi,
@@ -12,6 +13,10 @@ import {
 	toContactCreateBody,
 	toContactFormData,
 	toContactListItem,
+	toInvoiceCreateBody,
+	toInvoiceLineInput,
+	lineItemRowsToInvoiceLineInputs,
+	toInvoiceListItem,
 	toLeadCard,
 	toLeadCreateBody,
 	toLeadFormData,
@@ -20,7 +25,7 @@ import {
 	toQuoteCreateBody,
 	toQuoteListItem
 } from './mappers.js';
-import type { ApiClient, ApiContact, ApiLead, ApiQuote } from './types.js';
+import type { ApiClient, ApiContact, ApiInvoice, ApiLead, ApiQuote } from './types.js';
 
 const sampleContact: ApiContact = {
 	id: '11111111-2222-4333-8444-555555555555',
@@ -38,6 +43,7 @@ const sampleContact: ApiContact = {
 	primary_phone: '+44 7700 900123',
 	job_title: 'Head of Operations',
 	company_name: 'Northwind',
+	client_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 	owner_membership_id: null,
 	lifecycle_status: 'active',
 	source: null,
@@ -202,6 +208,113 @@ describe('api mappers', () => {
 			currency: 'GBP',
 			lines: []
 		});
+	});
+
+	it('maps invoices between API and form/list shapes with decimal lines', () => {
+		const sampleInvoice: ApiInvoice = {
+			id: 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			number: 'INV-0001',
+			client_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+			contact_id: null,
+			quote_id: null,
+			owner_membership_id: null,
+			source: 'manual',
+			recurring_run_id: null,
+			billing_period_start: null,
+			billing_period_end: null,
+			status: 'draft',
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			due_on: '2026-04-01',
+			purchase_order_number: 'PO-9',
+			subtotal_cents: 1000,
+			discount_cents: 0,
+			tax_cents: 200,
+			total_cents: 1200,
+			paid_cents: 0,
+			balance_due_cents: 1200,
+			party_snapshot: { name: 'Northwind' },
+			payment_terms: null,
+			notes: null,
+			internal_notes: null,
+			sent_at: null,
+			viewed_at: null,
+			paid_at: null,
+			voided_at: null,
+			void_reason: null
+		};
+		expect(invoiceStatusLabel('draft')).toBe('Draft');
+		expect(toInvoiceListItem(sampleInvoice)).toEqual({
+			id: sampleInvoice.id,
+			number: 'INV-0001',
+			client: 'Northwind',
+			total: '£12.00',
+			status: 'Draft',
+			dueOn: '2026-04-01'
+		});
+		expect(
+			toInvoiceCreateBody({
+				clientId: sampleInvoice.client_id,
+				clientName: 'Northwind',
+				contactId: '',
+				currency: 'GBP',
+				issueOn: '2026-03-01',
+				dueOn: '2026-04-01',
+				purchaseOrderNumber: ' PO-9 ',
+				status: 'draft',
+				quoteId: ''
+			})
+		).toEqual({
+			client_id: sampleInvoice.client_id,
+			contact_id: null,
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			due_on: '2026-04-01',
+			purchase_order_number: 'PO-9',
+			lines: []
+		});
+		expect(
+			toInvoiceLineInput({
+				productId: '',
+				description: 'Consulting',
+				qty: '1.5',
+				unitPrice: '12.50'
+			})
+		).toEqual({
+			product_id: null,
+			description: 'Consulting',
+			quantity: 1.5,
+			unit_price_cents: 1250
+		});
+		expect(
+			lineItemRowsToInvoiceLineInputs([
+				{
+					productId: 'dddddddd-dddd-4eee-8fff-000000000001',
+					description: 'Retainer',
+					qty: '2',
+					unitPrice: '10.00',
+					discountPercent: 5,
+					taxRatePercent: 20
+				}
+			])
+		).toEqual([
+			{
+				product_id: 'dddddddd-dddd-4eee-8fff-000000000001',
+				description: 'Retainer',
+				quantity: 2,
+				unit_price_cents: 1000,
+				discount_percent: 5,
+				tax_rate_percent: 20,
+				position: 0
+			}
+		]);
 	});
 
 	it('maps leads between API and form/board shapes', () => {

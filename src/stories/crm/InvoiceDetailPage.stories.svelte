@@ -27,11 +27,15 @@
 
 	const invoiceData = defaults(
 		{
+			clientId: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 			clientName: 'Northwind',
-			number: 'INV-0881',
+			contactId: '',
 			currency: 'GBP',
+			issueOn: '2026-03-01',
 			dueOn: '2026-04-01',
-			status: 'sent'
+			purchaseOrderNumber: '',
+			status: 'sent',
+			quoteId: ''
 		},
 		zod4(invoiceFormSchema)
 	);
@@ -172,15 +176,7 @@
 						actor: 'You'
 					});
 				}}
-				onRecordPayment={() => {
-					status = 'Part paid';
-					prependEvent({
-						kind: 'payment',
-						title: 'Payment recorded',
-						body: 'Storybook mock — open Payments for full form',
-						actor: 'You'
-					});
-				}}
+				isDraft={false}
 			/>
 		</div>
 	{/snippet}

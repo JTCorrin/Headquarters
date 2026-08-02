@@ -15,6 +15,7 @@ export type {
 	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
+	InvoicesEndpoints,
 	LeadsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
