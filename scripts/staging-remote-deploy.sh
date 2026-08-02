@@ -104,14 +104,16 @@ log "Supabase API ${PUBLIC_SUPABASE_URL}"
 # git resets when the stack was already up. Bounce it so api-v1 matches this SHA
 # (Wave A mailbox/AI routes otherwise stay Route not found after migration up).
 # Supabase local names vary: edge-runtime, supabase_edge_runtime_<id>, etc.
-edge_ids="$(
-	docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null \
-		| awk 'tolower($0) ~ /edge.runtime|edge-runtime|supabase_edge/ { print $1 }' \
-		| sort -u \
-		| tr '\n' ' ' \
-		| sed 's/[[:space:]]*$//'
-	|| true
-)"
+edge_ids=""
+if command -v docker >/dev/null 2>&1; then
+	edge_ids="$(
+		docker ps --format '{{.ID}} {{.Names}}' \
+			| awk 'tolower($0) ~ /edge[_-]runtime|supabase_edge/ { print $1 }' \
+			| sort -u \
+			| tr '\n' ' '
+	)"
+	edge_ids="${edge_ids%"${edge_ids##*[![:space:]]}"}"
+fi
 if [[ -n "$edge_ids" ]]; then
 	log "restarting edge-runtime to load api-v1 @ ${SHA} (${edge_ids})"
 	# shellcheck disable=SC2086
