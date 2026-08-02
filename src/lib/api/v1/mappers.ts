@@ -24,11 +24,13 @@ import type {
 import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 import type { ProductFormData } from '$lib/schemas/product.js';
 import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
+import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
 import type { ClientRow } from '$lib/components/crm/clients-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
 import type { ProductRow } from '$lib/components/crm/products-columns.js';
 import type {
 	ApiAiIntegration,
+	ApiEmailMessage,
 	ApiClient,
 	ApiClientCreateBody,
 	ApiClientUpdateBody,
@@ -798,12 +800,55 @@ export function toMailboxPutBody(data: MailboxFormData): ApiMailboxPutBody {
 	return body;
 }
 
+function mapAiIntegrationStatus(status: string | null | undefined): AiIntegrationResource['status'] {
+	if (status === 'active' || status === 'connected') return 'connected';
+	if (status === 'error') return 'error';
+	return 'disconnected';
+}
+
 export function toAiIntegrationResource(item: ApiAiIntegration): AiIntegrationResource {
 	return {
 		provider: item.provider,
 		credentials_configured: item.credentials_configured,
-		status: item.status,
-		last_verified_at: item.last_verified_at,
+		status: mapAiIntegrationStatus(item.status),
+		last_verified_at: item.last_verified_at ?? null,
 		last_error_code: item.last_error_code
+	};
+}
+
+/** Prefer BE `output_text`; fall back to legacy `suggestion_text`. */
+export function aiSuggestionText(suggestion: {
+	output_text?: string | null;
+	suggestion_text?: string | null;
+}): string {
+	return suggestion.output_text ?? suggestion.suggestion_text ?? '';
+}
+
+
+function firstAddress(value: unknown): string {
+	if (Array.isArray(value) && value.length > 0) {
+		const first = value[0];
+		if (typeof first === 'string') return first;
+		if (first && typeof first === 'object' && 'address' in first) {
+			const addr = (first as { address?: unknown }).address;
+			if (typeof addr === 'string') return addr;
+		}
+	}
+	if (typeof value === 'string') return value;
+	return '';
+}
+
+export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
+	const occurred = row.direction === 'outbound' ? row.sent_at : row.received_at;
+	return {
+		id: row.id,
+		direction: row.direction === 'outbound' ? 'out' : 'in',
+		from: row.from_address,
+		to: firstAddress(row.to_addresses),
+		subject: row.subject || '(no subject)',
+		preview: row.preview_text || row.body_text?.slice(0, 160) || '',
+		body: row.body_text || '',
+		occurredAt: occurred ? new Date(occurred).toLocaleString() : '',
+		unread: row.unread
 	};
 }

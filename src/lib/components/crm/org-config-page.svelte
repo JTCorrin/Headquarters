@@ -7,36 +7,25 @@
 	import {
 		membershipFromCreateResult,
 		roleFromMemberships,
-		themePreferenceFromApi,
-		themePreferenceToApi,
-		toMailboxAccountResource,
-		toMailboxPutBody,
 		toOrganisationConfigFormData,
 		toOrganisationConfigPatch,
 		toOrganisationConfigResource,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
-		toProfilePreferencesFormData,
 		toTaxRateCreateBody,
 		toTaxRateResource
 	} from '$lib/api/v1/mappers.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
+		canAccessOrgConfigRoutes,
 		organisationConfigSchema,
-		profilePreferencesSchema,
 		taxRateFormSchema,
 		type MembershipRole,
 		type OrganisationConfigResource,
 		type OrganisationCreateData,
 		type TaxRateResource
 	} from '$lib/schemas/organisation.js';
-	import {
-		emptyMailboxFormData,
-		mailboxFormFromResource,
-		mailboxFormSchema,
-		type MailboxAccountResource
-	} from '$lib/schemas/mailbox.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import SettingsConfigPage from './settings-config-page.svelte';
@@ -62,7 +51,6 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let configuration = $state<OrganisationConfigResource | null>(null);
 	let taxRates = $state<TaxRateResource[]>([]);
-	let mailboxAccount = $state<MailboxAccountResource | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -81,17 +69,6 @@
 		),
 		{
 			validators: zod4(organisationConfigSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
-
-	const preferencesForm = superForm(
-		defaults({ themePreference: 'org_default' as const }, zod4(profilePreferencesSchema)),
-		{
-			validators: zod4(profilePreferencesSchema),
 			SPA: true,
 			warnings: { duplicateId: false },
 			applyAction: false,
@@ -118,14 +95,6 @@
 		}
 	);
 
-	const mailboxForm = superForm(defaults(emptyMailboxFormData('gmail'), zod4(mailboxFormSchema)), {
-		validators: zod4(mailboxFormSchema),
-		SPA: true,
-		warnings: { duplicateId: false },
-		applyAction: false,
-		resetForm: false
-	});
-
 	const role = $derived(
 		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
 			'member') as MembershipRole
@@ -134,7 +103,7 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Config'));
+	const navGroups = $derived(appNavGroups('Config', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
@@ -184,32 +153,9 @@
 	function resetOrgScopedState() {
 		configuration = null;
 		taxRates = [];
-		mailboxAccount = null;
-		mailboxForm.form.set(emptyMailboxFormData('gmail'));
 		taxDrawerOpen = false;
 		editingTaxRateId = null;
 		viewState = { kind: 'loading' };
-	}
-
-	async function loadMailbox(epoch: RequestEpoch) {
-		try {
-			const account = await api.mailbox.get();
-			if (isStale(epoch)) return;
-			mailboxAccount = toMailboxAccountResource(account);
-			mailboxForm.form.set(
-				mailboxAccount ? mailboxFormFromResource(mailboxAccount) : emptyMailboxFormData('gmail')
-			);
-		} catch (error) {
-			if (isStale(epoch)) return;
-			// Wave A: BE may not be deployed yet, or no mailbox — keep the empty form.
-			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
-				mailboxAccount = null;
-				mailboxForm.form.set(emptyMailboxFormData('gmail'));
-				return;
-			}
-			// Non-fatal for Config page — org defaults still load.
-			mailboxAccount = null;
-		}
 	}
 
 	async function loadAll() {
@@ -231,10 +177,19 @@
 				session.setMemberships(rows.map(toOrgMembershipSummary));
 			}
 
-			const [config, rates, prefs] = await Promise.all([
+			const currentRole = (roleFromMemberships(session.memberships, session.selectedOrgId) ??
+				'member') as MembershipRole;
+			if (!canAccessOrgConfigRoutes(currentRole)) {
+				viewState = {
+					kind: 'forbidden',
+					message: 'Organisation Config is available to Owners only.'
+				};
+				return;
+			}
+
+			const [config, rates] = await Promise.all([
 				api.organisationConfig.get(),
-				api.taxRates.list(),
-				api.profilePreferences.get()
+				api.taxRates.list()
 			]);
 
 			if (isStale(epoch)) return;
@@ -242,13 +197,9 @@
 			configuration = toOrganisationConfigResource(config);
 			taxRates = rates.map(toTaxRateResource);
 			configForm.form.set(toOrganisationConfigFormData(config));
-			preferencesForm.form.set(toProfilePreferencesFormData(prefs));
-			session.setThemePreference(themePreferenceFromApi(prefs.theme_preference));
 			if (session.selectedOrgId) {
 				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
 			}
-			await loadMailbox(epoch);
-			if (isStale(epoch)) return;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -322,120 +273,9 @@
 		}
 	}
 
-	async function onSavePreferences() {
-		const epoch = captureEpoch();
-		try {
-			const values = get(preferencesForm.form);
-			const updated = await api.profilePreferences.update({
-				theme_preference: themePreferenceToApi(values.themePreference)
-			});
-			if (isStale(epoch)) {
-				void loadAll();
-				return false;
-			}
-			preferencesForm.form.set(toProfilePreferencesFormData(updated));
-			session.setThemePreference(themePreferenceFromApi(updated.theme_preference));
-		} catch (error) {
-			if (isStale(epoch)) {
-				void loadAll();
-				return false;
-			}
-			if (isApiClientError(error) && error.isValidationError) {
-				viewState = {
-					kind: 'validation',
-					message: userMessage(error, 'Validation failed'),
-					fields: error.fields
-				};
-				return;
-			}
-			viewState = {
-				kind: 'validation',
-				message: userMessage(error, 'Could not save preferences.')
-			};
-		}
-	}
 
-	async function onSaveMailbox() {
-		const epoch = captureEpoch();
-		try {
-			const updated = await api.mailbox.put(toMailboxPutBody(get(mailboxForm.form)));
-			if (isStale(epoch)) {
-				void loadAll();
-				return false;
-			}
-			mailboxAccount = toMailboxAccountResource(updated);
-			mailboxForm.form.set(
-				mailboxAccount ? mailboxFormFromResource(mailboxAccount) : emptyMailboxFormData('gmail')
-			);
-			viewState = { kind: 'ready' };
-		} catch (error) {
-			if (isStale(epoch)) {
-				void loadAll();
-				return false;
-			}
-			if (isApiClientError(error) && error.isValidationError) {
-				viewState = {
-					kind: 'validation',
-					message: userMessage(error, 'Validation failed'),
-					fields: error.fields
-				};
-				return false;
-			}
-			viewState = {
-				kind: 'validation',
-				message: userMessage(error, 'Could not save mailbox.')
-			};
-			return false;
-		}
-	}
 
-	async function onTestMailbox() {
-		const epoch = captureEpoch();
-		try {
-			const result = await api.mailbox.test();
-			if (isStale(epoch)) return false;
-			if (!result.ok) {
-				viewState = {
-					kind: 'validation',
-					message: result.message || result.error_code || 'Mailbox test failed.'
-				};
-				return false;
-			}
-			await loadMailbox(epoch);
-			viewState = { kind: 'ready' };
-		} catch (error) {
-			if (isStale(epoch)) return false;
-			viewState = {
-				kind: 'validation',
-				message: userMessage(error, 'Mailbox test failed.')
-			};
-			return false;
-		}
-	}
 
-	async function onDisconnectMailbox() {
-		const epoch = captureEpoch();
-		try {
-			await api.mailbox.disconnect();
-			if (isStale(epoch)) {
-				void loadAll();
-				return false;
-			}
-			mailboxAccount = null;
-			mailboxForm.form.set(emptyMailboxFormData('gmail'));
-			viewState = { kind: 'ready' };
-		} catch (error) {
-			if (isStale(epoch)) {
-				void loadAll();
-				return false;
-			}
-			viewState = {
-				kind: 'validation',
-				message: userMessage(error, 'Could not disconnect mailbox.')
-			};
-			return false;
-		}
-	}
 
 	async function onSaveTaxRate(): Promise<boolean> {
 		const epoch = captureEpoch();
@@ -581,33 +421,35 @@
 			{onLogout}
 			{onValidCreate}
 		>
-			<SettingsConfigPage
-				{orgName}
-				{navGroups}
-				{role}
-				{configuration}
-				{taxRates}
-				{configForm}
-				{preferencesForm}
-				{taxRateForm}
-				{mailboxForm}
-				{mailboxAccount}
-				bind:taxDrawerOpen
-				{editingTaxRateId}
-				{viewState}
-				onReload={loadAll}
-				{onSaveConfig}
-				{onSavePreferences}
-				{onSaveMailbox}
-				{onTestMailbox}
-				{onDisconnectMailbox}
-				{onSaveTaxRate}
-				{onSetDefaultTaxRate}
-				{onArchiveTaxRate}
-				{onEditTaxRate}
-				{onAddTaxRate}
-				showNav={false}
-			/>
+			{#if !canAccessOrgConfigRoutes(role)}
+				<div class="space-y-3 p-6" data-testid="org-config-forbidden">
+					<p class="text-destructive text-sm" role="alert">
+						Organisation Config is available to Owners only. Use My settings for personal theme and mailbox.
+					</p>
+					<a class="text-sm font-medium underline underline-offset-2" href="/settings">Open My settings</a>
+				</div>
+			{:else}
+				<SettingsConfigPage
+					{orgName}
+					{navGroups}
+					{role}
+					{configuration}
+					{taxRates}
+					{configForm}
+					{taxRateForm}
+					bind:taxDrawerOpen
+					{editingTaxRateId}
+					{viewState}
+					onReload={loadAll}
+					{onSaveConfig}
+					{onSaveTaxRate}
+					{onSetDefaultTaxRate}
+					{onArchiveTaxRate}
+					{onEditTaxRate}
+					{onAddTaxRate}
+					showNav={false}
+				/>
+			{/if}
 		</AppShell>
 	</div>
 {:else}

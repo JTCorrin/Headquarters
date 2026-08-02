@@ -31,8 +31,10 @@
 		configuration: OrganisationConfigResource | null;
 		taxRates: TaxRateResource[];
 		configForm: SuperForm<OrganisationConfigData>;
-		preferencesForm: SuperForm<ProfilePreferencesData>;
+		/** Personal theme — prefer `/settings` in Wave B; optional on org Config. */
+		preferencesForm?: SuperForm<ProfilePreferencesData>;
 		taxRateForm: SuperForm<TaxRateFormData>;
+		/** Personal mailbox — prefer `/settings#mail` in Wave B. */
 		mailboxForm?: SuperForm<MailboxFormData>;
 		mailboxAccount?: MailboxAccountResource | null;
 		taxDrawerOpen?: boolean;
@@ -64,9 +66,9 @@
 		configuration,
 		taxRates,
 		configForm,
-		preferencesForm,
+		preferencesForm = undefined,
 		taxRateForm,
-		mailboxForm,
+		mailboxForm = undefined,
 		mailboxAccount = null,
 		taxDrawerOpen = $bindable(false),
 		editingTaxRateId = null,
@@ -127,7 +129,7 @@
 			<PageHeader
 				breadcrumb="Organisation · Settings"
 				title="Config"
-				description="Organisation defaults, named tax rates, your personal theme, and personal mailbox."
+				description="Organisation defaults and named tax rates. Personal theme and mailbox live under My settings."
 			>
 				{#snippet actions()}
 					<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
@@ -247,18 +249,20 @@
 					{/if}
 				</section>
 
-				<section class="space-y-4" data-testid="personal-theme-section">
-					<div>
-						<h2 class="text-lg font-semibold tracking-tight">Personal theme</h2>
-						<p class="text-muted-foreground text-sm">
-							Optional override that applies across every organisation you belong to.
-						</p>
-					</div>
-					<ProfilePreferencesForm
-						form={preferencesForm}
-						onValidSubmit={onSavePreferences}
-					/>
-				</section>
+				{#if preferencesForm}
+					<section class="space-y-4" data-testid="personal-theme-section">
+						<div>
+							<h2 class="text-lg font-semibold tracking-tight">Personal theme</h2>
+							<p class="text-muted-foreground text-sm">
+								Optional override that applies across every organisation you belong to.
+							</p>
+						</div>
+						<ProfilePreferencesForm
+							form={preferencesForm}
+							onValidSubmit={onSavePreferences}
+						/>
+					</section>
+				{/if}
 
 				{#if mailboxForm}
 					<section class="space-y-4 scroll-mt-6" id="mail" data-testid="personal-mail-section">

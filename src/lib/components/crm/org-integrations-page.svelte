@@ -199,7 +199,7 @@
 					<h2 class="text-lg font-semibold tracking-tight">Email sending</h2>
 					<p class="text-muted-foreground text-sm">
 						Organisation quote / invoice / campaign SMTP is a separate plane and lands later.
-						Personal mailbox IMAP/SMTP is under <a class="underline underline-offset-2" href="/org/config#mail">Config → Mail</a>.
+						Personal mailbox IMAP/SMTP is under <a class="underline underline-offset-2" href="/settings#mail">My settings → Mail</a>.
 					</p>
 				</section>
 			{/if}

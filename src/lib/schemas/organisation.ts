@@ -176,8 +176,22 @@ export interface ProfilePreferencesResource {
 	theme_preference: ThemeOption | null;
 }
 
+/** Org Config / Integrations routes and mutate — Owner only (Wave B locked #5). */
+export function canAccessOrgConfigRoutes(role: MembershipRole): boolean {
+	return role === 'owner';
+}
+
+/** Org defaults / tax / AI connect writes — Owner only. */
 export function canMutateOrgConfig(role: MembershipRole): boolean {
-	return role === 'owner' || role === 'admin';
+	return role === 'owner';
+}
+
+/**
+ * Personal settings (theme + Mail) — every membership except billing.
+ * Owners also use this for personal Mail; org defaults stay under `/org/config`.
+ */
+export function canAccessPersonalConfig(role: MembershipRole): boolean {
+	return role !== 'billing';
 }
 
 export function roleLabel(role: MembershipRole): string {

@@ -22,6 +22,6 @@ describe('integration helpers', () => {
 
 	it('returns role-aware draft gate copy', () => {
 		expect(draftResponseGateCopy('owner').linkLabel).toMatch(/Org settings/i);
-		expect(draftResponseGateCopy('member').linkLabel).toMatch(/Ask an admin/i);
+		expect(draftResponseGateCopy('member').linkLabel).toMatch(/Ask an Owner/i);
 	});
 });

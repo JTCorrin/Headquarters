@@ -46,7 +46,7 @@ describe('EntityEmailInbox', () => {
 		});
 
 		await page.getByRole('button', { name: 'Reply' }).click();
-		await expect.element(page.getByTestId('draft-response-gate')).toHaveTextContent(/Ask an admin/i);
+		await expect.element(page.getByTestId('draft-response-gate')).toHaveTextContent(/Ask an Owner/i);
 		await expect.element(page.getByRole('button', { name: 'Draft response' })).toBeDisabled();
 		await expect.element(page.getByTestId('email-send')).toBeDisabled();
 		await expect

@@ -2,6 +2,7 @@ import { ApiClientError, type ApiErrorCode } from './errors.js';
 import { createClientsEndpoints } from './endpoints/clients.js';
 import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
+import { createEmailMessagesEndpoints } from './endpoints/email-messages.js';
 import { createIntegrationsEndpoints } from './endpoints/integrations.js';
 import { createInvoicesEndpoints } from './endpoints/invoices.js';
 import { createLeadsEndpoints } from './endpoints/leads.js';
@@ -16,6 +17,7 @@ import type {
 	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
+	EmailMessagesEndpoints,
 	IntegrationsEndpoints,
 	InvoicesEndpoints,
 	LeadsEndpoints,
@@ -61,6 +63,7 @@ export interface ApiV1Client {
 	clients: ClientsEndpoints;
 	leads: LeadsEndpoints;
 	documents: DocumentsEndpoints;
+	emailMessages: EmailMessagesEndpoints;
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
@@ -236,6 +239,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		contacts: createContactsEndpoints(request),
 		clients: createClientsEndpoints(request),
 		leads: createLeadsEndpoints(request),
-		documents: createDocumentsEndpoints(request)
+		documents: createDocumentsEndpoints(request),
+		emailMessages: createEmailMessagesEndpoints(request)
 	};
 }

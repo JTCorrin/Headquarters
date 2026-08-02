@@ -5,6 +5,7 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		roleFromMemberships,
 		invoiceStatusLabel,
 		lineItemRowsToInvoiceLineInputs,
 		membershipFromCreateResult,
@@ -23,7 +24,7 @@
 		lineItemFormSchema,
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
-	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import {
 		invoiceFormSchema,
 		type InvoiceClientOption,
@@ -112,7 +113,11 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Invoices'));
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Invoices', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const isDraft = $derived(invoice?.status === 'draft');
 

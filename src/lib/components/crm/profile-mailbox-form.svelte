@@ -3,6 +3,8 @@
 	import type { SuperForm } from 'sveltekit-superforms';
 	import {
 		applyMailboxPreset,
+		formatMailboxLastChecked,
+		humanizeMailboxSyncError,
 		mailboxPresets,
 		mailboxSecurityOptions,
 		type MailboxAccountResource,
@@ -139,10 +141,14 @@
 	{#if account?.last_checked_at || account?.last_error_code}
 		<p class="text-muted-foreground text-xs" data-testid="mailbox-sync-status">
 			{#if account.last_checked_at}
-				Last checked {account.last_checked_at}.
+				Last checked {formatMailboxLastChecked(account.last_checked_at)}.
 			{/if}
 			{#if account.last_error_code}
-				<span class="text-destructive"> Sync issue: {account.last_error_code}</span>
+				<span class="text-destructive">
+					{formatMailboxLastChecked(account.last_checked_at) ? ' ' : ''}{humanizeMailboxSyncError(
+						account.last_error_code
+					)}
+				</span>
 			{/if}
 		</p>
 	{/if}
