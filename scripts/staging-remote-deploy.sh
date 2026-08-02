@@ -100,6 +100,36 @@ fi
 PUBLIC_SUPABASE_URL="http://${APP_HOST}:54321"
 log "Supabase API ${PUBLIC_SUPABASE_URL}"
 
+# Edge runtime mounts supabase/functions but keeps a stale module graph across
+# git resets when the stack was already up. Bounce it so api-v1 matches this SHA
+# (Wave A mailbox/AI routes otherwise stay Route not found after migration up).
+edge_ids="$(docker ps -q --filter name=edge-runtime --filter status=running || true)"
+if [[ -n "$edge_ids" ]]; then
+	log "restarting edge-runtime to load api-v1 @ ${SHA}"
+	# shellcheck disable=SC2086
+	docker restart $edge_ids >/dev/null
+	ready=0
+	for _ in $(seq 1 60); do
+		code="$(
+			curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
+				-H "apikey: ${PUBLIC_SUPABASE_ANON_KEY}" \
+				"${PUBLIC_SUPABASE_URL}/functions/v1/api-v1/api/v1/organisations" || true
+		)"
+		if [[ "$code" =~ ^[0-9]{3}$ ]]; then
+			log "edge-runtime ready (HTTP ${code})"
+			ready=1
+			break
+		fi
+		sleep 1
+	done
+	if [[ "$ready" -ne 1 ]]; then
+		log "edge-runtime did not become ready after restart"
+		exit 1
+	fi
+else
+	log "no running edge-runtime container — skip restart"
+fi
+
 # Ensure user services survive SSH disconnects / reboot.
 if command -v loginctl >/dev/null 2>&1; then
 	sudo loginctl enable-linger "$(id -un)" >/dev/null 2>&1 || true
