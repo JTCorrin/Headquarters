@@ -267,9 +267,10 @@ void_inv="$(
 )"
 STATUS="$(printf '%s' "$void_inv" | jq -r '.data.status // empty')"
 REASON="$(printf '%s' "$void_inv" | jq -r '.data.void_reason // empty')"
-[[ "$STATUS" == "void" && "$REASON" == "Duplicate / curl proof" ]] \
+VOID_BAL="$(printf '%s' "$void_inv" | jq -r '.data.balance_due_cents // empty')"
+[[ "$STATUS" == "void" && "$REASON" == "Duplicate / curl proof" && "$VOID_BAL" == "0" ]] \
 	|| die "invoice void: ${void_inv}"
-log "invoice voided"
+log "invoice voided (balance_due_cents=0)"
 
 # ---------------------------------------------------------------------------
 # Soft-delete draft

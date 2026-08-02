@@ -1,6 +1,6 @@
 begin;
 
-select plan(68);
+select plan(75);
 
 select has_table('public', 'invoices', 'invoices table exists');
 select has_table('public', 'invoice_lines', 'invoice_lines table exists');
@@ -128,6 +128,8 @@ create temporary table _invoices_fixture (
   owner_membership_id uuid,
   client_id uuid,
   contact_id uuid,
+  alt_client_id uuid,
+  alt_contact_id uuid,
   product_id uuid,
   tax_rate_id uuid,
   quote_id uuid,
@@ -296,6 +298,20 @@ with created_contact as (
   returning id
 )
 update _invoices_fixture set contact_id = created_contact.id from created_contact;
+
+with created_alt_client as (
+  insert into public.clients (org_id, name, status, primary_email)
+  select org_id, 'Beta Client', 'active', 'ap@beta.test' from _invoices_fixture
+  returning id
+)
+update _invoices_fixture set alt_client_id = created_alt_client.id from created_alt_client;
+
+with created_alt_contact as (
+  insert into public.contacts (org_id, display_name, primary_email)
+  select org_id, 'Bob Builder', 'bob@beta.test' from _invoices_fixture
+  returning id
+)
+update _invoices_fixture set alt_contact_id = created_alt_contact.id from created_alt_contact;
 
 select ok(
   exists (
@@ -1098,6 +1114,144 @@ select ok(
     where invoices.id = (select invoice_id from _invoices_fixture)
   ),
   'send preserves accepted quote party snapshot despite live client mutation'
+);
+
+-- Explicit draft party-ID change must rebuild party_snapshot; Send keeps that rebuild.
+select lives_ok(
+  $$
+    select public.create_quote_draft(
+      (select org_id from _invoices_fixture),
+      jsonb_build_object(
+        'title', 'Party change quote',
+        'client_id', (select client_id from _invoices_fixture),
+        'contact_id', (select contact_id from _invoices_fixture)
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'product_id', (select product_id from _invoices_fixture),
+          'quantity', 1,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'owner can create a quote for the draft party-change probe'
+);
+
+update _invoices_fixture
+set
+  quote_id = quotes.id,
+  quote_version = quotes.version
+from public.quotes
+where quotes.org_id = _invoices_fixture.org_id
+  and quotes.title = 'Party change quote'
+  and quotes.deleted_at is null;
+
+select lives_ok(
+  $$
+    select public.accept_quote(
+      (select quote_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select quote_version from _invoices_fixture)
+    )
+  $$,
+  'owner can accept the party-change quote'
+);
+
+update _invoices_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _invoices_fixture.quote_id;
+
+select lives_ok(
+  $$
+    select public.create_invoice_from_quote(
+      (select quote_id from _invoices_fixture),
+      (select org_id from _invoices_fixture)
+    )
+  $$,
+  'owner can convert the party-change quote'
+);
+
+update _invoices_fixture
+set
+  invoice_id = quotes.converted_invoice_id,
+  invoice_version = invoices.version
+from public.quotes
+join public.invoices on invoices.id = quotes.converted_invoice_id
+where quotes.id = _invoices_fixture.quote_id;
+
+select lives_ok(
+  $$
+    select public.save_invoice_draft(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture),
+      jsonb_build_object(
+        'client_id', (select alt_client_id from _invoices_fixture),
+        'contact_id', (select alt_contact_id from _invoices_fixture)
+      ),
+      null
+    )
+  $$,
+  'owner can change draft client/contact on a quote-derived invoice'
+);
+
+update _invoices_fixture
+set invoice_version = invoices.version
+from public.invoices
+where invoices.id = _invoices_fixture.invoice_id;
+
+select ok(
+  (
+    select
+      invoices.client_id = (select alt_client_id from _invoices_fixture)
+      and invoices.contact_id = (select alt_contact_id from _invoices_fixture)
+      and invoices.party_snapshot -> 'client' ->> 'id'
+        = (select alt_client_id::text from _invoices_fixture)
+      and invoices.party_snapshot -> 'client' ->> 'name' = 'Beta Client'
+      and invoices.party_snapshot -> 'contact' ->> 'id'
+        = (select alt_contact_id::text from _invoices_fixture)
+      and invoices.party_snapshot -> 'contact' ->> 'display_name' = 'Bob Builder'
+    from public.invoices
+    where invoices.id = (select invoice_id from _invoices_fixture)
+  ),
+  'save_invoice_draft rebuilds party_snapshot when client/contact IDs change'
+);
+
+-- Mutate the live alt client after the rebuild; Send must keep the draft snapshot.
+reset role;
+update public.clients
+set name = 'Beta Client Renamed After Draft Change'
+where id = (select alt_client_id from _invoices_fixture);
+
+select pg_temp.as_user((select owner_id from _invoices_fixture));
+set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.send_invoice(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture)
+    )
+  $$,
+  'owner can send after an explicit draft party-ID change'
+);
+
+select ok(
+  (
+    select
+      invoices.party_snapshot -> 'client' ->> 'name' = 'Beta Client'
+      and invoices.party_snapshot -> 'contact' ->> 'display_name' = 'Bob Builder'
+      and invoices.party_snapshot -> 'client' ->> 'name'
+        is distinct from clients.name
+      and clients.name = 'Beta Client Renamed After Draft Change'
+    from public.invoices
+    join public.clients on clients.id = invoices.client_id
+    where invoices.id = (select invoice_id from _invoices_fixture)
+  ),
+  'send preserves the rebuilt draft party snapshot after party-ID change'
 );
 
 reset role;
