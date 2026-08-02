@@ -42,6 +42,14 @@ export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
 				{ label: 'Templates', href: '/email/templates', active: mark('Templates') },
 				{ label: 'Documents', href: '/documents', active: mark('Documents') }
 			]
+		},
+		{
+			label: 'Organisation',
+			items: [
+				{ label: 'Config', href: '/org/config', active: mark('Config') },
+				{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') },
+				{ label: 'Switch organisation', href: '/select-org', active: mark('Switch organisation') }
+			]
 		}
 	];
 }

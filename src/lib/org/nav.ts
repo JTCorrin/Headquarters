@@ -41,6 +41,7 @@ export function appNavGroups(activeLabel?: string): AppNavGroup[] {
 			label: 'Organisation',
 			items: [
 				{ label: 'Config', href: '/org/config', active: mark('Config') },
+				{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') },
 				{ label: 'Switch organisation', href: '/select-org', active: mark('Switch organisation') }
 			]
 		}

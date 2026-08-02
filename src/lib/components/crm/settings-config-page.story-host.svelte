@@ -9,6 +9,11 @@
 		type OrganisationConfigResource,
 		type TaxRateResource
 	} from '$lib/schemas/organisation.js';
+	import {
+		emptyMailboxFormData,
+		mailboxFormSchema,
+		type MailboxAccountResource
+	} from '$lib/schemas/mailbox.js';
 	import SettingsConfigPage from './settings-config-page.svelte';
 	import type { AppNavGroup } from './app-nav.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -19,6 +24,8 @@
 		role?: MembershipRole;
 		configuration?: OrganisationConfigResource | null;
 		taxRates?: TaxRateResource[];
+		mailboxAccount?: MailboxAccountResource | null;
+		includeMailbox?: boolean;
 		viewState?: ResourceViewState;
 		/** Simulate resolved `false` from tax save. */
 		failTaxSave?: boolean;
@@ -30,6 +37,9 @@
 		onReload?: () => void;
 		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
+		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
+		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
+		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		onSaveTaxRate?: () => boolean | void | Promise<boolean | void>;
 		onSetDefaultTaxRate?: (taxRateId: string) => void;
 		onArchiveTaxRate?: (taxRateId: string) => void;
@@ -41,6 +51,8 @@
 		role = 'owner',
 		configuration = null,
 		taxRates = [],
+		mailboxAccount = null,
+		includeMailbox = true,
 		viewState = { kind: 'ready' },
 		failTaxSave = false,
 		rejectTaxSave = false,
@@ -49,6 +61,9 @@
 		onReload,
 		onSaveConfig,
 		onSavePreferences,
+		onSaveMailbox,
+		onTestMailbox,
+		onDisconnectMailbox,
 		onSaveTaxRate,
 		onSetDefaultTaxRate,
 		onArchiveTaxRate
@@ -111,6 +126,14 @@
 		}
 	);
 
+	const mailboxForm = superForm(defaults(emptyMailboxFormData('gmail'), zod4(mailboxFormSchema)), {
+		validators: zod4(mailboxFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
+
 	function onAddTaxRate() {
 		editingTaxRateId = null;
 		taxRateForm.form.update((current) => ({
@@ -169,12 +192,17 @@
 	{configForm}
 	{preferencesForm}
 	{taxRateForm}
+	mailboxForm={includeMailbox ? mailboxForm : undefined}
+	{mailboxAccount}
 	bind:taxDrawerOpen
 	{editingTaxRateId}
 	{viewState}
 	{onReload}
 	{onSaveConfig}
 	{onSavePreferences}
+	{onSaveMailbox}
+	{onTestMailbox}
+	{onDisconnectMailbox}
 	onSaveTaxRate={handleSaveTaxRate}
 	onSetDefaultTaxRate={handleSetDefault}
 	{onArchiveTaxRate}

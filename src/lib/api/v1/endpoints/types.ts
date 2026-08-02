@@ -55,7 +55,13 @@ import type {
 	ApiTaxRate,
 	ApiTaxRateCreateBody,
 	ApiTaxRateListParams,
-	ApiTaxRatePatchBody
+	ApiTaxRatePatchBody,
+	ApiMailboxAccount,
+	ApiMailboxPutBody,
+	ApiMailboxTestResult,
+	ApiAiIntegration,
+	ApiAiIntegrationConnectBody,
+	ApiAiProvider
 } from '../types.js';
 
 export interface OrganisationsEndpoints {
@@ -260,4 +266,21 @@ export interface DocumentsEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiDocumentResult>;
+}
+
+export interface MailboxEndpoints {
+	get(signal?: AbortSignal): Promise<ApiMailboxAccount | null>;
+	put(body: ApiMailboxPutBody, signal?: AbortSignal): Promise<ApiMailboxAccount>;
+	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
+	disconnect(signal?: AbortSignal): Promise<void>;
+}
+
+export interface IntegrationsEndpoints {
+	list(signal?: AbortSignal): Promise<ApiAiIntegration[]>;
+	connectAi(
+		provider: ApiAiProvider,
+		body: ApiAiIntegrationConnectBody,
+		signal?: AbortSignal
+	): Promise<ApiAiIntegration>;
+	disconnectAi(provider: ApiAiProvider, signal?: AbortSignal): Promise<void>;
 }

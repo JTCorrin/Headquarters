@@ -2,8 +2,10 @@ import { ApiClientError, type ApiErrorCode } from './errors.js';
 import { createClientsEndpoints } from './endpoints/clients.js';
 import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
+import { createIntegrationsEndpoints } from './endpoints/integrations.js';
 import { createInvoicesEndpoints } from './endpoints/invoices.js';
 import { createLeadsEndpoints } from './endpoints/leads.js';
+import { createMailboxEndpoints } from './endpoints/mailbox.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
@@ -14,8 +16,10 @@ import type {
 	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
+	IntegrationsEndpoints,
 	InvoicesEndpoints,
 	LeadsEndpoints,
+	MailboxEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
 	ProductsEndpoints,
@@ -48,6 +52,8 @@ export interface ApiV1Client {
 	organisationConfig: OrganisationConfigEndpoints;
 	taxRates: TaxRatesEndpoints;
 	profilePreferences: ProfilePreferencesEndpoints;
+	mailbox: MailboxEndpoints;
+	integrations: IntegrationsEndpoints;
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
 	invoices: InvoicesEndpoints;
@@ -222,6 +228,8 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		organisationConfig: createOrganisationConfigEndpoints(request),
 		taxRates: createTaxRatesEndpoints(request),
 		profilePreferences: createProfilePreferencesEndpoints(request),
+		mailbox: createMailboxEndpoints(request),
+		integrations: createIntegrationsEndpoints(request),
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		invoices: createInvoicesEndpoints(request),
