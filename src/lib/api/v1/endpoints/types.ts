@@ -65,6 +65,7 @@ import type {
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
+	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
 	ApiEntityEmailType
 } from '../types.js';
@@ -297,7 +298,11 @@ export interface EmailMessagesEndpoints {
 		entityId: string,
 		signal?: AbortSignal
 	): Promise<ApiEmailMessage[]>;
-	share(messageId: string, signal?: AbortSignal): Promise<ApiEmailMessageShareResult>;
+	share(
+		messageId: string,
+		body: ApiEmailMessageShareBody,
+		signal?: AbortSignal
+	): Promise<ApiEmailMessageShareResult>;
 	generateDraft(
 		body: ApiAiSuggestionGenerateBody,
 		signal?: AbortSignal

@@ -857,6 +857,12 @@ export interface ApiEmailMessage {
 	unread?: boolean;
 }
 
+/** Body for `POST /api/v1/email-messages/{id}/share` (Wave B BE contract). */
+export interface ApiEmailMessageShareBody {
+	entity_type: ApiEntityEmailType;
+	entity_id: string;
+}
+
 export interface ApiEmailMessageShareResult {
 	message_id: string;
 	link_reason: 'timeline_share';
