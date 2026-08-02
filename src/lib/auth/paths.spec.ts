@@ -22,6 +22,8 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/quotes/abc')).toBe(true);
 		expect(requiresSelectedOrg('/invoices')).toBe(true);
 		expect(requiresSelectedOrg('/invoices/abc')).toBe(true);
+		expect(requiresSelectedOrg('/recurring-invoices')).toBe(true);
+		expect(requiresSelectedOrg('/recurring-invoices/abc')).toBe(true);
 		expect(requiresSelectedOrg('/bills')).toBe(true);
 		expect(requiresSelectedOrg('/bills/abc')).toBe(true);
 		expect(requiresSelectedOrg('/leads')).toBe(true);

@@ -1,4 +1,5 @@
 import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { createRecurringInvoiceSchedulesEndpoints } from './endpoints/recurring-invoice-schedules.js';
 import { createBillsEndpoints } from './endpoints/bills.js';
 import { createClientsEndpoints } from './endpoints/clients.js';
 import { createContactsEndpoints } from './endpoints/contacts.js';
@@ -31,6 +32,7 @@ import type {
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
+	RecurringInvoiceSchedulesEndpoints,
 	TaxRatesEndpoints,
 	TasksEndpoints,
 	VendorsEndpoints
@@ -65,6 +67,7 @@ export interface ApiV1Client {
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
 	invoices: InvoicesEndpoints;
+	recurringInvoiceSchedules: RecurringInvoiceSchedulesEndpoints;
 	vendors: VendorsEndpoints;
 	bills: BillsEndpoints;
 	contacts: ContactsEndpoints;
@@ -245,6 +248,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		invoices: createInvoicesEndpoints(request),
+		recurringInvoiceSchedules: createRecurringInvoiceSchedulesEndpoints(request),
 		vendors: createVendorsEndpoints(request),
 		bills: createBillsEndpoints(request),
 		contacts: createContactsEndpoints(request),

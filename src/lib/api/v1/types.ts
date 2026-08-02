@@ -1095,3 +1095,223 @@ export interface ApiAiSuggestion {
 	variant?: string | null;
 	kind?: string;
 }
+
+export type ApiRecurringInvoiceStatus =
+	| 'draft'
+	| 'active'
+	| 'paused'
+	| 'completed'
+	| 'cancelled';
+
+export type ApiRecurringInvoiceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export type ApiRecurringInvoiceMonthEndPolicy = 'clamp' | 'last_day' | 'skip';
+
+export type ApiRecurringInvoiceDeliveryMode = 'draft' | 'auto_send';
+
+export type ApiRecurringInvoicePricingMode = 'fixed' | 'catalog_at_generation';
+
+export type ApiRecurringInvoiceCatchUpPolicy = 'skip' | 'latest' | 'all';
+
+export type ApiRecurringInvoiceRunStatus =
+	| 'pending'
+	| 'processing'
+	| 'generated'
+	| 'delivery_pending'
+	| 'sent'
+	| 'skipped'
+	| 'generation_failed'
+	| 'delivery_failed'
+	| 'delivery_unknown';
+
+export type ApiRecurringInvoiceRunTrigger = 'scheduled' | 'manual' | 'catch_up';
+
+export interface ApiRecurringInvoiceSchedule {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	client_id: string;
+	contact_id: string | null;
+	owner_membership_id: string | null;
+	status: ApiRecurringInvoiceStatus;
+	currency: string;
+	frequency: ApiRecurringInvoiceFrequency;
+	interval_count: number;
+	anchor_on: string;
+	rule_version: number;
+	weekdays: number[] | null;
+	day_of_month: number | null;
+	month_of_year: number | null;
+	month_end_policy: ApiRecurringInvoiceMonthEndPolicy;
+	timezone: string;
+	local_run_time: string;
+	start_on: string;
+	end_on: string | null;
+	max_occurrences: number | null;
+	scheduled_occurrence_count: number;
+	next_run_at: string | null;
+	last_run_at: string | null;
+	due_days: number;
+	delivery_mode: ApiRecurringInvoiceDeliveryMode;
+	pricing_mode: ApiRecurringInvoicePricingMode;
+	catch_up_policy: ApiRecurringInvoiceCatchUpPolicy;
+	max_catch_up_runs: number;
+	purchase_order_number: string | null;
+	payment_terms: string | null;
+	notes: string | null;
+	internal_notes: string | null;
+	activated_at: string | null;
+	paused_at: string | null;
+	completed_at: string | null;
+	cancelled_at: string | null;
+	cancelled_by: string | null;
+	/** Optional projection fields from GET/detail responses. */
+	next_issue_on?: string | null;
+	next_due_on?: string | null;
+	estimated_total_cents?: number | null;
+	client_name?: string | null;
+}
+
+export interface ApiRecurringInvoiceLine {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	version: number;
+	schedule_id: string;
+	product_id: string | null;
+	sku_snapshot: string | null;
+	description_template: string;
+	quantity: number;
+	unit_price_cents: number;
+	discount_percent: number;
+	tax_rate_percent: number;
+	position: number;
+	active: boolean;
+}
+
+export type ApiRecurringInvoiceDocument = ApiRecurringInvoiceSchedule & {
+	lines: ApiRecurringInvoiceLine[];
+};
+
+export interface ApiRecurringInvoiceLineInput {
+	product_id?: string | null;
+	description_template: string;
+	quantity: number | string;
+	unit_price_cents: number;
+	discount_percent?: number | string;
+	tax_rate_percent?: number | string;
+	position?: number;
+}
+
+interface ApiRecurringInvoiceWritableFields {
+	name?: string;
+	client_id?: string;
+	contact_id?: string | null;
+	currency?: string;
+	frequency?: ApiRecurringInvoiceFrequency;
+	interval_count?: number;
+	anchor_on?: string;
+	weekdays?: number[] | null;
+	day_of_month?: number | null;
+	month_of_year?: number | null;
+	month_end_policy?: ApiRecurringInvoiceMonthEndPolicy;
+	timezone?: string;
+	local_run_time?: string;
+	start_on?: string;
+	end_on?: string | null;
+	max_occurrences?: number | null;
+	due_days?: number;
+	delivery_mode?: ApiRecurringInvoiceDeliveryMode;
+	pricing_mode?: ApiRecurringInvoicePricingMode;
+	catch_up_policy?: ApiRecurringInvoiceCatchUpPolicy;
+	max_catch_up_runs?: number;
+	purchase_order_number?: string | null;
+	payment_terms?: string | null;
+	notes?: string | null;
+	internal_notes?: string | null;
+}
+
+export type ApiRecurringInvoiceCreateBody = ApiRecurringInvoiceWritableFields & {
+	name: string;
+	client_id: string;
+	currency: string;
+	frequency: ApiRecurringInvoiceFrequency;
+	interval_count: number;
+	anchor_on: string;
+	month_end_policy: ApiRecurringInvoiceMonthEndPolicy;
+	timezone: string;
+	local_run_time: string;
+	start_on: string;
+	due_days: number;
+	delivery_mode: ApiRecurringInvoiceDeliveryMode;
+	pricing_mode: ApiRecurringInvoicePricingMode;
+	catch_up_policy: ApiRecurringInvoiceCatchUpPolicy;
+	max_catch_up_runs: number;
+	lines: ApiRecurringInvoiceLineInput[];
+};
+
+export type ApiRecurringInvoiceUpdateBody = ApiRecurringInvoiceWritableFields & {
+	lines?: ApiRecurringInvoiceLineInput[];
+};
+
+export type ApiRecurringInvoicePreviewBody = ApiRecurringInvoiceCreateBody;
+
+export interface ApiRecurringInvoicePreviewResult {
+	next_run_at?: string | null;
+	next_issue_on?: string | null;
+	next_due_on?: string | null;
+	projected_dates?: string[];
+	estimated_total_cents?: number | null;
+	currency?: string;
+}
+
+export interface ApiRecurringInvoiceRun {
+	id: string;
+	org_id: string;
+	schedule_id: string;
+	occurrence_sequence: number | null;
+	occurrence_key: string;
+	scheduled_for: string;
+	occurrence_local_date: string;
+	occurrence_timezone: string;
+	schedule_version: number;
+	period_start: string;
+	period_end: string;
+	trigger: ApiRecurringInvoiceRunTrigger;
+	status: ApiRecurringInvoiceRunStatus;
+	attempt_count: number;
+	available_at: string;
+	generated_at: string | null;
+	sent_at: string | null;
+	error_code: string | null;
+	error_message: string | null;
+	invoice_id?: string | null;
+	invoice_number?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export type ApiRecurringInvoiceRunDocument = ApiRecurringInvoiceRun & {
+	invoice_id?: string | null;
+	invoice_number?: string | null;
+};
+
+export interface ApiRecurringInvoiceListParams {
+	limit?: number;
+	cursor?: string;
+	status?: ApiRecurringInvoiceStatus;
+}
+
+export interface ApiRecurringInvoiceRunListParams {
+	limit?: number;
+	cursor?: string;
+}

@@ -54,6 +54,11 @@ export function appNavGroups(
 			items: [
 				{ label: 'Quotes', href: '/quotes', active: mark('Quotes') },
 				{ label: 'Invoices', href: '/invoices', active: mark('Invoices') },
+				{
+					label: 'Recurring',
+					href: '/recurring-invoices',
+					active: mark('Recurring')
+				},
 				{ label: 'Bills', href: '/bills', active: mark('Bills') },
 				{ label: 'Payments', href: '/payments', active: mark('Payments') }
 			]
