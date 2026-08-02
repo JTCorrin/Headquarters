@@ -1,6 +1,6 @@
 begin;
 
-select plan(60);
+select plan(58);
 
 select has_table('public', 'invoices', 'invoices table exists');
 select has_table('public', 'invoice_lines', 'invoice_lines table exists');
