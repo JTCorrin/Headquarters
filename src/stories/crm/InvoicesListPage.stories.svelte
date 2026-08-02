@@ -93,11 +93,15 @@
 
 	const data = defaults(
 		{
+			clientId: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 			clientName: '',
-			number: '',
+			contactId: '',
 			currency: 'GBP',
-			dueOn: '',
-			status: 'draft'
+			issueOn: '2026-03-01',
+			dueOn: '2026-04-01',
+			purchaseOrderNumber: '',
+			status: 'draft',
+			quoteId: ''
 		},
 		zod4(invoiceFormSchema)
 	);

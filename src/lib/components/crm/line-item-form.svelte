@@ -13,19 +13,25 @@
 		products?: CatalogProductOption[];
 		submitLabel?: string;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
 		form,
 		products = [],
 		submitLabel = 'Add line',
-		class: className
+		class: className,
+		onValidSubmit
 	}: LineItemFormProps = $props();
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	let submitLock = false;
+	const busy = $derived($submitting || pendingSubmit);
 
 	const NONE = '__none__';
 
@@ -50,7 +56,28 @@
 	}
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)}>
+<form
+	method="POST"
+	class={cn('space-y-4', className)}
+	data-testid="line-item-form"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (!onValidSubmit) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+>
 	<div class="space-y-2">
 		<Label for="line-product">Link product</Label>
 		<Select.Root
@@ -106,5 +133,5 @@
 		</div>
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={busy}>{submitLabel}</Button>
 </form>
