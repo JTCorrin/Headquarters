@@ -11,6 +11,7 @@ import { handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
+import { handleTasks } from './tasks.ts'
 import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleMailbox, listEntityEmailMessages } from './mailbox.ts'
@@ -78,6 +79,15 @@ function assertCanAccessBills(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify bills')
+  }
+}
+
+function assertCanAccessTasks(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access tasks')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify tasks')
   }
 }
 
@@ -335,6 +345,19 @@ export default {
         if (path === '/api/v1/bills' || path.startsWith('/api/v1/bills/')) {
           assertCanAccessBills(membership.role, req.method)
           return await handleBills(req, db, path, orgId, requestId)
+        }
+
+        if (path === '/api/v1/tasks' || path.startsWith('/api/v1/tasks/')) {
+          assertCanAccessTasks(membership.role, req.method)
+          return await handleTasks(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            membership.id,
+            requestId,
+          )
         }
 
         if (

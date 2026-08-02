@@ -420,6 +420,34 @@ export type BillLineRow = {
   position: number
 }
 
+export type TaskRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  title: string
+  description: string | null
+  priority: 'p1' | 'p2' | 'p3' | 'p4'
+  status: 'open' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
+  assignee_membership_id: string | null
+  assignee_agent_id: string | null
+  due_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  blocked_reason: string | null
+  source: 'manual' | 'meeting' | 'email' | 'workflow' | 'agent'
+  entity_type: 'contact' | 'lead' | 'client' | null
+  entity_id: string | null
+  meeting_id: string | null
+  project_card_id: string | null
+  position: number
+  metadata: Json
+}
+
 export type InvoiceLineRow = {
   id: string
   org_id: string
@@ -734,6 +762,9 @@ type BillLineInsert =
       | 'unit_price_cents'
     >
   >
+type TaskInsert =
+  & Pick<TaskRow, 'org_id' | 'title'>
+  & Partial<Omit<TaskRow, 'id' | 'org_id' | 'title'>>
 
 export type Database = {
   public: {
@@ -863,6 +894,12 @@ export type Database = {
         Row: BillLineRow
         Insert: BillLineInsert
         Update: Partial<BillLineInsert>
+        Relationships: []
+      }
+      tasks: {
+        Row: TaskRow
+        Insert: TaskInsert
+        Update: Partial<TaskInsert>
         Relationships: []
       }
       documents: {
@@ -1089,6 +1126,14 @@ export type Database = {
           p_expected_version: number
           p_org_id: string
           p_vendor_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_task: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_task_id: string
         }
         Returns: undefined
       }
