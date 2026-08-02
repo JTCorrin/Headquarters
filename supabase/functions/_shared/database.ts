@@ -70,6 +70,17 @@ export type MembershipRow = {
   updated_at: string
 }
 
+/** Minimal Wave B email message row for Draft response reads (RLS owner/share). */
+export type EmailMessageRow = {
+  id: string
+  org_id: string
+  subject: string | null
+  from_address: string | null
+  body_text: string | null
+  preview_text: string | null
+  deleted_at: string | null
+}
+
 export type ContactRow = {
   id: string
   org_id: string
@@ -671,6 +682,12 @@ export type Database = {
         Update: Partial<TimelineEventInsert>
         Relationships: []
       }
+      email_messages: {
+        Row: EmailMessageRow
+        Insert: Partial<EmailMessageRow> & Pick<EmailMessageRow, 'id' | 'org_id'>
+        Update: Partial<EmailMessageRow>
+        Relationships: []
+      }
       product_categories: {
         Row: ProductCategoryRow
         Insert: ProductCategoryInsert
@@ -1101,6 +1118,79 @@ export type Database = {
       disconnect_ai_integration: {
         Args: { p_org_id: string; p_provider: string }
         Returns: undefined
+      }
+      claim_mailbox_sync_lease: {
+        Args: { p_mailbox_id: string; p_holder: string; p_lease_seconds?: number }
+        Returns: Json
+      }
+      release_mailbox_sync_lease: {
+        Args: {
+          p_mailbox_id: string
+          p_holder: string
+          p_ok: boolean
+          p_error_code?: string | null
+          p_auth_failed?: boolean
+        }
+        Returns: undefined
+      }
+      list_mailboxes_due_for_sync: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      upsert_inbound_email_message: {
+        Args: {
+          p_org_id: string
+          p_mailbox_id: string
+          p_provider_message_id: string
+          p_provider_thread_id: string
+          p_from_address: string
+          p_from_name: string
+          p_to_addresses: Json
+          p_subject: string
+          p_body_text: string
+          p_preview_text: string
+          p_received_at: string
+          p_body_truncated?: boolean
+        }
+        Returns: Json
+      }
+      share_email_message_to_timeline: {
+        Args: {
+          p_org_id: string
+          p_message_id: string
+          p_entity_type: string
+          p_entity_id: string
+        }
+        Returns: Json
+      }
+      create_email_reply_suggestion: {
+        Args: {
+          p_org_id: string
+          p_message_id: string
+          p_output_text: string
+          p_model_provider: string
+          p_model_name: string
+          p_variant?: string
+        }
+        Returns: Json
+      }
+      decide_ai_suggestion: {
+        Args: {
+          p_org_id: string
+          p_suggestion_id: string
+          p_decision: string
+          p_accepted_text?: string | null
+        }
+        Returns: Json
+      }
+      list_entity_email_messages: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_limit?: number
+        }
+        Returns: Json
       }
     }
     Enums: Record<string, never>
