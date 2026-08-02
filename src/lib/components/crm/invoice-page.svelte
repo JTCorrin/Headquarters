@@ -266,6 +266,8 @@
 				} catch {
 					// Keep the form contactId; never clear solely because the option page truncated.
 				}
+				// Rejected pin fetch still awaits; bail if org/invoice switched meanwhile.
+				if (isStale(epoch)) return;
 			}
 			contactOptions = options;
 			viewState = { kind: 'ready' };
