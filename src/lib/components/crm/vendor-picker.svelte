@@ -100,7 +100,9 @@
 		>
 			<ComboboxPrimitive.Viewport class="p-1">
 				{#if filtered.length === 0}
-					<p class="text-muted-foreground px-3 py-2 text-sm">No vendors match.</p>
+					<p class="text-muted-foreground px-3 py-2 text-sm">
+						{options.length === 0 ? 'No vendors yet.' : 'No vendors match.'}
+					</p>
 				{:else}
 					{#each filtered as option (option.id)}
 						<ComboboxPrimitive.Item
