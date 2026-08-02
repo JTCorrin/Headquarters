@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Prove Wave A+B mailbox + org AI against a live stack:
+# Prove Wave A+B(+B.1) mailbox + org AI against a live stack:
 #   Wave A: signup → org → mailbox → test → AI×4 connect/list → disconnects
 #   Wave B: sync skeleton → address_match list → share full body → draft use/discard
 #           → owner-only AI write denial for admin (needs SUPABASE_SERVICE_ROLE_KEY)
+#   Wave B.1: owner draft OK; second member 404 on address_match-only; OK after share
 #
 # Usage:
 #   SUPABASE_URL=http://192.168.5.136:54321 \
@@ -186,7 +187,7 @@ printf '%s' "$list_json" | jq -e '
 	[.data[].provider] | sort == ["anthropic","google","openai","openrouter"]
 ' >/dev/null || die "unexpected provider set: ${list_json}"
 
-# --- Wave B: sync + share + draft + owner-only denial ---
+# --- Wave B + B.1: sync + draft visibility + share + owner-only denial ---
 
 log "POST mailbox/sync (synthetic imap.example.test)"
 sync_json="$(api POST /api/v1/me/mailbox/sync --data '{}')"
@@ -204,16 +205,7 @@ printf '%s' "$owner_emails" | jq -e '
 MESSAGE_ID="$(printf '%s' "$owner_emails" | jq -r '.data[0].id // empty')"
 [[ -n "$MESSAGE_ID" ]] || die "missing message id after sync"
 
-log "POST email-messages/{id}/share → timeline_share"
-share_json="$(
-	api POST "/api/v1/email-messages/${MESSAGE_ID}/share" --data "$(jq -n \
-		--arg id "$CONTACT_ID" \
-		'{entity_type:"contact", entity_id:$id}')"
-)"
-printf '%s' "$share_json" | jq -e '.data.timeline_event_id and .data.link_id' >/dev/null \
-	|| die "share failed: ${share_json}"
-
-log "POST ai-suggestions/email-reply"
+log "POST ai-suggestions/email-reply (owner, address_match-only)"
 draft_json="$(
 	api POST /api/v1/ai-suggestions/email-reply --data "$(jq -n \
 		--arg id "$MESSAGE_ID" \
@@ -223,31 +215,12 @@ printf '%s' "$draft_json" | jq -e '
 	.data.status == "ready"
 	and (.data.output_text | type == "string" and length > 0)
 	and .data.kind == "email_reply"
-' >/dev/null || die "draft generate failed: ${draft_json}"
+' >/dev/null || die "owner draft generate failed: ${draft_json}"
 SUGGESTION_ID="$(printf '%s' "$draft_json" | jq -r '.data.id // empty')"
 [[ -n "$SUGGESTION_ID" ]] || die "missing suggestion id"
 
-log "POST ai-suggestions/{id}/use (never sends)"
-use_json="$(api POST "/api/v1/ai-suggestions/${SUGGESTION_ID}/use" --data '{}')"
-printf '%s' "$use_json" | jq -e '.data.status == "accepted" and .data.accepted_text != null' >/dev/null \
-	|| die "draft use failed: ${use_json}"
-
-# Second suggestion for discard path
-log "POST ai-suggestions/email-reply (for discard)"
-draft2="$(
-	api POST /api/v1/ai-suggestions/email-reply --data "$(jq -n \
-		--arg id "$MESSAGE_ID" \
-		'{email_message_id:$id, variant:"warm"}')"
-)"
-SUGGESTION2="$(printf '%s' "$draft2" | jq -r '.data.id // empty')"
-[[ -n "$SUGGESTION2" ]] || die "missing second suggestion id: ${draft2}"
-log "POST ai-suggestions/{id}/discard"
-discard_json="$(api POST "/api/v1/ai-suggestions/${SUGGESTION2}/discard" --data '{}')"
-printf '%s' "$discard_json" | jq -e '.data.status == "discarded"' >/dev/null \
-	|| die "draft discard failed: ${discard_json}"
-
 if [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
-	log "signup second user (admin) for share + owner-only denial"
+	log "signup second user (admin) for B.1 draft visibility + owner-only denial"
 	ADMIN_EMAIL="mailai-admin-$(date +%s)-$RANDOM@example.test"
 	admin_signup="$(
 		curl -fsS --max-time 30 \
@@ -291,6 +264,71 @@ if [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
 	[[ "$mem_code" == "201" || "$mem_code" == "200" ]] \
 		|| die "admin membership insert expected 201, got ${mem_code}: $(cat /tmp/mailai-mem.json)"
 
+	log "admin POST ai-suggestions/email-reply on address_match-only → expect 404"
+	admin_draft_denied_code="$(
+		curl -sS --max-time 30 -o /tmp/mailai-admin-draft-denied.json -w '%{http_code}' \
+			-X POST "${API_BASE}/api/v1/ai-suggestions/email-reply" \
+			-H "apikey: ${SUPABASE_ANON_KEY}" \
+			-H "Authorization: Bearer ${ADMIN_TOKEN}" \
+			-H "X-Org-Id: ${ORG_ID}" \
+			-H 'content-type: application/json' \
+			-d "$(jq -n --arg id "$MESSAGE_ID" '{email_message_id:$id, variant:"neutral"}')"
+	)"
+	[[ "$admin_draft_denied_code" == "404" ]] \
+		|| die "admin draft before share expected 404, got ${admin_draft_denied_code}: $(cat /tmp/mailai-admin-draft-denied.json)"
+else
+	log "WARN: SUPABASE_SERVICE_ROLE_KEY unset — skipped B.1 second-member draft visibility proofs"
+fi
+
+log "POST email-messages/{id}/share → timeline_share"
+share_json="$(
+	api POST "/api/v1/email-messages/${MESSAGE_ID}/share" --data "$(jq -n \
+		--arg id "$CONTACT_ID" \
+		'{entity_type:"contact", entity_id:$id}')"
+)"
+printf '%s' "$share_json" | jq -e '.data.timeline_event_id and .data.link_id' >/dev/null \
+	|| die "share failed: ${share_json}"
+
+if [[ -n "${ADMIN_TOKEN:-}" ]]; then
+	log "admin POST ai-suggestions/email-reply after timeline_share → expect 201"
+	admin_draft_ok_code="$(
+		curl -sS --max-time 30 -o /tmp/mailai-admin-draft-ok.json -w '%{http_code}' \
+			-X POST "${API_BASE}/api/v1/ai-suggestions/email-reply" \
+			-H "apikey: ${SUPABASE_ANON_KEY}" \
+			-H "Authorization: Bearer ${ADMIN_TOKEN}" \
+			-H "X-Org-Id: ${ORG_ID}" \
+			-H 'content-type: application/json' \
+			-d "$(jq -n --arg id "$MESSAGE_ID" '{email_message_id:$id, variant:"firm"}')"
+	)"
+	[[ "$admin_draft_ok_code" == "201" ]] \
+		|| die "admin draft after share expected 201, got ${admin_draft_ok_code}: $(cat /tmp/mailai-admin-draft-ok.json)"
+	jq -e '
+		.data.status == "ready"
+		and (.data.output_text | type == "string" and length > 0)
+	' </tmp/mailai-admin-draft-ok.json >/dev/null \
+		|| die "admin draft after share missing ready output: $(cat /tmp/mailai-admin-draft-ok.json)"
+fi
+
+log "POST ai-suggestions/{id}/use (never sends)"
+use_json="$(api POST "/api/v1/ai-suggestions/${SUGGESTION_ID}/use" --data '{}')"
+printf '%s' "$use_json" | jq -e '.data.status == "accepted" and .data.accepted_text != null' >/dev/null \
+	|| die "draft use failed: ${use_json}"
+
+# Second suggestion for discard path
+log "POST ai-suggestions/email-reply (for discard)"
+draft2="$(
+	api POST /api/v1/ai-suggestions/email-reply --data "$(jq -n \
+		--arg id "$MESSAGE_ID" \
+		'{email_message_id:$id, variant:"warm"}')"
+)"
+SUGGESTION2="$(printf '%s' "$draft2" | jq -r '.data.id // empty')"
+[[ -n "$SUGGESTION2" ]] || die "missing second suggestion id: ${draft2}"
+log "POST ai-suggestions/{id}/discard"
+discard_json="$(api POST "/api/v1/ai-suggestions/${SUGGESTION2}/discard" --data '{}')"
+printf '%s' "$discard_json" | jq -e '.data.status == "discarded"' >/dev/null \
+	|| die "draft discard failed: ${discard_json}"
+
+if [[ -n "${ADMIN_TOKEN:-}" ]]; then
 	log "admin PUT AI openai → expect 403"
 	admin_ai_code="$(
 		curl -sS --max-time 30 -o /tmp/mailai-admin-ai.json -w '%{http_code}' \
@@ -329,8 +367,6 @@ if [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
 		and ((.data | map(select(.id == $mid)) | .[0].body_text) | contains("Wave B sync skeleton"))
 		and ((.data | map(select(.id == $mid)) | .[0].link_reason) == "timeline_share")
 	' >/dev/null || die "admin share visibility missing full body: ${admin_emails}"
-else
-	log "WARN: SUPABASE_SERVICE_ROLE_KEY unset — skipped admin denial + share visibility proofs"
 fi
 
 for provider in openai anthropic google openrouter; do
@@ -370,4 +406,4 @@ after_code="$(
 )"
 [[ "$after_code" == "404" ]] || die "expected 404 after disconnect, got ${after_code}"
 
-log "PASS mailbox + AI Wave A+B (sync/share/draft/owner-only; no secret echo)"
+log "PASS mailbox + AI Wave A+B+B.1 (sync/share/draft visibility/owner-only; no secret echo)"
