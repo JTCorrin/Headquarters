@@ -5,57 +5,51 @@
 	const rows = [
 		{
 			id: '1',
-			client: 'Northwind',
-			invoiceNumber: 'INV-0881',
+			direction: 'Inbound',
+			party: 'Northwind',
+			allocationsSummary: 'INV-0881',
 			amount: '£2,000.00',
 			method: 'Card',
-			status: 'Matched',
-			receivedOn: '2026-03-18'
+			status: 'Allocated',
+			statusKey: 'allocated',
+			occurredOn: '2026-03-18',
+			version: 1
 		},
 		{
 			id: '2',
-			client: 'Contoso',
-			invoiceNumber: 'INV-0875',
+			direction: 'Inbound',
+			party: 'Contoso',
+			allocationsSummary: 'INV-0875',
 			amount: '£4,500.00',
 			method: 'Bank',
-			status: 'Matched',
-			receivedOn: '2026-02-03'
+			status: 'Allocated',
+			statusKey: 'allocated',
+			occurredOn: '2026-02-03',
+			version: 1
 		},
 		{
 			id: '3',
-			client: 'Fabrikam',
-			invoiceNumber: '',
+			direction: 'Inbound',
+			party: 'Fabrikam',
+			allocationsSummary: 'Unallocated',
 			amount: '£750.00',
 			method: 'Bank',
 			status: 'Unallocated',
-			receivedOn: '2026-03-20'
+			statusKey: 'unallocated',
+			occurredOn: '2026-03-20',
+			version: 1
 		},
 		{
 			id: '4',
-			client: 'Litware',
-			invoiceNumber: 'INV-0890',
+			direction: 'Outbound',
+			party: 'Cloudflare',
+			allocationsSummary: 'BILL-0001',
 			amount: '£1,200.00',
-			method: 'Cash',
-			status: 'Pending',
-			receivedOn: '2026-03-22'
-		},
-		{
-			id: '5',
-			client: 'Adventure Works',
-			invoiceNumber: 'INV-0860',
-			amount: '£9,800.00',
-			method: 'Card',
-			status: 'Refunded',
-			receivedOn: '2026-01-15'
-		},
-		{
-			id: '6',
-			client: 'Northwind',
-			invoiceNumber: 'INV-0881',
-			amount: '£2,200.00',
 			method: 'Bank',
-			status: 'Pending',
-			receivedOn: '2026-03-25'
+			status: 'Part Allocated',
+			statusKey: 'part_allocated',
+			occurredOn: '2026-03-22',
+			version: 1
 		}
 	];
 
@@ -75,14 +69,19 @@
 
 	const data = defaults(
 		{
-			clientName: '',
-			invoiceNumber: '',
+			direction: 'inbound',
+			clientId: '11111111-2222-4333-8444-555555555555',
+			clientName: 'Northwind',
+			vendorId: '',
+			vendorName: '',
+			invoiceId: '',
+			billId: '',
 			amount: '',
 			currency: 'GBP',
 			method: 'bank',
-			receivedOn: '',
+			occurredOn: '',
 			reference: '',
-			status: 'pending'
+			notes: ''
 		},
 		zod4(paymentFormSchema)
 	);
@@ -93,6 +92,9 @@
 		warnings: { duplicateId: false },
 		resetForm: false
 	});
+
+	const clientOptions = [{ id: '11111111-2222-4333-8444-555555555555', name: 'Northwind' }];
+	const vendorOptions = [{ id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff', name: 'Cloudflare' }];
 </script>
 
 <Story name="Default">
@@ -103,6 +105,8 @@
 				navGroups={navGroupsWithActive('Payments')}
 				{rows}
 				{form}
+				{clientOptions}
+				{vendorOptions}
 			/>
 		</div>
 	{/snippet}

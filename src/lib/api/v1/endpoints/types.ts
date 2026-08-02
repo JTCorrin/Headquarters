@@ -92,7 +92,13 @@ import type {
 	ApiRecurringInvoiceRunListParams,
 	ApiRecurringInvoiceRunNowResult,
 	ApiRecurringInvoiceSchedule,
-	ApiRecurringInvoiceUpdateBody
+	ApiRecurringInvoiceUpdateBody,
+	ApiPayment,
+	ApiPaymentAllocateBody,
+	ApiPaymentCreateBody,
+	ApiPaymentDocument,
+	ApiPaymentListParams,
+	ApiPaymentReverseBody
 } from '../types.js';
 
 export interface OrganisationsEndpoints {
@@ -349,6 +355,27 @@ export interface RecurringInvoiceSchedulesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiRecurringInvoiceRunNowResult>;
+}
+
+export interface PaymentsEndpoints {
+	list(
+		params?: ApiPaymentListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiPayment[]>>;
+	create(body: ApiPaymentCreateBody, signal?: AbortSignal): Promise<ApiPaymentDocument>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiPaymentDocument>>;
+	allocate(
+		id: string,
+		body: ApiPaymentAllocateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiPaymentDocument>;
+	reverse(
+		id: string,
+		body: ApiPaymentReverseBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiPaymentDocument>;
 }
 
 export interface DocumentsEndpoints {
