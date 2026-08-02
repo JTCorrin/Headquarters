@@ -10,6 +10,8 @@ import {
   parseLimit,
   parseVersion,
 } from './http.ts'
+import { validateDecideBody, validateGenerateBody } from './ai-suggestions.ts'
+import { validateShareBody } from './email-messages.ts'
 import {
   parseAiProvider,
   payloadHasForbiddenSecretKey,
@@ -924,4 +926,32 @@ Deno.test('secret-echo guard treats auth_mode api_key value as safe, keys as for
   assertEquals(payloadHasForbiddenSecretKey({ api_key: 'sk-leaked' }), true)
   assertEquals(payloadHasForbiddenSecretKey({ secret_ref: 'x' }), true)
   assertEquals(payloadHasForbiddenSecretKey({ password: 'x' }), true)
+})
+
+Deno.test('email share validation requires entity_type and entity_id UUID', () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  assertEquals(validateShareBody({ entity_type: 'contact', entity_id: id }), {
+    entity_type: 'contact',
+    entity_id: id,
+  })
+  assertThrows(() => validateShareBody({ entity_type: 'invoice', entity_id: id }), ApiError)
+  assertThrows(() => validateShareBody({ entity_type: 'contact', entity_id: 'nope' }), ApiError)
+  assertThrows(
+    () => validateShareBody({ entity_type: 'contact', entity_id: id, extra: true }),
+    ApiError,
+  )
+})
+
+Deno.test('AI email_reply generate/decide validation', () => {
+  const id = '22222222-2222-4222-8222-222222222222'
+  assertEquals(validateGenerateBody({ email_message_id: id }), {
+    email_message_id: id,
+    variant: 'neutral',
+  })
+  assertEquals(validateGenerateBody({ email_message_id: id, variant: 'warm' }).variant, 'warm')
+  assertThrows(() => validateGenerateBody({ email_message_id: 'x' }), ApiError)
+  assertEquals(validateDecideBody({}), { accepted_text: null })
+  assertEquals(validateDecideBody({ accepted_text: 'Edited' }), { accepted_text: 'Edited' })
+  assertThrows(() => validateDecideBody({ accepted_text: 1 }), ApiError)
+  assertThrows(() => validateDecideBody({ send: true }), ApiError)
 })

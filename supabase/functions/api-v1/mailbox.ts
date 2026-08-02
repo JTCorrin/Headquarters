@@ -294,18 +294,18 @@ async function testMailbox(
   return jsonResponse({ data: { ok: true, error_code: null } }, 200, requestId)
 }
 
-export async function listEntityEmailMessagesStub(
+export async function listEntityEmailMessages(
   db: DatabaseClient,
   orgId: string,
   entityType: 'contact' | 'lead' | 'client',
   entityId: string,
   requestId: string,
 ): Promise<Response> {
-  // Wave A stub: ownership RLS exists; sync is Wave B. Return empty list after entity check.
-  let data: { id: string } | null = null
-  let error: { code?: string } | null = null
+  // Wave B: entity existence check + ownership/share list RPC.
+  let exists: { id: string } | null = null
+  let lookupError: { code?: string } | null = null
   if (entityType === 'contact') {
-    ;({ data, error } = await db
+    ;({ data: exists, error: lookupError } = await db
       .from('contacts')
       .select('id')
       .eq('org_id', orgId)
@@ -313,7 +313,7 @@ export async function listEntityEmailMessagesStub(
       .is('deleted_at', null)
       .maybeSingle())
   } else if (entityType === 'lead') {
-    ;({ data, error } = await db
+    ;({ data: exists, error: lookupError } = await db
       .from('leads')
       .select('id')
       .eq('org_id', orgId)
@@ -321,7 +321,7 @@ export async function listEntityEmailMessagesStub(
       .is('deleted_at', null)
       .maybeSingle())
   } else {
-    ;({ data, error } = await db
+    ;({ data: exists, error: lookupError } = await db
       .from('clients')
       .select('id')
       .eq('org_id', orgId)
@@ -329,15 +329,29 @@ export async function listEntityEmailMessagesStub(
       .is('deleted_at', null)
       .maybeSingle())
   }
-  if (error) {
+  if (lookupError) {
     console.error('Entity email list lookup failed', {
+      request_id: requestId,
+      code: lookupError.code ?? 'unknown',
+    })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Entity email list failed')
+  }
+  if (!exists) throw new ApiError(404, 'NOT_FOUND', `${entityType} not found`)
+
+  const { data, error } = await db.rpc('list_entity_email_messages', {
+    p_org_id: orgId,
+    p_entity_type: entityType,
+    p_entity_id: entityId,
+    p_limit: 50,
+  })
+  if (error) {
+    console.error('Entity email list failed', {
       request_id: requestId,
       code: error.code ?? 'unknown',
     })
     throw new ApiError(500, 'INTERNAL_ERROR', 'Entity email list failed')
   }
-  if (!data) throw new ApiError(404, 'NOT_FOUND', `${entityType} not found`)
-  return jsonResponse({ data: [] as Json[] }, 200, requestId)
+  return jsonResponse({ data: (data ?? []) as Json[] }, 200, requestId)
 }
 
 export function handleMailbox(

@@ -29,16 +29,20 @@ Rotate: new `store_secret` → update ref → `delete_secret` on the previous id
 | `email_threads` / `email_messages` | Owner membership by default (`owner_membership_id`). |
 | `email_message_links` | Owners see their links; teammates see rows only when `link_reason = 'timeline_share'` (and org role allows entity read). |
 | Teammate message body | Granted only via `timeline_share` (full body per Joe lock). `address_match` does **not** grant body. |
-| `integrations` | Status-visible to owner/admin/member/readonly; connect/disconnect owner/admin only (API + RLS write). |
+| `integrations` | Status-visible to owner/admin/member/readonly; connect/disconnect **owner only** (Wave B tighten; API + security-definer RPC). |
+| `ai_suggestions` | Org member SELECT (non-billing); generate/use/discard via security-definer RPCs for owner/admin/member. Use never sends mail. |
 
-## Sync bounds (schema-ready for Wave B)
+## Sync bounds (Wave B live)
 
-Defaults on `mailbox_accounts`: lookback **14d**, max **100** msgs/run, body **256 KiB**, attachments metadata-only (flag), exact-address match (app rule), one sync lease (`sync_lease_*`), auth circuit-breaker after **3** consecutive failures → `status = error`.
+Defaults on `mailbox_accounts`: lookback **14d**, max **100** msgs/run, body **256 KiB**, attachments metadata-only (flag), exact-address match (ingest rule), one sync lease (`claim_mailbox_sync_lease` / `release_mailbox_sync_lease`), auth circuit-breaker after **3** consecutive failures → `status = error`. Cron entry: `mailbox-sync` Edge Function (service role).
 
 ## API surface (`X-Org-Id` required)
 
-- `GET/PUT/DELETE /api/v1/me/mailbox` + `POST /api/v1/me/mailbox/test`
-- `GET /api/v1/integrations` + `PUT/DELETE /api/v1/integrations/ai/{provider}` (`openai` \| `anthropic` \| `google` \| `openrouter`)
-- Stub `GET /api/v1/{contacts\|leads\|clients}/{id}/email-messages` → `{ data: [] }` after ownership RLS exists
+- `GET/PUT/DELETE /api/v1/me/mailbox` + `POST /api/v1/me/mailbox/test` + `POST /api/v1/me/mailbox/sync`
+- `GET /api/v1/integrations` + `PUT/DELETE /api/v1/integrations/ai/{provider}` (`openai` \| `anthropic` \| `google` \| `openrouter`) — writes **owner only**
+- `GET /api/v1/organisation/configuration` + `PATCH` — **owner only** (Wave B)
+- `GET /api/v1/{contacts\|leads\|clients}/{id}/email-messages` — owner body + `timeline_share` teammate full body
+- `POST /api/v1/email-messages/{id}/share` → `timeline_share` + timeline email card (full body)
+- `POST /api/v1/ai-suggestions/email-reply` + `…/{id}/use` + `…/{id}/discard` — never send on use
 
-Wave A test/verify does **not** open live IMAP/SMTP or provider HTTP; it validates credentials are present/well-formed and returns safe `error_code` values only.
+Wave A/B verify does **not** open live IMAP/SMTP or provider HTTP for MVP; Wave B sync skeleton ingests synthetic mail for `*.example.test` hosts. Draft response uses a local draft when an org AI integration is connected (provider HTTP follow-on).
