@@ -198,10 +198,21 @@ export default {
           if (req.method !== 'GET') {
             throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for entity email')
           }
+          // Path segment is plural; stub expects singular entity type.
+          const entityTypeByResource = {
+            contacts: 'contact',
+            leads: 'lead',
+            clients: 'client',
+          } as const
+          const resource = entityEmailMatch[1].toLowerCase() as keyof typeof entityTypeByResource
+          const entityType = entityTypeByResource[resource]
+          if (!entityType) {
+            throw new ApiError(404, 'NOT_FOUND', 'Route not found')
+          }
           return await listEntityEmailMessagesStub(
             db,
             orgId,
-            entityEmailMatch[1].toLowerCase() as 'contact' | 'lead' | 'client',
+            entityType,
             entityEmailMatch[2],
             requestId,
           )
