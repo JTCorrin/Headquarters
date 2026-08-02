@@ -1,6 +1,6 @@
 begin;
 
-select plan(67);
+select plan(68);
 
 select has_table('public', 'invoices', 'invoices table exists');
 select has_table('public', 'invoice_lines', 'invoice_lines table exists');
@@ -954,20 +954,27 @@ select ok(
   'soft-deleting a quote-derived draft clears quotes.converted_invoice_id'
 );
 
+-- Run conversion in its own statement: a same-statement join to quotes would
+-- still see the pre-update snapshot (converted_invoice_id null → NULL ok()).
+select lives_ok(
+  $$
+    select public.create_invoice_from_quote(
+      (select quote_id from _invoices_fixture),
+      (select org_id from _invoices_fixture)
+    )
+  $$,
+  'reconverting after soft-delete succeeds'
+);
+
 select ok(
   (
-    with reconvert as (
-      select public.create_invoice_from_quote(
-        (select quote_id from _invoices_fixture),
-        (select org_id from _invoices_fixture)
-      ) as result
-    )
     select
-      (result ->> 'created')::boolean = true
-      and (result -> 'invoice' ->> 'id')::uuid is distinct from (select invoice_id from _invoices_fixture)
-      and (result -> 'invoice' ->> 'deleted_at') is null
-      and quotes.converted_invoice_id = (result -> 'invoice' ->> 'id')::uuid
-    from reconvert, public.quotes
+      invoices.id is distinct from (select invoice_id from _invoices_fixture)
+      and invoices.deleted_at is null
+      and invoices.source = 'quote'
+      and quotes.converted_invoice_id = invoices.id
+    from public.quotes
+    join public.invoices on invoices.id = quotes.converted_invoice_id
     where quotes.id = (select quote_id from _invoices_fixture)
   ),
   'reconverting after soft-delete creates a fresh live invoice'
