@@ -212,4 +212,15 @@ else
 	log "lead board / client links curl proof script missing — skipped"
 fi
 
+# Invoice draft CRUD + send/void lock + accepted-quote conversion.
+if [[ -x scripts/invoices_staging_curl_proof.sh ]]; then
+	log "running invoices foundation curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/invoices_staging_curl_proof.sh
+else
+	log "invoices curl proof script missing — skipped"
+fi
+
 log "done"

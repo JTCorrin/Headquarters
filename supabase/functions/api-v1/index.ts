@@ -6,6 +6,7 @@ import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { handleDocuments } from './documents.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
@@ -50,6 +51,15 @@ function assertCanAccessQuotes(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify quotes')
+  }
+}
+
+function assertCanAccessInvoices(role: MembershipRole, method: string): void {
+  if (role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read invoices')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify invoices')
   }
 }
 
@@ -187,9 +197,29 @@ export default {
           return await handleProducts(req, db, path, orgId, requestId, userId)
         }
 
+        // Compatibility alias; primary contract is POST /api/v1/invoices/from-quote.
+        const quoteConvertMatch = path.match(
+          /^\/api\/v1\/quotes\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/create-invoice$/i,
+        )
+        if (quoteConvertMatch) {
+          assertCanAccessInvoices(membership.role, req.method)
+          return await createInvoiceFromQuoteRoute(
+            req,
+            db,
+            orgId,
+            requestId,
+            quoteConvertMatch[1],
+          )
+        }
+
         if (path === '/api/v1/quotes' || path.startsWith('/api/v1/quotes/')) {
           assertCanAccessQuotes(membership.role, req.method)
           return await handleQuotes(req, db, path, orgId, requestId)
+        }
+
+        if (path === '/api/v1/invoices' || path.startsWith('/api/v1/invoices/')) {
+          assertCanAccessInvoices(membership.role, req.method)
+          return await handleInvoices(req, db, path, orgId, requestId)
         }
 
         if (
