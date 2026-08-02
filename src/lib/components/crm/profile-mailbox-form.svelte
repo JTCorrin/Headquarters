@@ -55,7 +55,7 @@
 	};
 
 	const securityLabels: Record<(typeof mailboxSecurityOptions)[number], string> = {
-		ssl: 'SSL/TLS',
+		tls: 'SSL/TLS',
 		starttls: 'STARTTLS',
 		none: 'None'
 	};
