@@ -795,10 +795,10 @@ export interface ApiMailboxAccount {
 	from_name: string | null;
 	imap_host: string;
 	imap_port: number;
-	imap_security: 'ssl' | 'starttls' | 'none';
+	imap_security: 'tls' | 'starttls' | 'none';
 	smtp_host: string;
 	smtp_port: number;
-	smtp_security: 'ssl' | 'starttls' | 'none';
+	smtp_security: 'tls' | 'starttls' | 'none';
 	credentials_configured: boolean;
 	status: 'disconnected' | 'configured' | 'ok' | 'error' | 'auth_failed';
 	last_checked_at: string | null;
@@ -813,10 +813,10 @@ export interface ApiMailboxPutBody {
 	from_name?: string | null;
 	imap_host: string;
 	imap_port: number;
-	imap_security: 'ssl' | 'starttls' | 'none';
+	imap_security: 'tls' | 'starttls' | 'none';
 	smtp_host: string;
 	smtp_port: number;
-	smtp_security: 'ssl' | 'starttls' | 'none';
+	smtp_security: 'tls' | 'starttls' | 'none';
 }
 
 export interface ApiMailboxTestResult {

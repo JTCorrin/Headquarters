@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const mailboxPresets = ['gmail', 'outlook', 'custom'] as const;
 export type MailboxPreset = (typeof mailboxPresets)[number];
 
-export const mailboxSecurityOptions = ['ssl', 'starttls', 'none'] as const;
+export const mailboxSecurityOptions = ['tls', 'starttls', 'none'] as const;
 export type MailboxSecurity = (typeof mailboxSecurityOptions)[number];
 
 export const mailboxStatusOptions = [
@@ -82,15 +82,15 @@ export const mailboxPresetDefaults: Record<MailboxPreset, MailboxPresetDefaults>
 	gmail: {
 		imapHost: 'imap.gmail.com',
 		imapPort: '993',
-		imapSecurity: 'ssl',
+		imapSecurity: 'tls',
 		smtpHost: 'smtp.gmail.com',
 		smtpPort: '465',
-		smtpSecurity: 'ssl'
+		smtpSecurity: 'tls'
 	},
 	outlook: {
 		imapHost: 'outlook.office365.com',
 		imapPort: '993',
-		imapSecurity: 'ssl',
+		imapSecurity: 'tls',
 		smtpHost: 'smtp.office365.com',
 		smtpPort: '587',
 		smtpSecurity: 'starttls'
@@ -98,10 +98,10 @@ export const mailboxPresetDefaults: Record<MailboxPreset, MailboxPresetDefaults>
 	custom: {
 		imapHost: '',
 		imapPort: '993',
-		imapSecurity: 'ssl',
+		imapSecurity: 'tls',
 		smtpHost: '',
 		smtpPort: '465',
-		smtpSecurity: 'ssl'
+		smtpSecurity: 'tls'
 	}
 };
 
