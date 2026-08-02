@@ -26,6 +26,13 @@ import type { VendorFormData } from '$lib/schemas/vendor.js';
 import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 import type { ProductFormData } from '$lib/schemas/product.js';
 import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
+import type {
+	TaskAssigneeOption,
+	TaskBoardStatus,
+	TaskFormData,
+	TaskListItem
+} from '$lib/schemas/task.js';
+import type { TaskRow } from '$lib/components/crm/tasks-columns.js';
 import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
 import type { ClientRow } from '$lib/components/crm/clients-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
@@ -71,7 +78,10 @@ import type {
 	ApiQuoteLineInput,
 	ApiQuoteUpdateBody,
 	ApiTaxRate,
-	ApiTaxRateCreateBody
+	ApiTaxRateCreateBody,
+	ApiTask,
+	ApiTaskCreateBody,
+	ApiTaskUpdateBody
 } from './types.js';
 
 export function toOrgMembershipSummary(
@@ -83,6 +93,7 @@ export function toOrgMembershipSummary(
 		org_slug: row.organisation.slug,
 		logo_url: row.organisation.logo_path,
 		role: row.membership.role,
+		membership_id: row.membership.id,
 		theme_default: row.organisation.theme_default ?? 'system'
 	};
 }
@@ -96,6 +107,7 @@ export function membershipFromCreateResult(
 		org_slug: result.organisation.slug,
 		logo_url: result.organisation.logo_path,
 		role: result.membership.role,
+		membership_id: result.membership.id,
 		theme_default: result.organisation.theme_default ?? 'system'
 	};
 }
@@ -992,6 +1004,178 @@ function firstAddress(value: unknown): string {
 	}
 	if (typeof value === 'string') return value;
 	return '';
+}
+
+const TASK_PRIORITY_LABELS: Record<string, string> = {
+	p1: 'P1 — Urgent',
+	p2: 'P2 — High',
+	p3: 'P3 — Normal',
+	p4: 'P4 — Low'
+};
+
+const TASK_STATUS_LABELS: Record<string, string> = {
+	open: 'Open',
+	in_progress: 'In progress',
+	blocked: 'Blocked',
+	done: 'Done',
+	cancelled: 'Cancelled'
+};
+
+export function taskPriorityLabel(priority: string): string {
+	return TASK_PRIORITY_LABELS[priority] ?? priority;
+}
+
+export function taskStatusLabel(status: string): string {
+	return TASK_STATUS_LABELS[status] ?? status.replaceAll('_', ' ');
+}
+
+function formatTaskDue(dueAt: string | null): string {
+	if (!dueAt) return '—';
+	const date = dueAt.slice(0, 10);
+	return date || '—';
+}
+
+function dueOnToApi(dueOn: string | undefined): string | null {
+	const trimmed = dueOn?.trim();
+	if (!trimmed) return null;
+	return `${trimmed}T00:00:00.000Z`;
+}
+
+function dueAtToForm(dueAt: string | null): string {
+	if (!dueAt) return '';
+	return dueAt.slice(0, 10);
+}
+
+export function assigneeLabel(
+	assigneeMembershipId: string | null,
+	options: {
+		currentMembershipId?: string | null;
+		assigneeOptions?: TaskAssigneeOption[];
+	}
+): string {
+	if (!assigneeMembershipId) return 'Unassigned';
+	if (options.currentMembershipId && assigneeMembershipId === options.currentMembershipId) {
+		return 'Me';
+	}
+	const match = options.assigneeOptions?.find((o) => o.id === assigneeMembershipId);
+	return match?.label ?? 'Teammate';
+}
+
+export function assigneeOptionsFromMemberships(
+	membershipRows: ApiOrganisationMembership[],
+	selectedOrgId: string | null
+): TaskAssigneeOption[] {
+	if (!selectedOrgId) return [];
+	const row = membershipRows.find((entry) => entry.organisation.id === selectedOrgId);
+	if (!row) return [];
+	return [{ id: row.membership.id, label: 'Me' }];
+}
+
+export function toTaskListItem(
+	task: ApiTask,
+	options: {
+		currentMembershipId?: string | null;
+		assigneeOptions?: TaskAssigneeOption[];
+	} = {}
+): TaskListItem {
+	return {
+		id: task.id,
+		title: task.title,
+		relatedTo: task.entity_type ? task.entity_type : '—',
+		owner: assigneeLabel(task.assignee_membership_id, options),
+		status: taskStatusLabel(task.status),
+		priority: taskPriorityLabel(task.priority),
+		dueOn: formatTaskDue(task.due_at),
+		version: task.version,
+		assigneeMembershipId: task.assignee_membership_id,
+		rawStatus: task.status,
+		rawPriority: task.priority,
+		description: task.description ?? '',
+		dueAt: task.due_at,
+		position: task.position
+	};
+}
+
+export function toTaskRow(item: TaskListItem): TaskRow {
+	return {
+		id: item.id,
+		title: item.title,
+		relatedTo: item.relatedTo,
+		owner: item.owner,
+		status: item.status,
+		priority: item.priority,
+		dueOn: item.dueOn
+	};
+}
+
+export function toTaskBoardCard(item: TaskListItem): {
+	id: string;
+	title: string;
+	relatedTo?: string;
+	owner?: string;
+	status: TaskBoardStatus;
+	dueOn?: string;
+} {
+	const status: TaskBoardStatus =
+		item.rawStatus === 'cancelled' ? 'done' : (item.rawStatus as TaskBoardStatus);
+	return {
+		id: item.id,
+		title: item.title,
+		relatedTo: item.relatedTo === '—' ? undefined : item.relatedTo,
+		owner: item.owner === 'Unassigned' ? undefined : item.owner,
+		status,
+		dueOn: item.dueOn === '—' ? undefined : item.dueOn
+	};
+}
+
+export function toTaskFormData(task: ApiTask | TaskListItem): TaskFormData {
+	if ('rawStatus' in task) {
+		return {
+			title: task.title,
+			description: task.description,
+			priority: task.rawPriority,
+			status: task.rawStatus,
+			assigneeMembershipId: task.assigneeMembershipId ?? '',
+			dueOn: dueAtToForm(task.dueAt)
+		};
+	}
+	return {
+		title: task.title,
+		description: task.description ?? '',
+		priority: task.priority,
+		status: task.status,
+		assigneeMembershipId: task.assignee_membership_id ?? '',
+		dueOn: dueAtToForm(task.due_at)
+	};
+}
+
+export function emptyTaskFormData(): TaskFormData {
+	return {
+		title: '',
+		description: '',
+		priority: 'p3',
+		status: 'open',
+		assigneeMembershipId: '',
+		dueOn: ''
+	};
+}
+
+export function toTaskCreateBody(data: TaskFormData): ApiTaskCreateBody {
+	return {
+		title: data.title.trim(),
+		description: data.description?.trim() ? data.description.trim() : null,
+		priority: data.priority,
+		status: data.status,
+		assignee_membership_id: data.assigneeMembershipId?.trim()
+			? data.assigneeMembershipId.trim()
+			: null,
+		due_at: dueOnToApi(data.dueOn),
+		source: 'manual'
+	};
+}
+
+export function toTaskUpdateBody(data: TaskFormData): ApiTaskUpdateBody {
+	return toTaskCreateBody(data);
 }
 
 export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {

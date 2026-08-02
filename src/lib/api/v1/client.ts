@@ -14,6 +14,7 @@ import { createProfilePreferencesEndpoints } from './endpoints/profile-preferenc
 import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
+import { createTasksEndpoints } from './endpoints/tasks.js';
 import { createVendorsEndpoints } from './endpoints/vendors.js';
 import type {
 	BillsEndpoints,
@@ -31,6 +32,7 @@ import type {
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
 	TaxRatesEndpoints,
+	TasksEndpoints,
 	VendorsEndpoints
 } from './endpoints/types.js';
 import type { ApiRequestFn, ApiRequestOptions, ApiResult } from './request.js';
@@ -68,6 +70,7 @@ export interface ApiV1Client {
 	contacts: ContactsEndpoints;
 	clients: ClientsEndpoints;
 	leads: LeadsEndpoints;
+	tasks: TasksEndpoints;
 	documents: DocumentsEndpoints;
 	emailMessages: EmailMessagesEndpoints;
 }
@@ -247,6 +250,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		contacts: createContactsEndpoints(request),
 		clients: createClientsEndpoints(request),
 		leads: createLeadsEndpoints(request),
+		tasks: createTasksEndpoints(request),
 		documents: createDocumentsEndpoints(request),
 		emailMessages: createEmailMessagesEndpoints(request)
 	};
