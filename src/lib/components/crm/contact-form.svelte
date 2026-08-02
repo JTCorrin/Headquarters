@@ -87,21 +87,25 @@
 	</div>
 
 	<div class="space-y-2">
-		<Label for="contact-client-picker">Client</Label>
+		<Label for="contact-client-picker">Linked client</Label>
 		<input type="hidden" name="clientId" value={$formData.clientId ?? ''} />
 		<ClientPicker
 			id="contact-client-picker"
 			value={$formData.clientId ?? ''}
 			options={clientOptions}
-			placeholder="Select client (optional)"
+			placeholder="Select linked client (optional)"
 			aria-invalid={!!$errors.clientId}
 			onValueChange={(id) => {
 				$formData.clientId = id;
+				const client = clientOptions.find((option) => option.id === id);
+				if (client && !$formData.company?.trim()) {
+					$formData.company = client.name;
+				}
 			}}
 			onCreateNew={onCreateClient}
 		/>
 		<p class="text-muted-foreground text-[11px]">
-			Links via the primary client relationship — not a contact column.
+			CRM client account link — separate from employer / company below.
 		</p>
 		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
 	</div>
@@ -126,13 +130,16 @@
 			{#if $errors.phone}<p class="text-destructive text-xs">{$errors.phone}</p>{/if}
 		</div>
 		<div class="space-y-2">
-			<Label for="contact-company">Company</Label>
+			<Label for="contact-company">Employer / company</Label>
 			<Input
 				id="contact-company"
 				name="company"
 				bind:value={$formData.company}
 				placeholder="Northwind"
 			/>
+			<p class="text-muted-foreground text-[11px]">
+				Free-text employer or affiliation — not the same as a linked client.
+			</p>
 			{#if $errors.company}<p class="text-destructive text-xs">{$errors.company}</p>{/if}
 		</div>
 	</div>

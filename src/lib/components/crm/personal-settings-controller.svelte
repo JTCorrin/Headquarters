@@ -24,10 +24,17 @@
 		type OrganisationCreateData
 	} from '$lib/schemas/organisation.js';
 	import {
+		clearMailboxDraft,
+		getMailboxDraft,
+		mailboxFormFromServer,
+		setMailboxDraft,
+		shouldRetainMailboxDraft
+	} from '$lib/personal-settings/mailbox-draft.js';
+	import {
 		emptyMailboxFormData,
-		mailboxFormFromResource,
 		mailboxFormSchema,
-		type MailboxAccountResource
+		type MailboxAccountResource,
+		type MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -125,7 +132,21 @@
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
 	}
 
-	async function loadAll() {
+	function applyMailboxFormFromServer(
+		orgId: string,
+		account: MailboxAccountResource | null,
+		force = false
+	) {
+		if (!force && shouldRetainMailboxDraft(orgId, account, get(mailboxForm.form))) {
+			const draft = getMailboxDraft(orgId);
+			if (draft) mailboxForm.form.set(draft);
+			return;
+		}
+		mailboxForm.form.set(mailboxFormFromServer(account));
+		if (!force) clearMailboxDraft(orgId);
+	}
+
+	async function loadAll(options?: { forceMailboxReload?: boolean }) {
 		if (!session.selectedOrgId) {
 			onMissingOrg?.();
 			viewState = {
@@ -136,6 +157,10 @@
 		}
 
 		const epoch = captureEpoch();
+		const orgId = session.selectedOrgId;
+		if (options?.forceMailboxReload && orgId) {
+			clearMailboxDraft(orgId);
+		}
 		viewState = { kind: 'loading' };
 		try {
 			if (session.memberships.length === 0) {
@@ -162,16 +187,24 @@
 			try {
 				const account = await api.mailbox.get();
 				if (isStale(epoch)) return;
-				mailboxAccount = toMailboxAccountResource(account);
-				mailboxForm.form.set(
-					mailboxAccount
-						? mailboxFormFromResource(mailboxAccount)
-						: emptyMailboxFormData('gmail')
-				);
+				mailboxAccount = account ? toMailboxAccountResource(account) : null;
+				if (orgId) {
+					applyMailboxFormFromServer(
+						orgId,
+						mailboxAccount,
+						options?.forceMailboxReload ?? false
+					);
+				}
 			} catch (error) {
 				if (isStale(epoch)) return;
 				mailboxAccount = null;
-				mailboxForm.form.set(emptyMailboxFormData('gmail'));
+				if (orgId) {
+					applyMailboxFormFromServer(
+						orgId,
+						null,
+						options?.forceMailboxReload ?? false
+					);
+				}
 				if (
 					!(
 						isApiClientError(error) &&
@@ -231,9 +264,8 @@
 				return false;
 			}
 			mailboxAccount = toMailboxAccountResource(updated);
-			mailboxForm.form.set(
-				mailboxAccount ? mailboxFormFromResource(mailboxAccount) : emptyMailboxFormData('gmail')
-			);
+			if (session.selectedOrgId) clearMailboxDraft(session.selectedOrgId);
+			mailboxForm.form.set(mailboxFormFromServer(mailboxAccount));
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -248,27 +280,29 @@
 		}
 	}
 
-	async function onTestMailbox() {
+	async function onTestMailbox(): Promise<MailboxTestFeedback | false> {
 		const epoch = captureEpoch();
 		try {
 			const result = await api.mailbox.test();
 			if (isStale(epoch)) return false;
 			if (!result.ok) {
-				viewState = {
-					kind: 'validation',
+				return {
+					ok: false,
 					message: result.message || result.error_code || 'Mailbox test failed.'
 				};
-				return false;
 			}
 			void loadAll();
 			viewState = { kind: 'ready' };
+			return {
+				ok: true,
+				message: result.message?.trim() || 'Connection successful.'
+			};
 		} catch (error) {
 			if (isStale(epoch)) return false;
-			viewState = {
-				kind: 'validation',
+			return {
+				ok: false,
 				message: userMessage(error, 'Mailbox test failed.')
 			};
-			return false;
 		}
 	}
 
@@ -281,6 +315,7 @@
 				return false;
 			}
 			mailboxAccount = null;
+			if (session.selectedOrgId) clearMailboxDraft(session.selectedOrgId);
 			mailboxForm.form.set(emptyMailboxFormData('gmail'));
 			viewState = { kind: 'ready' };
 		} catch (error) {
@@ -325,6 +360,15 @@
 		void session.cacheGeneration;
 		void loadAll();
 	});
+
+	$effect(() => {
+		const orgId = session.selectedOrgId;
+		if (!orgId) return;
+		const unsubscribe = mailboxForm.form.subscribe((values) => {
+			setMailboxDraft(orgId, values);
+		});
+		return unsubscribe;
+	});
 </script>
 
 {#if currentOrgId}
@@ -349,7 +393,7 @@
 				{mailboxForm}
 				{mailboxAccount}
 				{viewState}
-				onReload={loadAll}
+				onReload={() => loadAll({ forceMailboxReload: true })}
 				{onSavePreferences}
 				{onSaveMailbox}
 				{onTestMailbox}
