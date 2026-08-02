@@ -295,6 +295,8 @@ select throws_ok(
   'lead client_id must be an active client in the same organisation'
 );
 
+reset role;
+
 -- Seed: another contact is already primary; lead contact is a non-primary link.
 -- convert_lead must promote the lead contact (not skip because a link exists).
 with prior_contact as (
@@ -340,6 +342,9 @@ set
   );
 
 -- convert_lead reuses the pre-linked client and promotes the contact to primary
+select pg_temp.as_user((select owner_id from _link_fixture));
+set local role authenticated;
+
 select ok(
   (
     select (public.convert_lead(lead_id) -> 'client' ->> 'id')::uuid = client_id
