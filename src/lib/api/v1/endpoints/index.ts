@@ -1,6 +1,7 @@
 export { createClientsEndpoints } from './clients.js';
 export { createContactsEndpoints } from './contacts.js';
 export { createDocumentsEndpoints } from './documents.js';
+export { createInvoicesEndpoints } from './invoices.js';
 export { createLeadsEndpoints } from './leads.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
@@ -11,6 +12,7 @@ export type {
 	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
+	InvoicesEndpoints,
 	LeadsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,

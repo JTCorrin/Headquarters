@@ -1,18 +1,13 @@
 import type { ColumnDef } from '@tanstack/table-core';
+import type { InvoiceListItem } from '$lib/schemas/invoice.js';
 import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import InvoiceNumberLink from './invoice-number-link.svelte';
 
-export interface InvoiceRow {
-	id: string;
-	number: string;
-	client: string;
-	total: string;
-	status: string;
-	dueOn: string;
-}
+export type InvoiceRow = InvoiceListItem;
 
 export const invoiceColumns: ColumnDef<InvoiceRow>[] = [
 	{
@@ -39,6 +34,11 @@ export const invoiceColumns: ColumnDef<InvoiceRow>[] = [
 			renderComponent(DataTableSortHeader, {
 				label: 'Number',
 				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) =>
+			renderComponent(InvoiceNumberLink, {
+				id: row.original.id,
+				number: row.original.number
 			})
 	},
 	{

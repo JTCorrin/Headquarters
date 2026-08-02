@@ -17,6 +17,7 @@
 		triggerLabel?: string;
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -28,7 +29,8 @@
 		submitLabel = 'Add line',
 		triggerLabel = 'Add line item',
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: LineItemFormDrawerProps = $props();
 </script>
 
@@ -49,7 +51,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<LineItemForm {form} {products} {submitLabel} />
+			<LineItemForm {form} {products} {submitLabel} {onValidSubmit} />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

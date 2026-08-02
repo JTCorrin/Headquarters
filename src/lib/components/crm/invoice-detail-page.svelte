@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { fromStore } from 'svelte/store';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { InvoiceFormData } from '$lib/schemas/invoice.js';
+	import type {
+		InvoiceClientOption,
+		InvoiceContactOption,
+		InvoiceFormData
+	} from '$lib/schemas/invoice.js';
 	import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
@@ -30,10 +34,19 @@
 		lines?: LineItemRow[];
 		timelineEvents?: TimelineEvent[];
 		lineDrawerOpen?: boolean;
+		clientOptions?: InvoiceClientOption[];
+		contactOptions?: InvoiceContactOption[];
+		isDraft?: boolean;
+		actionPending?: boolean;
 		onRemoveLine?: (id: string) => void;
-		onSend?: () => void;
+		onAddLine?: () => boolean | void | Promise<boolean | void>;
+		onSaveInvoice?: () => boolean | void | Promise<boolean | void>;
+		onSend?: () => void | Promise<void>;
+		onVoid?: () => void | Promise<void>;
+		onDelete?: () => void | Promise<void>;
 		onChase?: (draft?: string) => void;
-		onRecordPayment?: () => void;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
 	}
 
@@ -48,10 +61,18 @@
 		lines = $bindable<LineItemRow[]>([]),
 		timelineEvents = $bindable<TimelineEvent[]>([]),
 		lineDrawerOpen = $bindable(false),
+		clientOptions = [],
+		contactOptions = [],
+		isDraft = true,
+		actionPending = false,
 		onRemoveLine,
+		onAddLine,
+		onSaveInvoice,
 		onSend,
+		onVoid,
+		onDelete,
 		onChase,
-		onRecordPayment,
+		showNav = true,
 		class: className
 	}: InvoiceDetailPageProps = $props();
 
@@ -71,8 +92,8 @@
 	async function generateChaseDraft() {
 		chaseStatus = 'generating';
 		const client = formData.current.clientName || 'there';
-		const number = formData.current.number || title;
 		const due = formData.current.dueOn || 'the due date';
+		const number = title.split('·')[0]?.trim() || 'this invoice';
 		await new Promise((r) => setTimeout(r, 650));
 		if (chaseTone === 'firm') {
 			chaseDraft = `Hi ${client},\n\nInvoice ${number} is past due (due ${due}). Please arrange payment or reply with a remittance date this week.\n\nRegards`;
@@ -88,12 +109,12 @@
 			orgName,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
-			documentNumber: formData.current.number || title.split('·')[0]?.trim() || 'Invoice',
+			documentNumber: title.split('·')[0]?.trim() || 'Invoice',
 			currency: formData.current.currency,
 			status: status || formData.current.status,
 			dueOn: formData.current.dueOn,
 			lines,
-			issueDate: new Date().toISOString().slice(0, 10)
+			issueDate: formData.current.issueOn || new Date().toISOString().slice(0, 10)
 		})
 	);
 
@@ -103,7 +124,7 @@
 			orgName,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
-			documentNumber: formData.current.number || 'invoice',
+			documentNumber: title.split('·')[0]?.trim() || 'invoice',
 			currency: formData.current.currency,
 			status,
 			lines
@@ -111,8 +132,16 @@
 	);
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -123,20 +152,44 @@
 				description="Edit on the left — the PDF preview updates live on the right."
 			>
 				{#snippet actions()}
-					<Button variant="outline" size="sm" onclick={() => onRecordPayment?.()}>
-						Record payment
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={() => {
-							openChaseAssist();
-							onChase?.();
-						}}
-					>
-						Chase
-					</Button>
-					<Button size="sm" onclick={() => onSend?.()}>Send</Button>
+					{#if isDraft}
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={actionPending}
+							onclick={() => onDelete?.()}
+						>
+							Delete draft
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={actionPending}
+							onclick={() => onVoid?.()}
+						>
+							Void
+						</Button>
+						<Button size="sm" disabled={actionPending} onclick={() => onSend?.()}>Send</Button>
+					{:else if status.toLowerCase() === 'sent'}
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => {
+								openChaseAssist();
+								onChase?.();
+							}}
+						>
+							Chase
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={actionPending}
+							onclick={() => onVoid?.()}
+						>
+							Void
+						</Button>
+					{/if}
 				{/snippet}
 			</PageHeader>
 
@@ -176,19 +229,37 @@
 						class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<h2 class="text-sm font-semibold tracking-tight">Invoice details</h2>
-						<InvoiceForm form={invoiceForm} submitLabel="Save details" />
+						<InvoiceForm
+							form={invoiceForm}
+							submitLabel="Save details"
+							{clientOptions}
+							{contactOptions}
+							readonly={!isDraft}
+							onValidSubmit={onSaveInvoice}
+						/>
 					</section>
 
-					<LineItemsTable rows={lines} onRemove={onRemoveLine} class="self-start">
+					<LineItemsTable
+						rows={lines}
+						onRemove={isDraft ? onRemoveLine : undefined}
+						class="self-start"
+					>
 						{#snippet headerActions()}
-							<LineItemFormDrawer bind:open={lineDrawerOpen} form={lineForm} {products}>
-								{#snippet trigger()}
-									<Button type="button" size="sm">
-										<PlusIcon class="size-3.5" />
-										Add line item
-									</Button>
-								{/snippet}
-							</LineItemFormDrawer>
+							{#if isDraft}
+								<LineItemFormDrawer
+									bind:open={lineDrawerOpen}
+									form={lineForm}
+									{products}
+									onValidSubmit={onAddLine}
+								>
+									{#snippet trigger()}
+										<Button type="button" size="sm">
+											<PlusIcon class="size-3.5" />
+											Add line item
+										</Button>
+									{/snippet}
+								</LineItemFormDrawer>
+							{/if}
 						{/snippet}
 					</LineItemsTable>
 
