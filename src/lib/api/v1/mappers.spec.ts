@@ -27,10 +27,20 @@ import {
 	toLeadFormData,
 	toOrganisationCreateBody,
 	toOrgMembershipSummary,
+	toPaymentCreateBody,
+	toPaymentListItem,
+	paymentStatusLabel,
 	toQuoteCreateBody,
 	toQuoteListItem
 } from './mappers.js';
-import type { ApiClient, ApiContact, ApiInvoice, ApiLead, ApiQuote } from './types.js';
+import type {
+	ApiClient,
+	ApiContact,
+	ApiInvoice,
+	ApiLead,
+	ApiPayment,
+	ApiQuote
+} from './types.js';
 
 const sampleContact: ApiContact = {
 	id: '11111111-2222-4333-8444-555555555555',
@@ -583,6 +593,77 @@ describe('api mappers', () => {
 			payment_terms_days: null,
 			renewal_on: null,
 			notes: null
+		});
+	});
+
+	it('maps payments create body and list rows', () => {
+		const samplePayment: ApiPayment = {
+			id: 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			version: 1,
+			direction: 'inbound',
+			client_id: 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			vendor_id: null,
+			amount_cents: 420000,
+			currency: 'GBP',
+			method: 'bank',
+			status: 'unallocated',
+			occurred_on: '2026-03-18',
+			reference: 'REF-1',
+			provider: 'manual',
+			provider_payment_id: null,
+			notes: null,
+			reverses_payment_id: null,
+			completed_at: null,
+			metadata: {}
+		};
+		expect(paymentStatusLabel('part_allocated')).toBe('Part Allocated');
+		expect(
+			toPaymentListItem(samplePayment, { clientName: 'Northwind' })
+		).toMatchObject({
+			party: 'Northwind',
+			amount: '£4,200.00',
+			status: 'Unallocated',
+			direction: 'Inbound',
+			method: 'Bank'
+		});
+		expect(
+			toPaymentCreateBody({
+				direction: 'inbound',
+				clientId: samplePayment.client_id!,
+				clientName: 'Northwind',
+				vendorId: '',
+				vendorName: '',
+				invoiceId: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+				billId: '',
+				amount: '42.00',
+				currency: 'GBP',
+				method: 'bank',
+				occurredOn: '2026-03-18',
+				reference: ' REF-1 ',
+				notes: ''
+			})
+		).toEqual({
+			direction: 'inbound',
+			client_id: samplePayment.client_id,
+			vendor_id: null,
+			amount_cents: 4200,
+			currency: 'GBP',
+			method: 'bank',
+			occurred_on: '2026-03-18',
+			provider: 'manual',
+			reference: 'REF-1',
+			notes: null,
+			allocations: [
+				{
+					invoice_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+					amount_cents: 4200
+				}
+			]
 		});
 	});
 });

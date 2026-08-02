@@ -137,6 +137,9 @@ describe('BillPage detail flows', () => {
 			'GET /api/v1/products': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
+			'GET /api/v1/payments': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`PATCH /api/v1/bills/${BILL_ID}`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"1"');
 				patchBody = await request.json();
@@ -188,6 +191,9 @@ describe('BillPage detail flows', () => {
 			'GET /api/v1/products': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
+			'GET /api/v1/payments': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`POST /api/v1/bills/${BILL_ID}/receive`]: async () => {
 				receiveCalled = true;
 				return {
@@ -223,6 +229,9 @@ describe('BillPage detail flows', () => {
 				body: { data: [sampleVendor()], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/payments': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			[`POST /api/v1/bills/${BILL_ID}/void`]: async (request) => {

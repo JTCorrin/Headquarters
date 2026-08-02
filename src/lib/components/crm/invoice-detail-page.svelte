@@ -7,11 +7,18 @@
 		InvoiceFormData
 	} from '$lib/schemas/invoice.js';
 	import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
+	import type {
+		PaymentClientOption,
+		PaymentFormData,
+		PaymentInvoiceOption,
+		PaymentListItem
+	} from '$lib/schemas/payment.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import InvoiceForm from './invoice-form.svelte';
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
+	import DocumentPaymentsPanel from './document-payments-panel.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
 	import AiSuggestionPanel, { type AiSuggestionStatus } from './ai-suggestion-panel.svelte';
@@ -47,6 +54,14 @@
 			totalCents: number;
 		} | null;
 		actionPending?: boolean;
+		paymentForm?: SuperForm<PaymentFormData>;
+		paymentRows?: PaymentListItem[];
+		paymentClientOptions?: PaymentClientOption[];
+		paymentInvoiceOptions?: PaymentInvoiceOption[];
+		paymentDrawerOpen?: boolean;
+		paidLabel?: string;
+		balanceLabel?: string;
+		canRecordPayment?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
 		onSaveInvoice?: () => boolean | void | Promise<boolean | void>;
@@ -54,6 +69,8 @@
 		onVoid?: () => void | Promise<void>;
 		onDelete?: () => void | Promise<void>;
 		onChase?: (draft?: string) => void;
+		onRecordPayment?: () => boolean | void | Promise<boolean | void>;
+		onReversePayment?: (paymentId: string) => void | Promise<void>;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -76,6 +93,14 @@
 		isDirty = false,
 		moneyTotals = null,
 		actionPending = false,
+		paymentForm,
+		paymentRows = [],
+		paymentClientOptions = [],
+		paymentInvoiceOptions = [],
+		paymentDrawerOpen = $bindable(false),
+		paidLabel = '—',
+		balanceLabel = '—',
+		canRecordPayment = false,
 		onRemoveLine,
 		onAddLine,
 		onSaveInvoice,
@@ -83,6 +108,8 @@
 		onVoid,
 		onDelete,
 		onChase,
+		onRecordPayment,
+		onReversePayment,
 		showNav = true,
 		class: className
 	}: InvoiceDetailPageProps = $props();
@@ -294,6 +321,23 @@
 							{/if}
 						{/snippet}
 					</LineItemsTable>
+
+					{#if paymentForm}
+						<DocumentPaymentsPanel
+							{status}
+							{paidLabel}
+							{balanceLabel}
+							rows={paymentRows}
+							form={paymentForm}
+							clientOptions={paymentClientOptions}
+							invoiceOptions={paymentInvoiceOptions}
+							bind:drawerOpen={paymentDrawerOpen}
+							{actionPending}
+							canRecord={canRecordPayment}
+							onValidSubmit={onRecordPayment}
+							onReverse={onReversePayment}
+						/>
+					{/if}
 
 					<Timeline
 						bind:events={timelineEvents}

@@ -1172,4 +1172,128 @@ describe('createApiV1Client', () => {
 		const restored = await client.documents.restore(documentId, 3);
 		expect(restored.document.version).toBe(4);
 	});
+
+	it('supports payment list/create/get/allocate/reverse with Idempotency-Key and If-Match', async () => {
+		const paymentId = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb';
+		const clientId = 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+		const invoiceId = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
+
+		const samplePayment = (overrides: Record<string, unknown> = {}) => ({
+			id: paymentId,
+			org_id: ORG_A,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			version: 1,
+			direction: 'inbound',
+			client_id: clientId,
+			vendor_id: null,
+			amount_cents: 1200,
+			currency: 'GBP',
+			method: 'bank',
+			status: 'allocated',
+			occurred_on: '2026-03-18',
+			reference: null,
+			provider: 'manual',
+			provider_payment_id: null,
+			notes: null,
+			reverses_payment_id: null,
+			completed_at: '2026-03-18T12:00:00Z',
+			metadata: {},
+			allocations: [
+				{
+					id: 'dddddddd-dddd-4eee-8fff-000000000001',
+					org_id: ORG_A,
+					created_at: '2026-01-01T00:00:00Z',
+					updated_at: '2026-01-01T00:00:00Z',
+					created_by: null,
+					updated_by: null,
+					version: 1,
+					payment_id: paymentId,
+					invoice_id: invoiceId,
+					bill_id: null,
+					amount_cents: 1200,
+					allocated_at: '2026-03-18T12:00:00Z',
+					reversed_at: null,
+					reversal_reason: null,
+					invoice_number: 'INV-0001'
+				}
+			],
+			...overrides
+		});
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/payments': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const url = new URL(request.url);
+				expect(url.searchParams.get('invoice_id')).toBe(invoiceId);
+				expect(url.searchParams.get('bill_id')).toBeNull();
+				return { body: { data: [samplePayment()], meta: { next_cursor: null } } };
+			},
+			'POST /api/v1/payments': async (request) => {
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
+				expect(await request.json()).toMatchObject({
+					direction: 'inbound',
+					client_id: clientId,
+					amount_cents: 1200,
+					provider: 'manual'
+				});
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: { data: samplePayment() }
+				};
+			},
+			[`GET /api/v1/payments/${paymentId}`]: async () => ({
+				headers: { etag: '"1"' },
+				body: { data: samplePayment() }
+			}),
+			[`POST /api/v1/payments/${paymentId}/allocate`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
+				return {
+					headers: { etag: '"2"' },
+					body: { data: samplePayment({ version: 2, status: 'allocated' }) }
+				};
+			},
+			[`POST /api/v1/payments/${paymentId}/reverse`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(await request.json()).toEqual({ reason: 'Correction' });
+				return {
+					headers: { etag: '"3"' },
+					body: { data: samplePayment({ version: 3, status: 'reversed' }) }
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const listed = await client.payments.list({ limit: 20, invoice_id: invoiceId });
+		expect(listed.data).toHaveLength(1);
+
+		const created = await client.payments.create({
+			direction: 'inbound',
+			client_id: clientId,
+			amount_cents: 1200,
+			currency: 'GBP',
+			method: 'bank',
+			occurred_on: '2026-03-18',
+			provider: 'manual',
+			allocations: [{ invoice_id: invoiceId, amount_cents: 1200 }]
+		});
+		expect(created.id).toBe(paymentId);
+
+		const got = await client.payments.get(paymentId);
+		expect(got.data.allocations).toHaveLength(1);
+
+		const allocated = await client.payments.allocate(
+			paymentId,
+			{ allocations: [{ invoice_id: invoiceId, amount_cents: 1200 }] },
+			1
+		);
+		expect(allocated.version).toBe(2);
+
+		const reversed = await client.payments.reverse(paymentId, { reason: 'Correction' }, 2);
+		expect(reversed.status).toBe('reversed');
+	});
 });

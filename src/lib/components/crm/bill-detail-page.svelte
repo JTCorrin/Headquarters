@@ -3,11 +3,18 @@
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { BillFormData, BillVendorOption } from '$lib/schemas/bill.js';
 	import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
+	import type {
+		PaymentBillOption,
+		PaymentFormData,
+		PaymentListItem,
+		PaymentVendorOption
+	} from '$lib/schemas/payment.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import BillForm from './bill-form.svelte';
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
+	import DocumentPaymentsPanel from './document-payments-panel.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
 	import VendorFormDrawer from './vendor-form-drawer.svelte';
@@ -44,6 +51,14 @@
 			taxCents: number;
 			totalCents: number;
 		} | null;
+		paymentForm?: SuperForm<PaymentFormData>;
+		paymentRows?: PaymentListItem[];
+		paymentVendorOptions?: PaymentVendorOption[];
+		paymentBillOptions?: PaymentBillOption[];
+		paymentDrawerOpen?: boolean;
+		paidLabel?: string;
+		balanceLabel?: string;
+		canRecordPayment?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
 		onSaveBill?: () => boolean | void | Promise<boolean | void>;
@@ -52,6 +67,8 @@
 		onDelete?: () => void | Promise<void>;
 		onCreateVendor?: () => void;
 		onValidVendorCreate?: () => boolean | void | Promise<boolean | void>;
+		onRecordPayment?: () => boolean | void | Promise<boolean | void>;
+		onReversePayment?: (paymentId: string) => void | Promise<void>;
 		showNav?: boolean;
 		class?: string;
 	}
@@ -74,6 +91,14 @@
 		isDirty = false,
 		actionPending = false,
 		moneyTotals = null,
+		paymentForm,
+		paymentRows = [],
+		paymentVendorOptions = [],
+		paymentBillOptions = [],
+		paymentDrawerOpen = $bindable(false),
+		paidLabel = '—',
+		balanceLabel = '—',
+		canRecordPayment = false,
 		onRemoveLine,
 		onAddLine,
 		onSaveBill,
@@ -82,6 +107,8 @@
 		onDelete,
 		onCreateVendor,
 		onValidVendorCreate,
+		onRecordPayment,
+		onReversePayment,
 		showNav = true,
 		class: className
 	}: BillDetailPageProps = $props();
@@ -232,6 +259,23 @@
 							{/if}
 						{/snippet}
 					</LineItemsTable>
+
+					{#if paymentForm}
+						<DocumentPaymentsPanel
+							{status}
+							{paidLabel}
+							{balanceLabel}
+							rows={paymentRows}
+							form={paymentForm}
+							vendorOptions={paymentVendorOptions}
+							billOptions={paymentBillOptions}
+							bind:drawerOpen={paymentDrawerOpen}
+							{actionPending}
+							canRecord={canRecordPayment}
+							onValidSubmit={onRecordPayment}
+							onReverse={onReversePayment}
+						/>
+					{/if}
 
 					<Timeline
 						bind:events={timelineEvents}

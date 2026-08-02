@@ -28,6 +28,11 @@ import type {
 	RecurringLineFormData
 } from '$lib/schemas/recurring-invoice.js';
 import type { BillFormData, BillListItem } from '$lib/schemas/bill.js';
+import type {
+	PaymentAllocationRow,
+	PaymentFormData,
+	PaymentListItem
+} from '$lib/schemas/payment.js';
 import type { VendorFormData } from '$lib/schemas/vendor.js';
 import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 import type { ProductFormData } from '$lib/schemas/product.js';
@@ -83,6 +88,10 @@ import type {
 	ApiQuoteDocument,
 	ApiQuoteLineInput,
 	ApiQuoteUpdateBody,
+	ApiPayment,
+	ApiPaymentAllocation,
+	ApiPaymentCreateBody,
+	ApiPaymentDocument,
 	ApiRecurringInvoiceCreateBody,
 	ApiRecurringInvoiceDocument,
 	ApiRecurringInvoiceLineInput,
@@ -1485,4 +1494,141 @@ export function toRecurringInvoiceRunListItem(
 		invoiceId: linked?.id ?? run.invoice_id ?? null,
 		invoiceNumber: linked?.number ?? run.invoice_number ?? null
 	};
+}
+
+export function paymentStatusLabel(status: ApiPayment['status']): string {
+	return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function paymentMethodLabel(method: ApiPayment['method']): string {
+	if (method === 'stripe') return 'Stripe';
+	return method.charAt(0).toUpperCase() + method.slice(1);
+}
+
+export function paymentDirectionLabel(direction: ApiPayment['direction']): string {
+	return direction === 'inbound' ? 'Inbound' : 'Outbound';
+}
+
+function allocationSummary(payment: ApiPayment | ApiPaymentDocument): string {
+	const doc = 'allocations' in payment ? payment : null;
+	const active = doc?.allocations?.filter((a) => !a.reversed_at) ?? [];
+	if (active.length === 0) {
+		if (payment.status === 'unallocated') return 'Unallocated';
+		return '—';
+	}
+	if (active.length === 1) {
+		const a = active[0]!;
+		return a.invoice_number ?? a.bill_number ?? (a.invoice_id ? 'Invoice' : 'Bill');
+	}
+	return `${active.length} allocations`;
+}
+
+export function toPaymentListItem(
+	payment: ApiPayment | ApiPaymentDocument,
+	partyNames?: { clientName?: string; vendorName?: string }
+): PaymentListItem {
+	const party =
+		payment.direction === 'inbound'
+			? (partyNames?.clientName ?? '—')
+			: (partyNames?.vendorName ?? '—');
+	return {
+		id: payment.id,
+		direction: paymentDirectionLabel(payment.direction),
+		party,
+		amount: formatMoney(payment.amount_cents, payment.currency),
+		method: paymentMethodLabel(payment.method),
+		status: paymentStatusLabel(payment.status),
+		occurredOn: payment.occurred_on,
+		allocationsSummary: allocationSummary(payment),
+		statusKey: payment.status,
+		version: payment.version
+	};
+}
+
+export function toPaymentAllocationRow(
+	allocation: ApiPaymentAllocation,
+	currency: string
+): PaymentAllocationRow {
+	const targetLabel =
+		allocation.invoice_number ??
+		allocation.bill_number ??
+		(allocation.invoice_id ? 'Invoice' : allocation.bill_id ? 'Bill' : '—');
+	return {
+		id: allocation.id,
+		paymentId: allocation.payment_id,
+		targetLabel,
+		amount: formatMoney(allocation.amount_cents, currency),
+		allocatedAt: allocation.allocated_at.slice(0, 10),
+		reversed: Boolean(allocation.reversed_at)
+	};
+}
+
+export function toPaymentCreateBody(data: PaymentFormData): ApiPaymentCreateBody {
+	const amountCents = amountStringToCents(data.amount);
+	if (amountCents == null || amountCents <= 0) {
+		throw new Error('Amount must be greater than zero');
+	}
+
+	const body: ApiPaymentCreateBody = {
+		direction: data.direction,
+		amount_cents: amountCents,
+		currency: data.currency,
+		method: data.method,
+		occurred_on: data.occurredOn,
+		provider: 'manual',
+		reference: emptyToNull(data.reference),
+		notes: emptyToNull(data.notes)
+	};
+
+	if (data.direction === 'inbound') {
+		body.client_id = data.clientId?.trim() || null;
+		body.vendor_id = null;
+		const invoiceId = data.invoiceId?.trim();
+		if (invoiceId) {
+			body.allocations = [{ invoice_id: invoiceId, amount_cents: amountCents }];
+		}
+	} else {
+		body.vendor_id = data.vendorId?.trim() || null;
+		body.client_id = null;
+		const billId = data.billId?.trim();
+		if (billId) {
+			body.allocations = [{ bill_id: billId, amount_cents: amountCents }];
+		}
+	}
+
+	return body;
+}
+
+/** Create body for recording a payment against a known invoice/bill. */
+export function toDocumentPaymentCreateBody(options: {
+	direction: 'inbound' | 'outbound';
+	clientId?: string;
+	vendorId?: string;
+	invoiceId?: string;
+	billId?: string;
+	amount: string;
+	currency: string;
+	method: PaymentFormData['method'];
+	occurredOn: string;
+	reference?: string;
+	notes?: string;
+}): ApiPaymentCreateBody {
+	return toPaymentCreateBody({
+		direction: options.direction,
+		clientId: options.clientId ?? '',
+		clientName: '',
+		vendorId: options.vendorId ?? '',
+		vendorName: '',
+		invoiceId: options.invoiceId ?? '',
+		billId: options.billId ?? '',
+		amount: options.amount,
+		currency:
+			options.currency === 'USD' || options.currency === 'EUR' || options.currency === 'GBP'
+				? options.currency
+				: 'GBP',
+		method: options.method,
+		occurredOn: options.occurredOn,
+		reference: options.reference ?? '',
+		notes: options.notes ?? ''
+	});
 }

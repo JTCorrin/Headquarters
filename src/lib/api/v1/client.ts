@@ -11,6 +11,7 @@ import { createLeadsEndpoints } from './endpoints/leads.js';
 import { createMailboxEndpoints } from './endpoints/mailbox.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
+import { createPaymentsEndpoints } from './endpoints/payments.js';
 import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
 import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
@@ -29,6 +30,7 @@ import type {
 	MailboxEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
+	PaymentsEndpoints,
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
@@ -70,6 +72,7 @@ export interface ApiV1Client {
 	recurringInvoiceSchedules: RecurringInvoiceSchedulesEndpoints;
 	vendors: VendorsEndpoints;
 	bills: BillsEndpoints;
+	payments: PaymentsEndpoints;
 	contacts: ContactsEndpoints;
 	clients: ClientsEndpoints;
 	leads: LeadsEndpoints;
@@ -251,6 +254,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		recurringInvoiceSchedules: createRecurringInvoiceSchedulesEndpoints(request),
 		vendors: createVendorsEndpoints(request),
 		bills: createBillsEndpoints(request),
+		payments: createPaymentsEndpoints(request),
 		contacts: createContactsEndpoints(request),
 		clients: createClientsEndpoints(request),
 		leads: createLeadsEndpoints(request),
