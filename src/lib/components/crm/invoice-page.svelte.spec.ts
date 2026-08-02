@@ -354,6 +354,87 @@ describe('InvoicePage detail flows', () => {
 		await expect.element(page.getByTestId('line-items-total')).toHaveTextContent('22.80');
 	});
 
+	it('discards a rejected pinned-contact fetch after org switch', async () => {
+		const ORG_B = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
+		const CONTACT_ID = 'cccccccc-cccc-4ddd-8eee-111111111111';
+		let releasePin: (() => void) | undefined;
+		const pinGate = new Promise<void>((resolve) => {
+			releasePin = resolve;
+		});
+		let pinStarted = false;
+		let pinCompletions = 0;
+
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					logo_url: null,
+					role: 'owner',
+					theme_default: 'system'
+				},
+				{
+					org_id: ORG_B,
+					org_name: 'Certivue',
+					org_slug: 'certivue',
+					logo_url: null,
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/invoices/${INVOICE_ID}`]: async (request) => {
+				if (request.headers.get('x-org-id') === ORG_B) {
+					return {
+						status: 404,
+						body: {
+							error: { code: 'NOT_FOUND', message: 'Invoice not found' }
+						}
+					};
+				}
+				return { body: { data: sampleInvoice({ contact_id: CONTACT_ID }) } };
+			},
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: 'page-2' } }
+			}),
+			[`GET /api/v1/contacts/${CONTACT_ID}`]: async () => {
+				pinStarted = true;
+				await pinGate;
+				pinCompletions += 1;
+				return {
+					status: 404,
+					body: {
+						error: { code: 'NOT_FOUND', message: 'Contact not found' }
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(InvoicePage, { api, session, invoiceId: INVOICE_ID });
+
+		// Pin runs before viewState becomes ready — wait for the in-flight get, not the heading.
+		await vi.waitFor(() => expect(pinStarted).toBe(true));
+
+		session.selectOrg(ORG_B);
+		await vi.waitFor(() => expect(session.selectedOrgId).toBe(ORG_B));
+		await expect.element(page.getByText(/Invoice not found/i)).toBeInTheDocument();
+
+		releasePin?.();
+		await vi.waitFor(() => expect(pinCompletions).toBe(1));
+		// Stale rejected pin must not flip org B back to a ready invoice view.
+		await expect.element(page.getByText(/Invoice not found/i)).toBeInTheDocument();
+		await expect.element(page.getByRole('heading', { name: 'INV-0001' })).not.toBeInTheDocument();
+	});
+
 	it('surfaces ETag conflict on send and still loads after void lifecycle', async () => {
 		const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Duplicate');
 
