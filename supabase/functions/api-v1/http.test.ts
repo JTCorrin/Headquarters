@@ -802,11 +802,19 @@ Deno.test('bill create validation requires vendor_id and number', () => {
 })
 
 Deno.test('vendor create validation defaults status and rejects unknown fields', () => {
-  const body = validateVendorBody({ name: 'Acme Vendor' }, false)
+  const body = validateVendorBody(
+    { name: 'Acme Vendor', primary_email: 'vendor@example.test' },
+    false,
+  )
   assertEquals(body.status, 'active')
   assertEquals(body.name, 'Acme Vendor')
+  assertEquals(body.primary_email, 'vendor@example.test')
   assertThrows(
     () => validateVendorBody({ name: 'X', bank_details_encrypted: 'secret' }, false),
+    ApiError,
+  )
+  assertThrows(
+    () => validateVendorBody({ name: 'X', primary_email: 'not-an-email' }, false),
     ApiError,
   )
 })
