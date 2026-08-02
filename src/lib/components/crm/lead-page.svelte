@@ -5,6 +5,8 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		aiSuggestionText,
+		roleFromMemberships,
 		membershipFromCreateResult,
 		toClientCreateBody,
 		toClientResource,
@@ -16,6 +18,11 @@
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiLead } from '$lib/api/v1/types.js';
+	import {
+		emptyEntityEmailTabState,
+		loadEntityEmailTab,
+		type EntityEmailTabState
+	} from '$lib/crm/entity-email-tab.js';
 	import { resolveLeadCurrency } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -27,7 +34,7 @@
 		type LeadFormData,
 		type LeadResource
 	} from '$lib/schemas/lead.js';
-	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { LeadConvertResult } from './lead-detail-page.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -59,6 +66,8 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let lead = $state<ApiLead | null>(null);
+	let emailTab = $state<EntityEmailTabState>(emptyEntityEmailTabState());
+	let sharingId = $state<string | null>(null);
 	let clientOptions = $state<LeadClientOption[]>([]);
 	let orgCurrency = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
@@ -129,7 +138,11 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Leads'));
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Leads', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const leadResource = $derived<LeadResource | null>(lead ? toLeadResource(lead) : null);
 
@@ -183,6 +196,8 @@
 
 	function resetOrgScopedState() {
 		lead = null;
+		emailTab = emptyEntityEmailTabState();
+		sharingId = null;
 		clientOptions = [];
 		orgCurrency = null;
 		lastConvertResult = null;
@@ -228,9 +243,14 @@
 			lead = result.data;
 			leadForm.form.set(toLeadFormData(result.data));
 			viewState = { kind: 'ready' };
+
+			const tab = await loadEntityEmailTab(api, 'lead', leadId);
+			if (isStale(epoch)) return;
+			emailTab = tab;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			lead = null;
+			emailTab = emptyEntityEmailTabState();
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Lead not found.' };
 				return;
@@ -244,6 +264,35 @@
 				message: userMessage(error, 'Could not load lead.')
 			};
 		}
+	}
+
+	async function onAddToTimeline(payload: { messageId: string }) {
+		sharingId = payload.messageId;
+		try {
+			await api.emailMessages.share(payload.messageId, {
+				entity_type: 'lead',
+				entity_id: leadId
+			});
+			emailTab = await loadEntityEmailTab(api, 'lead', leadId);
+		} finally {
+			sharingId = null;
+		}
+	}
+
+	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+		const suggestion = await api.emailMessages.generateDraft({
+			email_message_id: payload.messageId,
+			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onUseSuggestion(payload: { suggestionId?: string; text: string }) {
+		if (payload.suggestionId) await api.emailMessages.useDraft(payload.suggestionId, payload.text);
+	}
+
+	async function onDiscardSuggestion(payload: { suggestionId?: string }) {
+		if (payload.suggestionId) await api.emailMessages.discardDraft(payload.suggestionId);
 	}
 
 	async function onSave(): Promise<boolean> {
@@ -397,6 +446,17 @@
 						bind:convertOpen
 						{converting}
 						{lastConvertResult}
+						emailMessages={emailTab.messages}
+						emailEmptyState={emailTab.emptyState}
+						mailboxConnected={emailTab.mailboxConnected}
+						aiProviderConnected={emailTab.aiProviderConnected}
+						smtpReady={emailTab.smtpReady}
+						{role}
+						{sharingId}
+						{onAddToTimeline}
+						{onDraftResponse}
+						{onUseSuggestion}
+						{onDiscardSuggestion}
 						{onSave}
 						{onConvert}
 						{onOpenClient}

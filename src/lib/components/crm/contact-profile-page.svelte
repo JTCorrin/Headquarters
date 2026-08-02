@@ -32,6 +32,8 @@
 		aiProviderConnected?: boolean;
 		smtpReady?: boolean;
 		role?: MembershipRole;
+		mailSettingsHref?: string;
+		sharingId?: string | null;
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
@@ -39,6 +41,16 @@
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
+		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
+		onDraftResponse?: (payload: {
+			messageId: string;
+			tone: 'warm' | 'neutral' | 'firm';
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onUseSuggestion?: (payload: {
+			suggestionId?: string;
+			text: string;
+		}) => void | Promise<void>;
+		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 	}
 
 	let {
@@ -57,12 +69,18 @@
 		aiProviderConnected = false,
 		smtpReady = false,
 		role = 'member',
+		mailSettingsHref = '/settings#mail',
+		sharingId = null,
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
 		documentDrawerOpen = $bindable(false),
 		moneyItems = [],
 		showNav = true,
-		class: className
+		class: className,
+		onAddToTimeline,
+		onDraftResponse,
+		onUseSuggestion,
+		onDiscardSuggestion
 	}: ContactProfilePageProps = $props();
 
 	const tabs = [
@@ -119,6 +137,12 @@
 							{aiProviderConnected}
 							{smtpReady}
 							{role}
+							{mailSettingsHref}
+							{sharingId}
+							{onAddToTimeline}
+							{onDraftResponse}
+							{onUseSuggestion}
+							{onDiscardSuggestion}
 							class="min-h-0 flex-1"
 						/>
 					{:else if active === 'documents'}

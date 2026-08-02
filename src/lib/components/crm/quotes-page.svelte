@@ -5,6 +5,7 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		roleFromMemberships,
 		membershipFromCreateResult,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
@@ -13,7 +14,7 @@
 	} from '$lib/api/v1/mappers.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import {
 		quoteFormSchema,
 		type QuoteClientOption,
@@ -74,7 +75,11 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Quotes'));
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Quotes', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {

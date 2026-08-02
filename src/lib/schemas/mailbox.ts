@@ -122,6 +122,40 @@ export function emptyMailboxFormData(preset: MailboxPreset = 'custom'): MailboxF
 	};
 }
 
+/** Plain-language sync / connection errors for Mail settings. */
+export function humanizeMailboxSyncError(code: string | null | undefined): string | null {
+	if (!code) return null;
+	switch (code) {
+		case 'auth_failed':
+		case 'authentication_failed':
+		case 'imap_auth_failed':
+		case 'smtp_auth_failed':
+			return 'Sign-in failed — check the email address and password (or app password).';
+		case 'connection_failed':
+		case 'imap_connection_failed':
+		case 'smtp_connection_failed':
+		case 'timeout':
+			return 'Could not reach the mail server — check host, port, and security settings.';
+		case 'tls_failed':
+		case 'certificate_error':
+			return 'Secure connection failed — try a different security setting (SSL / STARTTLS).';
+		case 'circuit_open':
+		case 'circuit_breaker':
+			return 'Sync paused after repeated failures — fix credentials, then use Test connection.';
+		case 'quota_exceeded':
+			return 'The mail provider rejected the request (quota or rate limit). Try again later.';
+		default:
+			return `Sync issue (${code}). Try Test connection, or reconnect the mailbox.`;
+	}
+}
+
+export function formatMailboxLastChecked(iso: string | null | undefined): string | null {
+	if (!iso) return null;
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return iso;
+	return date.toLocaleString();
+}
+
 export function mailboxFormFromResource(resource: MailboxAccountResource): MailboxFormData {
 	return {
 		preset: 'custom',

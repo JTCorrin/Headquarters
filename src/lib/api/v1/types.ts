@@ -830,11 +830,59 @@ export type ApiAiProvider = 'openai' | 'anthropic' | 'google' | 'openrouter';
 export interface ApiAiIntegration {
 	provider: ApiAiProvider;
 	credentials_configured: boolean;
-	status: 'disconnected' | 'connected' | 'error';
-	last_verified_at: string | null;
+	/** Wire status from `integrations.status` — FE maps `active` → connected. */
+	status: 'disconnected' | 'connected' | 'pending' | 'active' | 'error' | 'disabled' | string;
+	last_verified_at?: string | null;
 	last_error_code: string | null;
 }
 
 export interface ApiAiIntegrationConnectBody {
 	api_key: string;
+}
+
+export type ApiEntityEmailType = 'contact' | 'lead' | 'client';
+
+export interface ApiEmailMessage {
+	id: string;
+	direction: 'inbound' | 'outbound';
+	from_address: string;
+	from_name?: string | null;
+	to_addresses: string[] | unknown;
+	subject: string;
+	preview_text?: string | null;
+	body_text?: string | null;
+	received_at?: string | null;
+	sent_at?: string | null;
+	link_reason?: 'address_match' | 'timeline_share' | null;
+	unread?: boolean;
+}
+
+/** Body for `POST /api/v1/email-messages/{id}/share` (Wave B BE contract). */
+export interface ApiEmailMessageShareBody {
+	entity_type: ApiEntityEmailType;
+	entity_id: string;
+}
+
+export interface ApiEmailMessageShareResult {
+	message_id: string;
+	link_reason: 'timeline_share';
+	timeline_event_id?: string | null;
+	body_text?: string | null;
+	subject?: string | null;
+}
+
+export interface ApiAiSuggestionGenerateBody {
+	email_message_id: string;
+	/** BE field name — warm | neutral | firm. */
+	variant?: 'warm' | 'neutral' | 'firm' | string;
+}
+
+export interface ApiAiSuggestion {
+	id: string;
+	status: 'generating' | 'ready' | 'used' | 'discarded' | string;
+	/** BE returns `output_text`; keep optional alias for older fixtures. */
+	output_text?: string;
+	suggestion_text?: string;
+	variant?: string | null;
+	kind?: string;
 }

@@ -61,7 +61,13 @@ import type {
 	ApiMailboxTestResult,
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
-	ApiAiProvider
+	ApiAiProvider,
+	ApiAiSuggestion,
+	ApiAiSuggestionGenerateBody,
+	ApiEmailMessage,
+	ApiEmailMessageShareBody,
+	ApiEmailMessageShareResult,
+	ApiEntityEmailType
 } from '../types.js';
 
 export interface OrganisationsEndpoints {
@@ -283,4 +289,28 @@ export interface IntegrationsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiAiIntegration>;
 	disconnectAi(provider: ApiAiProvider, signal?: AbortSignal): Promise<void>;
+}
+
+
+export interface EmailMessagesEndpoints {
+	listForEntity(
+		entityType: ApiEntityEmailType,
+		entityId: string,
+		signal?: AbortSignal
+	): Promise<ApiEmailMessage[]>;
+	share(
+		messageId: string,
+		body: ApiEmailMessageShareBody,
+		signal?: AbortSignal
+	): Promise<ApiEmailMessageShareResult>;
+	generateDraft(
+		body: ApiAiSuggestionGenerateBody,
+		signal?: AbortSignal
+	): Promise<ApiAiSuggestion>;
+	useDraft(
+		suggestionId: string,
+		acceptedText?: string | null,
+		signal?: AbortSignal
+	): Promise<ApiAiSuggestion>;
+	discardDraft(suggestionId: string, signal?: AbortSignal): Promise<void>;
 }

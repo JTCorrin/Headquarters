@@ -22,6 +22,8 @@
 	/** Wave A empty states — three different stories, not one generic message. */
 	export type EntityEmailEmptyState = 'no_mailbox' | 'no_matches' | 'teammate_nothing_shared';
 
+	export type DraftTone = 'warm' | 'neutral' | 'firm';
+
 	export interface EntityEmailInboxProps {
 		messages: EmailMessage[];
 		selectedId?: string;
@@ -38,8 +40,21 @@
 		showForward?: boolean;
 		/** Optional mock delay (ms) for Draft response in Storybook. */
 		draftDelayMs?: number;
+		/** When true, show Add to timeline on the reading pane. */
+		canAddToTimeline?: boolean;
+		sharingId?: string | null;
 		class?: string;
 		onSendReply?: (payload: { messageId: string; body: string }) => void;
+		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
+		onDraftResponse?: (payload: {
+			messageId: string;
+			tone: DraftTone;
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onUseSuggestion?: (payload: {
+			suggestionId?: string;
+			text: string;
+		}) => void | Promise<void>;
+		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 	}
 
 	let {
@@ -51,19 +66,28 @@
 		aiProviderConnected = false,
 		smtpReady = false,
 		role = 'member',
-		mailSettingsHref = '/org/config#mail',
+		mailSettingsHref = '/settings#mail',
 		integrationsHref = '/org/integrations',
 		showForward = false,
 		draftDelayMs = 700,
+		canAddToTimeline = true,
+		sharingId = null,
 		class: className,
-		onSendReply
+		onSendReply,
+		onAddToTimeline,
+		onDraftResponse,
+		onUseSuggestion,
+		onDiscardSuggestion
 	}: EntityEmailInboxProps = $props();
 
 	let composing = $state(false);
 	let replyBody = $state('');
 	let suggestionBody = $state('');
+	let suggestionId = $state<string | undefined>(undefined);
 	let aiStatus = $state<AiSuggestionStatus>('idle');
-	let tone = $state<'warm' | 'neutral' | 'firm'>('warm');
+	let tone = $state<DraftTone>('warm');
+	let draftError = $state<string | null>(null);
+	let shareError = $state<string | null>(null);
 
 	$effect(() => {
 		if (selectedId === undefined && messages.length > 0) {
@@ -85,7 +109,7 @@
 				return {
 					title: 'Connect your mailbox to see email here',
 					detail:
-						'Personal IMAP/SMTP lives under Config → Mail. Organisation Email sending is a separate plane.',
+						'Personal IMAP/SMTP lives under My settings → Mail. Organisation Email sending is a separate plane.',
 					ctaHref: mailSettingsHref,
 					ctaLabel: 'Open Mail settings'
 				};
@@ -118,17 +142,21 @@
 		composing = true;
 		replyBody = '';
 		suggestionBody = '';
+		suggestionId = undefined;
 		aiStatus = 'idle';
+		draftError = null;
 	}
 
 	function cancelReply() {
 		composing = false;
 		replyBody = '';
 		suggestionBody = '';
+		suggestionId = undefined;
 		aiStatus = 'idle';
+		draftError = null;
 	}
 
-	function buildDraft(message: EmailMessage, draftTone: typeof tone): string {
+	function buildDraft(message: EmailMessage, draftTone: DraftTone): string {
 		const firstName = message.from.split('@')[0]?.split('.')[0] ?? 'there';
 		const greeting = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 		if (draftTone === 'firm') {
@@ -143,21 +171,50 @@
 	async function draftResponse() {
 		if (!selected || draftDisabled) return;
 		aiStatus = 'generating';
+		draftError = null;
 		const message = selected;
 		const draftTone = tone;
-		await new Promise((r) => setTimeout(r, draftDelayMs));
-		suggestionBody = buildDraft(message, draftTone);
-		aiStatus = 'ready';
+		try {
+			if (onDraftResponse) {
+				const result = await onDraftResponse({ messageId: message.id, tone: draftTone });
+				suggestionBody = result.suggestionText;
+				suggestionId = result.suggestionId;
+			} else {
+				await new Promise((r) => setTimeout(r, draftDelayMs));
+				suggestionBody = buildDraft(message, draftTone);
+				suggestionId = undefined;
+			}
+			aiStatus = 'ready';
+		} catch {
+			aiStatus = 'idle';
+			draftError = 'Could not draft a reply — try again.';
+		}
 	}
 
-	function useSuggestion() {
-		replyBody = suggestionBody;
+	async function useSuggestion() {
+		const text = suggestionBody;
+		const id = suggestionId;
+		try {
+			await onUseSuggestion?.({ suggestionId: id, text });
+		} catch {
+			draftError = 'Could not apply suggestion — try again.';
+			return;
+		}
+		replyBody = text;
 		suggestionBody = '';
+		suggestionId = undefined;
 		aiStatus = 'idle';
 	}
 
-	function discardSuggestion() {
+	async function discardSuggestion() {
+		const id = suggestionId;
+		try {
+			await onDiscardSuggestion?.({ suggestionId: id });
+		} catch {
+			/* local discard still clears the panel */
+		}
 		suggestionBody = '';
+		suggestionId = undefined;
 		aiStatus = 'idle';
 	}
 
@@ -165,6 +222,16 @@
 		if (!selected || sendDisabled) return;
 		onSendReply?.({ messageId: selected.id, body: replyBody.trim() });
 		cancelReply();
+	}
+
+	async function addToTimeline() {
+		if (!selected || !onAddToTimeline) return;
+		shareError = null;
+		try {
+			await onAddToTimeline({ messageId: selected.id });
+		} catch {
+			shareError = 'Could not add to timeline — try again.';
+		}
 	}
 </script>
 
@@ -235,19 +302,31 @@
 							· {selected.occurredAt}
 						</p>
 					</div>
-					<div class="flex gap-2">
+					<div class="flex flex-wrap gap-2">
 						{#if !composing}
+							{#if canAddToTimeline && onAddToTimeline}
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={addToTimeline}
+									disabled={sharingId === selected.id}
+									data-testid="email-add-to-timeline"
+								>
+									{sharingId === selected.id ? 'Adding…' : 'Add to timeline'}
+								</Button>
+							{/if}
 							<Button variant="outline" size="sm" onclick={startReply}>Reply</Button>
 							{#if showForward}
 								<Button size="sm">Forward</Button>
-							{:else}
-								<Button size="sm" disabled title="Forward lands in a later wave">Forward</Button>
 							{/if}
 						{:else}
 							<Button variant="ghost" size="sm" onclick={cancelReply}>Cancel</Button>
 						{/if}
 					</div>
 				</div>
+				{#if shareError}
+					<p class="text-destructive text-xs" data-testid="email-share-error">{shareError}</p>
+				{/if}
 			</header>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
@@ -296,12 +375,15 @@
 							<p class="text-muted-foreground text-xs" data-testid="draft-response-gate">
 								{draftGate.hint}
 								<a
-									href={integrationsHref}
+									href={draftGate.href || integrationsHref}
 									class="text-foreground font-medium underline underline-offset-2"
 								>
 									{draftGate.linkLabel}
 								</a>
 							</p>
+						{/if}
+						{#if draftError}
+							<p class="text-destructive text-xs" data-testid="draft-response-error">{draftError}</p>
 						{/if}
 
 						{#if aiStatus === 'ready'}
@@ -345,14 +427,18 @@
 									disabled={sendDisabled}
 									onclick={sendReply}
 									data-testid="email-send"
-									title={smtpReady ? undefined : 'Connect mailbox in Settings'}
+									title={smtpReady ? undefined : 'Connect mailbox in My settings'}
 								>
 									Send
 								</Button>
 							</div>
 							{#if !smtpReady}
 								<p class="text-muted-foreground text-xs" data-testid="email-send-gate">
-									Connect mailbox in Settings before sending.
+									Connect mailbox in <a
+										href={mailSettingsHref}
+										class="text-foreground font-medium underline underline-offset-2"
+										>My settings</a
+									> before sending.
 								</p>
 							{/if}
 						</div>

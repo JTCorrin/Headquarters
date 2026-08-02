@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	canAccessOrgConfigRoutes,
+	canAccessPersonalConfig,
+	canMutateOrgConfig,
 	isIanaTimezone,
 	organisationConfigSchema,
 	organisationCreateSchema,
@@ -130,6 +133,20 @@ describe('organisation schemas', () => {
 				result.error.issues.some((issue) => /must remain active/i.test(issue.message))
 			).toBe(true);
 		}
+	});
+
+	it('locks org Config/Integrations to Owner and personal settings to non-billing', () => {
+		expect(canAccessOrgConfigRoutes('owner')).toBe(true);
+		expect(canMutateOrgConfig('owner')).toBe(true);
+		for (const role of ['admin', 'member', 'billing', 'readonly'] as const) {
+			expect(canAccessOrgConfigRoutes(role)).toBe(false);
+			expect(canMutateOrgConfig(role)).toBe(false);
+		}
+		expect(canAccessPersonalConfig('owner')).toBe(true);
+		expect(canAccessPersonalConfig('admin')).toBe(true);
+		expect(canAccessPersonalConfig('member')).toBe(true);
+		expect(canAccessPersonalConfig('readonly')).toBe(true);
+		expect(canAccessPersonalConfig('billing')).toBe(false);
 	});
 
 	it('accepts org config and theme preference enums', () => {

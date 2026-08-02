@@ -5,6 +5,7 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		roleFromMemberships,
 		lineItemRowsToQuoteLineInputs,
 		membershipFromCreateResult,
 		quoteStatusLabel,
@@ -23,7 +24,7 @@
 		lineItemFormSchema,
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
-	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import { quoteFormSchema, type QuoteClientOption } from '$lib/schemas/quote.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -99,7 +100,11 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Quotes'));
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Quotes', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const canEditLines = $derived(quote?.status === 'draft' || quote?.status === 'sent');
 	const canAccept = $derived(quote?.status === 'draft' || quote?.status === 'sent');
