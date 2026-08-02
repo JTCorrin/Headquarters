@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { MembershipRole, ProfilePreferencesData } from '$lib/schemas/organisation.js';
 	import { roleLabel } from '$lib/schemas/organisation.js';
 	import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
+	import ProfileTabs from './profile-tabs.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
 	} from './resource-state-banner.svelte';
@@ -49,6 +51,15 @@
 	const showContent = $derived(
 		viewState.kind === 'ready' || viewState.kind === 'empty' || viewState.kind === 'conflict'
 	);
+
+	const tabs = [
+		{ id: 'theme', label: 'Theme' },
+		{ id: 'mail', label: 'Mail' }
+	] as const;
+
+	let activeTab = $state<(typeof tabs)[number]['id']>(
+		browser && window.location.hash === '#mail' ? 'mail' : 'theme'
+	);
 </script>
 
 <div
@@ -77,35 +88,45 @@
 			<ResourceStateBanner state={viewState} {onReload} />
 
 			{#if showContent}
-				<section class="space-y-4" data-testid="personal-theme-section">
-					<div>
-						<h2 class="text-lg font-semibold tracking-tight">Personal theme</h2>
-						<p class="text-muted-foreground text-sm">
-							Optional override that applies across every organisation you belong to.
-						</p>
-					</div>
-					<ProfilePreferencesForm
-						form={preferencesForm}
-						onValidSubmit={onSavePreferences}
-					/>
-				</section>
-
-				<section class="space-y-4 scroll-mt-6" id="mail" data-testid="personal-mail-section">
-					<div>
-						<h2 class="text-lg font-semibold tracking-tight">Mail</h2>
-						<p class="text-muted-foreground text-sm">
-							Your personal IMAP/SMTP for this organisation membership — not organisation Email
-							sending used for quotes and campaigns.
-						</p>
-					</div>
-					<ProfileMailboxForm
-						form={mailboxForm}
-						account={mailboxAccount}
-						onValidSubmit={onSaveMailbox}
-						onTest={onTestMailbox}
-						onDisconnect={onDisconnectMailbox}
-					/>
-				</section>
+				<ProfileTabs {tabs} bind:value={activeTab}>
+					{#snippet children({ active })}
+						{#if active === 'theme'}
+							<section class="space-y-4" data-testid="personal-theme-section">
+								<div>
+									<h2 class="text-lg font-semibold tracking-tight">Personal theme</h2>
+									<p class="text-muted-foreground text-sm">
+										Optional override that applies across every organisation you belong to.
+									</p>
+								</div>
+								<ProfilePreferencesForm
+									form={preferencesForm}
+									onValidSubmit={onSavePreferences}
+								/>
+							</section>
+						{:else if active === 'mail'}
+							<section
+								class="space-y-4 scroll-mt-6"
+								id="mail"
+								data-testid="personal-mail-section"
+							>
+								<div>
+									<h2 class="text-lg font-semibold tracking-tight">Mail</h2>
+									<p class="text-muted-foreground text-sm">
+										Your personal IMAP/SMTP for this organisation membership — not organisation
+										Email sending used for quotes and campaigns.
+									</p>
+								</div>
+								<ProfileMailboxForm
+									form={mailboxForm}
+									account={mailboxAccount}
+									onValidSubmit={onSaveMailbox}
+									onTest={onTestMailbox}
+									onDisconnect={onDisconnectMailbox}
+								/>
+							</section>
+						{/if}
+					{/snippet}
+				</ProfileTabs>
 			{/if}
 		</div>
 	</main>

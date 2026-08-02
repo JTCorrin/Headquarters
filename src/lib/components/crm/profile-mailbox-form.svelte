@@ -9,7 +9,8 @@
 		mailboxSecurityOptions,
 		type MailboxAccountResource,
 		type MailboxFormData,
-		type MailboxPreset
+		type MailboxPreset,
+		type MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -23,7 +24,7 @@
 		submitLabel?: string;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
-		onTest?: () => boolean | void | Promise<boolean | void>;
+		onTest?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnect?: () => boolean | void | Promise<boolean | void>;
 	}
 
@@ -45,6 +46,7 @@
 	let pendingSubmit = $state(false);
 	let pendingTest = $state(false);
 	let pendingDisconnect = $state(false);
+	let testFeedback = $state<MailboxTestFeedback | null>(null);
 	let submitLock = false;
 	const busy = $derived($submitting || pendingSubmit || pendingTest || pendingDisconnect);
 
@@ -80,8 +82,12 @@
 	async function handleTest() {
 		if (pendingTest || !onTest) return;
 		pendingTest = true;
+		testFeedback = null;
 		try {
-			await onTest();
+			const result = await onTest();
+			if (result && typeof result === 'object' && 'ok' in result) {
+				testFeedback = result;
+			}
 		} finally {
 			pendingTest = false;
 		}
@@ -294,6 +300,21 @@
 			</Select.Root>
 		</div>
 	</div>
+
+	{#if testFeedback}
+		<p
+			class={cn(
+				'rounded-2xl px-3 py-2 text-xs',
+				testFeedback.ok
+					? 'bg-emerald-500/10 text-emerald-900 ring-1 ring-emerald-500/20 dark:text-emerald-100'
+					: 'bg-destructive/10 text-destructive ring-1 ring-destructive/20'
+			)}
+			role="status"
+			data-testid="mailbox-test-feedback"
+		>
+			{testFeedback.message}
+		</p>
+	{/if}
 
 	<div class="flex flex-wrap justify-end gap-2">
 		{#if account && onDisconnect}
