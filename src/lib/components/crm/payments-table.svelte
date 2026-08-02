@@ -15,7 +15,7 @@
 <DataTableShell
 	data={rows}
 	columns={paymentColumns}
-	filterColumn="client"
+	filterColumn="party"
 	filterPlaceholder="Filter payments…"
 	emptyMessage="No payments yet."
 	class={className}

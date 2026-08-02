@@ -103,6 +103,8 @@ export { default as PaymentForm } from './payment-form.svelte';
 export { default as PaymentFormDrawer } from './payment-form-drawer.svelte';
 export { default as PaymentsTable } from './payments-table.svelte';
 export { default as PaymentsListPage } from './payments-list-page.svelte';
+export { default as PaymentsPage } from './payments-page.svelte';
+export { default as DocumentPaymentsPanel } from './document-payments-panel.svelte';
 export { default as MoneySummary } from './money-summary.svelte';
 export { default as ClientsTable } from './clients-table.svelte';
 export { default as ClientsListPage } from './clients-list-page.svelte';

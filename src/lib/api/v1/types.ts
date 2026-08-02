@@ -1323,3 +1323,112 @@ export interface ApiRecurringInvoiceRunListParams {
 	limit?: number;
 	cursor?: string;
 }
+
+// --- Payments ---
+
+export type ApiPaymentDirection = 'inbound' | 'outbound';
+export type ApiPaymentMethod = 'bank' | 'card' | 'cash' | 'stripe' | 'other';
+export type ApiPaymentStatus =
+	| 'pending'
+	| 'completed'
+	| 'unallocated'
+	| 'part_allocated'
+	| 'allocated'
+	| 'refunded'
+	| 'reversed'
+	| 'failed';
+
+export interface ApiPayment {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	version: number;
+	direction: ApiPaymentDirection;
+	client_id: string | null;
+	vendor_id: string | null;
+	amount_cents: number;
+	currency: string;
+	method: ApiPaymentMethod;
+	status: ApiPaymentStatus;
+	occurred_on: string;
+	reference: string | null;
+	provider: string | null;
+	provider_payment_id: string | null;
+	notes: string | null;
+	reverses_payment_id: string | null;
+	completed_at: string | null;
+	metadata: unknown;
+	/** Present when list/get joins active allocation totals. */
+	allocated_cents?: number;
+}
+
+export interface ApiPaymentAllocation {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	version: number;
+	payment_id: string;
+	invoice_id: string | null;
+	bill_id: string | null;
+	amount_cents: number;
+	allocated_at: string;
+	reversed_at: string | null;
+	reversal_reason: string | null;
+	/** Optional join labels when BE includes them. */
+	invoice_number?: string | null;
+	bill_number?: string | null;
+}
+
+export type ApiPaymentDocument = ApiPayment & {
+	allocations: ApiPaymentAllocation[];
+	/** Present on reverse responses when BE returns the reversing ledger row. */
+	reversing_payment?: ApiPayment;
+};
+
+export interface ApiPaymentAllocationInput {
+	invoice_id?: string;
+	bill_id?: string;
+	amount_cents: number;
+}
+
+export interface ApiPaymentCreateBody {
+	direction: ApiPaymentDirection;
+	client_id?: string | null;
+	vendor_id?: string | null;
+	amount_cents: number;
+	currency: string;
+	method: ApiPaymentMethod;
+	occurred_on: string;
+	reference?: string | null;
+	provider?: string | null;
+	provider_payment_id?: string | null;
+	notes?: string | null;
+	allocations?: ApiPaymentAllocationInput[];
+}
+
+export interface ApiPaymentAllocateBody {
+	allocations: ApiPaymentAllocationInput[];
+}
+
+export interface ApiPaymentReverseBody {
+	reason: string;
+}
+
+export interface ApiPaymentListParams {
+	limit?: number;
+	cursor?: string;
+	direction?: ApiPaymentDirection;
+	client_id?: string;
+	vendor_id?: string;
+	status?: ApiPaymentStatus;
+	/** Via payment_allocations join — mutually exclusive with bill_id. */
+	invoice_id?: string;
+	/** Via payment_allocations join — mutually exclusive with invoice_id. */
+	bill_id?: string;
+}
