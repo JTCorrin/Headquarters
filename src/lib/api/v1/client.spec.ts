@@ -1226,6 +1226,9 @@ describe('createApiV1Client', () => {
 		const fetchMock = createMockFetch({
 			'GET /api/v1/payments': async (request) => {
 				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const url = new URL(request.url);
+				expect(url.searchParams.get('invoice_id')).toBe(invoiceId);
+				expect(url.searchParams.get('bill_id')).toBeNull();
 				return { body: { data: [samplePayment()], meta: { next_cursor: null } } };
 			},
 			'POST /api/v1/payments': async (request) => {
@@ -1265,7 +1268,7 @@ describe('createApiV1Client', () => {
 		});
 
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
-		const listed = await client.payments.list({ limit: 20 });
+		const listed = await client.payments.list({ limit: 20, invoice_id: invoiceId });
 		expect(listed.data).toHaveLength(1);
 
 		const created = await client.payments.create({

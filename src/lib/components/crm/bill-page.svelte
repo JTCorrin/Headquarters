@@ -355,26 +355,14 @@
 
 			const listedPayments = await api.payments.list({
 				limit: 50,
-				direction: 'outbound',
-				vendor_id: result.data.vendor_id
+				bill_id: billId
 			});
 			if (isStale(epoch)) return;
-			const paymentDocs = await Promise.all(
-				listedPayments.data.slice(0, 20).map((payment) => api.payments.get(payment.id))
+			paymentRows = listedPayments.data.map((payment) =>
+				toPaymentListItem(payment, {
+					vendorName: vendors.data.find((v) => v.id === payment.vendor_id)?.name
+				})
 			);
-			if (isStale(epoch)) return;
-			paymentRows = paymentDocs
-				.map((got) => got.data)
-				.filter((payment) =>
-					payment.allocations.some(
-						(allocation) => allocation.bill_id === billId && !allocation.reversed_at
-					)
-				)
-				.map((payment) =>
-					toPaymentListItem(payment, {
-						vendorName: vendors.data.find((v) => v.id === payment.vendor_id)?.name
-					})
-				);
 
 			const selectedVendorId = result.data.vendor_id;
 			if (selectedVendorId && !vendorOptions.some((v) => v.id === selectedVendorId)) {
