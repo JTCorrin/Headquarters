@@ -84,6 +84,22 @@ log "starting Supabase (migrations apply on first start)"
 if supabase status >/dev/null 2>&1; then
 	# Already running — apply any new migrations from this SHA (do not wipe data).
 	supabase migration up
+	# PostgREST schema cache otherwise misses new tables/RPCs until restart.
+	if command -v docker >/dev/null 2>&1; then
+		rest_ids="$(
+			docker ps --format '{{.ID}} {{.Names}}' \
+				| awk 'tolower($0) ~ /rest|postgrest/ { print $1 }' \
+				| sort -u \
+				| tr '\n' ' '
+		)"
+		rest_ids="${rest_ids%"${rest_ids##*[![:space:]]}"}"
+		if [[ -n "$rest_ids" ]]; then
+			log "reloading PostgREST schema cache (${rest_ids})"
+			# shellcheck disable=SC2086
+			docker kill -s SIGHUP $rest_ids >/dev/null 2>&1 \
+				|| docker restart $rest_ids >/dev/null
+		fi
+	fi
 else
 	supabase start
 fi
