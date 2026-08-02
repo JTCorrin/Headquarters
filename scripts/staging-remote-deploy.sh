@@ -234,4 +234,15 @@ else
 	log "product→quote→invoice convert curl proof script missing — skipped"
 fi
 
+# Personal mailbox + org AI integrations (Wave A foundations; no secret echo).
+if [[ -x scripts/email_mailbox_ai_staging_curl_proof.sh ]]; then
+	log "running mailbox + AI integrations curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/email_mailbox_ai_staging_curl_proof.sh
+else
+	log "mailbox/AI curl proof script missing — skipped"
+fi
+
 log "done"

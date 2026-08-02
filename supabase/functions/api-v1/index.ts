@@ -6,8 +6,10 @@ import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { handleDocuments } from './documents.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
+import { handleMailbox, listEntityEmailMessagesStub } from './mailbox.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
@@ -80,7 +82,7 @@ export default {
           'Access-Control-Allow-Origin': corsOrigin,
           'Access-Control-Allow-Headers':
             'authorization, apikey, content-type, if-match, idempotency-key, x-client-info, x-org-id, x-request-id',
-          'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
           'Access-Control-Expose-Headers': 'etag, location, x-request-id',
         },
       },
@@ -160,8 +162,49 @@ export default {
           )
         }
 
+        if (path === '/api/v1/me/mailbox' || path.startsWith('/api/v1/me/mailbox/')) {
+          return await handleMailbox(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
+        if (path === '/api/v1/integrations' || path.startsWith('/api/v1/integrations/')) {
+          return await handleIntegrations(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
         if (path === '/api/v1/tax-rates' || path.startsWith('/api/v1/tax-rates/')) {
           return await handleTaxRates(req, db, path, orgId, membership.role, requestId)
+        }
+
+        const entityEmailMatch = path.match(
+          /^\/api\/v1\/(contacts|leads|clients)\/([0-9a-f-]{36})\/email-messages$/i,
+        )
+        if (entityEmailMatch) {
+          if (membership.role === 'billing') {
+            throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access entity email')
+          }
+          if (req.method !== 'GET') {
+            throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for entity email')
+          }
+          return await listEntityEmailMessagesStub(
+            db,
+            orgId,
+            entityEmailMatch[1].toLowerCase() as 'contact' | 'lead' | 'client',
+            entityEmailMatch[2],
+            requestId,
+          )
         }
 
         if (path === '/api/v1/contacts' || path.startsWith('/api/v1/contacts/')) {
