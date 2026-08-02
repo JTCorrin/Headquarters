@@ -28,6 +28,8 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/leads/abc')).toBe(true);
 		expect(requiresSelectedOrg('/clients')).toBe(true);
 		expect(requiresSelectedOrg('/clients/abc')).toBe(true);
+		expect(requiresSelectedOrg('/tasks')).toBe(true);
+		expect(requiresSelectedOrg('/tasks/abc')).toBe(true);
 		expect(requiresSelectedOrg('/settings')).toBe(true);
 		expect(requiresSelectedOrg('/select-org')).toBe(false);
 		expect(requiresSelectedOrg('/login')).toBe(false);

@@ -10,6 +10,7 @@
 			relatedTo: 'Northwind',
 			owner: 'Joe',
 			status: 'Open',
+			priority: 'P3 — Normal',
 			dueOn: '2026-03-18'
 		},
 		{
@@ -18,6 +19,7 @@
 			relatedTo: 'Fabrikam',
 			owner: 'Maya',
 			status: 'Overdue',
+			priority: 'P1 — Urgent',
 			dueOn: '2026-03-10'
 		},
 		{
@@ -26,6 +28,7 @@
 			relatedTo: 'Contoso',
 			owner: 'Joe',
 			status: 'In progress',
+			priority: 'P2 — High',
 			dueOn: '2026-03-22'
 		},
 		{
@@ -34,6 +37,7 @@
 			relatedTo: 'Litware',
 			owner: 'Maya',
 			status: 'Open',
+			priority: 'P3 — Normal',
 			dueOn: '2026-03-25'
 		},
 		{
@@ -42,6 +46,7 @@
 			relatedTo: 'Adventure Works',
 			owner: 'Joe',
 			status: 'Done',
+			priority: 'P4 — Low',
 			dueOn: '2026-03-12'
 		},
 		{
@@ -50,6 +55,7 @@
 			relatedTo: 'Northwind',
 			owner: 'Maya',
 			status: 'Open',
+			priority: 'P3 — Normal',
 			dueOn: '2026-03-19'
 		},
 		{
@@ -58,6 +64,7 @@
 			relatedTo: 'Contoso',
 			owner: 'Joe',
 			status: 'In progress',
+			priority: 'P3 — Normal',
 			dueOn: '2026-03-17'
 		},
 		{
@@ -66,6 +73,7 @@
 			relatedTo: 'Catalog',
 			owner: 'Maya',
 			status: 'Open',
+			priority: 'P4 — Low',
 			dueOn: '2026-03-28'
 		},
 		{
@@ -74,6 +82,7 @@
 			relatedTo: 'Old Town',
 			owner: 'Joe',
 			status: 'Done',
+			priority: 'P3 — Normal',
 			dueOn: '2026-03-08'
 		}
 	];
