@@ -122,6 +122,8 @@
 	function selectFromEvent(e: Event) {
 		const target = e.target as HTMLElement | null;
 		if (target?.closest?.('[data-testid="leads-board-keyboard-moves"]')) return;
+		// Column collapse/expand controls must not be treated as card selection.
+		if (target?.closest?.('.wx-expand, .wx-toggle, .wx-add, button')) return;
 		const card = target?.closest?.('[data-id]') as HTMLElement | null;
 		if (!card) return;
 		const id = resolveLeadId(card.getAttribute('data-id'));
@@ -132,7 +134,7 @@
 		if (e.key !== 'Enter' && e.key !== ' ') return;
 		const target = e.target as HTMLElement | null;
 		if (target?.closest?.('[data-testid="leads-board-keyboard-moves"]')) return;
-		if (target?.closest?.('button, select, input, textarea, a')) return;
+		if (target?.closest?.('button, select, input, textarea, a, .wx-expand, .wx-toggle')) return;
 		if (!target?.closest?.('[data-id]')) return;
 		e.preventDefault();
 		selectFromEvent(e);

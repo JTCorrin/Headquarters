@@ -132,6 +132,74 @@ export interface ApiProfilePreferencesPatch {
 	theme_preference: ThemeOption | null;
 }
 
+export type ApiProductType = 'product' | 'service';
+export type ApiProductStatus = 'active' | 'archived';
+
+export interface ApiProduct {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	sku: string;
+	name: string;
+	description: string | null;
+	category_id: string | null;
+	product_type: ApiProductType;
+	unit_name: string | null;
+	unit_price_cents: number;
+	cost_price_cents: number | null;
+	currency: string;
+	tax_rate_id: string | null;
+	track_stock: boolean;
+	stock_qty: number;
+	low_stock_at: number | null;
+	status: ApiProductStatus;
+	metadata: unknown;
+}
+
+export interface ApiProductCreateBody {
+	sku: string;
+	name: string;
+	description?: string | null;
+	category_id?: string | null;
+	product_type?: ApiProductType;
+	unit_name?: string | null;
+	unit_price_cents: number;
+	cost_price_cents?: number | null;
+	currency?: string;
+	tax_rate_id?: string | null;
+	track_stock?: boolean;
+	low_stock_at?: number | null;
+	status?: ApiProductStatus;
+	metadata?: unknown;
+}
+
+export type ApiProductUpdateBody = Partial<ApiProductCreateBody>;
+
+export interface ApiProductListParams {
+	limit?: number;
+	cursor?: string;
+	status?: ApiProductStatus;
+}
+
+export type ApiProductAdjustReason =
+	| 'opening'
+	| 'adjustment'
+	| 'invoice'
+	| 'return'
+	| 'void';
+
+export interface ApiProductAdjustStockBody {
+	quantity_delta: number;
+	reason?: ApiProductAdjustReason;
+	note?: string | null;
+	occurred_at?: string;
+}
+
 export type ApiQuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'void';
 
 export interface ApiQuote {

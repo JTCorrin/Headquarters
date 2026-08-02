@@ -7,6 +7,7 @@ import { createLeadsEndpoints } from './endpoints/leads.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
+import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
 import type {
@@ -17,6 +18,7 @@ import type {
 	LeadsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
+	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
 	TaxRatesEndpoints
@@ -46,6 +48,7 @@ export interface ApiV1Client {
 	organisationConfig: OrganisationConfigEndpoints;
 	taxRates: TaxRatesEndpoints;
 	profilePreferences: ProfilePreferencesEndpoints;
+	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
 	invoices: InvoicesEndpoints;
 	contacts: ContactsEndpoints;
@@ -219,6 +222,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		organisationConfig: createOrganisationConfigEndpoints(request),
 		taxRates: createTaxRatesEndpoints(request),
 		profilePreferences: createProfilePreferencesEndpoints(request),
+		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		invoices: createInvoicesEndpoints(request),
 		contacts: createContactsEndpoints(request),

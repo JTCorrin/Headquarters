@@ -4,12 +4,12 @@
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
 	import { getOrgSession } from '$lib/org/index.js';
-	import QuotePage from '$lib/components/crm/quote-page.svelte';
+	import ProductPage from '$lib/components/crm/product-page.svelte';
 
 	const api = getApiV1Client();
 	const session = getOrgSession();
 	const auth = getAuthSession();
-	const quoteId = $derived(page.params.id ?? '');
+	const productId = $derived(page.params.id ?? '');
 
 	async function handleLogout() {
 		await auth.signOut();
@@ -19,19 +19,16 @@
 	}
 </script>
 
-{#if quoteId}
-	<QuotePage
+{#if productId}
+	<ProductPage
 		{api}
 		{session}
-		{quoteId}
+		{productId}
 		onMissingOrg={() => {
 			void goto('/select-org');
 		}}
 		onSwitchNavigate={() => {
-			void goto('/quotes');
-		}}
-		onConverted={(invoiceId) => {
-			void goto(`/invoices/${invoiceId}`);
+			void goto('/products');
 		}}
 		onLogout={handleLogout}
 	/>

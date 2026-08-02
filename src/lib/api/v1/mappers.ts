@@ -19,10 +19,12 @@ import type {
 	InvoiceFormData,
 	InvoiceListItem
 } from '$lib/schemas/invoice.js';
-import type { LineItemFormData } from '$lib/schemas/line-item.js';
+import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
+import type { ProductFormData } from '$lib/schemas/product.js';
 import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
 import type { ClientRow } from '$lib/components/crm/clients-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
+import type { ProductRow } from '$lib/components/crm/products-columns.js';
 import type {
 	ApiClient,
 	ApiClientCreateBody,
@@ -43,10 +45,14 @@ import type {
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
 	ApiOrganisationMembership,
+	ApiProduct,
+	ApiProductCreateBody,
+	ApiProductUpdateBody,
 	ApiProfilePreferences,
 	ApiQuote,
 	ApiQuoteCreateBody,
 	ApiQuoteDocument,
+	ApiQuoteLineInput,
 	ApiQuoteUpdateBody,
 	ApiTaxRate,
 	ApiTaxRateCreateBody
@@ -307,6 +313,129 @@ export function toQuoteUpdateBody(data: QuoteFormData): ApiQuoteUpdateBody {
 		client_id: data.clientId,
 		currency: data.currency
 	};
+}
+
+export function productStatusLabel(status: ApiProduct['status']): string {
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function toProductRow(product: ApiProduct): ProductRow {
+	return {
+		id: product.id,
+		sku: product.sku,
+		name: product.name,
+		unitPrice: formatMoney(product.unit_price_cents, product.currency),
+		stock: product.track_stock ? product.stock_qty : undefined,
+		lowStockAt: product.low_stock_at ?? undefined,
+		status: productStatusLabel(product.status)
+	};
+}
+
+export function toCatalogProductOption(product: ApiProduct): CatalogProductOption {
+	return {
+		id: product.id,
+		sku: product.sku,
+		name: product.name,
+		unitPrice: centsToAmountString(product.unit_price_cents) || '0'
+	};
+}
+
+export function toProductFormData(product: ApiProduct): ProductFormData {
+	return {
+		sku: product.sku,
+		name: product.name,
+		description: product.description ?? '',
+		unitPrice: centsToAmountString(product.unit_price_cents) || '0',
+		trackStock: product.track_stock,
+		stockQty: product.track_stock ? String(product.stock_qty) : '',
+		status: product.status
+	};
+}
+
+export function toProductCreateBody(data: ProductFormData): ApiProductCreateBody {
+	return {
+		sku: data.sku.trim(),
+		name: data.name.trim(),
+		description: data.description?.trim() || null,
+		product_type: 'product',
+		unit_price_cents: amountStringToCents(data.unitPrice) ?? 0,
+		currency: 'GBP',
+		track_stock: data.trackStock,
+		status: data.status
+	};
+}
+
+export function toProductUpdateBody(data: ProductFormData): ApiProductUpdateBody {
+	return {
+		sku: data.sku.trim(),
+		name: data.name.trim(),
+		description: data.description?.trim() || null,
+		unit_price_cents: amountStringToCents(data.unitPrice) ?? 0,
+		track_stock: data.trackStock,
+		status: data.status
+	};
+}
+
+export function toQuoteLineInput(data: LineItemFormData, position?: number): ApiQuoteLineInput {
+	const quantity = Number(data.qty);
+	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
+	const productId = data.productId?.trim();
+	if (productId) {
+		return {
+			product_id: productId,
+			quantity,
+			description: data.description.trim(),
+			unit_price_cents: unitPriceCents,
+			...(position === undefined ? {} : { position })
+		};
+	}
+	return {
+		product_id: null,
+		description: data.description.trim(),
+		quantity,
+		unit_price_cents: unitPriceCents,
+		...(position === undefined ? {} : { position })
+	};
+}
+
+/** Preserve product link + discount/tax when rebuilding quote PATCH line payloads. */
+export function lineItemRowsToQuoteLineInputs(
+	lines: {
+		productId?: string | null;
+		description: string;
+		qty: string;
+		unitPrice: string;
+		discountPercent?: number;
+		taxRatePercent?: number;
+	}[]
+): ApiQuoteLineInput[] {
+	return lines.map((line, index) => {
+		const quantity = Number(line.qty);
+		const unitPriceCents = amountStringToCents(line.unitPrice) ?? 0;
+		const productId = line.productId?.trim() ? line.productId.trim() : null;
+		const input: ApiQuoteLineInput = productId
+			? {
+					product_id: productId,
+					quantity,
+					description: line.description,
+					unit_price_cents: unitPriceCents,
+					position: index
+				}
+			: {
+					product_id: null,
+					description: line.description,
+					quantity,
+					unit_price_cents: unitPriceCents,
+					position: index
+				};
+		if (line.discountPercent !== undefined) {
+			input.discount_percent = line.discountPercent;
+		}
+		if (line.taxRatePercent !== undefined) {
+			input.tax_rate_percent = line.taxRatePercent;
+		}
+		return input;
+	});
 }
 
 export function invoiceStatusLabel(status: ApiInvoice['status']): string {
