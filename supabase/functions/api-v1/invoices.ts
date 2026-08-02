@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, Json, QuoteLineRow, QuoteRow } from '../_shared/database.ts'
+import type { Database, InvoiceLineRow, InvoiceRow, Json } from '../_shared/database.ts'
 import {
   ApiError,
   etag,
@@ -10,31 +10,21 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
+import { assertJsonSafeLineMoney } from './quotes.ts'
 
-const QUOTE_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,title,client_id,lead_id,contact_id,owner_membership_id,status,currency,issue_on,valid_until,subtotal_cents,discount_cents,tax_cents,total_cents,party_snapshot,terms,notes,internal_notes,sent_at,viewed_at,accepted_at,rejected_at,converted_invoice_id'
-
-type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'void'
-const QUOTE_STATUSES: readonly QuoteStatus[] = [
-  'draft',
-  'sent',
-  'accepted',
-  'rejected',
-  'expired',
-  'void',
-]
+const INVOICE_SELECT =
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,client_id,contact_id,quote_id,owner_membership_id,source,recurring_run_id,billing_period_start,billing_period_end,status,currency,issue_on,due_on,purchase_order_number,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_due_cents,party_snapshot,payment_terms,notes,internal_notes,sent_at,viewed_at,paid_at,voided_at,void_reason'
 
 const HEADER_WRITABLE = new Set([
-  'title',
   'client_id',
-  'lead_id',
   'contact_id',
   'owner_membership_id',
   'currency',
   'issue_on',
-  'valid_until',
+  'due_on',
+  'purchase_order_number',
   'discount_cents',
-  'terms',
+  'payment_terms',
   'notes',
   'internal_notes',
   'lines',
@@ -50,9 +40,12 @@ const LINE_WRITABLE = new Set([
   'position',
 ])
 
+type InvoiceStatus = 'draft' | 'partial' | 'paid' | 'sent' | 'void'
+const INVOICE_STATUSES: readonly InvoiceStatus[] = ['draft', 'sent', 'partial', 'paid', 'void']
+
 type DatabaseClient = SupabaseClient<Database>
 
-type QuoteLineInput = {
+type InvoiceLineInput = {
   product_id?: string | null
   description?: string
   quantity: number
@@ -62,34 +55,33 @@ type QuoteLineInput = {
   position?: number
 }
 
-type QuoteHeaderInput = {
-  title?: string
-  client_id?: string | null
-  lead_id?: string | null
+type InvoiceHeaderInput = {
+  client_id?: string
   contact_id?: string | null
   owner_membership_id?: string | null
   currency?: string
   issue_on?: string
-  valid_until?: string | null
+  due_on?: string
+  purchase_order_number?: string | null
   discount_cents?: number
-  terms?: string | null
+  payment_terms?: string | null
   notes?: string | null
   internal_notes?: string | null
 }
 
-type QuoteCreate = QuoteHeaderInput & {
-  title: string
+type InvoiceCreate = InvoiceHeaderInput & {
+  client_id: string
   currency: string
-  lines: QuoteLineInput[]
+  lines: InvoiceLineInput[]
 }
 
-type QuoteUpdate = QuoteHeaderInput & {
-  lines?: QuoteLineInput[]
+type InvoiceUpdate = InvoiceHeaderInput & {
+  lines?: InvoiceLineInput[]
 }
 
-type QuoteDocument = QuoteRow & { lines: QuoteLineRow[] }
+type InvoiceDocument = InvoiceRow & { lines: InvoiceLineRow[] }
 
-interface QuoteCursor {
+interface InvoiceCursor {
   created_at: string
   id: string
 }
@@ -121,22 +113,10 @@ function hasAtMostFourDecimals(value: number): boolean {
   return Math.abs(scaled - Math.round(scaled)) < 1e-6
 }
 
-/** Reject quantity × unit_price products that would round in JSON number encoding. */
-export function assertJsonSafeLineMoney(
-  quantity: number,
-  unitPriceCents: number,
-): boolean {
-  if (!Number.isFinite(quantity) || !Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0) {
-    return false
-  }
-  if (unitPriceCents === 0) return true
-  return quantity <= Number.MAX_SAFE_INTEGER / unitPriceCents
-}
-
-function validateQuoteLine(
+function validateInvoiceLine(
   body: Record<string, unknown>,
   index: number,
-): QuoteLineInput {
+): InvoiceLineInput {
   const fields: Record<string, string> = {}
   const prefix = `lines.${index}`
 
@@ -169,7 +149,6 @@ function validateQuoteLine(
       description = value.trim()
     }
   } else if (productId === null || productId === undefined) {
-    // Free-text lines require description; product lines may inherit name in RPC.
     if (!('product_id' in body) || body.product_id === null) {
       fields[`${prefix}.description`] = 'Required for free-text lines'
     }
@@ -250,7 +229,7 @@ function validateQuoteLine(
   }
 
   if (Object.keys(fields).length > 0) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Quote line validation failed', fields)
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice line validation failed', fields)
   }
 
   return {
@@ -264,60 +243,64 @@ function validateQuoteLine(
   }
 }
 
-function validateLines(value: unknown): QuoteLineInput[] {
+function validateLines(value: unknown): InvoiceLineInput[] {
   if (!Array.isArray(value)) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Quote validation failed', {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice validation failed', {
       lines: 'Must be an array',
     })
   }
   if (value.length > 200) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Quote validation failed', {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice validation failed', {
       lines: 'Must not exceed 200 lines',
     })
   }
   return value.map((item, index) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      throw new ApiError(422, 'VALIDATION_ERROR', 'Quote validation failed', {
+      throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice validation failed', {
         [`lines.${index}`]: 'Must be an object',
       })
     }
-    return validateQuoteLine(item as Record<string, unknown>, index)
+    return validateInvoiceLine(item as Record<string, unknown>, index)
   })
 }
 
-export function validateQuoteBody(
+export function validateInvoiceBody(
   body: Record<string, unknown>,
   partial: false,
   options?: { defaultCurrency?: string },
-): QuoteCreate
-export function validateQuoteBody(
+): InvoiceCreate
+export function validateInvoiceBody(
   body: Record<string, unknown>,
   partial: true,
   options?: { defaultCurrency?: string },
-): QuoteUpdate
-export function validateQuoteBody(
+): InvoiceUpdate
+export function validateInvoiceBody(
   body: Record<string, unknown>,
   partial: boolean,
   options: { defaultCurrency?: string } = {},
-): QuoteCreate | QuoteUpdate {
+): InvoiceCreate | InvoiceUpdate {
   const fields: Record<string, string> = {}
-  const output: QuoteUpdate = {}
+  const output: InvoiceUpdate = {}
   const defaultCurrency = options.defaultCurrency ?? 'GBP'
 
   for (const key of Object.keys(body)) {
     if (!HEADER_WRITABLE.has(key)) fields[key] = 'Field is not writable'
   }
 
-  if (!partial || 'title' in body) {
-    const value = body.title
-    if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > 160) {
-      fields.title = 'Must be a string between 1 and 160 characters'
+  if (!partial || 'client_id' in body) {
+    const value = body.client_id
+    if (value === null || typeof value !== 'string') {
+      fields.client_id = 'Must be a UUID'
     } else {
-      output.title = value.trim()
+      try {
+        output.client_id = parseUuid(value, 'client_id')
+      } catch {
+        fields.client_id = 'Must be a UUID'
+      }
     }
   }
 
-  for (const field of ['client_id', 'lead_id', 'contact_id', 'owner_membership_id'] as const) {
+  for (const field of ['contact_id', 'owner_membership_id'] as const) {
     if (!(field in body)) continue
     const value = body[field]
     if (value === null) {
@@ -351,14 +334,23 @@ export function validateQuoteBody(
     }
   }
 
-  if ('valid_until' in body) {
-    const value = body.valid_until
-    if (value === null) {
-      output.valid_until = null
-    } else if (typeof value !== 'string' || !isValidDateOnly(value)) {
-      fields.valid_until = 'Must be a YYYY-MM-DD date or null'
+  if ('due_on' in body) {
+    const value = body.due_on
+    if (typeof value !== 'string' || !isValidDateOnly(value)) {
+      fields.due_on = 'Must be a YYYY-MM-DD date'
     } else {
-      output.valid_until = value
+      output.due_on = value
+    }
+  }
+
+  if ('purchase_order_number' in body) {
+    const value = body.purchase_order_number
+    if (value !== null && typeof value !== 'string') {
+      fields.purchase_order_number = 'Must be a string or null'
+    } else if (typeof value === 'string' && value.trim().length > 200) {
+      fields.purchase_order_number = 'Must not exceed 200 characters'
+    } else {
+      output.purchase_order_number = typeof value === 'string' ? value.trim() || null : null
     }
   }
 
@@ -371,10 +363,10 @@ export function validateQuoteBody(
     }
   }
 
-  for (const field of ['terms', 'notes', 'internal_notes'] as const) {
+  for (const field of ['payment_terms', 'notes', 'internal_notes'] as const) {
     if (!(field in body)) continue
     const value = body[field]
-    const limit = field === 'terms' ? 20_000 : 20_000
+    const limit = 20_000
     if (value !== null && typeof value !== 'string') {
       fields[field] = 'Must be a string or null'
     } else if (typeof value === 'string' && value.trim().length > limit) {
@@ -384,7 +376,7 @@ export function validateQuoteBody(
     }
   }
 
-  let lines: QuoteLineInput[] | undefined
+  let lines: InvoiceLineInput[] | undefined
   if ('lines' in body) {
     try {
       lines = validateLines(body.lines)
@@ -398,36 +390,26 @@ export function validateQuoteBody(
     output.lines = lines
   }
 
-  if (!partial) {
-    const clientId = output.client_id
-    const leadId = output.lead_id
-    if (clientId == null && leadId == null) {
-      fields.client_id = 'Provide client_id or lead_id'
-      fields.lead_id = 'Provide client_id or lead_id'
-    }
-  } else if ('client_id' in body || 'lead_id' in body) {
-    // Cross-field check deferred to RPC when only one side is patched.
-  }
-
   if (Object.keys(fields).length > 0) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Quote validation failed', fields)
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice validation failed', fields)
   }
 
   if (!partial) {
     return {
-      title: output.title as string,
+      client_id: output.client_id as string,
       currency: output.currency as string,
       lines: output.lines ?? [],
-      ...(output.client_id !== undefined ? { client_id: output.client_id } : {}),
-      ...(output.lead_id !== undefined ? { lead_id: output.lead_id } : {}),
       ...(output.contact_id !== undefined ? { contact_id: output.contact_id } : {}),
       ...(output.owner_membership_id !== undefined
         ? { owner_membership_id: output.owner_membership_id }
         : {}),
       ...(output.issue_on !== undefined ? { issue_on: output.issue_on } : {}),
-      ...(output.valid_until !== undefined ? { valid_until: output.valid_until } : {}),
+      ...(output.due_on !== undefined ? { due_on: output.due_on } : {}),
+      ...(output.purchase_order_number !== undefined
+        ? { purchase_order_number: output.purchase_order_number }
+        : {}),
       ...(output.discount_cents !== undefined ? { discount_cents: output.discount_cents } : {}),
-      ...(output.terms !== undefined ? { terms: output.terms } : {}),
+      ...(output.payment_terms !== undefined ? { payment_terms: output.payment_terms } : {}),
       ...(output.notes !== undefined ? { notes: output.notes } : {}),
       ...(output.internal_notes !== undefined ? { internal_notes: output.internal_notes } : {}),
     }
@@ -442,19 +424,29 @@ export function validateQuoteBody(
   return output
 }
 
-function encodeCursor(row: QuoteCursor): string {
+function validateVoidBody(body: Record<string, unknown>): string {
+  const value = body.void_reason
+  if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > 2000) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice void validation failed', {
+      void_reason: 'Must be a string between 1 and 2000 characters',
+    })
+  }
+  return value.trim()
+}
+
+function encodeCursor(row: InvoiceCursor): string {
   return btoa(JSON.stringify({ created_at: row.created_at, id: row.id }))
     .replaceAll('+', '-')
     .replaceAll('/', '_')
     .replace(/=+$/, '')
 }
 
-export function decodeQuoteCursor(value: string): QuoteCursor {
+export function decodeInvoiceCursor(value: string): InvoiceCursor {
   try {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
     const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
     const padding = '='.repeat((4 - (base64.length % 4)) % 4)
-    const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<QuoteCursor>
+    const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<InvoiceCursor>
     const createdAt = cursor.created_at
     const id = parseUuid(cursor.id ?? null, 'cursor')
     if (typeof createdAt !== 'string' || !isStrictIsoTimestamp(createdAt)) {
@@ -468,23 +460,12 @@ export function decodeQuoteCursor(value: string): QuoteCursor {
   }
 }
 
-/** Validate optional `status` list filter against the quotes.status check enum. */
-export function parseQuoteListStatus(value: string | null): QuoteStatus | null {
-  if (value === null) return null
-  if (!QUOTE_STATUSES.includes(value as QuoteStatus)) {
-    throw new ApiError(400, 'BAD_REQUEST', 'status is not supported', {
-      status: 'Must be one of draft, sent, accepted, rejected, expired, void',
-    })
-  }
-  return value as QuoteStatus
-}
-
 function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.message?.toLowerCase().includes('version conflict')) {
-    return new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
+    return new ApiError(412, 'PRECONDITION_FAILED', 'Invoice version does not match If-Match')
   }
   if (error.code === '23505') {
-    return new ApiError(409, 'CONFLICT', 'The quote conflicts with an existing record')
+    return new ApiError(409, 'CONFLICT', 'The invoice conflicts with an existing record')
   }
   if (
     error.code === '23503' ||
@@ -495,38 +476,38 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
     return new ApiError(
       422,
       'VALIDATION_ERROR',
-      error.message || 'The quote failed a database constraint',
+      error.message || 'The invoice failed a database constraint',
     )
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
   }
   if (error.code === 'P0002') {
-    return new ApiError(404, 'NOT_FOUND', 'Quote not found')
+    return new ApiError(404, 'NOT_FOUND', error.message || 'Invoice not found')
   }
-  console.error('Quote database operation failed', {
+  console.error('Invoice database operation failed', {
     request_id: requestId,
     code: error.code,
     message: error.message,
   })
-  return new ApiError(500, 'INTERNAL_ERROR', 'Quote operation failed')
+  return new ApiError(500, 'INTERNAL_ERROR', 'Invoice operation failed')
 }
 
-function asQuoteDocument(data: Json): QuoteDocument {
+function asInvoiceDocument(data: Json): InvoiceDocument {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an unexpected payload')
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice RPC returned an unexpected payload')
   }
-  const payload = data as { quote?: QuoteRow; lines?: QuoteLineRow[] }
-  if (!payload.quote) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an incomplete payload')
+  const payload = data as { invoice?: InvoiceRow; lines?: InvoiceLineRow[] }
+  if (!payload.invoice) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice RPC returned an incomplete payload')
   }
   return {
-    ...payload.quote,
+    ...payload.invoice,
     lines: Array.isArray(payload.lines) ? payload.lines : [],
   }
 }
 
-function toRpcPayload(input: QuoteHeaderInput): Record<string, unknown> {
+function toRpcPayload(input: InvoiceHeaderInput): Record<string, unknown> {
   const payload: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(input)) {
     if (key === 'lines') continue
@@ -535,7 +516,7 @@ function toRpcPayload(input: QuoteHeaderInput): Record<string, unknown> {
   return payload
 }
 
-async function listQuotes(
+async function listInvoices(
   req: Request,
   db: DatabaseClient,
   orgId: string,
@@ -543,20 +524,25 @@ async function listQuotes(
 ): Promise<Response> {
   const url = new URL(req.url)
   const limit = parseLimit(url.searchParams.get('limit'))
-  const status = parseQuoteListStatus(url.searchParams.get('status'))
+  const status = url.searchParams.get('status')
+  if (status !== null && !INVOICE_STATUSES.includes(status as InvoiceStatus)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'status is not supported', {
+      status: 'Must be one of draft, sent, partial, paid, void',
+    })
+  }
   const cursorValue = url.searchParams.get('cursor')
-  const cursor = cursorValue ? decodeQuoteCursor(cursorValue) : null
+  const cursor = cursorValue ? decodeInvoiceCursor(cursorValue) : null
 
   let query = db
-    .from('quotes')
-    .select(QUOTE_SELECT)
+    .from('invoices')
+    .select(INVOICE_SELECT)
     .eq('org_id', orgId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1)
 
-  if (status) query = query.eq('status', status)
+  if (status) query = query.eq('status', status as InvoiceStatus)
   if (cursor) {
     query = query.or(
       `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
@@ -585,7 +571,7 @@ async function listQuotes(
   )
 }
 
-async function createQuote(
+async function createInvoice(
   req: Request,
   db: DatabaseClient,
   orgId: string,
@@ -601,74 +587,74 @@ async function createQuote(
   if (!organisation) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
 
   const body = await jsonBody(req)
-  const validated = validateQuoteBody(body, false, {
+  const validated = validateInvoiceBody(body, false, {
     defaultCurrency: organisation.default_currency,
   })
   const { lines, ...header } = validated
 
-  const { data, error } = await db.rpc('create_quote_draft', {
+  const { data, error } = await db.rpc('create_invoice_draft', {
     p_org_id: orgId,
     p_payload: toRpcPayload(header) as Json,
     p_lines: lines as unknown as Json,
   })
 
   if (error) throw databaseError(error, requestId)
-  const document = asQuoteDocument(data)
+  const document = asInvoiceDocument(data)
 
   return jsonResponse({ data: document }, 201, requestId, {
     etag: etag(document.version),
-    location: `/api/v1/quotes/${document.id}`,
+    location: `/api/v1/invoices/${document.id}`,
   })
 }
 
-async function findQuoteDocument(
+async function findInvoiceDocument(
   db: DatabaseClient,
   orgId: string,
-  quoteId: string,
+  invoiceId: string,
   requestId: string,
-): Promise<QuoteDocument> {
+): Promise<InvoiceDocument> {
   // Single transactional RPC: FOR SHARE on the header, then lines, so a concurrent
   // save cannot return a stale ETag with replaced lines.
-  const { data, error } = await db.rpc('get_quote_document', {
-    p_quote_id: quoteId,
+  const { data, error } = await db.rpc('get_invoice_document', {
+    p_invoice_id: invoiceId,
     p_org_id: orgId,
   })
 
   if (error) throw databaseError(error, requestId)
-  return asQuoteDocument(data)
+  return asInvoiceDocument(data)
 }
 
-async function getQuote(
+async function getInvoice(
   db: DatabaseClient,
   orgId: string,
-  quoteId: string,
+  invoiceId: string,
   requestId: string,
 ): Promise<Response> {
-  const data = await findQuoteDocument(db, orgId, quoteId, requestId)
+  const data = await findInvoiceDocument(db, orgId, invoiceId, requestId)
   return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
 }
 
-async function updateQuote(
+async function updateInvoice(
   req: Request,
   db: DatabaseClient,
   orgId: string,
-  quoteId: string,
+  invoiceId: string,
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findQuoteDocument(db, orgId, quoteId, requestId)
+  const current = await findInvoiceDocument(db, orgId, invoiceId, requestId)
   if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Invoice version does not match If-Match')
   }
   if (current.status !== 'draft') {
-    throw new ApiError(409, 'CONFLICT', 'Only draft quotes can be edited in this release')
+    throw new ApiError(409, 'CONFLICT', 'Only draft invoices can be edited in this release')
   }
 
-  const validated = validateQuoteBody(await jsonBody(req), true)
+  const validated = validateInvoiceBody(await jsonBody(req), true)
   const { lines, ...header } = validated
 
-  const { data, error } = await db.rpc('save_quote_draft', {
-    p_quote_id: quoteId,
+  const { data, error } = await db.rpc('save_invoice_draft', {
+    p_invoice_id: invoiceId,
     p_org_id: orgId,
     p_expected_version: version,
     p_payload: toRpcPayload(header) as Json,
@@ -676,28 +662,28 @@ async function updateQuote(
   })
 
   if (error) throw databaseError(error, requestId)
-  const document = asQuoteDocument(data)
+  const document = asInvoiceDocument(data)
 
   return jsonResponse({ data: document }, 200, requestId, {
     etag: etag(document.version),
   })
 }
 
-async function deleteQuote(
+async function deleteInvoice(
   req: Request,
   db: DatabaseClient,
   orgId: string,
-  quoteId: string,
+  invoiceId: string,
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findQuoteDocument(db, orgId, quoteId, requestId)
+  const current = await findInvoiceDocument(db, orgId, invoiceId, requestId)
   if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Invoice version does not match If-Match')
   }
 
-  const { error } = await db.rpc('soft_delete_quote_draft', {
-    p_quote_id: quoteId,
+  const { error } = await db.rpc('soft_delete_invoice_draft', {
+    p_invoice_id: invoiceId,
     p_org_id: orgId,
     p_expected_version: version,
   })
@@ -710,95 +696,135 @@ async function deleteQuote(
   })
 }
 
-async function acceptQuoteRoute(
+async function sendInvoiceRoute(
   req: Request,
   db: DatabaseClient,
   orgId: string,
-  quoteId: string,
+  invoiceId: string,
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
 
-  const { data, error } = await db.rpc('accept_quote', {
-    p_quote_id: quoteId,
+  const { data, error } = await db.rpc('send_invoice', {
+    p_invoice_id: invoiceId,
     p_org_id: orgId,
     p_expected_version: version,
   })
 
-  if (error) {
-    if (error.message?.toLowerCase().includes('version conflict')) {
-      throw new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
-    }
-    if (error.code === 'P0002') {
-      throw new ApiError(404, 'NOT_FOUND', error.message || 'Quote not found')
-    }
-    if (error.code === '42501') {
-      throw new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
-    }
-    if (
-      error.code === '22023' ||
-      error.code === '23503' ||
-      error.code === '23514'
-    ) {
-      throw new ApiError(
-        422,
-        'VALIDATION_ERROR',
-        error.message || 'The quote failed a database constraint',
-      )
-    }
-    console.error('Quote accept failed', {
-      request_id: requestId,
-      code: error.code,
-      message: error.message,
-    })
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote accept failed')
-  }
-
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an unexpected payload')
-  }
-  const payload = data as { quote?: QuoteRow; lines?: QuoteLineRow[] }
-  if (!payload.quote) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an incomplete payload')
-  }
-  const document = {
-    ...payload.quote,
-    lines: Array.isArray(payload.lines) ? payload.lines : [],
-  }
+  if (error) throw databaseError(error, requestId)
+  const document = asInvoiceDocument(data)
 
   return jsonResponse({ data: document }, 200, requestId, {
     etag: etag(document.version),
   })
 }
 
-export function handleQuotes(
+async function voidInvoiceRoute(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  invoiceId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const voidReason = validateVoidBody(await jsonBody(req))
+
+  const { data, error } = await db.rpc('void_invoice', {
+    p_invoice_id: invoiceId,
+    p_org_id: orgId,
+    p_expected_version: version,
+    p_void_reason: voidReason,
+  })
+
+  if (error) throw databaseError(error, requestId)
+  const document = asInvoiceDocument(data)
+
+  return jsonResponse({ data: document }, 200, requestId, {
+    etag: etag(document.version),
+  })
+}
+
+/** Primary contract: POST /api/v1/invoices/from-quote with `{ quote_id }`. */
+export async function createInvoiceFromQuoteRoute(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+  quoteIdFromPath?: string,
+): Promise<Response> {
+  if (req.method !== 'POST') {
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote conversion')
+  }
+
+  let quoteId = quoteIdFromPath
+  if (!quoteId) {
+    const body = await jsonBody(req)
+    if (!('quote_id' in body) || typeof body.quote_id !== 'string') {
+      throw new ApiError(400, 'BAD_REQUEST', 'quote_id is required', {
+        quote_id: 'Must be a UUID',
+      })
+    }
+    quoteId = parseUuid(body.quote_id, 'quote_id')
+  }
+
+  const { data, error } = await db.rpc('create_invoice_from_quote', {
+    p_quote_id: quoteId,
+    p_org_id: orgId,
+  })
+
+  if (error) throw databaseError(error, requestId)
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice RPC returned an unexpected payload')
+  }
+  const created = (data as { created?: boolean }).created !== false
+  const document = asInvoiceDocument(data as Json)
+
+  return jsonResponse({ data: document }, created ? 201 : 200, requestId, {
+    etag: etag(document.version),
+    location: `/api/v1/invoices/${document.id}`,
+  })
+}
+
+export function handleInvoices(
   req: Request,
   db: DatabaseClient,
   path: string,
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  if (path === '/api/v1/quotes') {
-    if (req.method === 'GET') return listQuotes(req, db, orgId, requestId)
-    if (req.method === 'POST') return createQuote(req, db, orgId, requestId)
-    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quotes')
+  if (path === '/api/v1/invoices') {
+    if (req.method === 'GET') return listInvoices(req, db, orgId, requestId)
+    if (req.method === 'POST') return createInvoice(req, db, orgId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoices')
+  }
+
+  if (path === '/api/v1/invoices/from-quote') {
+    if (req.method === 'POST') {
+      return createInvoiceFromQuoteRoute(req, db, orgId, requestId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice from-quote')
   }
 
   const itemMatch = path.match(
-    /^\/api\/v1\/quotes\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/(accept))?$/i,
+    /^\/api\/v1\/invoices\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/(send|void))?$/i,
   )
   if (!itemMatch) throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 
-  const quoteId = itemMatch[1]
+  const invoiceId = itemMatch[1]
   const action = itemMatch[2]
 
-  if (action === 'accept') {
-    if (req.method === 'POST') return acceptQuoteRoute(req, db, orgId, quoteId, requestId)
-    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote accept')
+  if (action === 'send') {
+    if (req.method === 'POST') return sendInvoiceRoute(req, db, orgId, invoiceId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice send')
   }
 
-  if (req.method === 'GET') return getQuote(db, orgId, quoteId, requestId)
-  if (req.method === 'PATCH') return updateQuote(req, db, orgId, quoteId, requestId)
-  if (req.method === 'DELETE') return deleteQuote(req, db, orgId, quoteId, requestId)
-  throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote')
+  if (action === 'void') {
+    if (req.method === 'POST') return voidInvoiceRoute(req, db, orgId, invoiceId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice void')
+  }
+
+  if (req.method === 'GET') return getInvoice(db, orgId, invoiceId, requestId)
+  if (req.method === 'PATCH') return updateInvoice(req, db, orgId, invoiceId, requestId)
+  if (req.method === 'DELETE') return deleteInvoice(req, db, orgId, invoiceId, requestId)
+  throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice')
 }
