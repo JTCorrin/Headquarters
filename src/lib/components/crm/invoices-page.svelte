@@ -176,13 +176,30 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [listed, clients, contacts, quotes] = await Promise.all([
+			const [listed, clients, contacts] = await Promise.all([
 				api.invoices.list({ limit: 50 }),
 				api.clients.list({ limit: 100 }),
-				api.contacts.list({ limit: 100 }),
-				api.quotes.list({ limit: 50 })
+				api.contacts.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
+
+			const acceptedQuotes: InvoiceQuoteOption[] = [];
+			let quoteCursor: string | undefined;
+			do {
+				const page = await api.quotes.list({
+					status: 'accepted',
+					limit: 50,
+					cursor: quoteCursor
+				});
+				if (isStale(epoch)) return;
+				acceptedQuotes.push(
+					...page.data.map((q) => ({
+						id: q.id,
+						label: `${q.number} · ${q.title}`
+					}))
+				);
+				quoteCursor = page.meta?.next_cursor ?? undefined;
+			} while (quoteCursor);
 
 			rows = listed.data.map(toInvoiceListItem);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
@@ -191,12 +208,7 @@
 				label: c.display_name || c.primary_email || c.id,
 				clientId: c.client_id ?? null
 			}));
-			quoteOptions = quotes.data
-				.filter((q) => q.status === 'accepted')
-				.map((q) => ({
-					id: q.id,
-					label: `${q.number} · ${q.title}`
-				}));
+			quoteOptions = acceptedQuotes;
 			if (clientOptions[0] && get(invoiceForm.form).clientId.startsWith('00000000')) {
 				invoiceForm.form.update((current) => ({
 					...current,

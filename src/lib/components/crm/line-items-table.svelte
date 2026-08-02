@@ -18,9 +18,18 @@
 		taxRatePercent?: number;
 	}
 
+	export interface LineItemsMoneyTotals {
+		subtotalCents: number;
+		discountCents: number;
+		taxCents: number;
+		totalCents: number;
+	}
+
 	export interface LineItemsTableProps {
 		rows: LineItemRow[];
 		currency?: string;
+		/** Server-authoritative totals; preferred over client-side qty×unit. */
+		totals?: LineItemsMoneyTotals | null;
 		onRemove?: (id: string) => void;
 		/** Custom header control (e.g. Add line item drawer trigger). */
 		headerActions?: Snippet;
@@ -30,17 +39,34 @@
 	let {
 		rows,
 		currency = 'GBP',
+		totals = null,
 		onRemove,
 		headerActions,
 		class: className
 	}: LineItemsTableProps = $props();
 
-	const subtotal = $derived(
-		rows.reduce((sum, row) => {
-			const qty = Number(row.qty) || 0;
-			const unit = Number(row.unitPrice) || 0;
-			return sum + qty * unit;
-		}, 0)
+	function formatMajor(cents: number): string {
+		return (cents / 100).toLocaleString(undefined, {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
+	}
+
+	const displayTotal = $derived(
+		totals
+			? formatMajor(totals.totalCents)
+			: rows
+					.reduce((sum, row) => {
+						const parsed = Number(row.total);
+						if (!Number.isNaN(parsed)) return sum + parsed;
+						const qty = Number(row.qty) || 0;
+						const unit = Number(row.unitPrice) || 0;
+						return sum + qty * unit;
+					}, 0)
+					.toLocaleString(undefined, {
+						minimumFractionDigits: 2,
+						maximumFractionDigits: 2
+					})
 	);
 </script>
 
@@ -56,13 +82,23 @@
 			<p class="text-muted-foreground text-xs">{rows.length} line(s)</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-3">
-			<p class="text-sm font-medium tabular-nums">
-				{currency}
-				{subtotal.toLocaleString(undefined, {
-					minimumFractionDigits: 2,
-					maximumFractionDigits: 2
-				})}
-			</p>
+			<div class="text-end">
+				<p class="text-sm font-medium tabular-nums" data-testid="line-items-total">
+					{currency}
+					{displayTotal}
+				</p>
+				{#if totals && (totals.discountCents > 0 || totals.taxCents > 0)}
+					<p class="text-muted-foreground text-xs tabular-nums" data-testid="line-items-total-detail">
+						Sub {formatMajor(totals.subtotalCents)}
+						{#if totals.discountCents > 0}
+							· Disc −{formatMajor(totals.discountCents)}
+						{/if}
+						{#if totals.taxCents > 0}
+							· Tax {formatMajor(totals.taxCents)}
+						{/if}
+					</p>
+				{/if}
+			</div>
 			{#if headerActions}
 				{@render headerActions()}
 			{:else}
