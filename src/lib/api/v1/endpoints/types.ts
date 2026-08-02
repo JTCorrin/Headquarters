@@ -66,6 +66,10 @@ import type {
 	ApiTaxRateCreateBody,
 	ApiTaxRateListParams,
 	ApiTaxRatePatchBody,
+	ApiTask,
+	ApiTaskCreateBody,
+	ApiTaskListParams,
+	ApiTaskUpdateBody,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
 	ApiMailboxTestResult,
@@ -263,6 +267,19 @@ export interface LeadsEndpoints {
 		body?: ApiLeadConvertBody,
 		signal?: AbortSignal
 	): Promise<ApiLeadConvertResult>;
+}
+
+export interface TasksEndpoints {
+	list(params?: ApiTaskListParams, signal?: AbortSignal): Promise<ApiResult<ApiTask[]>>;
+	create(body: ApiTaskCreateBody, signal?: AbortSignal): Promise<ApiTask>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiTask>>;
+	update(
+		id: string,
+		body: ApiTaskUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiTask>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 }
 
 export interface DocumentsEndpoints {
