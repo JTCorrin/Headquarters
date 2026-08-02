@@ -92,7 +92,12 @@
 			if (error.isNetworkError) return 'Network error — check your connection and retry.';
 			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
 			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
+				if (error.fields) {
+					const keyed = Object.entries(error.fields)
+						.map(([field, message]) => `${field}: ${message}`)
+						.join(' · ');
+					return keyed || error.message;
+				}
 				return error.message;
 			}
 			return error.message || fallback;
