@@ -37,6 +37,8 @@
 		clientOptions?: InvoiceClientOption[];
 		contactOptions?: InvoiceContactOption[];
 		isDraft?: boolean;
+		/** Unsaved header/line edits — Send stays disabled until saved. */
+		isDirty?: boolean;
 		actionPending?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
@@ -64,6 +66,7 @@
 		clientOptions = [],
 		contactOptions = [],
 		isDraft = true,
+		isDirty = false,
 		actionPending = false,
 		onRemoveLine,
 		onAddLine,
@@ -169,7 +172,14 @@
 						>
 							Void
 						</Button>
-						<Button size="sm" disabled={actionPending} onclick={() => onSend?.()}>Send</Button>
+						<Button
+							size="sm"
+							disabled={actionPending || isDirty}
+							title={isDirty ? 'Save your changes before sending' : undefined}
+							onclick={() => onSend?.()}
+						>
+							Send
+						</Button>
 					{:else if status.toLowerCase() === 'sent'}
 						<Button
 							variant="outline"
@@ -229,6 +239,11 @@
 						class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<h2 class="text-sm font-semibold tracking-tight">Invoice details</h2>
+						{#if isDraft && isDirty}
+							<p class="text-muted-foreground text-xs" data-testid="invoice-dirty-hint">
+								Unsaved changes — save before sending.
+							</p>
+						{/if}
 						<InvoiceForm
 							form={invoiceForm}
 							submitLabel="Save details"

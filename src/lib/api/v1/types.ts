@@ -368,10 +368,6 @@ export type ApiInvoiceUpdateBody = ApiInvoiceWritableFields & {
 	lines?: ApiInvoiceLineInput[];
 };
 
-export interface ApiInvoiceFromQuoteBody {
-	quote_id: string;
-}
-
 export interface ApiInvoiceVoidBody {
 	void_reason: string;
 }
@@ -379,8 +375,8 @@ export interface ApiInvoiceVoidBody {
 export interface ApiInvoiceListParams {
 	limit?: number;
 	cursor?: string;
-	/** This release only supports draft listing when set. */
-	status?: 'draft';
+	/** Optional user-selected status filter; omit to list all statuses. */
+	status?: ApiInvoiceStatus;
 }
 
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
@@ -522,6 +518,8 @@ export interface ApiContact {
 	primary_phone: string | null;
 	job_title: string | null;
 	company_name: string | null;
+	/** Resolved primary client via `client_contacts` (read model). */
+	client_id: string | null;
 	owner_membership_id: string | null;
 	lifecycle_status: ApiContactLifecycleStatus;
 	source: string | null;

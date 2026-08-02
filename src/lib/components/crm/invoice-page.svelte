@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { get } from 'svelte/store';
+	import { fromStore, get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		invoiceStatusLabel,
+		lineItemRowsToInvoiceLineInputs,
 		membershipFromCreateResult,
 		toInvoiceFormData,
 		toInvoiceLineInput,
@@ -13,7 +14,7 @@
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiInvoiceDocument, ApiInvoiceLineInput } from '$lib/api/v1/types.js';
+	import type { ApiInvoiceDocument } from '$lib/api/v1/types.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -22,7 +23,8 @@
 	import {
 		invoiceFormSchema,
 		type InvoiceClientOption,
-		type InvoiceContactOption
+		type InvoiceContactOption,
+		type InvoiceFormData
 	} from '$lib/schemas/invoice.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -57,6 +59,7 @@
 	let clientOptions = $state<InvoiceClientOption[]>([]);
 	let contactOptions = $state<InvoiceContactOption[]>([]);
 	let lines = $state<LineItemRow[]>([]);
+	let savedFingerprint = $state('');
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -98,6 +101,8 @@
 		}
 	);
 
+	const formSnapshot = fromStore(invoiceForm.form);
+
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
@@ -105,6 +110,31 @@
 	const navGroups = $derived(appNavGroups('Invoices'));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const isDraft = $derived(invoice?.status === 'draft');
+
+	function fingerprintFrom(form: InvoiceFormData, rowLines: LineItemRow[]) {
+		return JSON.stringify({
+			clientId: form.clientId,
+			contactId: form.contactId,
+			currency: form.currency,
+			issueOn: form.issueOn,
+			dueOn: form.dueOn,
+			purchaseOrderNumber: form.purchaseOrderNumber,
+			lines: rowLines.map((line) => ({
+				id: line.id,
+				productId: line.productId ?? null,
+				description: line.description,
+				qty: line.qty,
+				unitPrice: line.unitPrice,
+				discountPercent: line.discountPercent,
+				taxRatePercent: line.taxRatePercent
+			}))
+		});
+	}
+
+	const isDirty = $derived.by(() => {
+		if (!invoice || invoice.status !== 'draft' || !savedFingerprint) return false;
+		return fingerprintFrom(formSnapshot.current, lines) !== savedFingerprint;
+	});
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
@@ -162,6 +192,7 @@
 		lines = [];
 		clientOptions = [];
 		contactOptions = [];
+		savedFingerprint = '';
 		viewState = { kind: 'loading' };
 	}
 
@@ -169,33 +200,23 @@
 		return document.lines.map((line) => ({
 			id: line.id,
 			productSku: line.sku_snapshot ?? undefined,
+			productId: line.product_id,
 			description: line.description,
 			qty: String(line.quantity),
 			unitPrice: centsToAmountString(line.unit_price_cents) || '0',
-			total: centsToAmountString(line.total_cents) || '0'
+			total: centsToAmountString(line.total_cents) || '0',
+			discountPercent: line.discount_percent,
+			taxRatePercent: line.tax_rate_percent
 		}));
 	}
 
 	function applyDocument(document: ApiInvoiceDocument) {
 		invoice = document;
-		invoiceForm.form.set(toInvoiceFormData(document));
-		lines = mapLines(document);
-	}
-
-	function documentLineInputs(nextLines: LineItemRow[]): ApiInvoiceLineInput[] {
-		return nextLines.map((line, index) => {
-			const qty = line.qty;
-			const unitPrice = line.unitPrice;
-			return toInvoiceLineInput(
-				{
-					productId: '',
-					description: line.description,
-					qty,
-					unitPrice
-				},
-				index
-			);
-		});
+		const formData = toInvoiceFormData(document);
+		invoiceForm.form.set(formData);
+		const mapped = mapLines(document);
+		lines = mapped;
+		savedFingerprint = fingerprintFrom(formData, mapped);
 	}
 
 	async function loadAll() {
@@ -229,7 +250,7 @@
 			contactOptions = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
-				clientId: null
+				clientId: c.client_id ?? null
 			}));
 			viewState = { kind: 'ready' };
 		} catch (error) {
@@ -258,7 +279,7 @@
 				invoice.id,
 				{
 					...toInvoiceUpdateBody(get(invoiceForm.form)),
-					lines: documentLineInputs(lines)
+					lines: lineItemRowsToInvoiceLineInputs(lines)
 				},
 				invoice.version
 			);
@@ -288,7 +309,10 @@
 		if (!invoice || invoice.status !== 'draft') return false;
 		const epoch = captureEpoch();
 		const draftLine = get(lineForm.form);
-		const nextInputs = [...documentLineInputs(lines), toInvoiceLineInput(draftLine, lines.length)];
+		const nextInputs = [
+			...lineItemRowsToInvoiceLineInputs(lines),
+			toInvoiceLineInput(draftLine, lines.length)
+		];
 		try {
 			const updated = await api.invoices.update(
 				invoice.id,
@@ -326,7 +350,7 @@
 		try {
 			const updated = await api.invoices.update(
 				invoice.id,
-				{ lines: documentLineInputs(next) },
+				{ lines: lineItemRowsToInvoiceLineInputs(next) },
 				invoice.version
 			);
 			if (isStale(epoch)) return;
@@ -379,7 +403,14 @@
 	}
 
 	async function onSend() {
-		if (!invoice) return;
+		if (!invoice || invoice.status !== 'draft') return;
+		if (isDirty) {
+			viewState = {
+				kind: 'validation',
+				message: 'Save your changes before sending this invoice.'
+			};
+			return;
+		}
 		const version = invoice.version;
 		await runLifecycle(
 			() => api.invoices.send(invoice!.id, version),
@@ -487,6 +518,7 @@
 						{clientOptions}
 						{contactOptions}
 						{isDraft}
+						{isDirty}
 						{actionPending}
 						bind:lines
 						bind:lineDrawerOpen

@@ -8,10 +8,14 @@
 	export interface LineItemRow {
 		id: string;
 		productSku?: string;
+		/** Server product link — must round-trip on line replacement. */
+		productId?: string | null;
 		description: string;
 		qty: string;
 		unitPrice: string;
 		total: string;
+		discountPercent?: number;
+		taxRatePercent?: number;
 	}
 
 	export interface LineItemsTableProps {
