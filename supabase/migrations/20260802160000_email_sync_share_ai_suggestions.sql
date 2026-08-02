@@ -492,7 +492,8 @@ begin
     where email_threads.id = thread_row.id;
   end if;
 
-  -- Exact-address match against contact/lead/client primary_email (from or to).
+  -- Exact-address match (from or to): contacts + clients on primary_email;
+  -- leads via linked contact.primary_email (leads have no email column).
   for match_address in
     select distinct lower(addr) as addr
     from (
@@ -520,9 +521,14 @@ begin
     )
     select p_org_id, message_row.id, 'lead', l.id, 'address_match'
     from public.leads l
+    join public.contacts c
+      on c.org_id = l.org_id
+     and c.id = l.contact_id
     where l.org_id = p_org_id
       and l.deleted_at is null
-      and l.primary_email = match_address
+      and l.contact_id is not null
+      and c.deleted_at is null
+      and c.primary_email = match_address
     on conflict do nothing;
 
     insert into public.email_message_links (
