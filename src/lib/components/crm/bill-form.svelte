@@ -64,7 +64,8 @@
 	const statusLabel = $derived(
 		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Status'
 	);
-	const useVendorPicker = $derived(vendorOptions.length > 0);
+	/** Live pages pass onCreateVendor — keep picker even with zero vendors so bootstrap works. */
+	const useVendorPicker = $derived(Boolean(onCreateVendor) || vendorOptions.length > 0);
 
 	$effect(() => {
 		const selected = vendorOptions.find((o) => o.id === $formData.vendorId);
