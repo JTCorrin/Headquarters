@@ -26,7 +26,9 @@ export function createPaymentsEndpoints(request: ApiRequestFn): PaymentsEndpoint
 					direction: params.direction,
 					client_id: params.client_id,
 					vendor_id: params.vendor_id,
-					status: params.status
+					status: params.status,
+					invoice_id: params.invoice_id,
+					bill_id: params.bill_id
 				},
 				signal
 			});

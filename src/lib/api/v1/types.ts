@@ -1427,4 +1427,8 @@ export interface ApiPaymentListParams {
 	client_id?: string;
 	vendor_id?: string;
 	status?: ApiPaymentStatus;
+	/** Via payment_allocations join — mutually exclusive with bill_id. */
+	invoice_id?: string;
+	/** Via payment_allocations join — mutually exclusive with invoice_id. */
+	bill_id?: string;
 }
