@@ -411,7 +411,7 @@ declare
   mailbox public.mailbox_accounts;
   thread_row public.email_threads;
   message_row public.email_messages;
-  match_address citext;
+  match_address extensions.citext;
 begin
   select * into mailbox
   from public.mailbox_accounts
