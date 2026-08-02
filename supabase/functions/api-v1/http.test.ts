@@ -21,6 +21,8 @@ import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
+import { validateBillBody } from './bills.ts'
+import { validateVendorBody } from './vendors.ts'
 import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -774,6 +776,45 @@ Deno.test('invoice void_reason is required for the /void action body', () => {
         },
         false,
       ),
+    ApiError,
+  )
+})
+
+Deno.test('bill create validation requires vendor_id and number', () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  const body = validateBillBody(
+    {
+      vendor_id: id,
+      number: 'V-1',
+      currency: 'gbp',
+      lines: [{ description: 'Paper', quantity: 1, unit_price_cents: 100, position: 0 }],
+    },
+    false,
+  )
+  assertEquals(body.currency, 'GBP')
+  assertEquals(body.vendor_id, id)
+  assertEquals(body.number, 'V-1')
+  assertThrows(() => validateBillBody({ number: 'V-1' }, false), ApiError)
+  assertThrows(
+    () => validateBillBody({ vendor_id: id, total_cents: 1 }, false),
+    ApiError,
+  )
+})
+
+Deno.test('vendor create validation defaults status and rejects unknown fields', () => {
+  const body = validateVendorBody(
+    { name: 'Acme Vendor', primary_email: 'vendor@example.test' },
+    false,
+  )
+  assertEquals(body.status, 'active')
+  assertEquals(body.name, 'Acme Vendor')
+  assertEquals(body.primary_email, 'vendor@example.test')
+  assertThrows(
+    () => validateVendorBody({ name: 'X', bank_details_encrypted: 'secret' }, false),
+    ApiError,
+  )
+  assertThrows(
+    () => validateVendorBody({ name: 'X', primary_email: 'not-an-email' }, false),
     ApiError,
   )
 })
