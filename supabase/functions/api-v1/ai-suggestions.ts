@@ -25,6 +25,7 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
   console.error('AI suggestion operation failed', {
     request_id: requestId,
     code: error.code ?? 'unknown',
+    message: error.message ?? 'unknown',
   })
   return new ApiError(500, 'INTERNAL_ERROR', 'The AI suggestion operation failed')
 }
@@ -74,18 +75,6 @@ export function validateDecideBody(
   return { accepted_text: accepted }
 }
 
-function localDraft(subject: string, from: string, body: string, variant: string): string {
-  const tone = variant === 'firm'
-    ? 'Thanks for your note — please confirm the next step by end of week.'
-    : variant === 'warm'
-    ? 'Thanks so much for getting in touch — happy to help.'
-    : 'Thanks for your email — I will follow up shortly.'
-  const snippet = body.trim().slice(0, 120).replace(/\s+/g, ' ')
-  return `${tone}\n\nRe: ${subject || '(no subject)'}\n(From ${from}${
-    snippet ? `; ref: “${snippet}…”` : ''
-  })\n`
-}
-
 async function generateEmailReply(
   req: Request,
   db: DatabaseClient,
@@ -108,35 +97,13 @@ async function generateEmailReply(
     throw new ApiError(409, 'CONFLICT', 'No active AI integration is connected')
   }
 
-  // Prefer owner mailbox message fields via PostgREST select (RLS owner/share).
-  const { data: message, error: messageError } = await db
-    .from('email_messages')
-    .select('id,subject,from_address,body_text,preview_text')
-    .eq('org_id', orgId)
-    .eq('id', payload.email_message_id)
-    .is('deleted_at', null)
-    .maybeSingle()
-  if (messageError) throw databaseError(messageError, requestId)
-  if (!message) throw new ApiError(404, 'NOT_FOUND', 'Email message not found')
-
   const provider = String(active.provider ?? 'openrouter')
-  const row = message as {
-    subject: string | null
-    from_address: string | null
-    body_text: string | null
-    preview_text: string | null
-  }
-  const output = localDraft(
-    row.subject ?? '',
-    row.from_address ?? '',
-    row.body_text ?? row.preview_text ?? '',
-    payload.variant,
-  )
-
+  // Empty p_output_text → RPC synthesizes the draft from the message row
+  // (avoids PostgREST .from('email_messages') on staging after migration-up).
   const { data, error } = await db.rpc('create_email_reply_suggestion', {
     p_org_id: orgId,
     p_message_id: payload.email_message_id,
-    p_output_text: output,
+    p_output_text: '',
     p_model_provider: provider,
     p_model_name: 'wave-b-local-draft',
     p_variant: payload.variant,
