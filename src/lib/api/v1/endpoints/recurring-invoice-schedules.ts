@@ -7,6 +7,7 @@ import type {
 	ApiRecurringInvoicePreviewResult,
 	ApiRecurringInvoiceRun,
 	ApiRecurringInvoiceRunDocument,
+	ApiRecurringInvoiceRunNowResult,
 	ApiRecurringInvoiceSchedule,
 	ApiRecurringInvoiceUpdateBody
 } from '../types.js';
@@ -166,7 +167,7 @@ export function createRecurringInvoiceSchedulesEndpoints(
 			return data;
 		},
 		runNow: async (id, version, signal) => {
-			const { data } = await request<ApiRecurringInvoiceRunDocument>(
+			const { data } = await request<ApiRecurringInvoiceRunNowResult>(
 				`/api/v1/recurring-invoice-schedules/${id}/run-now`,
 				{
 					method: 'POST',

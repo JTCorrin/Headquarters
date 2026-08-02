@@ -213,9 +213,19 @@
 	}
 
 	async function loadRuns(epoch: RequestEpoch) {
-		const listed = await api.recurringInvoiceSchedules.listRuns(scheduleId, { limit: 50 });
+		// Runs do not embed invoice_id — link via invoices.recurring_run_id (BE contract).
+		const [listed, invoices] = await Promise.all([
+			api.recurringInvoiceSchedules.listRuns(scheduleId, { limit: 50 }),
+			api.invoices.list({ limit: 100 })
+		]);
 		if (isStale(epoch)) return;
-		runs = listed.data.map(toRecurringInvoiceRunListItem);
+		const invoiceByRunId = new Map<string, { id: string; number: string }>();
+		for (const inv of invoices.data) {
+			if (inv.recurring_run_id) {
+				invoiceByRunId.set(inv.recurring_run_id, { id: inv.id, number: inv.number });
+			}
+		}
+		runs = listed.data.map((run) => toRecurringInvoiceRunListItem(run, invoiceByRunId));
 	}
 
 	async function loadAll() {
@@ -321,10 +331,11 @@
 		try {
 			await api.recurringInvoiceSchedules.runNow(scheduleId, schedule.version);
 			if (isStale(epoch)) return;
-			await loadRuns(epoch);
+			// run-now returns { run, invoice, schedule }; reload document + join invoices for links
 			const refreshed = await api.recurringInvoiceSchedules.get(scheduleId);
 			if (isStale(epoch)) return;
 			applyDocument(refreshed.data);
+			await loadRuns(epoch);
 		} catch (error) {
 			if (isStale(epoch)) return;
 			actionError = userMessage(error, 'Run now failed.');
