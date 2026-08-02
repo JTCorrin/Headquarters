@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
 	import { getOrgSession } from '$lib/org/index.js';
-	import QuotePage from '$lib/components/crm/quote-page.svelte';
+	import ProductsPage from '$lib/components/crm/products-page.svelte';
 
 	const api = getApiV1Client();
 	const session = getOrgSession();
 	const auth = getAuthSession();
-	const quoteId = $derived(page.params.id ?? '');
 
 	async function handleLogout() {
 		await auth.signOut();
@@ -19,20 +17,14 @@
 	}
 </script>
 
-{#if quoteId}
-	<QuotePage
-		{api}
-		{session}
-		{quoteId}
-		onMissingOrg={() => {
-			void goto('/select-org');
-		}}
-		onSwitchNavigate={() => {
-			void goto('/quotes');
-		}}
-		onConverted={(invoiceId) => {
-			void goto(`/invoices/${invoiceId}`);
-		}}
-		onLogout={handleLogout}
-	/>
-{/if}
+<ProductsPage
+	{api}
+	{session}
+	onMissingOrg={() => {
+		void goto('/select-org');
+	}}
+	onSwitchNavigate={() => {
+		// Stay on products; page reloads via cacheGeneration.
+	}}
+	onLogout={handleLogout}
+/>

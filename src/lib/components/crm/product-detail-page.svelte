@@ -28,6 +28,9 @@
 		inventoryFields?: InfoCardField[];
 		usage?: ProductUsageRow[];
 		stats?: { label: string; value: string; hint?: string }[];
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
+		onEdit?: () => void;
 		class?: string;
 	}
 
@@ -42,12 +45,22 @@
 		inventoryFields = [],
 		usage = [],
 		stats = [],
+		showNav = true,
+		onEdit,
 		class: className
 	}: ProductDetailPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -58,8 +71,7 @@
 				{status}
 			>
 				{#snippet actions()}
-					<Button variant="outline" size="sm">Duplicate</Button>
-					<Button size="sm">Edit</Button>
+					<Button size="sm" type="button" onclick={() => onEdit?.()}>Edit</Button>
 				{/snippet}
 			</PageHeader>
 

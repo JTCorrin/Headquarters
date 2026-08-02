@@ -29,10 +29,14 @@
 		lines?: LineItemRow[];
 		timelineEvents?: TimelineEvent[];
 		lineDrawerOpen?: boolean;
+		canEditLines?: boolean;
+		canAccept?: boolean;
+		canConvert?: boolean;
+		actionPending?: boolean;
 		onRemoveLine?: (id: string) => void;
-		onSend?: () => void;
-		onChase?: () => void;
-		onConvert?: () => void;
+		onAddLine?: () => boolean | void | Promise<boolean | void>;
+		onAccept?: () => void | Promise<void>;
+		onConvert?: () => void | Promise<void>;
 		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
 		clientOptions?: import('$lib/schemas/quote.js').QuoteClientOption[];
 		/** When false, omit AppNav (shell already renders it at full window height). */
@@ -51,9 +55,13 @@
 		lines = $bindable<LineItemRow[]>([]),
 		timelineEvents = $bindable<TimelineEvent[]>([]),
 		lineDrawerOpen = $bindable(false),
+		canEditLines = true,
+		canAccept = false,
+		canConvert = false,
+		actionPending = false,
 		onRemoveLine,
-		onSend,
-		onChase,
+		onAddLine,
+		onAccept,
 		onConvert,
 		onSaveQuote,
 		clientOptions = [],
@@ -112,9 +120,28 @@
 				description="Edit on the left — the PDF preview updates live on the right."
 			>
 				{#snippet actions()}
-					<Button variant="outline" size="sm" onclick={() => onSend?.()}>Send</Button>
-					<Button variant="outline" size="sm" onclick={() => onChase?.()}>Chase</Button>
-					<Button size="sm" onclick={() => onConvert?.()}>Convert to invoice</Button>
+					{#if canAccept}
+						<Button
+							size="sm"
+							type="button"
+							disabled={actionPending}
+							data-testid="quote-accept"
+							onclick={() => void onAccept?.()}
+						>
+							Accept
+						</Button>
+					{/if}
+					{#if canConvert}
+						<Button
+							size="sm"
+							type="button"
+							disabled={actionPending}
+							data-testid="quote-convert"
+							onclick={() => void onConvert?.()}
+						>
+							Convert to invoice
+						</Button>
+					{/if}
 				{/snippet}
 			</PageHeader>
 
@@ -132,16 +159,27 @@
 						/>
 					</section>
 
-					<LineItemsTable rows={lines} onRemove={onRemoveLine} class="self-start">
+					<LineItemsTable
+						rows={lines}
+						onRemove={canEditLines ? onRemoveLine : undefined}
+						class="self-start"
+					>
 						{#snippet headerActions()}
-							<LineItemFormDrawer bind:open={lineDrawerOpen} form={lineForm} {products}>
-								{#snippet trigger()}
-									<Button type="button" size="sm">
-										<PlusIcon class="size-3.5" />
-										Add line item
-									</Button>
-								{/snippet}
-							</LineItemFormDrawer>
+							{#if canEditLines}
+								<LineItemFormDrawer
+									bind:open={lineDrawerOpen}
+									form={lineForm}
+									{products}
+									onValidSubmit={onAddLine}
+								>
+									{#snippet trigger()}
+										<Button type="button" size="sm">
+											<PlusIcon class="size-3.5" />
+											Add line item
+										</Button>
+									{/snippet}
+								</LineItemFormDrawer>
+							{/if}
 						{/snippet}
 					</LineItemsTable>
 

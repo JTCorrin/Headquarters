@@ -4,6 +4,7 @@ import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import ProductSkuLink from './product-sku-link.svelte';
 
 export interface ProductRow {
 	id: string;
@@ -43,7 +44,11 @@ export const productColumns: ColumnDef<ProductRow>[] = [
 				label: 'SKU',
 				onclick: column.getToggleSortingHandler()
 			}),
-		cell: ({ row }) => row.getValue('sku')
+		cell: ({ row }) =>
+			renderComponent(ProductSkuLink, {
+				id: row.original.id,
+				sku: row.original.sku
+			})
 	},
 	{
 		accessorKey: 'name',

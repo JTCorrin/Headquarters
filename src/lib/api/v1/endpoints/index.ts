@@ -5,6 +5,7 @@ export { createInvoicesEndpoints } from './invoices.js';
 export { createLeadsEndpoints } from './leads.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
+export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
 export { createTaxRatesEndpoints } from './tax-rates.js';
@@ -16,6 +17,7 @@ export type {
 	LeadsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
+	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
 	TaxRatesEndpoints
