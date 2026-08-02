@@ -319,7 +319,6 @@ declare
   local_today date;
   cand date;
   ts timestamptz;
-  i integer;
   month_start date;
   y integer;
   m integer;
@@ -1444,8 +1443,8 @@ declare
   tax_rate numeric(7, 4);
   amounts record;
   product_row public.products;
-  tax_row public.tax_rates;
   line_product_id uuid;
+  product_tax numeric(7, 4);
 begin
   if actor_id is null then
     raise exception 'Authentication is required' using errcode = '42501';
@@ -1531,9 +1530,9 @@ begin
         if line_item ? 'tax_rate_percent' and line_item ->> 'tax_rate_percent' is not null then
           tax_rate := (line_item ->> 'tax_rate_percent')::numeric;
         elsif product_row.tax_rate_id is not null then
-          select rate_percent into tax_rate from public.tax_rates
+          select rate_percent into product_tax from public.tax_rates
           where id = product_row.tax_rate_id and org_id = p_org_id and deleted_at is null and active;
-          tax_rate := coalesce(tax_rate, 0);
+          tax_rate := coalesce(product_tax, 0);
         else
           tax_rate := 0;
         end if;
@@ -1703,7 +1702,7 @@ security definer
 set search_path = ''
 as $$
 declare
-  actor_id uuid := auth.uid();
+  v_actor_id uuid := auth.uid();
   schedule_row public.recurring_invoice_schedules;
   run_row public.recurring_invoice_runs;
   v_existing public.api_idempotency_keys;
@@ -1718,7 +1717,7 @@ declare
   response_body jsonb;
   lines_snapshot jsonb;
 begin
-  if actor_id is null then
+  if v_actor_id is null then
     raise exception 'Authentication is required' using errcode = '42501';
   end if;
   if p_org_id is null
@@ -1738,10 +1737,10 @@ begin
   loop
     select * into v_existing
     from public.api_idempotency_keys
-    where org_id = p_org_id
-      and actor_type = 'user'
-      and actor_id = actor_id
-      and idempotency_key_hash = p_idempotency_key_hash
+    where api_idempotency_keys.org_id = p_org_id
+      and api_idempotency_keys.actor_type = 'user'
+      and api_idempotency_keys.actor_id = v_actor_id
+      and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash
     for update;
 
     if found then
@@ -1769,7 +1768,7 @@ begin
       insert into public.api_idempotency_keys (
         org_id, actor_type, actor_id, idempotency_key_hash, route, request_hash, expires_at
       ) values (
-        p_org_id, 'user', actor_id, p_idempotency_key_hash, p_route, p_request_hash, v_expires_at
+        p_org_id, 'user', v_actor_id, p_idempotency_key_hash, p_route, p_request_hash, v_expires_at
       );
       exit;
     exception
@@ -1847,13 +1846,13 @@ begin
     p_org_id, schedule_row.id, null, occurrence_key,
     now(), local_date, schedule_row.timezone,
     schedule_row.rule_version, config_snapshot, period_start, period_end,
-    'manual', 'processing', 1, now(), now(), 'run-now:' || actor_id::text,
+    'manual', 'processing', 1, now(), now(), 'run-now:' || v_actor_id::text,
     null, null
   )
   returning * into run_row;
 
   invoice_doc := private.generate_invoice_from_recurring_run(
-    p_org_id, schedule_row, run_row, actor_id
+    p_org_id, schedule_row, run_row, v_actor_id
   );
 
   update public.recurring_invoice_runs
@@ -1866,7 +1865,7 @@ begin
 
   -- Do not advance next_run_at or scheduled_occurrence_count for manual runs.
   update public.recurring_invoice_schedules
-  set last_run_at = now(), updated_by = actor_id
+  set last_run_at = now(), updated_by = v_actor_id
   where id = schedule_row.id;
 
   response_headers := jsonb_build_object(
@@ -1891,10 +1890,10 @@ begin
     response_body = response_body,
     resource_type = 'recurring_invoice_run',
     resource_id = run_row.id
-  where org_id = p_org_id
-    and actor_type = 'user'
-    and actor_id = actor_id
-    and idempotency_key_hash = p_idempotency_key_hash;
+  where api_idempotency_keys.org_id = p_org_id
+    and api_idempotency_keys.actor_type = 'user'
+    and api_idempotency_keys.actor_id = v_actor_id
+    and api_idempotency_keys.idempotency_key_hash = p_idempotency_key_hash;
 
   return jsonb_build_object(
     'replay', false,
