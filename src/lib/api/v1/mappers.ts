@@ -21,6 +21,12 @@ import type {
 	InvoiceFormData,
 	InvoiceListItem
 } from '$lib/schemas/invoice.js';
+import type {
+	RecurringInvoiceFormData,
+	RecurringInvoiceListItem,
+	RecurringInvoiceRunListItem,
+	RecurringLineFormData
+} from '$lib/schemas/recurring-invoice.js';
 import type { BillFormData, BillListItem } from '$lib/schemas/bill.js';
 import type { VendorFormData } from '$lib/schemas/vendor.js';
 import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
@@ -77,6 +83,12 @@ import type {
 	ApiQuoteDocument,
 	ApiQuoteLineInput,
 	ApiQuoteUpdateBody,
+	ApiRecurringInvoiceCreateBody,
+	ApiRecurringInvoiceDocument,
+	ApiRecurringInvoiceLineInput,
+	ApiRecurringInvoiceRun,
+	ApiRecurringInvoiceSchedule,
+	ApiRecurringInvoiceUpdateBody,
 	ApiTaxRate,
 	ApiTaxRateCreateBody,
 	ApiTask,
@@ -1190,5 +1202,283 @@ export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
 		body: row.body_text || '',
 		occurredAt: occurred ? new Date(occurred).toLocaleString() : '',
 		unread: row.unread
+	};
+}
+
+export function recurringInvoiceStatusLabel(
+	status: ApiRecurringInvoiceSchedule['status']
+): string {
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function recurringInvoiceFrequencyLabel(
+	frequency: ApiRecurringInvoiceSchedule['frequency'],
+	intervalCount: number
+): string {
+	const base =
+		frequency === 'daily'
+			? 'Daily'
+			: frequency === 'weekly'
+				? 'Weekly'
+				: frequency === 'monthly'
+					? 'Monthly'
+					: 'Yearly';
+	if (intervalCount <= 1) return base;
+	return `Every ${intervalCount} ${frequency === 'daily' ? 'days' : frequency === 'weekly' ? 'weeks' : frequency === 'monthly' ? 'months' : 'years'}`;
+}
+
+function formatNextRunAt(value: string | null | undefined): string {
+	if (!value) return '—';
+	try {
+		return new Date(value).toLocaleString(undefined, {
+			dateStyle: 'medium',
+			timeStyle: 'short'
+		});
+	} catch {
+		return value;
+	}
+}
+
+export function toRecurringInvoiceListItem(
+	schedule: ApiRecurringInvoiceSchedule,
+	clientNameFallback = ''
+): RecurringInvoiceListItem {
+	return {
+		id: schedule.id,
+		name: schedule.name,
+		client: (schedule.client_name ?? clientNameFallback) || '—',
+		status: recurringInvoiceStatusLabel(schedule.status),
+		frequency: recurringInvoiceFrequencyLabel(schedule.frequency, schedule.interval_count),
+		nextRunAt: formatNextRunAt(schedule.next_run_at),
+		deliveryMode: schedule.delivery_mode === 'auto_send' ? 'Auto-send' : 'Draft',
+		version: schedule.version
+	};
+}
+
+export function emptyRecurringInvoiceFormData(): RecurringInvoiceFormData {
+	const today = new Date().toISOString().slice(0, 10);
+	return {
+		name: '',
+		clientId: '00000000-0000-4000-8000-000000000000',
+		clientName: '',
+		contactId: '',
+		currency: 'GBP',
+		frequency: 'monthly',
+		intervalCount: 1,
+		anchorOn: today,
+		weekday: '1',
+		dayOfMonth: 1,
+		monthOfYear: 1,
+		monthEndPolicy: 'clamp',
+		timezone: 'Europe/London',
+		localRunTime: '09:00',
+		startOn: today,
+		endOn: '',
+		maxOccurrences: '',
+		dueDays: 14,
+		deliveryMode: 'draft',
+		pricingMode: 'fixed',
+		catchUpPolicy: 'latest',
+		maxCatchUpRuns: 1,
+		purchaseOrderNumber: '',
+		paymentTerms: '',
+		notes: '',
+		internalNotes: '',
+		status: 'draft'
+	};
+}
+
+export function toRecurringInvoiceFormData(
+	document: ApiRecurringInvoiceSchedule | ApiRecurringInvoiceDocument,
+	clientNameFallback = ''
+): RecurringInvoiceFormData {
+	const currency =
+		document.currency === 'USD' || document.currency === 'EUR' || document.currency === 'GBP'
+			? document.currency
+			: 'GBP';
+	return {
+		name: document.name,
+		clientId: document.client_id,
+		clientName: document.client_name ?? clientNameFallback,
+		contactId: document.contact_id ?? '',
+		currency,
+		frequency: document.frequency,
+		intervalCount: document.interval_count,
+		anchorOn: document.anchor_on,
+		weekday: document.weekdays?.[0] != null ? String(document.weekdays[0]) : '1',
+		dayOfMonth: document.day_of_month,
+		monthOfYear: document.month_of_year,
+		monthEndPolicy: document.month_end_policy,
+		timezone: document.timezone,
+		localRunTime: document.local_run_time.slice(0, 5),
+		startOn: document.start_on,
+		endOn: document.end_on ?? '',
+		maxOccurrences:
+			document.max_occurrences != null ? String(document.max_occurrences) : '',
+		dueDays: document.due_days,
+		deliveryMode: document.delivery_mode,
+		pricingMode: document.pricing_mode,
+		catchUpPolicy: document.catch_up_policy,
+		maxCatchUpRuns: document.max_catch_up_runs,
+		purchaseOrderNumber: document.purchase_order_number ?? '',
+		paymentTerms: document.payment_terms ?? '',
+		notes: document.notes ?? '',
+		internalNotes: document.internal_notes ?? '',
+		status: document.status
+	};
+}
+
+function recurringFrequencyFields(data: RecurringInvoiceFormData): Pick<
+	ApiRecurringInvoiceCreateBody,
+	'weekdays' | 'day_of_month' | 'month_of_year'
+> {
+	if (data.frequency === 'weekly') {
+		const day = Number(data.weekday) || 1;
+		return { weekdays: [day], day_of_month: null, month_of_year: null };
+	}
+	if (data.frequency === 'monthly') {
+		return {
+			weekdays: null,
+			day_of_month: data.dayOfMonth ?? 1,
+			month_of_year: null
+		};
+	}
+	if (data.frequency === 'yearly') {
+		return {
+			weekdays: null,
+			day_of_month: data.dayOfMonth ?? 1,
+			month_of_year: data.monthOfYear ?? 1
+		};
+	}
+	return { weekdays: null, day_of_month: null, month_of_year: null };
+}
+
+function normalizeLocalRunTime(value: string): string {
+	const trimmed = value.trim();
+	if (/^\d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`;
+	return trimmed;
+}
+
+function recurringWritableFields(
+	data: RecurringInvoiceFormData
+): Omit<ApiRecurringInvoiceCreateBody, 'lines'> {
+	const maxOcc = data.maxOccurrences?.trim();
+	return {
+		name: data.name.trim(),
+		client_id: data.clientId,
+		contact_id: data.contactId?.trim() ? data.contactId.trim() : null,
+		currency: data.currency,
+		frequency: data.frequency,
+		interval_count: data.intervalCount,
+		anchor_on: data.anchorOn,
+		...recurringFrequencyFields(data),
+		month_end_policy: data.monthEndPolicy,
+		timezone: data.timezone.trim(),
+		local_run_time: normalizeLocalRunTime(data.localRunTime),
+		start_on: data.startOn,
+		end_on: data.endOn?.trim() ? data.endOn.trim() : null,
+		max_occurrences: maxOcc ? Number(maxOcc) : null,
+		due_days: data.dueDays,
+		delivery_mode: data.deliveryMode,
+		pricing_mode: data.pricingMode,
+		catch_up_policy: data.catchUpPolicy,
+		max_catch_up_runs: data.maxCatchUpRuns,
+		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		payment_terms: data.paymentTerms?.trim() || null,
+		notes: data.notes?.trim() || null,
+		internal_notes: data.internalNotes?.trim() || null
+	};
+}
+
+export interface RecurringLineRow {
+	id: string;
+	productId?: string | null;
+	productSku?: string;
+	descriptionTemplate: string;
+	qty: string;
+	unitPrice: string;
+	taxRatePercent: string;
+}
+
+export function toRecurringLineFormData(row: RecurringLineRow): RecurringLineFormData {
+	return {
+		productId: row.productId ?? '',
+		descriptionTemplate: row.descriptionTemplate,
+		qty: row.qty,
+		unitPrice: row.unitPrice,
+		taxRatePercent: row.taxRatePercent
+	};
+}
+
+export function recurringLineRowsFromDocument(
+	document: ApiRecurringInvoiceDocument
+): RecurringLineRow[] {
+	return document.lines.map((line) => ({
+		id: line.id,
+		productId: line.product_id,
+		productSku: line.sku_snapshot ?? undefined,
+		descriptionTemplate: line.description_template,
+		qty: String(line.quantity),
+		unitPrice: centsToAmountString(line.unit_price_cents) || '0',
+		taxRatePercent: String(line.tax_rate_percent ?? 0)
+	}));
+}
+
+export function toRecurringLineInput(
+	data: RecurringLineFormData,
+	position?: number
+): ApiRecurringInvoiceLineInput {
+	const unitCents = amountStringToCents(data.unitPrice);
+	if (unitCents == null) throw new Error('Invalid unit price');
+	const tax = data.taxRatePercent?.trim();
+	const input: ApiRecurringInvoiceLineInput = {
+		description_template: data.descriptionTemplate.trim(),
+		quantity: data.qty,
+		unit_price_cents: unitCents,
+		discount_percent: '0',
+		tax_rate_percent: tax ? tax : '0',
+		position
+	};
+	const productId = data.productId?.trim();
+	if (productId) input.product_id = productId;
+	return input;
+}
+
+export function recurringLineRowsToInputs(rows: RecurringLineRow[]): ApiRecurringInvoiceLineInput[] {
+	return rows.map((row, index) =>
+		toRecurringLineInput(toRecurringLineFormData(row), index + 1)
+	);
+}
+
+export function toRecurringInvoiceCreateBody(
+	data: RecurringInvoiceFormData,
+	lines: RecurringLineRow[]
+): ApiRecurringInvoiceCreateBody {
+	return {
+		...recurringWritableFields(data),
+		lines: recurringLineRowsToInputs(lines)
+	};
+}
+
+export function toRecurringInvoiceUpdateBody(
+	data: RecurringInvoiceFormData,
+	lines: RecurringLineRow[]
+): ApiRecurringInvoiceUpdateBody {
+	return {
+		...recurringWritableFields(data),
+		lines: recurringLineRowsToInputs(lines)
+	};
+}
+
+export function toRecurringInvoiceRunListItem(run: ApiRecurringInvoiceRun): RecurringInvoiceRunListItem {
+	return {
+		id: run.id,
+		scheduledFor: formatNextRunAt(run.scheduled_for),
+		trigger: run.trigger.replace('_', ' '),
+		status: run.status.replace(/_/g, ' '),
+		periodStart: run.period_start,
+		periodEnd: run.period_end,
+		invoiceId: run.invoice_id ?? null,
+		invoiceNumber: run.invoice_number ?? null
 	};
 }

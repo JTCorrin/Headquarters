@@ -81,7 +81,17 @@ import type {
 	ApiEmailMessage,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
-	ApiEntityEmailType
+	ApiEntityEmailType,
+	ApiRecurringInvoiceCreateBody,
+	ApiRecurringInvoiceDocument,
+	ApiRecurringInvoiceListParams,
+	ApiRecurringInvoicePreviewBody,
+	ApiRecurringInvoicePreviewResult,
+	ApiRecurringInvoiceRun,
+	ApiRecurringInvoiceRunDocument,
+	ApiRecurringInvoiceRunListParams,
+	ApiRecurringInvoiceSchedule,
+	ApiRecurringInvoiceUpdateBody
 } from '../types.js';
 
 export interface OrganisationsEndpoints {
@@ -280,6 +290,64 @@ export interface TasksEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiTask>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface RecurringInvoiceSchedulesEndpoints {
+	list(
+		params?: ApiRecurringInvoiceListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiRecurringInvoiceSchedule[]>>;
+	create(
+		body: ApiRecurringInvoiceCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceDocument>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiRecurringInvoiceDocument>>;
+	update(
+		id: string,
+		body: ApiRecurringInvoiceUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceDocument>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	preview(
+		body: ApiRecurringInvoicePreviewBody,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoicePreviewResult>;
+	listRuns(
+		id: string,
+		params?: ApiRecurringInvoiceRunListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiRecurringInvoiceRun[]>>;
+	getRun(
+		scheduleId: string,
+		runId: string,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiRecurringInvoiceRunDocument>>;
+	activate(
+		id: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceDocument>;
+	pause(
+		id: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceDocument>;
+	resume(
+		id: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceDocument>;
+	cancel(
+		id: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceDocument>;
+	runNow(
+		id: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceRunDocument>;
 }
 
 export interface DocumentsEndpoints {
