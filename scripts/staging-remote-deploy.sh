@@ -303,6 +303,17 @@ else
 	log "recurring invoices curl proof script missing — skipped"
 fi
 
+# Payments foundation: inbound/outbound allocate + reverse + list doc filters.
+if [[ -x scripts/payments_staging_curl_proof.sh ]]; then
+	log "running payments foundation curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/payments_staging_curl_proof.sh
+else
+	log "payments curl proof script missing — skipped"
+fi
+
 # Product → quote line → accept → from-quote (product_id + SKU/price/tax snapshots).
 if [[ -x scripts/product_quote_invoice_staging_curl_proof.sh ]]; then
 	log "running product→quote→invoice convert curl proof"
