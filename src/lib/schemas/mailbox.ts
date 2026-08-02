@@ -51,6 +51,11 @@ export const mailboxFormSchema = z.object({
 
 export type MailboxFormData = z.infer<typeof mailboxFormSchema>;
 
+export interface MailboxTestFeedback {
+	ok: boolean;
+	message: string;
+}
+
 export interface MailboxAccountResource {
 	id: string;
 	email_address: string;
