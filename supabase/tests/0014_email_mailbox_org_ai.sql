@@ -1,6 +1,6 @@
 begin;
 
-select plan(28);
+select plan(30);
 
 select has_table('private', 'integration_secrets', 'private.integration_secrets exists');
 select has_table('private', 'encryption_keys', 'private.encryption_keys exists');
