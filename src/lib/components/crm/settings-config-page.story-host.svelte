@@ -52,7 +52,7 @@
 		configuration = null,
 		taxRates = [],
 		mailboxAccount = null,
-		includeMailbox = true,
+		includeMailbox = false,
 		viewState = { kind: 'ready' },
 		failTaxSave = false,
 		rejectTaxSave = false,
