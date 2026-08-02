@@ -2,15 +2,22 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		aiSuggestionText,
+		roleFromMemberships,
 		contactLifecycleLabel,
 		membershipFromCreateResult,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiContact } from '$lib/api/v1/types.js';
+	import {
+		emptyEntityEmailTabState,
+		loadEntityEmailTab,
+		type EntityEmailTabState
+	} from '$lib/crm/entity-email-tab.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -39,6 +46,8 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let contact = $state<ApiContact | null>(null);
+	let emailTab = $state<EntityEmailTabState>(emptyEntityEmailTabState());
+	let sharingId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -47,7 +56,11 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Contacts'));
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Contacts', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	const contactFields = $derived.by((): InfoCardField[] => {
@@ -115,6 +128,8 @@
 
 	function resetOrgScopedState() {
 		contact = null;
+		emailTab = emptyEntityEmailTabState();
+		sharingId = null;
 		viewState = { kind: 'loading' };
 	}
 
@@ -142,9 +157,14 @@
 
 			contact = result.data;
 			viewState = { kind: 'ready' };
+
+			const tab = await loadEntityEmailTab(api, 'contact', contactId);
+			if (isStale(epoch)) return;
+			emailTab = tab;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			contact = null;
+			emailTab = emptyEntityEmailTabState();
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Contact not found.' };
 				return;
@@ -158,6 +178,32 @@
 				message: userMessage(error, 'Could not load contact.')
 			};
 		}
+	}
+
+	async function onAddToTimeline(payload: { messageId: string }) {
+		sharingId = payload.messageId;
+		try {
+			await api.emailMessages.share(payload.messageId);
+			emailTab = await loadEntityEmailTab(api, 'contact', contactId);
+		} finally {
+			sharingId = null;
+		}
+	}
+
+	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+		const suggestion = await api.emailMessages.generateDraft({
+			email_message_id: payload.messageId,
+			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onUseSuggestion(payload: { suggestionId?: string; text: string }) {
+		if (payload.suggestionId) await api.emailMessages.useDraft(payload.suggestionId, payload.text);
+	}
+
+	async function onDiscardSuggestion(payload: { suggestionId?: string }) {
+		if (payload.suggestionId) await api.emailMessages.discardDraft(payload.suggestionId);
 	}
 
 	function onSwitchOrg(orgId: string) {
@@ -224,6 +270,17 @@
 							: (contact.job_title ?? undefined)}
 						{contactFields}
 						{companyFields}
+						emailMessages={emailTab.messages}
+						emailEmptyState={emailTab.emptyState}
+						mailboxConnected={emailTab.mailboxConnected}
+						aiProviderConnected={emailTab.aiProviderConnected}
+						smtpReady={emailTab.smtpReady}
+						{role}
+						{sharingId}
+						{onAddToTimeline}
+						{onDraftResponse}
+						{onUseSuggestion}
+						{onDiscardSuggestion}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>

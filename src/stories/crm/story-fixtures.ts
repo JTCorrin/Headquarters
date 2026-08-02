@@ -6,8 +6,23 @@ import type {
 } from '$lib/components/crm/entity-documents.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
-export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
+export function navGroupsWithActive(
+	activeLabel: string,
+	role: 'owner' | 'admin' | 'member' | 'billing' | 'readonly' = 'owner'
+): AppNavGroup[] {
 	const mark = (label: string) => label === activeLabel;
+	const organisationItems = [
+		...(role === 'owner'
+			? [
+					{ label: 'Config', href: '/org/config', active: mark('Config') },
+					{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') }
+				]
+			: []),
+		...(role !== 'billing'
+			? [{ label: 'My settings', href: '/settings', active: mark('My settings') }]
+			: []),
+		{ label: 'Switch organisation', href: '/select-org', active: mark('Switch organisation') }
+	];
 	return [
 		{
 			items: [
@@ -45,11 +60,7 @@ export function navGroupsWithActive(activeLabel: string): AppNavGroup[] {
 		},
 		{
 			label: 'Organisation',
-			items: [
-				{ label: 'Config', href: '/org/config', active: mark('Config') },
-				{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') },
-				{ label: 'Switch organisation', href: '/select-org', active: mark('Switch organisation') }
-			]
+			items: organisationItems
 		}
 	];
 }

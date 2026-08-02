@@ -40,13 +40,14 @@ const taxRates: TaxRateResource[] = [
 ];
 
 describe('SettingsConfigPage', () => {
-	it('shows personal Mail section next to theme', async () => {
+	it('can still host personal Mail when mailboxForm is provided', async () => {
 		render(SettingsConfigPageTestHost, {
 			orgName: 'Corrin Data',
 			navGroups: navGroupsWithActive('Config'),
 			role: 'owner',
 			configuration,
-			taxRates
+			taxRates,
+			includeMailbox: true
 		});
 
 		await expect.element(page.getByTestId('personal-mail-section')).toBeInTheDocument();
@@ -54,6 +55,20 @@ describe('SettingsConfigPage', () => {
 			.element(page.getByText(/not the org Email sending/i))
 			.toBeInTheDocument();
 		await expect.element(page.getByTestId('profile-mailbox-form')).toBeInTheDocument();
+	});
+
+	it('omits personal Mail on Owner org Config when mailboxForm is absent', async () => {
+		render(SettingsConfigPageTestHost, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Config'),
+			role: 'owner',
+			configuration,
+			taxRates,
+			includeMailbox: false
+		});
+
+		expect(page.getByTestId('personal-mail-section').elements().length).toBe(0);
+		await expect.element(page.getByTestId('organisation-config-form')).toBeInTheDocument();
 	});
 
 	it('recovers from 412 conflict via reload', async () => {
@@ -81,7 +96,7 @@ describe('SettingsConfigPage', () => {
 		render(SettingsConfigPageTestHost, {
 			orgName: 'Corrin Data',
 			navGroups: navGroupsWithActive('Config'),
-			role: 'admin',
+			role: 'owner',
 			configuration,
 			taxRates,
 			onSetDefaultTaxRate
@@ -92,6 +107,20 @@ describe('SettingsConfigPage', () => {
 		await expect
 			.element(page.getByTestId('tax-rate-row-tax-2'))
 			.toHaveTextContent(/Default/i);
+	});
+
+	it('keeps tax mutation controls hidden for admin roles', async () => {
+		render(SettingsConfigPageTestHost, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Config'),
+			role: 'admin',
+			configuration,
+			taxRates
+		});
+
+		await expect.element(page.getByTestId('tax-rates-list')).toBeInTheDocument();
+		expect(page.getByTestId('tax-rate-add').elements().length).toBe(0);
+		expect(page.getByTestId('tax-rate-set-default-tax-2').elements().length).toBe(0);
 	});
 
 	it('keeps tax mutation controls hidden for readonly roles', async () => {

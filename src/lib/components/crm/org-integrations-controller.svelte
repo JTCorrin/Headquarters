@@ -13,7 +13,10 @@
 		type AiIntegrationResource,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
-	import type { MembershipRole } from '$lib/schemas/organisation.js';
+	import {
+		canAccessOrgConfigRoutes,
+		type MembershipRole
+	} from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import OrgIntegrationsPage from './org-integrations-page.svelte';
@@ -51,7 +54,7 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Integrations'));
+	const navGroups = $derived(appNavGroups('Integrations', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	interface RequestEpoch {
@@ -118,6 +121,16 @@
 				const rows = await api.organisations.list();
 				if (isStale(epoch)) return;
 				session.setMemberships(rows.map(toOrgMembershipSummary));
+			}
+
+			const currentRole = (roleFromMemberships(session.memberships, session.selectedOrgId) ??
+				'member') as MembershipRole;
+			if (!canAccessOrgConfigRoutes(currentRole)) {
+				viewState = {
+					kind: 'forbidden',
+					message: 'Organisation Integrations are available to Owners only.'
+				};
+				return;
 			}
 
 			const rows = await api.integrations.list();
@@ -239,18 +252,27 @@
 			{onSwitchOrg}
 			{onLogout}
 		>
-			<OrgIntegrationsPage
-				{orgName}
-				{navGroups}
-				{role}
-				{integrations}
-				{viewState}
-				{connectError}
-				onReload={loadAll}
-				{onConnect}
-				{onDisconnect}
-				showNav={false}
-			/>
+			{#if !canAccessOrgConfigRoutes(role)}
+				<div class="space-y-3 p-6" data-testid="org-integrations-forbidden">
+					<p class="text-destructive text-sm" role="alert">
+						Organisation Integrations are available to Owners only.
+					</p>
+					<a class="text-sm font-medium underline underline-offset-2" href="/settings">Open My settings</a>
+				</div>
+			{:else}
+				<OrgIntegrationsPage
+					{orgName}
+					{navGroups}
+					{role}
+					{integrations}
+					{viewState}
+					{connectError}
+					onReload={loadAll}
+					{onConnect}
+					{onDisconnect}
+					showNav={false}
+				/>
+			{/if}
 		</AppShell>
 	</div>
 {:else}

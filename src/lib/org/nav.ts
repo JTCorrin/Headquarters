@@ -1,7 +1,36 @@
 import type { AppNavGroup } from '$lib/components/crm/app-nav.svelte';
+import type { MembershipRole } from '$lib/schemas/organisation.js';
+import {
+	canAccessOrgConfigRoutes,
+	canAccessPersonalConfig
+} from '$lib/schemas/organisation.js';
 
-export function appNavGroups(activeLabel?: string): AppNavGroup[] {
+export function appNavGroups(
+	activeLabel?: string,
+	role: MembershipRole = 'owner'
+): AppNavGroup[] {
 	const mark = (label: string) => (activeLabel ? label === activeLabel : false);
+	const organisationItems: AppNavGroup['items'] = [];
+
+	if (canAccessOrgConfigRoutes(role)) {
+		organisationItems.push(
+			{ label: 'Config', href: '/org/config', active: mark('Config') },
+			{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') }
+		);
+	}
+	if (canAccessPersonalConfig(role)) {
+		organisationItems.push({
+			label: 'My settings',
+			href: '/settings',
+			active: mark('My settings')
+		});
+	}
+	organisationItems.push({
+		label: 'Switch organisation',
+		href: '/select-org',
+		active: mark('Switch organisation')
+	});
+
 	return [
 		{
 			items: [
@@ -39,11 +68,7 @@ export function appNavGroups(activeLabel?: string): AppNavGroup[] {
 		},
 		{
 			label: 'Organisation',
-			items: [
-				{ label: 'Config', href: '/org/config', active: mark('Config') },
-				{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') },
-				{ label: 'Switch organisation', href: '/select-org', active: mark('Switch organisation') }
-			]
+			items: organisationItems
 		}
 	];
 }
