@@ -874,6 +874,21 @@ async function previewSchedule(
   return jsonResponse({ data }, 200, requestId)
 }
 
+/** Idempotency request payload for lifecycle commands.
+ * run-now omits expected_version: If-Match is a first-exec precondition only.
+ * Retries may send a refreshed ETag after the schedule version bumps (e.g. last_run_at).
+ */
+export function recurringLifecycleIdempotencyPayload(
+  command: string,
+  scheduleId: string,
+  expectedVersion: number,
+): Record<string, unknown> {
+  if (command === 'run-now') {
+    return { schedule_id: scheduleId }
+  }
+  return { schedule_id: scheduleId, expected_version: expectedVersion }
+}
+
 async function lifecycleCommand(
   req: Request,
   db: DatabaseClient,
@@ -885,10 +900,10 @@ async function lifecycleCommand(
   const version = parseVersion(req)
   const rawKey = parseIdempotencyKey(req)
   const route = `/api/v1/recurring-invoice-schedules/${scheduleId}/${command}`
-  const requestHash = await hashIdempotencyRequest(route, {
-    schedule_id: scheduleId,
-    expected_version: version,
-  })
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    recurringLifecycleIdempotencyPayload(command, scheduleId, version),
+  )
   const keyHash = await sha256Hex(rawKey)
 
   if (command === 'run-now') {
