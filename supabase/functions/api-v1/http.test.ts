@@ -20,7 +20,12 @@ import {
 import { decodeProductCategoryCursor, validateProductCategoryBody } from './product-categories.ts'
 import { decodeProductCursor, validateAdjustStockBody, validateProductBody } from './products.ts'
 import { validateProfilePreferencesBody } from './profile-preferences.ts'
-import { assertJsonSafeLineMoney, decodeQuoteCursor, validateQuoteBody } from './quotes.ts'
+import {
+  assertJsonSafeLineMoney,
+  decodeQuoteCursor,
+  parseQuoteListStatus,
+  validateQuoteBody,
+} from './quotes.ts'
 import { validateTaxRateBody } from './tax-rates.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
@@ -609,6 +614,19 @@ Deno.test('quote create validation defaults currency and rejects calculated fiel
       ),
     ApiError,
   )
+})
+
+Deno.test('quote list status filter accepts the full quotes.status enum', () => {
+  assertEquals(parseQuoteListStatus(null), null)
+  assertEquals(parseQuoteListStatus('draft'), 'draft')
+  assertEquals(parseQuoteListStatus('sent'), 'sent')
+  assertEquals(parseQuoteListStatus('accepted'), 'accepted')
+  assertEquals(parseQuoteListStatus('rejected'), 'rejected')
+  assertEquals(parseQuoteListStatus('expired'), 'expired')
+  assertEquals(parseQuoteListStatus('void'), 'void')
+  assertThrows(() => parseQuoteListStatus('partial'), ApiError)
+  assertThrows(() => parseQuoteListStatus('Draft'), ApiError)
+  assertThrows(() => parseQuoteListStatus(''), ApiError)
 })
 
 Deno.test('quote line money rejects JSON-unsafe quantity × price products', () => {
