@@ -368,6 +368,10 @@ export type ApiInvoiceUpdateBody = ApiInvoiceWritableFields & {
 	lines?: ApiInvoiceLineInput[];
 };
 
+export interface ApiInvoiceFromQuoteBody {
+	quote_id: string;
+}
+
 export interface ApiInvoiceVoidBody {
 	void_reason: string;
 }

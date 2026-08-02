@@ -462,7 +462,7 @@ describe('createApiV1Client', () => {
 		await client.quotes.delete(QUOTE_ID, 2);
 	});
 
-	it('supports invoice draft CRUD, send/void, and quote create-invoice with ETag / If-Match', async () => {
+	it('supports invoice draft CRUD, send/void, and from-quote with ETag / If-Match', async () => {
 		const INVOICE_ID = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb';
 		const sampleInvoiceDocument = {
 			id: INVOICE_ID,
@@ -517,8 +517,10 @@ describe('createApiV1Client', () => {
 					body: { data: sampleInvoiceDocument }
 				};
 			},
-			[`POST /api/v1/quotes/${QUOTE_ID}/create-invoice`]: async (request) => {
+			'POST /api/v1/invoices/from-quote': async (request) => {
 				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const body = await request.json();
+				expect(body.quote_id).toBe(QUOTE_ID);
 				return {
 					status: 201,
 					headers: { etag: '"1"' },
@@ -588,7 +590,7 @@ describe('createApiV1Client', () => {
 		});
 		expect(created.number).toBe('INV-0001');
 
-		const fromQuote = await client.quotes.createInvoice(QUOTE_ID);
+		const fromQuote = await client.invoices.createFromQuote({ quote_id: QUOTE_ID });
 		expect(fromQuote.quote_id).toBe(QUOTE_ID);
 
 		const got = await client.invoices.get(INVOICE_ID);

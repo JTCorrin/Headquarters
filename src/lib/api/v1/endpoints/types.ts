@@ -38,6 +38,7 @@ import type {
 	ApiInvoice,
 	ApiInvoiceCreateBody,
 	ApiInvoiceDocument,
+	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
@@ -97,8 +98,6 @@ export interface QuotesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiQuoteDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
-	/** Convert an accepted quote into a draft invoice (server copies snapshots). */
-	createInvoice(quoteId: string, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
 }
 
 export interface InvoicesEndpoints {
@@ -107,6 +106,11 @@ export interface InvoicesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiResult<ApiInvoice[]>>;
 	create(body: ApiInvoiceCreateBody, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
+	/** Primary conversion contract — copies accepted-quote snapshots into a draft invoice. */
+	createFromQuote(
+		body: ApiInvoiceFromQuoteBody,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiInvoiceDocument>>;
 	update(
 		id: string,
