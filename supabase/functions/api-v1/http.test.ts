@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { validateClientBody } from './clients.ts'
-import { decodeCursor, validateContactBody } from './contacts.ts'
+import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
 import { validateFolderCreateBody, validateUploadIntentBody } from './documents.ts'
 import {
   ApiError,
@@ -10,7 +10,7 @@ import {
   parseLimit,
   parseVersion,
 } from './http.ts'
-import { validateLeadBody } from './leads.ts'
+import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import {
   validateOrganisationConfigurationBody,
@@ -97,6 +97,33 @@ Deno.test('contact validation rejects tenancy and invalid lifecycle fields', () 
         false,
       ),
     ApiError,
+  )
+})
+
+Deno.test('contact client_id is a virtual field extracted for client_contacts sync', () => {
+  const clientId = '52e1a71a-1c93-4ec8-a566-e0eecaf06747'
+  assertEquals(extractContactClientId({ client_id: clientId }), {
+    provided: true,
+    clientId,
+  })
+  assertEquals(extractContactClientId({ client_id: null }), {
+    provided: true,
+    clientId: null,
+  })
+  assertEquals(extractContactClientId({ display_name: 'Ada' }), {
+    provided: false,
+    clientId: null,
+  })
+  assertEquals(
+    validateContactBody(
+      { display_name: 'Ada', client_id: clientId },
+      false,
+    ).display_name,
+    'Ada',
+  )
+  assertEquals(
+    validateContactBody({ client_id: clientId }, true),
+    {},
   )
 })
 
@@ -199,6 +226,54 @@ Deno.test('lead validation rejects unsafe integers and impossible dates', () => 
   assertEquals(
     validateLeadBody({ name: 'Position ok', position: 12345.6789012345 }, false).position,
     12345.6789012345,
+  )
+})
+
+Deno.test('lead PATCH accepts atomic stage+position and optional client_id', () => {
+  const clientId = '52e1a71a-1c93-4ec8-a566-e0eecaf06747'
+  assertEquals(
+    validateLeadBody({ stage: 'proposal', position: 10.5 }, true),
+    { stage: 'proposal', position: 10.5 },
+  )
+  assertEquals(
+    validateLeadBody({ client_id: clientId }, true),
+    { client_id: clientId },
+  )
+  assertEquals(
+    validateLeadBody({ client_id: null }, true),
+    { client_id: null },
+  )
+})
+
+Deno.test('lead currency resolves client default then organisation default', () => {
+  assertEquals(
+    resolveLeadCurrency({
+      clientDefault: 'USD',
+      orgDefault: 'GBP',
+    }),
+    'USD',
+  )
+  assertEquals(
+    resolveLeadCurrency({
+      clientDefault: null,
+      orgDefault: 'GBP',
+    }),
+    'GBP',
+  )
+  assertEquals(
+    resolveLeadCurrency({
+      explicit: 'EUR',
+      clientDefault: 'USD',
+      orgDefault: 'GBP',
+    }),
+    'EUR',
+  )
+  assertEquals(
+    resolveLeadCurrency({
+      clientDefault: 'usd',
+      orgDefault: 'GBP',
+    }),
+    'GBP',
   )
 })
 

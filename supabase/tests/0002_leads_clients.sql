@@ -103,7 +103,6 @@ select ok(
     where table_schema = 'public'
       and table_name = 'leads'
       and column_name in (
-        'client_id',
         'converted_at',
         'created_at',
         'created_by',
@@ -116,7 +115,7 @@ select ok(
       and grantee = 'authenticated'
       and privilege_type = 'UPDATE'
   ),
-  'authenticated users cannot directly update lead conversion or audit columns'
+  'authenticated users cannot directly update lead conversion timestamps or audit columns'
 );
 
 select ok(

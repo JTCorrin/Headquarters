@@ -201,4 +201,15 @@ else
 	log "products curl proof script missing — skipped"
 fi
 
+# Lead board reorder + currency fallback + contact client links.
+if [[ -x scripts/lead_board_client_links_staging_curl_proof.sh ]]; then
+	log "running lead board / client links curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/lead_board_client_links_staging_curl_proof.sh
+else
+	log "lead board / client links curl proof script missing — skipped"
+fi
+
 log "done"
