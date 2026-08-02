@@ -177,7 +177,7 @@
 			}
 
 			const [listed, clients, contacts, quotes] = await Promise.all([
-				api.invoices.list({ limit: 50, status: 'draft' }),
+				api.invoices.list({ limit: 50 }),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
 				api.quotes.list({ limit: 50 })
@@ -189,9 +189,8 @@
 			contactOptions = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
-				clientId: null
+				clientId: c.client_id ?? null
 			}));
-			// Quotes list is draft-scoped in the current API; accepted options appear when BE expands listing.
 			quoteOptions = quotes.data
 				.filter((q) => q.status === 'accepted')
 				.map((q) => ({
@@ -207,7 +206,7 @@
 			}
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No draft invoices yet — create your first invoice.' }
+					? { kind: 'empty', message: 'No invoices yet — create your first invoice.' }
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -227,7 +226,7 @@
 		const form = get(invoiceForm.form);
 		try {
 			const created = form.quoteId
-				? await api.invoices.createFromQuote({ quote_id: form.quoteId })
+				? await api.quotes.createInvoice(form.quoteId)
 				: await api.invoices.create(toInvoiceCreateBody(form));
 			if (isStale(epoch)) return false;
 			rows = [toInvoiceListItem(created), ...rows];

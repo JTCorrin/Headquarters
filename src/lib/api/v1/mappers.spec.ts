@@ -15,6 +15,7 @@ import {
 	toContactListItem,
 	toInvoiceCreateBody,
 	toInvoiceLineInput,
+	lineItemRowsToInvoiceLineInputs,
 	toInvoiceListItem,
 	toLeadCard,
 	toLeadCreateBody,
@@ -42,6 +43,7 @@ const sampleContact: ApiContact = {
 	primary_phone: '+44 7700 900123',
 	job_title: 'Head of Operations',
 	company_name: 'Northwind',
+	client_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 	owner_membership_id: null,
 	lifecycle_status: 'active',
 	source: null,
@@ -291,6 +293,28 @@ describe('api mappers', () => {
 			quantity: 1.5,
 			unit_price_cents: 1250
 		});
+		expect(
+			lineItemRowsToInvoiceLineInputs([
+				{
+					productId: 'dddddddd-dddd-4eee-8fff-000000000001',
+					description: 'Retainer',
+					qty: '2',
+					unitPrice: '10.00',
+					discountPercent: 5,
+					taxRatePercent: 20
+				}
+			])
+		).toEqual([
+			{
+				product_id: 'dddddddd-dddd-4eee-8fff-000000000001',
+				description: 'Retainer',
+				quantity: 2,
+				unit_price_cents: 1000,
+				discount_percent: 5,
+				tax_rate_percent: 20,
+				position: 0
+			}
+		]);
 	});
 
 	it('maps leads between API and form/board shapes', () => {
