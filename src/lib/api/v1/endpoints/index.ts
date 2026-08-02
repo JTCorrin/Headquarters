@@ -1,3 +1,4 @@
+export { createRecurringInvoiceSchedulesEndpoints } from './recurring-invoice-schedules.js';
 export { createBillsEndpoints } from './bills.js';
 export { createClientsEndpoints } from './clients.js';
 export { createContactsEndpoints } from './contacts.js';
@@ -30,6 +31,7 @@ export type {
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
+	RecurringInvoiceSchedulesEndpoints,
 	TaxRatesEndpoints,
 	TasksEndpoints,
 	VendorsEndpoints
