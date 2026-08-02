@@ -281,6 +281,17 @@ else
 	log "bills curl proof script missing — skipped"
 fi
 
+# Tasks foundation: CRUD + assignee=me + entity link + ETag.
+if [[ -x scripts/tasks_staging_curl_proof.sh ]]; then
+	log "running tasks foundation curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/tasks_staging_curl_proof.sh
+else
+	log "tasks curl proof script missing — skipped"
+fi
+
 # Product → quote line → accept → from-quote (product_id + SKU/price/tax snapshots).
 if [[ -x scripts/product_quote_invoice_staging_curl_proof.sh ]]; then
 	log "running product→quote→invoice convert curl proof"
