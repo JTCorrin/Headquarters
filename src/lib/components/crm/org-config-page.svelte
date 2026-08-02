@@ -9,6 +9,8 @@
 		roleFromMemberships,
 		themePreferenceFromApi,
 		themePreferenceToApi,
+		toMailboxAccountResource,
+		toMailboxPutBody,
 		toOrganisationConfigFormData,
 		toOrganisationConfigPatch,
 		toOrganisationConfigResource,
@@ -29,6 +31,12 @@
 		type OrganisationCreateData,
 		type TaxRateResource
 	} from '$lib/schemas/organisation.js';
+	import {
+		emptyMailboxFormData,
+		mailboxFormFromResource,
+		mailboxFormSchema,
+		type MailboxAccountResource
+	} from '$lib/schemas/mailbox.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import SettingsConfigPage from './settings-config-page.svelte';
@@ -54,6 +62,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let configuration = $state<OrganisationConfigResource | null>(null);
 	let taxRates = $state<TaxRateResource[]>([]);
+	let mailboxAccount = $state<MailboxAccountResource | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -108,6 +117,14 @@
 			resetForm: false
 		}
 	);
+
+	const mailboxForm = superForm(defaults(emptyMailboxFormData('gmail'), zod4(mailboxFormSchema)), {
+		validators: zod4(mailboxFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const role = $derived(
 		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
@@ -167,9 +184,32 @@
 	function resetOrgScopedState() {
 		configuration = null;
 		taxRates = [];
+		mailboxAccount = null;
+		mailboxForm.form.set(emptyMailboxFormData('gmail'));
 		taxDrawerOpen = false;
 		editingTaxRateId = null;
 		viewState = { kind: 'loading' };
+	}
+
+	async function loadMailbox(epoch: RequestEpoch) {
+		try {
+			const account = await api.mailbox.get();
+			if (isStale(epoch)) return;
+			mailboxAccount = toMailboxAccountResource(account);
+			mailboxForm.form.set(
+				mailboxAccount ? mailboxFormFromResource(mailboxAccount) : emptyMailboxFormData('gmail')
+			);
+		} catch (error) {
+			if (isStale(epoch)) return;
+			// Wave A: BE may not be deployed yet, or no mailbox — keep the empty form.
+			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
+				mailboxAccount = null;
+				mailboxForm.form.set(emptyMailboxFormData('gmail'));
+				return;
+			}
+			// Non-fatal for Config page — org defaults still load.
+			mailboxAccount = null;
+		}
 	}
 
 	async function loadAll() {
@@ -207,6 +247,8 @@
 			if (session.selectedOrgId) {
 				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
 			}
+			await loadMailbox(epoch);
+			if (isStale(epoch)) return;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -310,6 +352,88 @@
 				kind: 'validation',
 				message: userMessage(error, 'Could not save preferences.')
 			};
+		}
+	}
+
+	async function onSaveMailbox() {
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.mailbox.put(toMailboxPutBody(get(mailboxForm.form)));
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			mailboxAccount = toMailboxAccountResource(updated);
+			mailboxForm.form.set(
+				mailboxAccount ? mailboxFormFromResource(mailboxAccount) : emptyMailboxFormData('gmail')
+			);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			if (isApiClientError(error) && error.isValidationError) {
+				viewState = {
+					kind: 'validation',
+					message: userMessage(error, 'Validation failed'),
+					fields: error.fields
+				};
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not save mailbox.')
+			};
+			return false;
+		}
+	}
+
+	async function onTestMailbox() {
+		const epoch = captureEpoch();
+		try {
+			const result = await api.mailbox.test();
+			if (isStale(epoch)) return false;
+			if (!result.ok) {
+				viewState = {
+					kind: 'validation',
+					message: result.message || result.error_code || 'Mailbox test failed.'
+				};
+				return false;
+			}
+			await loadMailbox(epoch);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Mailbox test failed.')
+			};
+			return false;
+		}
+	}
+
+	async function onDisconnectMailbox() {
+		const epoch = captureEpoch();
+		try {
+			await api.mailbox.disconnect();
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			mailboxAccount = null;
+			mailboxForm.form.set(emptyMailboxFormData('gmail'));
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not disconnect mailbox.')
+			};
+			return false;
 		}
 	}
 
@@ -466,12 +590,17 @@
 				{configForm}
 				{preferencesForm}
 				{taxRateForm}
+				{mailboxForm}
+				{mailboxAccount}
 				bind:taxDrawerOpen
 				{editingTaxRateId}
 				{viewState}
 				onReload={loadAll}
 				{onSaveConfig}
 				{onSavePreferences}
+				{onSaveMailbox}
+				{onTestMailbox}
+				{onDisconnectMailbox}
 				{onSaveTaxRate}
 				{onSetDefaultTaxRate}
 				{onArchiveTaxRate}
