@@ -451,6 +451,160 @@ export interface ApiInvoiceListParams {
 	status?: ApiInvoiceStatus;
 }
 
+export type ApiVendorStatus = 'active' | 'inactive' | 'archived';
+
+export interface ApiVendor {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	status: ApiVendorStatus;
+	primary_email: string | null;
+	phone: string | null;
+	website_url: string | null;
+	tax_identifier: string | null;
+	default_currency: string | null;
+	payment_terms_days: number | null;
+	notes: string | null;
+	metadata: Record<string, unknown>;
+}
+
+export interface ApiVendorListParams {
+	limit?: number;
+	cursor?: string;
+}
+
+export interface ApiVendorCreateBody {
+	name: string;
+	status?: ApiVendorStatus;
+	primary_email?: string | null;
+	phone?: string | null;
+	website_url?: string | null;
+	tax_identifier?: string | null;
+	default_currency?: string | null;
+	payment_terms_days?: number | null;
+	notes?: string | null;
+	metadata?: Record<string, unknown>;
+}
+
+export type ApiVendorUpdateBody = Partial<ApiVendorCreateBody>;
+
+export type ApiBillStatus = 'draft' | 'received' | 'scheduled' | 'partial' | 'paid' | 'void';
+
+export interface ApiBill {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	vendor_id: string;
+	number: string;
+	internal_reference: string | null;
+	status: ApiBillStatus;
+	currency: string;
+	issue_on: string | null;
+	received_on: string | null;
+	due_on: string;
+	scheduled_payment_on: string | null;
+	subtotal_cents: number;
+	discount_cents: number;
+	tax_cents: number;
+	total_cents: number;
+	paid_cents: number;
+	balance_due_cents: number;
+	party_snapshot: unknown;
+	notes: string | null;
+	attachment_document_id: string | null;
+	paid_at: string | null;
+	voided_at: string | null;
+	void_reason: string | null;
+}
+
+export interface ApiBillLine {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	version: number;
+	bill_id: string;
+	product_id: string | null;
+	sku_snapshot: string | null;
+	description: string;
+	quantity: number;
+	unit_price_cents: number;
+	discount_percent: number;
+	tax_rate_percent: number;
+	subtotal_cents: number;
+	tax_cents: number;
+	total_cents: number;
+	position: number;
+}
+
+export type ApiBillDocument = ApiBill & { lines: ApiBillLine[] };
+
+export interface ApiBillProductLineInput {
+	product_id: string;
+	quantity: number;
+	description?: string;
+	unit_price_cents?: number;
+	discount_percent?: number;
+	tax_rate_percent?: number;
+	position?: number;
+}
+
+export interface ApiBillFreeTextLineInput {
+	product_id?: null;
+	description: string;
+	quantity: number;
+	unit_price_cents: number;
+	discount_percent?: number;
+	tax_rate_percent?: number;
+	position?: number;
+}
+
+export type ApiBillLineInput = ApiBillProductLineInput | ApiBillFreeTextLineInput;
+
+interface ApiBillWritableFields {
+	currency?: string;
+	internal_reference?: string | null;
+	issue_on?: string | null;
+	received_on?: string | null;
+	due_on?: string;
+	notes?: string | null;
+}
+
+export type ApiBillCreateBody = ApiBillWritableFields & {
+	vendor_id: string;
+	number: string;
+	lines: ApiBillLineInput[];
+};
+
+export type ApiBillUpdateBody = ApiBillWritableFields & {
+	vendor_id?: string;
+	number?: string;
+	lines?: ApiBillLineInput[];
+};
+
+export interface ApiBillVoidBody {
+	void_reason: string;
+}
+
+export interface ApiBillListParams {
+	limit?: number;
+	cursor?: string;
+	status?: ApiBillStatus;
+}
+
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
 export interface ApiClient {

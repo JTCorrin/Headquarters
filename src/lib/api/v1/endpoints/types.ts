@@ -42,6 +42,16 @@ import type {
 	ApiInvoiceListParams,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
+	ApiBill,
+	ApiBillCreateBody,
+	ApiBillDocument,
+	ApiBillListParams,
+	ApiBillUpdateBody,
+	ApiBillVoidBody,
+	ApiVendor,
+	ApiVendorCreateBody,
+	ApiVendorListParams,
+	ApiVendorUpdateBody,
 	ApiProduct,
 	ApiProductAdjustStockBody,
 	ApiProductCreateBody,
@@ -165,6 +175,44 @@ export interface InvoicesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiInvoiceDocument>;
+}
+
+export interface VendorsEndpoints {
+	list(
+		params?: ApiVendorListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiVendor[]>>;
+	create(body: ApiVendorCreateBody, signal?: AbortSignal): Promise<ApiVendor>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiVendor>>;
+	update(
+		id: string,
+		body: ApiVendorUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiVendor>;
+}
+
+export interface BillsEndpoints {
+	list(
+		params?: ApiBillListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiBill[]>>;
+	create(body: ApiBillCreateBody, signal?: AbortSignal): Promise<ApiBillDocument>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiBillDocument>>;
+	update(
+		id: string,
+		body: ApiBillUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiBillDocument>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	receive(id: string, version: number, signal?: AbortSignal): Promise<ApiBillDocument>;
+	void(
+		id: string,
+		body: ApiBillVoidBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiBillDocument>;
 }
 
 export interface ContactsEndpoints {
