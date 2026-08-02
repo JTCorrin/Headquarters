@@ -14,6 +14,16 @@ import {
 const QUOTE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,title,client_id,lead_id,contact_id,owner_membership_id,status,currency,issue_on,valid_until,subtotal_cents,discount_cents,tax_cents,total_cents,party_snapshot,terms,notes,internal_notes,sent_at,viewed_at,accepted_at,rejected_at,converted_invoice_id'
 
+type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'void'
+const QUOTE_STATUSES: readonly QuoteStatus[] = [
+  'draft',
+  'sent',
+  'accepted',
+  'rejected',
+  'expired',
+  'void',
+]
+
 const HEADER_WRITABLE = new Set([
   'title',
   'client_id',
@@ -458,6 +468,17 @@ export function decodeQuoteCursor(value: string): QuoteCursor {
   }
 }
 
+/** Validate optional `status` list filter against the quotes.status check enum. */
+export function parseQuoteListStatus(value: string | null): QuoteStatus | null {
+  if (value === null) return null
+  if (!QUOTE_STATUSES.includes(value as QuoteStatus)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'status is not supported', {
+      status: 'Must be one of draft, sent, accepted, rejected, expired, void',
+    })
+  }
+  return value as QuoteStatus
+}
+
 function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.message?.toLowerCase().includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
@@ -522,12 +543,7 @@ async function listQuotes(
 ): Promise<Response> {
   const url = new URL(req.url)
   const limit = parseLimit(url.searchParams.get('limit'))
-  const status = url.searchParams.get('status')
-  if (status !== null && status !== 'draft') {
-    throw new ApiError(400, 'BAD_REQUEST', 'Only status=draft is supported in this release', {
-      status: 'Must be draft when provided',
-    })
-  }
+  const status = parseQuoteListStatus(url.searchParams.get('status'))
   const cursorValue = url.searchParams.get('cursor')
   const cursor = cursorValue ? decodeQuoteCursor(cursorValue) : null
 
