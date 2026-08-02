@@ -61,8 +61,8 @@ export function draftResponseGateCopy(role: MembershipRole): {
 	}
 	return {
 		disabled: true,
-		hint: 'Ask an admin to connect AI before drafting replies.',
-		href: '/org/integrations',
-		linkLabel: 'Ask an admin to connect AI'
+		hint: 'Ask an Owner to connect AI before drafting replies.',
+		href: '/settings',
+		linkLabel: 'Ask an Owner to connect AI'
 	};
 }

@@ -49,6 +49,8 @@
 		aiProviderConnected?: boolean;
 		smtpReady?: boolean;
 		role?: MembershipRole;
+		mailSettingsHref?: string;
+		sharingId?: string | null;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -57,6 +59,16 @@
 		onOpenClient?: (clientId: string) => void;
 		onCreateClient?: () => void;
 		onReload?: () => void;
+		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
+		onDraftResponse?: (payload: {
+			messageId: string;
+			tone: 'warm' | 'neutral' | 'firm';
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onUseSuggestion?: (payload: {
+			suggestionId?: string;
+			text: string;
+		}) => void | Promise<void>;
+		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 	}
 
 	let {
@@ -77,13 +89,19 @@
 		aiProviderConnected = false,
 		smtpReady = false,
 		role = 'member',
+		mailSettingsHref = '/settings#mail',
+		sharingId = null,
 		showNav = true,
 		class: className,
 		onSave,
 		onConvert,
 		onOpenClient,
 		onCreateClient,
-		onReload
+		onReload,
+		onAddToTimeline,
+		onDraftResponse,
+		onUseSuggestion,
+		onDiscardSuggestion
 	}: LeadDetailPageProps = $props();
 
 	const isWon = $derived(lead?.stage === 'won');
@@ -236,6 +254,12 @@
 								{mailboxConnected}
 								{aiProviderConnected}
 								{smtpReady}
+								{mailSettingsHref}
+								{sharingId}
+								{onAddToTimeline}
+								{onDraftResponse}
+								{onUseSuggestion}
+								{onDiscardSuggestion}
 								{role}
 								class="min-h-0 flex-1"
 							/>
