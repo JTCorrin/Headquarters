@@ -28,6 +28,11 @@ const WRITABLE_FIELDS = new Set([
   'metadata',
 ])
 
+/** Virtual write field — persists via client_contacts, not contacts.client_id. */
+const VIRTUAL_FIELDS = new Set(['client_id'])
+
+export type ContactWithClientId = ContactRow & { client_id: string | null }
+
 const NULLABLE_TEXT_FIELDS = [
   'first_name',
   'last_name',
@@ -81,6 +86,27 @@ interface DatabaseError {
   message?: string
 }
 
+/** Extract optional client_id before row validation (not a contacts column). */
+export function extractContactClientId(body: Record<string, unknown>): {
+  provided: boolean
+  clientId: string | null
+} {
+  if (!('client_id' in body)) return { provided: false, clientId: null }
+
+  const value = body.client_id
+  if (value === null) return { provided: true, clientId: null }
+  try {
+    return {
+      provided: true,
+      clientId: parseUuid(typeof value === 'string' ? value : null, 'client_id'),
+    }
+  } catch {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Contact validation failed', {
+      client_id: 'Must be a UUID or null',
+    })
+  }
+}
+
 export function validateContactBody(
   body: Record<string, unknown>,
   partial: false,
@@ -97,7 +123,9 @@ export function validateContactBody(
   const output: ContactUpdate = {}
 
   for (const key of Object.keys(body)) {
-    if (!WRITABLE_FIELDS.has(key)) fields[key] = 'Field is not writable'
+    if (!WRITABLE_FIELDS.has(key) && !VIRTUAL_FIELDS.has(key)) {
+      fields[key] = 'Field is not writable'
+    }
   }
 
   if (!partial || 'display_name' in body) {
@@ -168,7 +196,8 @@ export function validateContactBody(
   if (Object.keys(fields).length > 0) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'Contact validation failed', fields)
   }
-  if (partial && Object.keys(output).length === 0) {
+  const hasVirtual = Object.keys(body).some((key) => VIRTUAL_FIELDS.has(key))
+  if (partial && Object.keys(output).length === 0 && !hasVirtual) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'At least one writable field is required')
   }
 
@@ -270,14 +299,20 @@ async function listContacts(
   const { data, error } = await query
   if (error) throw databaseError(error, requestId)
 
-  const contacts = data ?? []
+  const contacts = (data ?? []) as ContactRow[]
   const hasNextPage = contacts.length > limit
   const page = hasNextPage ? contacts.slice(0, limit) : contacts
   const lastContact = page.at(-1) as ContactCursor | undefined
+  const clientIds = await resolveContactClientIds(
+    db,
+    orgId,
+    page.map((contact) => contact.id),
+    requestId,
+  )
 
   return jsonResponse(
     {
-      data: page,
+      data: page.map((contact) => withClientId(contact, clientIds)),
       meta: {
         next_cursor: hasNextPage && lastContact ? encodeCursor(lastContact) : null,
       },
@@ -287,25 +322,98 @@ async function listContacts(
   )
 }
 
+type ContactRpcResult = {
+  contact: ContactRow
+  client_id: string | null
+}
+
+function parseContactRpcResult(data: unknown, requestId: string): ContactRpcResult {
+  if (!data || typeof data !== 'object') {
+    console.error('Contact RPC returned unexpected payload', { request_id: requestId })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'The contact operation failed')
+  }
+  const row = data as { contact?: ContactRow; client_id?: string | null }
+  if (!row.contact || typeof row.contact !== 'object') {
+    console.error('Contact RPC missing contact row', { request_id: requestId })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'The contact operation failed')
+  }
+  return {
+    contact: row.contact,
+    client_id: row.client_id ?? null,
+  }
+}
+
+function mapContactClientRpcError(error: DatabaseError, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('contact client must be an active client')) {
+    return new ApiError(422, 'VALIDATION_ERROR', 'Contact validation failed', {
+      client_id: 'Must reference an active client in this organisation',
+    })
+  }
+  return databaseError(error, requestId)
+}
+
+/** Resolve form client_id from the contact's primary client_contacts link only. */
+async function resolveContactClientIds(
+  db: DatabaseClient,
+  orgId: string,
+  contactIds: string[],
+  requestId: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (contactIds.length === 0) return map
+
+  const { data, error } = await db
+    .from('client_contacts')
+    .select('contact_id, client_id')
+    .eq('org_id', orgId)
+    .in('contact_id', contactIds)
+    .eq('is_primary', true)
+    .is('deleted_at', null)
+
+  if (error) throw databaseError(error, requestId)
+
+  for (const row of data ?? []) {
+    map.set(row.contact_id, row.client_id)
+  }
+  return map
+}
+
+function withClientId(
+  contact: ContactRow,
+  clientIds: Map<string, string>,
+): ContactWithClientId {
+  return { ...contact, client_id: clientIds.get(contact.id) ?? null }
+}
+
 async function createContact(
   req: Request,
   db: DatabaseClient,
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const payload = validateContactBody(await jsonBody(req), false)
-  const { data, error } = await db
-    .from('contacts')
-    .insert({ ...payload, org_id: orgId })
-    .select(CONTACT_SELECT)
-    .single()
-
-  if (error) throw databaseError(error, requestId)
-
-  return jsonResponse({ data }, 201, requestId, {
-    etag: etag(data.version),
-    location: `/api/v1/contacts/${data.id}`,
+  const body = await jsonBody(req)
+  const clientLink = extractContactClientId(body)
+  const payload = validateContactBody(body, false)
+  // Atomic contact insert + optional primary client_contacts link (no orphan on 422).
+  const { data, error } = await db.rpc('create_contact_with_primary_client', {
+    p_org_id: orgId,
+    p_payload: payload,
+    p_client_id: clientLink.clientId,
+    p_set_client_id: clientLink.provided,
   })
+
+  if (error) throw mapContactClientRpcError(error, requestId)
+
+  const result = parseContactRpcResult(data, requestId)
+  return jsonResponse(
+    { data: { ...result.contact, client_id: result.client_id } },
+    201,
+    requestId,
+    {
+      etag: etag(result.contact.version),
+      location: `/api/v1/contacts/${result.contact.id}`,
+    },
+  )
 }
 
 async function findContact(
@@ -334,7 +442,10 @@ async function getContact(
   requestId: string,
 ): Promise<Response> {
   const data = await findContact(db, orgId, contactId, requestId)
-  return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
+  const clientIds = await resolveContactClientIds(db, orgId, [data.id], requestId)
+  return jsonResponse({ data: withClientId(data, clientIds) }, 200, requestId, {
+    etag: etag(data.version),
+  })
 }
 
 async function updateContact(
@@ -345,28 +456,33 @@ async function updateContact(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findContact(db, orgId, contactId, requestId)
-  if (current.version !== version) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact version does not match If-Match')
+  const body = await jsonBody(req)
+  const clientLink = extractContactClientId(body)
+  const payload = validateContactBody(body, true)
+
+  // client_id-only PATCH is valid (virtual field); RPC bumps version for If-Match.
+  if (Object.keys(payload).length === 0 && !clientLink.provided) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'At least one writable field is required')
   }
 
-  const payload = validateContactBody(await jsonBody(req), true)
-  const { data, error } = await db
-    .from('contacts')
-    .update(payload)
-    .eq('org_id', orgId)
-    .eq('id', contactId)
-    .eq('version', version)
-    .is('deleted_at', null)
-    .select(CONTACT_SELECT)
-    .maybeSingle()
+  const { data, error } = await db.rpc('update_contact_with_primary_client', {
+    p_contact_id: contactId,
+    p_org_id: orgId,
+    p_expected_version: version,
+    p_payload: payload,
+    p_client_id: clientLink.clientId,
+    p_set_client_id: clientLink.provided,
+  })
 
-  if (error) throw databaseError(error, requestId)
-  if (!data) {
-    throw new ApiError(412, 'PRECONDITION_FAILED', 'Contact changed during this request')
-  }
+  if (error) throw mapContactClientRpcError(error, requestId)
 
-  return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
+  const result = parseContactRpcResult(data, requestId)
+  return jsonResponse(
+    { data: { ...result.contact, client_id: result.client_id } },
+    200,
+    requestId,
+    { etag: etag(result.contact.version) },
+  )
 }
 
 async function deleteContact(

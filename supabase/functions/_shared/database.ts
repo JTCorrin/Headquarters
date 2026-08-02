@@ -668,6 +668,26 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_contact_with_primary_client: {
+        Args: {
+          p_client_id?: string | null
+          p_org_id: string
+          p_payload: Json
+          p_set_client_id?: boolean
+        }
+        Returns: Json
+      }
+      update_contact_with_primary_client: {
+        Args: {
+          p_client_id?: string | null
+          p_contact_id: string
+          p_expected_version: number
+          p_org_id: string
+          p_payload?: Json
+          p_set_client_id?: boolean
+        }
+        Returns: Json
+      }
       soft_delete_lead: {
         Args: {
           p_expected_version: number
