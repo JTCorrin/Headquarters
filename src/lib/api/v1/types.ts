@@ -608,7 +608,7 @@ export interface ApiBillListParams {
 export type ApiTaskPriority = 'p1' | 'p2' | 'p3' | 'p4';
 export type ApiTaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'cancelled';
 export type ApiTaskSource = 'manual' | 'meeting' | 'email' | 'workflow' | 'agent';
-export type ApiTaskEntityType = 'contact' | 'client' | 'lead' | 'project';
+export type ApiTaskEntityType = 'contact' | 'client' | 'lead';
 
 export interface ApiTask {
 	id: string;
