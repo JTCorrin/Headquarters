@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(22);
 
 select has_table('public', 'tasks', 'tasks table exists');
 
@@ -135,15 +135,19 @@ from public.memberships
 where memberships.org_id = _tasks_fixture.org_id
   and memberships.user_id = _tasks_fixture.member_id;
 
+-- Owner creates contact + task (RLS via authenticated role).
+select pg_temp.as_user((select owner_id from _tasks_fixture));
+set local role authenticated;
+
 select lives_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   insert into public.contacts (org_id, display_name, primary_email)
   select org_id, 'Ada Contact', 'ada@tasks.test' from _tasks_fixture;
   $$,
   'owner can insert a contact for entity link'
 );
 
+reset role;
 update _tasks_fixture
 set contact_id = (
   select contacts.id from public.contacts
@@ -152,9 +156,11 @@ set contact_id = (
   limit 1
 );
 
+select pg_temp.as_user((select owner_id from _tasks_fixture));
+set local role authenticated;
+
 select lives_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   insert into public.tasks (
     org_id, title, priority, status, source, assignee_membership_id,
     entity_type, entity_id
@@ -173,6 +179,7 @@ select lives_ok(
   'owner can create a task with human assignee and entity link'
 );
 
+reset role;
 update _tasks_fixture
 set owner_task_id = tasks.id
 from public.tasks
@@ -180,15 +187,18 @@ where tasks.org_id = (select org_id from _tasks_fixture)
   and tasks.title = 'Owner task'
   and tasks.deleted_at is null;
 
+select pg_temp.as_user((select member_id from _tasks_fixture));
+set local role authenticated;
+
 select lives_ok(
   $$
-  select pg_temp.as_user(member_id) from _tasks_fixture;
   insert into public.tasks (org_id, title, status)
   select org_id, 'Member task', 'open' from _tasks_fixture;
   $$,
   'member can create their own task'
 );
 
+reset role;
 update _tasks_fixture
 set member_task_id = tasks.id
 from public.tasks
@@ -196,16 +206,13 @@ where tasks.org_id = (select org_id from _tasks_fixture)
   and tasks.title = 'Member task'
   and tasks.deleted_at is null;
 
+select pg_temp.as_user((select billing_id from _tasks_fixture));
+set local role authenticated;
+
 select is(
   (
-    select count(*)::int
-    from (
-      select pg_temp.as_user(billing_id) from _tasks_fixture
-    ) as _
-    cross join lateral (
-      select 1 from public.tasks
-      where org_id = (select org_id from _tasks_fixture)
-    ) t
+    select count(*)::int from public.tasks
+    where org_id = (select org_id from _tasks_fixture)
   ),
   0,
   'billing member sees zero tasks'
@@ -213,7 +220,6 @@ select is(
 
 select throws_ok(
   $$
-  select pg_temp.as_user(billing_id) from _tasks_fixture;
   insert into public.tasks (org_id, title)
   select org_id, 'Billing denied' from _tasks_fixture;
   $$,
@@ -222,29 +228,30 @@ select throws_ok(
   'billing cannot insert tasks'
 );
 
+reset role;
+select pg_temp.as_user((select outsider_id from _tasks_fixture));
+set local role authenticated;
+
 select is(
   (
-    select count(*)::int
-    from (
-      select pg_temp.as_user(outsider_id) from _tasks_fixture
-    ) as _
-    cross join lateral (
-      select 1 from public.tasks
-      where id = (select owner_task_id from _tasks_fixture)
-    ) t
+    select count(*)::int from public.tasks
+    where id = (select owner_task_id from _tasks_fixture)
   ),
   0,
   'cross-org outsider sees zero tasks'
 );
 
+reset role;
+select pg_temp.as_user((select member_id from _tasks_fixture));
+set local role authenticated;
+
 select lives_ok(
   $$
-  select pg_temp.as_user(member_id) from _tasks_fixture;
   update public.tasks
-  set title = 'Hijacked', updated_by = (select member_id from _tasks_fixture)
+  set title = 'Hijacked'
   where id = (select owner_task_id from _tasks_fixture);
   $$,
-  'member update of owner task is a no-op under RLS (no error)'
+  'member update of owner task is a no-op under RLS'
 );
 
 select is(
@@ -255,19 +262,19 @@ select is(
 
 select lives_ok(
   $$
-  select pg_temp.as_user(member_id) from _tasks_fixture;
   update public.tasks
-  set
-    status = 'in_progress',
-    updated_by = (select member_id from _tasks_fixture)
+  set status = 'in_progress'
   where id = (select member_task_id from _tasks_fixture);
   $$,
   'member can update their own task'
 );
 
+reset role;
+select pg_temp.as_user((select owner_id from _tasks_fixture));
+set local role authenticated;
+
 select throws_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   insert into public.tasks (
     org_id, title, assignee_membership_id
   )
@@ -286,7 +293,6 @@ select throws_ok(
 
 select throws_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   insert into public.tasks (
     org_id, title, entity_type, entity_id
   )
@@ -300,7 +306,6 @@ select throws_ok(
 
 select throws_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   select public.soft_delete_task(
     (select owner_task_id from _tasks_fixture),
     (select org_id from _tasks_fixture),
@@ -314,7 +319,6 @@ select throws_ok(
 
 select lives_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   select public.soft_delete_task(
     (select owner_task_id from _tasks_fixture),
     (select org_id from _tasks_fixture),
@@ -328,24 +332,25 @@ select is(
   (
     select count(*)::int from public.tasks
     where id = (select owner_task_id from _tasks_fixture)
-      and deleted_at is null
   ),
   0,
-  'soft-deleted task is hidden from active rows'
+  'soft-deleted task is hidden by RLS'
 );
 
 select lives_ok(
   $$
-  select pg_temp.as_user(owner_id) from _tasks_fixture;
   insert into public.tasks (org_id, title)
   select org_id, 'Owner protected' from _tasks_fixture;
   $$,
   'owner creates protected task for delete-gate test'
 );
 
+reset role;
+select pg_temp.as_user((select member_id from _tasks_fixture));
+set local role authenticated;
+
 select throws_ok(
   $$
-  select pg_temp.as_user(member_id) from _tasks_fixture;
   select public.soft_delete_task(
     (select id from public.tasks where title = 'Owner protected' and deleted_at is null limit 1),
     (select org_id from _tasks_fixture),
@@ -359,7 +364,6 @@ select throws_ok(
 
 select lives_ok(
   $$
-  select pg_temp.as_user(member_id) from _tasks_fixture;
   select public.soft_delete_task(
     (select member_task_id from _tasks_fixture),
     (select org_id from _tasks_fixture),
@@ -368,6 +372,8 @@ select lives_ok(
   $$,
   'member can soft-delete their own task'
 );
+
+reset role;
 
 select is(
   (select priority from public.tasks where title = 'Owner protected' limit 1),
