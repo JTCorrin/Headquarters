@@ -3,6 +3,14 @@ import type { LineItemRow } from '$lib/components/crm/line-items-table.svelte';
 
 export type MoneyDocumentKind = 'quote' | 'invoice' | 'bill';
 
+/** Server-authoritative money totals in minor units. */
+export interface MoneyDocumentTotals {
+	subtotalCents: number;
+	discountCents: number;
+	taxCents: number;
+	totalCents: number;
+}
+
 export interface MoneyDocumentInput {
 	kind: MoneyDocumentKind;
 	orgName: string;
@@ -16,6 +24,8 @@ export interface MoneyDocumentInput {
 	issueDate?: string;
 	lines: LineItemRow[];
 	notes?: string;
+	/** When set (invoices), summary uses these instead of recomputing from lines. */
+	totals?: MoneyDocumentTotals;
 }
 
 const KIND_LABEL: Record<MoneyDocumentKind, string> = {
@@ -58,10 +68,15 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 		dueOn,
 		issueDate,
 		lines,
-		notes
+		notes,
+		totals
 	} = input;
 
-	const subtotal = lines.reduce((sum, row) => sum + lineTotal(row), 0);
+	const computedSubtotal = lines.reduce((sum, row) => sum + lineTotal(row), 0);
+	const summarySubtotal = totals ? totals.subtotalCents / 100 : computedSubtotal;
+	const summaryDiscount = totals ? totals.discountCents / 100 : 0;
+	const summaryTax = totals ? totals.taxCents / 100 : 0;
+	const summaryTotal = totals ? totals.totalCents / 100 : computedSubtotal;
 	const tableBody: Content[][] = [
 		[
 			{ text: 'Description', style: 'tableHeader' },
@@ -161,14 +176,48 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 							{
 								columns: [
 									{ text: 'Subtotal', style: 'muted' },
-									{ text: money(subtotal, currency), alignment: 'right', style: 'meta' }
+									{
+										text: money(summarySubtotal, currency),
+										alignment: 'right',
+										style: 'meta'
+									}
 								]
 							},
+							...(summaryDiscount > 0
+								? [
+										{
+											columns: [
+												{ text: 'Discount', style: 'muted', margin: [0, 4, 0, 0] },
+												{
+													text: `−${money(summaryDiscount, currency)}`,
+													alignment: 'right' as const,
+													style: 'meta',
+													margin: [0, 4, 0, 0]
+												}
+											]
+										}
+									]
+								: []),
+							...(summaryTax > 0
+								? [
+										{
+											columns: [
+												{ text: 'Tax', style: 'muted', margin: [0, 4, 0, 0] },
+												{
+													text: money(summaryTax, currency),
+													alignment: 'right' as const,
+													style: 'meta',
+													margin: [0, 4, 0, 0]
+												}
+											]
+										}
+									]
+								: []),
 							{
 								columns: [
 									{ text: 'Total', style: 'totalLabel', margin: [0, 8, 0, 0] },
 									{
-										text: money(subtotal, currency),
+										text: money(summaryTotal, currency),
 										alignment: 'right',
 										style: 'totalValue',
 										margin: [0, 8, 0, 0]

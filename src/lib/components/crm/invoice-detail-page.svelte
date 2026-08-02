@@ -39,6 +39,13 @@
 		isDraft?: boolean;
 		/** Unsaved header/line edits — Send stays disabled until saved. */
 		isDirty?: boolean;
+		/** Server-authoritative money totals for table/PDF (minor units). */
+		moneyTotals?: {
+			subtotalCents: number;
+			discountCents: number;
+			taxCents: number;
+			totalCents: number;
+		} | null;
 		actionPending?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
@@ -67,6 +74,7 @@
 		contactOptions = [],
 		isDraft = true,
 		isDirty = false,
+		moneyTotals = null,
 		actionPending = false,
 		onRemoveLine,
 		onAddLine,
@@ -117,7 +125,15 @@
 			status: status || formData.current.status,
 			dueOn: formData.current.dueOn,
 			lines,
-			issueDate: formData.current.issueOn || new Date().toISOString().slice(0, 10)
+			issueDate: formData.current.issueOn || new Date().toISOString().slice(0, 10),
+			totals: moneyTotals
+				? {
+						subtotalCents: moneyTotals.subtotalCents,
+						discountCents: moneyTotals.discountCents,
+						taxCents: moneyTotals.taxCents,
+						totalCents: moneyTotals.totalCents
+					}
+				: undefined
 		})
 	);
 
@@ -256,6 +272,7 @@
 
 					<LineItemsTable
 						rows={lines}
+						totals={moneyTotals}
 						onRemove={isDraft ? onRemoveLine : undefined}
 						class="self-start"
 					>

@@ -247,11 +247,27 @@
 
 			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
-			contactOptions = contacts.data.map((c) => ({
+			const options: InvoiceContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
 				clientId: c.client_id ?? null
 			}));
+			const selectedContactId = result.data.contact_id;
+			if (selectedContactId && !options.some((c) => c.id === selectedContactId)) {
+				try {
+					const pinned = await api.contacts.get(selectedContactId);
+					if (isStale(epoch)) return;
+					options.push({
+						id: pinned.data.id,
+						label:
+							pinned.data.display_name || pinned.data.primary_email || pinned.data.id,
+						clientId: pinned.data.client_id ?? null
+					});
+				} catch {
+					// Keep the form contactId; never clear solely because the option page truncated.
+				}
+			}
+			contactOptions = options;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -314,9 +330,13 @@
 			toInvoiceLineInput(draftLine, lines.length)
 		];
 		try {
+			// Atomic with current header so applyDocument cannot discard unsaved PO/date/client.
 			const updated = await api.invoices.update(
 				invoice.id,
-				{ lines: nextInputs },
+				{
+					...toInvoiceUpdateBody(get(invoiceForm.form)),
+					lines: nextInputs
+				},
 				invoice.version
 			);
 			if (isStale(epoch)) return false;
@@ -350,7 +370,10 @@
 		try {
 			const updated = await api.invoices.update(
 				invoice.id,
-				{ lines: lineItemRowsToInvoiceLineInputs(next) },
+				{
+					...toInvoiceUpdateBody(get(invoiceForm.form)),
+					lines: lineItemRowsToInvoiceLineInputs(next)
+				},
 				invoice.version
 			);
 			if (isStale(epoch)) return;
@@ -520,6 +543,12 @@
 						{isDraft}
 						{isDirty}
 						{actionPending}
+						moneyTotals={{
+							subtotalCents: invoice.subtotal_cents,
+							discountCents: invoice.discount_cents,
+							taxCents: invoice.tax_cents,
+							totalCents: invoice.total_cents
+						}}
 						bind:lines
 						bind:lineDrawerOpen
 						onSaveInvoice={onSaveInvoice}
