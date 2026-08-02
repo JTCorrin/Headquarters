@@ -12,6 +12,7 @@ import {
 } from './http.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
+import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
 import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -631,6 +632,119 @@ Deno.test('quote line money rejects JSON-unsafe quantity × price products', () 
               unit_price_cents: Number.MAX_SAFE_INTEGER,
             },
           ],
+        },
+        false,
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('invoice create validation defaults currency, requires client_id, and rejects calculated fields', () => {
+  const productId = '11111111-1111-4111-8111-111111111111'
+  const clientId = '22222222-2222-4222-8222-222222222222'
+  assertEquals(
+    validateInvoiceBody(
+      {
+        client_id: clientId,
+        due_on: '2026-09-01',
+        purchase_order_number: '  PO-42  ',
+        lines: [
+          {
+            product_id: productId,
+            quantity: 2,
+            unit_price_cents: 10000,
+            tax_rate_percent: 20,
+          },
+        ],
+      },
+      false,
+      { defaultCurrency: 'USD' },
+    ),
+    {
+      client_id: clientId,
+      currency: 'USD',
+      due_on: '2026-09-01',
+      purchase_order_number: 'PO-42',
+      lines: [
+        {
+          product_id: productId,
+          quantity: 2,
+          unit_price_cents: 10000,
+          discount_percent: 0,
+          tax_rate_percent: 20,
+        },
+      ],
+    },
+  )
+  assertThrows(
+    () =>
+      validateInvoiceBody(
+        {
+          lines: [],
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateInvoiceBody(
+        {
+          client_id: clientId,
+          status: 'sent',
+          lines: [],
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateInvoiceBody(
+        {
+          client_id: clientId,
+          total_cents: 1,
+          lines: [],
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertEquals(
+    validateInvoiceBody(
+      {
+        purchase_order_number: 'PO-99',
+        discount_cents: 100,
+      },
+      true,
+    ),
+    { purchase_order_number: 'PO-99', discount_cents: 100 },
+  )
+  assertThrows(() => validateInvoiceBody({}, true), ApiError)
+  assertThrows(
+    () => validateInvoiceBody({ client_id: null }, true),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      decodeInvoiceCursor(
+        btoa(JSON.stringify({ created_at: 'not-a-date', id: clientId }))
+          .replaceAll('+', '-')
+          .replaceAll('/', '_')
+          .replace(/=+$/, ''),
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('invoice void_reason is required for the /void action body', () => {
+  assertThrows(
+    () =>
+      validateInvoiceBody(
+        {
+          client_id: '22222222-2222-4222-8222-222222222222',
+          void_reason: 'Duplicate invoice',
+          lines: [],
         },
         false,
       ),
