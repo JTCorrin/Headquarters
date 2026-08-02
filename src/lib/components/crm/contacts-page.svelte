@@ -5,6 +5,7 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		roleFromMemberships,
 		membershipFromCreateResult,
 		toClientCreateBody,
 		toContactCreateBody,
@@ -17,7 +18,7 @@
 	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
 	import { contactFormSchema, type ContactListItem } from '$lib/schemas/contact.js';
 	import type { LeadClientOption } from '$lib/schemas/lead.js';
-	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import ClientFormDrawer from './client-form-drawer.svelte';
@@ -96,7 +97,11 @@
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
 			'Organisation'
 	);
-	const navGroups = $derived(appNavGroups('Contacts'));
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Contacts', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {

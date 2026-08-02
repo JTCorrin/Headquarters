@@ -24,6 +24,7 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/leads/abc')).toBe(true);
 		expect(requiresSelectedOrg('/clients')).toBe(true);
 		expect(requiresSelectedOrg('/clients/abc')).toBe(true);
+		expect(requiresSelectedOrg('/settings')).toBe(true);
 		expect(requiresSelectedOrg('/select-org')).toBe(false);
 		expect(requiresSelectedOrg('/login')).toBe(false);
 	});
@@ -40,7 +41,7 @@ describe('auth paths', () => {
 				membershipCount: 1,
 				selectedOrgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 			})
-		).toBe('/org/config');
+		).toBe('/settings');
 		expect(postAuthDestination({ membershipCount: 2, selectedOrgId: null })).toBe(
 			'/select-org'
 		);

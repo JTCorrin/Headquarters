@@ -59,7 +59,7 @@ function memberships() {
 			{
 				membership: {
 					id: 'm2',
-					role: 'admin',
+					role: 'owner',
 					status: 'active',
 					joined_at: '2026-02-01T00:00:00Z'
 				},
@@ -93,9 +93,8 @@ function memoryStorage(seed: Record<string, string> = {}) {
 }
 
 describe('OrgConfigPage integration', () => {
-	it('loads config/tax/preferences with X-Org-Id and saves preferences', async () => {
+	it('loads config/tax with X-Org-Id and keeps personal Mail off org Config', async () => {
 		const seenOrgHeaders: string[] = [];
-		let prefsBody: unknown;
 		const session = createOrgSession({
 			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
 			initialOrgId: ORG_A
@@ -129,16 +128,6 @@ describe('OrgConfigPage integration', () => {
 							]
 						}
 					};
-				},
-				'GET /api/v1/profile/preferences': async (request) => {
-					expect(request.headers.get('x-org-id')).toBeNull();
-					return { body: { data: { theme_preference: null, locale: null, timezone: null } } };
-				},
-				'PATCH /api/v1/profile/preferences': async (request) => {
-					prefsBody = await request.json();
-					return {
-						body: { data: { theme_preference: 'dark', locale: null, timezone: null } }
-					};
 				}
 			}),
 			getOrgId: () => session.selectedOrgId
@@ -148,11 +137,34 @@ describe('OrgConfigPage integration', () => {
 
 		await expect.element(page.getByText('VAT 20%')).toBeInTheDocument();
 		expect(seenOrgHeaders.every((h) => h === ORG_A)).toBe(true);
+		expect(page.getByTestId('personal-mail-section').elements().length).toBe(0);
+		expect(page.getByTestId('personal-theme-section').elements().length).toBe(0);
+	});
 
-		await page.getByTestId('profile-theme-trigger').click();
-		await page.getByRole('option', { name: 'Dark' }).click();
-		await page.getByRole('button', { name: /save preference/i }).click();
-		await vi.waitFor(() => expect(prefsBody).toEqual({ theme_preference: 'dark' }));
+	it('blocks non-owners from org Config with a My settings link', async () => {
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					role: 'admin',
+					theme_default: 'system'
+				}
+			]
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({}),
+			getOrgId: () => session.selectedOrgId
+		});
+
+		render(OrgConfigPage, { api, session });
+		await expect.element(page.getByTestId('org-config-forbidden')).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId('org-config-forbidden').getByRole('link'))
+			.toHaveAttribute('href', '/settings');
 	});
 
 	it('surfaces 403 on configuration load', async () => {
@@ -173,10 +185,7 @@ describe('OrgConfigPage integration', () => {
 			fetch: createMockFetch({
 				'GET /api/v1/organisation/configuration': async () =>
 					apiError(403, 'FORBIDDEN', 'No active membership for this organisation'),
-				'GET /api/v1/tax-rates': async () => ({ body: { data: [] } }),
-				'GET /api/v1/profile/preferences': async () => ({
-					body: { data: { theme_preference: null, locale: null, timezone: null } }
-				})
+				'GET /api/v1/tax-rates': async () => ({ body: { data: [] } })
 			}),
 			getOrgId: () => session.selectedOrgId
 		});
@@ -206,9 +215,6 @@ describe('OrgConfigPage integration', () => {
 					body: { data: orgConfig(2) }
 				}),
 				'GET /api/v1/tax-rates': async () => ({ body: { data: [] } }),
-				'GET /api/v1/profile/preferences': async () => ({
-					body: { data: { theme_preference: 'system', locale: null, timezone: null } }
-				}),
 				'PATCH /api/v1/organisation/configuration': async () =>
 					apiError(412, 'PRECONDITION_FAILED', 'Organisation version does not match If-Match')
 			}),
