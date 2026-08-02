@@ -75,6 +75,8 @@ create_vendor="$(
 		-d '{"name":"Proof Vendor Ltd","status":"active","primary_email":"vendor@example.test"}'
 )"
 VENDOR_ID="$(printf '%s' "$create_vendor" | jq -r '.data.id // empty')"
+VENDOR_EMAIL="$(printf '%s' "$create_vendor" | jq -r '.data.primary_email // empty')"
+[[ "$VENDOR_EMAIL" == "vendor@example.test" ]] || die "vendor primary_email dropped: ${create_vendor}"
 [[ -n "$VENDOR_ID" ]] || die "vendor create: ${create_vendor}"
 log "vendor ${VENDOR_ID}"
 
