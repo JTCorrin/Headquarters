@@ -18,6 +18,9 @@ EMAIL="${PROOF_EMAIL:-inv-proof-$(date +%s)-$RANDOM@example.test}"
 PASSWORD="${PROOF_PASSWORD:-ProofPass123!}"
 SLUG="${PROOF_SLUG:-inv-proof-$(date +%s)}"
 DISPLAY_NAME="${PROOF_DISPLAY_NAME:-Invoices Curl Proof}"
+# Relative to "today" so the proof does not rot after a hard-coded calendar date.
+DUE_ON_PRIMARY="$(date -u -d '+30 days' +%Y-%m-%d)"
+DUE_ON_SECONDARY="$(date -u -d '+60 days' +%Y-%m-%d)"
 
 log() { printf '[inv-curl-proof] %s\n' "$*"; }
 die() { printf '[inv-curl-proof] FAIL: %s\n' "$*" >&2; exit 1; }
@@ -131,11 +134,11 @@ create_inv="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H 'content-type: application/json' \
-		-d "$(jq -n --arg client "$CLIENT_ID" --arg contact "$CONTACT_ID" '{
+		-d "$(jq -n --arg client "$CLIENT_ID" --arg contact "$CONTACT_ID" --arg due "$DUE_ON_PRIMARY" '{
 			client_id: $client,
 			contact_id: $contact,
 			currency: "GBP",
-			due_on: "2026-09-01",
+			due_on: $due,
 			purchase_order_number: "PO-INV-1",
 			lines: [
 				{
@@ -279,10 +282,10 @@ create_del="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H 'content-type: application/json' \
-		-d "$(jq -n --arg client "$CLIENT_ID" '{
+		-d "$(jq -n --arg client "$CLIENT_ID" --arg due "$DUE_ON_SECONDARY" '{
 			client_id: $client,
 			currency: "GBP",
-			due_on: "2026-10-01",
+			due_on: $due,
 			lines: [{description: "Delete me", quantity: 1, unit_price_cents: 100, tax_rate_percent: 0}]
 		}')"
 )"

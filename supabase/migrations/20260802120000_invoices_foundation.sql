@@ -883,6 +883,8 @@ as $$
 declare
   actor_id uuid := auth.uid();
   invoice_row public.invoices;
+  client_row public.clients;
+  contact_row public.contacts;
   lines_json jsonb;
   next_client_id uuid;
   next_contact_id uuid;
@@ -895,6 +897,7 @@ declare
   next_payment_terms text;
   next_notes text;
   next_internal_notes text;
+  next_party_snapshot jsonb;
   line_totals record;
   next_subtotal bigint;
   next_tax bigint;
@@ -1010,6 +1013,57 @@ begin
       using errcode = '22023';
   end if;
 
+  -- Draft party changes rebuild the snapshot immediately. Quote-derived invoices
+  -- keep their accepted snapshot until a client/contact change; Send then
+  -- preserves whatever snapshot is stored (never re-reads mutable live parties).
+  next_party_snapshot := invoice_row.party_snapshot;
+  if next_client_id is distinct from invoice_row.client_id
+    or next_contact_id is distinct from invoice_row.contact_id
+  then
+    select * into client_row
+    from public.clients
+    where clients.id = next_client_id
+      and clients.org_id = p_org_id;
+
+    if not found then
+      raise exception 'Invoice client not found'
+        using errcode = 'P0002';
+    end if;
+
+    contact_row := null;
+    if next_contact_id is not null then
+      select * into contact_row
+      from public.contacts
+      where contacts.id = next_contact_id
+        and contacts.org_id = p_org_id;
+
+      if not found then
+        raise exception 'Invoice contact not found'
+          using errcode = 'P0002';
+      end if;
+    end if;
+
+    next_party_snapshot := jsonb_build_object(
+      'client', jsonb_build_object(
+        'id', client_row.id,
+        'name', client_row.name,
+        'primary_email', client_row.primary_email,
+        'phone', client_row.phone,
+        'tax_identifier', client_row.tax_identifier,
+        'registration_number', client_row.registration_number
+      ),
+      'contact', case
+        when contact_row.id is not null then jsonb_build_object(
+          'id', contact_row.id,
+          'display_name', contact_row.display_name,
+          'primary_email', contact_row.primary_email,
+          'primary_phone', contact_row.primary_phone
+        )
+        else null
+      end
+    );
+  end if;
+
   perform set_config('app.allow_invoice_totals', 'on', true);
 
   if p_lines is not null then
@@ -1056,6 +1110,7 @@ begin
     tax_cents = next_tax,
     total_cents = next_subtotal - next_discount_cents + next_tax,
     balance_due_cents = next_subtotal - next_discount_cents + next_tax,
+    party_snapshot = next_party_snapshot,
     payment_terms = next_payment_terms,
     notes = next_notes,
     internal_notes = next_internal_notes,
@@ -1193,6 +1248,24 @@ begin
   returning * into invoice_row;
 
   perform set_config('app.allow_invoice_totals', 'off', true);
+
+  -- Soft-deleting a quote-derived draft clears the conversion link so a later
+  -- reconversion creates a live invoice instead of returning the hidden row.
+  if invoice_row.quote_id is not null then
+    perform set_config('app.allow_quote_lifecycle', 'on', true);
+    perform set_config('app.allow_quote_totals', 'on', true);
+
+    update public.quotes
+    set
+      converted_invoice_id = null,
+      updated_by = actor_id
+    where quotes.id = invoice_row.quote_id
+      and quotes.org_id = p_org_id
+      and quotes.converted_invoice_id = invoice_row.id;
+
+    perform set_config('app.allow_quote_lifecycle', 'off', true);
+    perform set_config('app.allow_quote_totals', 'off', true);
+  end if;
 
   return jsonb_build_object('invoice', to_jsonb(invoice_row));
 end;
@@ -1376,42 +1449,50 @@ begin
       using errcode = '22023';
   end if;
 
-  select * into client_row
-  from public.clients
-  where clients.id = invoice_row.client_id
-    and clients.org_id = p_org_id;
+  -- Quote-derived invoices keep the accepted (or draft-updated) party snapshot.
+  -- Manual drafts still freeze live client/contact data at send time.
+  if invoice_row.source = 'quote'
+    and invoice_row.party_snapshot ? 'client'
+  then
+    snapshot := invoice_row.party_snapshot;
+  else
+    select * into client_row
+    from public.clients
+    where clients.id = invoice_row.client_id
+      and clients.org_id = p_org_id;
 
-  if not found then
-    raise exception 'Invoice client not found'
-      using errcode = 'P0002';
+    if not found then
+      raise exception 'Invoice client not found'
+        using errcode = 'P0002';
+    end if;
+
+    if invoice_row.contact_id is not null then
+      select * into contact_row
+      from public.contacts
+      where contacts.id = invoice_row.contact_id
+        and contacts.org_id = p_org_id;
+    end if;
+
+    snapshot := jsonb_build_object(
+      'client', jsonb_build_object(
+        'id', client_row.id,
+        'name', client_row.name,
+        'primary_email', client_row.primary_email,
+        'phone', client_row.phone,
+        'tax_identifier', client_row.tax_identifier,
+        'registration_number', client_row.registration_number
+      ),
+      'contact', case
+        when contact_row.id is not null then jsonb_build_object(
+          'id', contact_row.id,
+          'display_name', contact_row.display_name,
+          'primary_email', contact_row.primary_email,
+          'primary_phone', contact_row.primary_phone
+        )
+        else null
+      end
+    );
   end if;
-
-  if invoice_row.contact_id is not null then
-    select * into contact_row
-    from public.contacts
-    where contacts.id = invoice_row.contact_id
-      and contacts.org_id = p_org_id;
-  end if;
-
-  snapshot := jsonb_build_object(
-    'client', jsonb_build_object(
-      'id', client_row.id,
-      'name', client_row.name,
-      'primary_email', client_row.primary_email,
-      'phone', client_row.phone,
-      'tax_identifier', client_row.tax_identifier,
-      'registration_number', client_row.registration_number
-    ),
-    'contact', case
-      when contact_row.id is not null then jsonb_build_object(
-        'id', contact_row.id,
-        'display_name', contact_row.display_name,
-        'primary_email', contact_row.primary_email,
-        'primary_phone', contact_row.primary_phone
-      )
-      else null
-    end
-  );
 
   perform set_config('app.allow_invoice_lifecycle', 'on', true);
 
@@ -1502,6 +1583,8 @@ begin
   update public.invoices
   set
     status = 'void',
+    -- A voided receivable is no longer collectible.
+    balance_due_cents = 0,
     voided_at = now(),
     void_reason = reason,
     updated_by = actor_id
@@ -1563,12 +1646,15 @@ begin
       using errcode = 'P0002';
   end if;
 
-  -- Idempotent reconvert: return the previously converted invoice unchanged.
+  -- Idempotent reconvert: return the previously converted *live* invoice.
+  -- Soft-deleted conversion targets are ignored and the link is cleared so a
+  -- fresh draft can be created (soft_delete_invoice_draft also clears the link).
   if quote_row.converted_invoice_id is not null then
     select * into invoice_row
     from public.invoices
     where invoices.id = quote_row.converted_invoice_id
-      and invoices.org_id = p_org_id;
+      and invoices.org_id = p_org_id
+      and invoices.deleted_at is null;
 
     if found then
       select coalesce(
@@ -1585,6 +1671,20 @@ begin
         'created', false
       );
     end if;
+
+    perform set_config('app.allow_quote_lifecycle', 'on', true);
+    perform set_config('app.allow_quote_totals', 'on', true);
+
+    update public.quotes
+    set
+      converted_invoice_id = null,
+      updated_by = actor_id
+    where quotes.id = quote_row.id;
+
+    quote_row.converted_invoice_id := null;
+
+    perform set_config('app.allow_quote_lifecycle', 'off', true);
+    perform set_config('app.allow_quote_totals', 'off', true);
   end if;
 
   if quote_row.status <> 'accepted' then
