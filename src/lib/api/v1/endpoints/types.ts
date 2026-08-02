@@ -42,6 +42,11 @@ import type {
 	ApiInvoiceListParams,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
+	ApiProduct,
+	ApiProductAdjustStockBody,
+	ApiProductCreateBody,
+	ApiProductListParams,
+	ApiProductUpdateBody,
 	ApiQuote,
 	ApiQuoteCreateBody,
 	ApiQuoteDocument,
@@ -84,6 +89,27 @@ export interface ProfilePreferencesEndpoints {
 	update(body: ApiProfilePreferencesPatch, signal?: AbortSignal): Promise<ApiProfilePreferences>;
 }
 
+export interface ProductsEndpoints {
+	list(
+		params?: ApiProductListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiProduct[]>>;
+	create(body: ApiProductCreateBody, signal?: AbortSignal): Promise<ApiProduct>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiProduct>>;
+	update(
+		id: string,
+		body: ApiProductUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiProduct>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	adjustStock(
+		id: string,
+		body: ApiProductAdjustStockBody,
+		signal?: AbortSignal
+	): Promise<ApiProduct>;
+}
+
 export interface QuotesEndpoints {
 	list(
 		params?: ApiQuoteListParams,
@@ -98,6 +124,7 @@ export interface QuotesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiQuoteDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	accept(id: string, version: number, signal?: AbortSignal): Promise<ApiQuoteDocument>;
 }
 
 export interface InvoicesEndpoints {

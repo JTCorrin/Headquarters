@@ -462,6 +462,149 @@ describe('createApiV1Client', () => {
 		await client.quotes.delete(QUOTE_ID, 2);
 	});
 
+	it('covers products CRUD plus quote accept', async () => {
+		const PRODUCT_ID = 'dddddddd-dddd-4eee-8fff-000000000099';
+		const fetchMock = createMockFetch({
+			'GET /api/v1/products': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				expect(new URL(request.url).searchParams.get('status')).toBe('active');
+				return {
+					body: {
+						data: [
+							{
+								id: PRODUCT_ID,
+								org_id: ORG_A,
+								created_at: '2026-03-01T00:00:00Z',
+								updated_at: '2026-03-01T00:00:00Z',
+								created_by: null,
+								updated_by: null,
+								deleted_at: null,
+								version: 1,
+								sku: 'WID-1',
+								name: 'Widget',
+								description: null,
+								category_id: null,
+								product_type: 'product',
+								unit_name: null,
+								unit_price_cents: 2500,
+								cost_price_cents: null,
+								currency: 'GBP',
+								tax_rate_id: null,
+								track_stock: true,
+								stock_qty: 0,
+								low_stock_at: null,
+								status: 'active',
+								metadata: {}
+							}
+						]
+					}
+				};
+			},
+			'POST /api/v1/products': async (request) => {
+				const body = await request.json();
+				expect(body.sku).toBe('WID-2');
+				return {
+					headers: { etag: '"1"' },
+					body: {
+						data: {
+							id: PRODUCT_ID,
+							org_id: ORG_A,
+							created_at: '2026-03-01T00:00:00Z',
+							updated_at: '2026-03-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							sku: 'WID-2',
+							name: 'Widget Two',
+							description: null,
+							category_id: null,
+							product_type: 'product',
+							unit_name: null,
+							unit_price_cents: 3000,
+							cost_price_cents: null,
+							currency: 'GBP',
+							tax_rate_id: null,
+							track_stock: false,
+							stock_qty: 0,
+							low_stock_at: null,
+							status: 'active',
+							metadata: {}
+						}
+					}
+				};
+			},
+			[`POST /api/v1/products/${PRODUCT_ID}/adjust-stock`]: async (request) => {
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
+				const body = await request.json();
+				expect(body.quantity_delta).toBe(5);
+				return {
+					body: {
+						data: {
+							id: PRODUCT_ID,
+							org_id: ORG_A,
+							created_at: '2026-03-01T00:00:00Z',
+							updated_at: '2026-03-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 2,
+							sku: 'WID-2',
+							name: 'Widget Two',
+							description: null,
+							category_id: null,
+							product_type: 'product',
+							unit_name: null,
+							unit_price_cents: 3000,
+							cost_price_cents: null,
+							currency: 'GBP',
+							tax_rate_id: null,
+							track_stock: true,
+							stock_qty: 5,
+							low_stock_at: null,
+							status: 'active',
+							metadata: {}
+						}
+					}
+				};
+			},
+			[`POST /api/v1/quotes/${QUOTE_ID}/accept`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return {
+					headers: { etag: '"3"' },
+					body: {
+						data: {
+							...sampleQuoteDocument,
+							version: 3,
+							status: 'accepted',
+							accepted_at: '2026-03-02T00:00:00Z'
+						}
+					}
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const listed = await client.products.list({ status: 'active' });
+		expect(listed.data[0]?.sku).toBe('WID-1');
+
+		const created = await client.products.create({
+			sku: 'WID-2',
+			name: 'Widget Two',
+			unit_price_cents: 3000
+		});
+		expect(created.id).toBe(PRODUCT_ID);
+
+		const adjusted = await client.products.adjustStock(PRODUCT_ID, {
+			quantity_delta: 5,
+			reason: 'opening'
+		});
+		expect(adjusted.stock_qty).toBe(5);
+
+		const accepted = await client.quotes.accept(QUOTE_ID, 2);
+		expect(accepted.status).toBe('accepted');
+	});
+
 	it('supports invoice draft CRUD, send/void, and from-quote with ETag / If-Match', async () => {
 		const INVOICE_ID = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb';
 		const sampleInvoiceDocument = {

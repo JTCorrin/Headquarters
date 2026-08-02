@@ -14,8 +14,11 @@
 		description?: string;
 		submitLabel?: string;
 		triggerLabel?: string;
+		/** When false, drawer is controlled only via `open` (no trigger button). */
+		showTrigger?: boolean;
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -25,20 +28,24 @@
 		description = 'Add a catalog item for quotes, invoices, and inventory.',
 		submitLabel = 'Save product',
 		triggerLabel = 'New product',
+		showTrigger = true,
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: ProductFormDrawerProps = $props();
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
-	{#if trigger}
-		<Drawer.Trigger>
-			{@render trigger()}
-		</Drawer.Trigger>
-	{:else}
-		<Drawer.Trigger>
-			<Button type="button">{triggerLabel}</Button>
-		</Drawer.Trigger>
+	{#if showTrigger}
+		{#if trigger}
+			<Drawer.Trigger>
+				{@render trigger()}
+			</Drawer.Trigger>
+		{:else}
+			<Drawer.Trigger>
+				<Button type="button">{triggerLabel}</Button>
+			</Drawer.Trigger>
+		{/if}
 	{/if}
 
 	<Drawer.Content class={cn('mx-auto w-full max-w-lg', className)}>
@@ -47,7 +54,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ProductForm {form} {submitLabel} />
+			<ProductForm {form} {submitLabel} {onValidSubmit} />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>
