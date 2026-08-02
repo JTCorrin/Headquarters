@@ -1,6 +1,6 @@
 begin;
 
-select plan(58);
+select plan(67);
 
 select has_table('public', 'invoices', 'invoices table exists');
 select has_table('public', 'invoice_lines', 'invoice_lines table exists');
@@ -716,10 +716,11 @@ select ok(
     select status = 'void'
       and voided_at is not null
       and void_reason = 'Issued in error'
+      and balance_due_cents = 0
     from public.invoices
     where id = (select invoice_id from _invoices_fixture)
   ),
-  'void sets status, voided_at, and void_reason'
+  'void sets status, zeros balance_due_cents, voided_at, and void_reason'
 );
 
 select throws_ok(
@@ -772,10 +773,11 @@ select lives_ok(
 select ok(
   (
     select status = 'void'
+      and balance_due_cents = 0
     from public.invoices
     where id = (select invoice_id from _invoices_fixture)
   ),
-  'draft-to-void transition succeeds without passing through sent'
+  'draft-to-void transition succeeds and zeros balance_due_cents'
 );
 
 -- ---------------------------------------------------------------------------
@@ -921,6 +923,174 @@ select ok(
     where quotes.id = (select quote_id from _invoices_fixture)
   ),
   'reconverting an already-converted quote is idempotent'
+);
+
+-- Capture the first converted invoice before soft-delete → reconvert.
+update _invoices_fixture
+set
+  invoice_id = quotes.converted_invoice_id,
+  invoice_version = invoices.version
+from public.quotes
+join public.invoices on invoices.id = quotes.converted_invoice_id
+where quotes.id = _invoices_fixture.quote_id;
+
+select lives_ok(
+  $$
+    select public.soft_delete_invoice_draft(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture)
+    )
+  $$,
+  'owner can soft-delete a quote-derived draft invoice'
+);
+
+select ok(
+  (
+    select converted_invoice_id is null
+    from public.quotes
+    where id = (select quote_id from _invoices_fixture)
+  ),
+  'soft-deleting a quote-derived draft clears quotes.converted_invoice_id'
+);
+
+select ok(
+  (
+    with reconvert as (
+      select public.create_invoice_from_quote(
+        (select quote_id from _invoices_fixture),
+        (select org_id from _invoices_fixture)
+      ) as result
+    )
+    select
+      (result ->> 'created')::boolean = true
+      and (result -> 'invoice' ->> 'id')::uuid is distinct from (select invoice_id from _invoices_fixture)
+      and (result -> 'invoice' ->> 'deleted_at') is null
+      and quotes.converted_invoice_id = (result -> 'invoice' ->> 'id')::uuid
+    from reconvert, public.quotes
+    where quotes.id = (select quote_id from _invoices_fixture)
+  ),
+  'reconverting after soft-delete creates a fresh live invoice'
+);
+
+-- Mutation after acceptance must not leak into quote-derived send snapshots.
+update _invoices_fixture
+set
+  invoice_id = quotes.converted_invoice_id,
+  invoice_version = invoices.version
+from public.quotes
+join public.invoices on invoices.id = quotes.converted_invoice_id
+where quotes.id = _invoices_fixture.quote_id;
+
+-- Soft-delete the reconverted draft so we can convert a second quote for the
+-- snapshot-mutation probe without colliding on the same quote link.
+select lives_ok(
+  $$
+    select public.soft_delete_invoice_draft(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture)
+    )
+  $$,
+  'owner can soft-delete the reconverted draft before the snapshot probe'
+);
+
+select lives_ok(
+  $$
+    select public.create_quote_draft(
+      (select org_id from _invoices_fixture),
+      jsonb_build_object(
+        'title', 'Snapshot freeze quote',
+        'client_id', (select client_id from _invoices_fixture),
+        'contact_id', (select contact_id from _invoices_fixture)
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'product_id', (select product_id from _invoices_fixture),
+          'quantity', 1,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'owner can create a second quote for the mutation-after-acceptance probe'
+);
+
+update _invoices_fixture
+set
+  quote_id = quotes.id,
+  quote_version = quotes.version
+from public.quotes
+where quotes.org_id = _invoices_fixture.org_id
+  and quotes.title = 'Snapshot freeze quote'
+  and quotes.deleted_at is null;
+
+select lives_ok(
+  $$
+    select public.accept_quote(
+      (select quote_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select quote_version from _invoices_fixture)
+    )
+  $$,
+  'owner can accept the snapshot-freeze quote'
+);
+
+update _invoices_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _invoices_fixture.quote_id;
+
+-- Rename the live client after acceptance; Send must keep the accepted name.
+reset role;
+update public.clients
+set name = 'Acme Client Renamed After Accept'
+where id = (select client_id from _invoices_fixture);
+
+select pg_temp.as_user((select owner_id from _invoices_fixture));
+set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.create_invoice_from_quote(
+      (select quote_id from _invoices_fixture),
+      (select org_id from _invoices_fixture)
+    )
+  $$,
+  'owner can convert the accepted quote after a live client rename'
+);
+
+update _invoices_fixture
+set
+  invoice_id = quotes.converted_invoice_id,
+  invoice_version = invoices.version
+from public.quotes
+join public.invoices on invoices.id = quotes.converted_invoice_id
+where quotes.id = _invoices_fixture.quote_id;
+
+select lives_ok(
+  $$
+    select public.send_invoice(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture)
+    )
+  $$,
+  'owner can send a quote-derived invoice after a live client rename'
+);
+
+select ok(
+  (
+    select
+      invoices.party_snapshot -> 'client' ->> 'name' = 'Acme Client'
+      and invoices.party_snapshot -> 'client' ->> 'name'
+        is distinct from clients.name
+      and clients.name = 'Acme Client Renamed After Accept'
+    from public.invoices
+    join public.clients on clients.id = invoices.client_id
+    where invoices.id = (select invoice_id from _invoices_fixture)
+  ),
+  'send preserves accepted quote party snapshot despite live client mutation'
 );
 
 reset role;
