@@ -10,6 +10,8 @@ import {
   parseLimit,
   parseVersion,
 } from './http.ts'
+import { parseAiProvider, validateAiConnectBody } from './integrations.ts'
+import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
@@ -840,4 +842,68 @@ Deno.test('document folder create validation trims name and allows null parent',
   assertEquals(ok.name, 'Contracts')
   assertEquals(ok.parent_id, null)
   assertThrows(() => validateFolderCreateBody({ name: '' }), ApiError)
+})
+
+Deno.test('mailbox validation normalises email and rejects empty password rotate', () => {
+  const ok = validateMailboxBody({
+    email_address: '  Ada@Example.TEST ',
+    from_name: ' Ada ',
+    imap_host: 'imap.example.test',
+    imap_port: 993,
+    imap_security: 'tls',
+    smtp_host: 'smtp.example.test',
+    smtp_port: 587,
+    smtp_security: 'starttls',
+    username: 'ada@example.test',
+    password: 'secret-pass',
+  })
+  assertEquals(ok.email_address, 'ada@example.test')
+  assertEquals(ok.from_name, 'Ada')
+  assertEquals(ok.password, 'secret-pass')
+
+  assertThrows(
+    () =>
+      validateMailboxBody({
+        email_address: 'ada@example.test',
+        imap_host: 'imap.example.test',
+        imap_port: 993,
+        imap_security: 'tls',
+        smtp_host: 'smtp.example.test',
+        smtp_port: 587,
+        smtp_security: 'tls',
+        username: 'ada',
+        password: '',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateMailboxBody({
+        email_address: 'not-an-email',
+        imap_host: 'imap.example.test',
+        imap_port: 993,
+        imap_security: 'tls',
+        smtp_host: 'smtp.example.test',
+        smtp_port: 587,
+        smtp_security: 'tls',
+        username: 'ada',
+      }),
+    ApiError,
+  )
+})
+
+Deno.test('mailbox test body accepts optional password only', () => {
+  assertEquals(validateMailboxTestBody({}), { password: null })
+  assertEquals(validateMailboxTestBody({ password: 'x' }), { password: 'x' })
+  assertThrows(() => validateMailboxTestBody({ password: '' }), ApiError)
+  assertThrows(() => validateMailboxTestBody({ host: 'nope' }), ApiError)
+})
+
+Deno.test('AI connect validation requires api_key and parses providers', () => {
+  assertEquals(validateAiConnectBody({ api_key: 'sk-test-123456' }).api_key, 'sk-test-123456')
+  assertThrows(() => validateAiConnectBody({ api_key: 'short' }), ApiError)
+  assertThrows(() => validateAiConnectBody({ api_key: 'sk-test-123456', oauth: true }), ApiError)
+  assertEquals(parseAiProvider('openai'), 'openai')
+  assertEquals(parseAiProvider('openrouter'), 'openrouter')
+  assertThrows(() => parseAiProvider('azure'), ApiError)
 })
