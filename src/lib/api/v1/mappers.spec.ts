@@ -121,7 +121,8 @@ describe('api mappers', () => {
 			phone: '+44 7700 900123',
 			company: 'Northwind',
 			title: 'Head of Operations',
-			status: 'active'
+			status: 'active',
+			clientId: ''
 		});
 		expect(
 			toContactCreateBody({
@@ -130,7 +131,8 @@ describe('api mappers', () => {
 				phone: ' ',
 				company: 'Contoso',
 				title: '',
-				status: 'active'
+				status: 'active',
+				clientId: ''
 			})
 		).toEqual({
 			display_name: 'Sam Ortiz',
@@ -138,7 +140,8 @@ describe('api mappers', () => {
 			primary_phone: null,
 			company_name: 'Contoso',
 			job_title: null,
-			lifecycle_status: 'active'
+			lifecycle_status: 'active',
+			client_id: null
 		});
 	});
 
@@ -241,15 +244,17 @@ describe('api mappers', () => {
 		expect(toLeadFormData(sampleLead)).toMatchObject({
 			name: 'Contoso expansion',
 			stage: 'qualified',
-			valueCents: '250000',
-			currency: 'GBP'
+			valueAmount: '2500',
+			currency: 'GBP',
+			clientId: ''
 		});
 		expect(
 			toLeadCreateBody({
 				name: '  Northwind pilot  ',
 				companyName: '',
+				clientId: '',
 				stage: 'new',
-				valueCents: '1000',
+				valueAmount: '10',
 				currency: 'USD',
 				probabilityPercent: '',
 				source: '',
@@ -260,6 +265,7 @@ describe('api mappers', () => {
 		).toEqual({
 			name: 'Northwind pilot',
 			company_name: null,
+			client_id: null,
 			stage: 'new',
 			value_cents: 1000,
 			currency: 'USD',

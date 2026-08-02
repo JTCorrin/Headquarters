@@ -14,6 +14,8 @@
 		description?: string;
 		submitLabel?: string;
 		triggerLabel?: string;
+		/** When false, drawer is controlled only via `open` (no trigger button). */
+		showTrigger?: boolean;
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -26,6 +28,7 @@
 		description = 'Create a client account. Leads convert into clients via Convert lead.',
 		submitLabel = 'Save client',
 		triggerLabel = 'New client',
+		showTrigger = true,
 		class: className,
 		trigger,
 		onValidSubmit
@@ -33,16 +36,18 @@
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
-	{#if trigger}
-		<Drawer.Trigger>
-			{@render trigger()}
-		</Drawer.Trigger>
-	{:else}
-		<Drawer.Trigger>
-			{#snippet child({ props })}
-				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
-			{/snippet}
-		</Drawer.Trigger>
+	{#if showTrigger}
+		{#if trigger}
+			<Drawer.Trigger>
+				{@render trigger()}
+			</Drawer.Trigger>
+		{:else}
+			<Drawer.Trigger>
+				{#snippet child({ props })}
+					<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+				{/snippet}
+			</Drawer.Trigger>
+		{/if}
 	{/if}
 
 	<Drawer.Content class={cn('mx-auto w-full max-w-lg', className)}>

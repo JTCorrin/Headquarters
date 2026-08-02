@@ -4,6 +4,12 @@ import { page } from 'vitest/browser';
 import LeadFormTestHost from './lead-form.test-host.svelte';
 
 describe('LeadForm', () => {
+	it('labels value as ordinary currency, not cents', async () => {
+		render(LeadFormTestHost);
+		await expect.element(page.getByLabelText('Value')).toBeInTheDocument();
+		await expect.element(page.getByText(/\(cents\)/i)).not.toBeInTheDocument();
+	});
+
 	it('shows lost reason when stage is lost', async () => {
 		render(LeadFormTestHost, { initial: { stage: 'lost' } });
 		await expect.element(page.getByLabelText('Lost reason')).toBeInTheDocument();

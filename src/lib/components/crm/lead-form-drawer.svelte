@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { LeadFormData } from '$lib/schemas/lead.js';
+	import type { LeadClientOption, LeadFormData } from '$lib/schemas/lead.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import LeadForm from './lead-form.svelte';
@@ -9,6 +9,8 @@
 
 	export interface LeadFormDrawerProps {
 		form: SuperForm<LeadFormData>;
+		clientOptions?: LeadClientOption[];
+		orgCurrency?: string | null;
 		open?: boolean;
 		title?: string;
 		description?: string;
@@ -17,10 +19,13 @@
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onCreateClient?: () => void;
 	}
 
 	let {
 		form,
+		clientOptions = [],
+		orgCurrency = null,
 		open = $bindable(false),
 		title = 'New lead',
 		description = 'Create a pipeline lead. Mark won only via Convert on the lead detail.',
@@ -28,7 +33,8 @@
 		triggerLabel = 'New lead',
 		class: className,
 		trigger,
-		onValidSubmit
+		onValidSubmit,
+		onCreateClient
 	}: LeadFormDrawerProps = $props();
 </script>
 
@@ -51,7 +57,14 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<LeadForm {form} {submitLabel} {onValidSubmit} />
+			<LeadForm
+				{form}
+				{clientOptions}
+				{orgCurrency}
+				{submitLabel}
+				{onValidSubmit}
+				{onCreateClient}
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

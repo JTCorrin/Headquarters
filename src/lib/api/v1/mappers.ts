@@ -2,6 +2,7 @@ import type { ClientFormData, ClientResource } from '$lib/schemas/client.js';
 import type { ContactFormData, ContactListItem } from '$lib/schemas/contact.js';
 import type { ConvertLeadFormData, LeadFormData, LeadResource } from '$lib/schemas/lead.js';
 import { leadWritableStages } from '$lib/schemas/lead.js';
+import { amountStringToCents, centsToAmountString } from '$lib/money.js';
 import type {
 	MembershipRole,
 	OrganisationConfigData,
@@ -185,14 +186,18 @@ export function toContactListItem(contact: ApiContact): ContactListItem {
 	};
 }
 
-export function toContactFormData(contact: ApiContact): ContactFormData {
+export function toContactFormData(
+	contact: ApiContact,
+	clientId: string | null = null
+): ContactFormData {
 	return {
 		name: contact.display_name,
 		email: contact.primary_email ?? '',
 		phone: contact.primary_phone ?? '',
 		company: contact.company_name ?? '',
 		title: contact.job_title ?? '',
-		status: contact.lifecycle_status
+		status: contact.lifecycle_status,
+		clientId: clientId ?? ''
 	};
 }
 
@@ -203,7 +208,8 @@ export function toContactCreateBody(data: ContactFormData): ApiContactCreateBody
 		primary_phone: emptyToNull(data.phone),
 		company_name: emptyToNull(data.company),
 		job_title: emptyToNull(data.title),
-		lifecycle_status: data.status
+		lifecycle_status: data.status,
+		client_id: emptyToNull(data.clientId)
 	};
 }
 
@@ -388,7 +394,9 @@ export function toLeadCard(lead: ApiLead): LeadCard {
 		currency: lead.currency,
 		owner: null,
 		stage: lead.stage,
-		version: lead.version
+		version: lead.version,
+		position: lead.position,
+		clientId: lead.client_id
 	};
 }
 
@@ -421,8 +429,9 @@ export function toLeadFormData(lead: ApiLead): LeadFormData {
 	return {
 		name: lead.name,
 		companyName: lead.company_name ?? '',
+		clientId: lead.client_id ?? '',
 		stage,
-		valueCents: lead.value_cents == null ? '' : String(lead.value_cents),
+		valueAmount: centsToAmountString(lead.value_cents),
 		currency: lead.currency,
 		probabilityPercent:
 			lead.probability_percent == null ? '' : String(lead.probability_percent),
@@ -434,8 +443,10 @@ export function toLeadFormData(lead: ApiLead): LeadFormData {
 }
 
 export function toLeadCreateBody(data: LeadFormData): ApiLeadCreateBody {
-	const valueCents =
-		data.valueCents === undefined || data.valueCents === '' ? null : Number(data.valueCents);
+	let valueCents: number | null = null;
+	if (data.valueAmount !== undefined && data.valueAmount !== '') {
+		valueCents = amountStringToCents(data.valueAmount);
+	}
 	const probability =
 		data.probabilityPercent === undefined || data.probabilityPercent === ''
 			? null
@@ -443,6 +454,7 @@ export function toLeadCreateBody(data: LeadFormData): ApiLeadCreateBody {
 	return {
 		name: data.name.trim(),
 		company_name: emptyToNull(data.companyName),
+		client_id: emptyToNull(data.clientId),
 		stage: data.stage,
 		value_cents: valueCents,
 		currency: data.currency,

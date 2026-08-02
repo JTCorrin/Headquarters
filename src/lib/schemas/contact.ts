@@ -8,7 +8,9 @@ export const contactFormSchema = z.object({
 	phone: z.string().max(64).optional().or(z.literal('')),
 	company: z.string().max(200).optional().or(z.literal('')),
 	title: z.string().max(200).optional().or(z.literal('')),
-	status: z.enum(contactLifecycleStatuses)
+	status: z.enum(contactLifecycleStatuses),
+	/** Primary client link; empty means unlinked. */
+	clientId: z.string().uuid().optional().or(z.literal(''))
 });
 
 export type ContactFormSchema = typeof contactFormSchema;
