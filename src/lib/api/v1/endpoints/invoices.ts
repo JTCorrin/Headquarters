@@ -3,6 +3,7 @@ import type {
 	ApiInvoice,
 	ApiInvoiceCreateBody,
 	ApiInvoiceDocument,
+	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody
@@ -24,6 +25,15 @@ export function createInvoicesEndpoints(request: ApiRequestFn): InvoicesEndpoint
 		},
 		create: async (body: ApiInvoiceCreateBody, signal) => {
 			const { data } = await request<ApiInvoiceDocument>('/api/v1/invoices', {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
+		},
+		createFromQuote: async (body: ApiInvoiceFromQuoteBody, signal) => {
+			const { data } = await request<ApiInvoiceDocument>('/api/v1/invoices/from-quote', {
 				method: 'POST',
 				body,
 				orgScoped: true,

@@ -226,7 +226,7 @@
 		const form = get(invoiceForm.form);
 		try {
 			const created = form.quoteId
-				? await api.quotes.createInvoice(form.quoteId)
+				? await api.invoices.createFromQuote({ quote_id: form.quoteId })
 				: await api.invoices.create(toInvoiceCreateBody(form));
 			if (isStale(epoch)) return false;
 			rows = [toInvoiceListItem(created), ...rows];
