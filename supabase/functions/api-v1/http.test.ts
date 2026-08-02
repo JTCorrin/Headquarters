@@ -23,6 +23,7 @@ import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
 import { validateBillBody } from './bills.ts'
 import { validateVendorBody } from './vendors.ts'
+import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
 import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -817,6 +818,43 @@ Deno.test('vendor create validation defaults status and rejects unknown fields',
     () => validateVendorBody({ name: 'X', primary_email: 'not-an-email' }, false),
     ApiError,
   )
+})
+
+Deno.test('task create validation defaults priority/status/source and rejects reserved fields', () => {
+  const body = validateTaskBody({ title: 'Ship Tasks BE' }, false)
+  assertEquals(body.title, 'Ship Tasks BE')
+  assertEquals(body.priority, 'p3')
+  assertEquals(body.status, 'open')
+  assertEquals(body.source, 'manual')
+  assertEquals(body.position, 0)
+  assertThrows(
+    () => validateTaskBody({ title: 'X', assignee_agent_id: crypto.randomUUID() }, false),
+    ApiError,
+  )
+  assertThrows(
+    () => validateTaskBody({ title: 'X', entity_type: 'contact' }, false),
+    ApiError,
+  )
+  assertThrows(
+    () => validateTaskBody({ title: 'X', priority: 'urgent' }, false),
+    ApiError,
+  )
+  const patched = validateTaskBody({ status: 'blocked', blocked_reason: 'Waiting' }, true)
+  assertEquals(patched.status, 'blocked')
+  assertEquals(patched.blocked_reason, 'Waiting')
+})
+
+Deno.test('task cursor round-trip shape', () => {
+  const createdAt = '2026-08-02T18:00:00.000Z'
+  const id = '11111111-1111-4111-8111-111111111111'
+  const encoded = btoa(JSON.stringify({ created_at: createdAt, id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+  const decoded = decodeTaskCursor(encoded)
+  assertEquals(decoded.created_at, createdAt)
+  assertEquals(decoded.id, id)
+  assertThrows(() => decodeTaskCursor('not-a-cursor'), ApiError)
 })
 
 Deno.test('tax rate and profile preference validation', () => {
