@@ -2,6 +2,8 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import BillDetailPage from '$lib/components/crm/bill-detail-page.svelte';
 
+	const VENDOR_ID = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
+
 	const catalog = [
 		{ id: 'p1', sku: 'SAAS-M', name: 'SaaS seat (monthly)', unitPrice: '18.00' },
 		{ id: 'p2', sku: 'HOST-M', name: 'Hosting (monthly)', unitPrice: '120.00' },
@@ -27,10 +29,15 @@
 
 	const billData = defaults(
 		{
+			vendorId: VENDOR_ID,
 			vendorName: 'Figma',
 			number: 'BILL-0141',
+			internalReference: '',
 			currency: 'GBP',
+			issueOn: '2026-03-01',
+			receivedOn: '2026-03-01',
 			dueOn: '2026-03-20',
+			notes: '',
 			status: 'received'
 		},
 		zod4(billFormSchema)
@@ -126,36 +133,69 @@
 				{billForm}
 				{lineForm}
 				products={catalog}
+				vendorOptions={[{ id: VENDOR_ID, name: 'Figma', defaultCurrency: 'GBP' }]}
+				isDraft={false}
+				moneyTotals={{
+					subtotalCents: 18000,
+					discountCents: 0,
+					taxCents: 0,
+					totalCents: 18000
+				}}
 				{timelineEvents}
 				bind:lines
 				bind:lineDrawerOpen
 				onRemoveLine={(id) => {
 					lines = lines.filter((row) => row.id !== id);
 				}}
-				onSchedule={() => {
-					status = 'Scheduled';
+				onVoid={() => {
+					status = 'Void';
 					prependEvent({
 						kind: 'status',
-						title: 'Payment scheduled',
-						body: 'Bank transfer · due Mar 20',
+						title: 'Bill voided',
+						body: 'Storybook mock',
 						actor: 'You'
 					});
 				}}
-				onRecordPayment={() => {
-					status = 'Part paid';
+			/>
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Draft">
+	{#snippet template()}
+		<div class="h-screen">
+			<BillDetailPage
+				orgName="Acme Org"
+				navGroups={navGroupsWithActive('Bills')}
+				title="BILL-0144 · Notion"
+				status="Draft"
+				{billForm}
+				{lineForm}
+				products={catalog}
+				vendorOptions={[{ id: VENDOR_ID, name: 'Notion', defaultCurrency: 'GBP' }]}
+				isDraft={true}
+				moneyTotals={{
+					subtotalCents: 12000,
+					discountCents: 0,
+					taxCents: 0,
+					totalCents: 12000
+				}}
+				{timelineEvents}
+				bind:lines
+				bind:lineDrawerOpen
+				onReceive={() => {
+					status = 'Received';
 					prependEvent({
-						kind: 'payment',
-						title: 'Outbound payment recorded',
-						body: 'Storybook mock — £90 of £180',
+						kind: 'status',
+						title: 'Bill received',
 						actor: 'You'
 					});
 				}}
-				onMarkPaid={() => {
-					status = 'Paid';
+				onVoid={() => {
+					status = 'Void';
 					prependEvent({
-						kind: 'payment',
-						title: 'Bill marked paid',
-						body: '£180 · Figma',
+						kind: 'status',
+						title: 'Bill voided',
 						actor: 'You'
 					});
 				}}

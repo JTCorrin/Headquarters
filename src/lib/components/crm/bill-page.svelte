@@ -1,0 +1,630 @@
+<script lang="ts">
+	import { fromStore, get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
+	import type { ApiV1Client } from '$lib/api/v1/client.js';
+	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import {
+		roleFromMemberships,
+		billStatusLabel,
+		lineItemRowsToBillLineInputs,
+		membershipFromCreateResult,
+		toBillFormData,
+		toBillLineInput,
+		toBillUpdateBody,
+		toCatalogProductOption,
+		toOrganisationCreateBody,
+		toOrgMembershipSummary,
+		toVendorCreateBody
+	} from '$lib/api/v1/mappers.js';
+	import type { ApiBillDocument } from '$lib/api/v1/types.js';
+	import { centsToAmountString } from '$lib/money.js';
+	import { appNavGroups } from '$lib/org/nav.js';
+	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import {
+		lineItemFormSchema,
+		type CatalogProductOption
+	} from '$lib/schemas/line-item.js';
+	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		billFormSchema,
+		type BillFormData,
+		type BillVendorOption
+	} from '$lib/schemas/bill.js';
+	import { vendorFormSchema } from '$lib/schemas/vendor.js';
+	import type { LineItemRow } from './line-items-table.svelte';
+	import type { ResourceViewState } from './resource-state-banner.svelte';
+	import AppShell from './app-shell.svelte';
+	import BillDetailPage from './bill-detail-page.svelte';
+	import ResourceStateBanner from './resource-state-banner.svelte';
+
+	export interface BillPageProps {
+		api: ApiV1Client;
+		session: OrgSession;
+		billId: string;
+		onMissingOrg?: () => void;
+		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
+		onLogout?: () => void | Promise<void>;
+		class?: string;
+	}
+
+	let {
+		api,
+		session,
+		billId,
+		onMissingOrg,
+		onSwitchNavigate,
+		onDeleted,
+		onLogout,
+		class: className
+	}: BillPageProps = $props();
+
+	let viewState = $state<ResourceViewState>({ kind: 'loading' });
+	let bill = $state<ApiBillDocument | null>(null);
+	let vendorOptions = $state<BillVendorOption[]>([]);
+	let products = $state<CatalogProductOption[]>([]);
+	let lines = $state<LineItemRow[]>([]);
+	let savedFingerprint = $state('');
+	let switchError = $state<string | null>(null);
+	let createError = $state<string | null>(null);
+	let busy = $state(false);
+	let actionPending = $state(false);
+	let lineDrawerOpen = $state(false);
+	let vendorDrawerOpen = $state(false);
+
+	const billForm = superForm(
+		defaults(
+			{
+				vendorId: '00000000-0000-4000-8000-000000000000',
+				vendorName: '',
+				number: '',
+				internalReference: '',
+				currency: 'GBP' as const,
+				issueOn: '',
+				receivedOn: '',
+				dueOn: '',
+				notes: '',
+				status: 'draft' as const
+			},
+			zod4(billFormSchema)
+		),
+		{
+			validators: zod4(billFormSchema),
+			SPA: true,
+			warnings: { duplicateId: false },
+			applyAction: false,
+			resetForm: false
+		}
+	);
+
+	const vendorForm = superForm(
+		defaults({ name: '' }, zod4(vendorFormSchema)),
+		{
+			validators: zod4(vendorFormSchema),
+			SPA: true,
+			warnings: { duplicateId: false },
+			applyAction: false,
+			resetForm: false
+		}
+	);
+
+	const lineForm = superForm(
+		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
+		{
+			validators: zod4(lineItemFormSchema),
+			SPA: true,
+			warnings: { duplicateId: false },
+			applyAction: false,
+			resetForm: false
+		}
+	);
+
+	const formSnapshot = fromStore(billForm.form);
+
+	const orgName = $derived(
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
+			'Organisation'
+	);
+	const role = $derived(
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
+			'member') as MembershipRole
+	);
+	const navGroups = $derived(appNavGroups('Bills', role));
+	const currentOrgId = $derived(session.selectedOrgId ?? '');
+	const isDraft = $derived(bill?.status === 'draft');
+
+	function fingerprintFrom(form: BillFormData, rowLines: LineItemRow[]) {
+		return JSON.stringify({
+			vendorId: form.vendorId,
+			number: form.number,
+			internalReference: form.internalReference,
+			currency: form.currency,
+			issueOn: form.issueOn,
+			receivedOn: form.receivedOn,
+			dueOn: form.dueOn,
+			notes: form.notes,
+			lines: rowLines.map((line) => ({
+				id: line.id,
+				productId: line.productId ?? null,
+				description: line.description,
+				qty: line.qty,
+				unitPrice: line.unitPrice,
+				discountPercent: line.discountPercent,
+				taxRatePercent: line.taxRatePercent
+			}))
+		});
+	}
+
+	const isDirty = $derived.by(() => {
+		if (!bill || bill.status !== 'draft' || !savedFingerprint) return false;
+		return fingerprintFrom(formSnapshot.current, lines) !== savedFingerprint;
+	});
+
+	function userMessage(error: unknown, fallback: string): string {
+		if (isApiClientError(error)) {
+			if (error.isNetworkError) return 'Network error — check your connection and retry.';
+			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
+			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Bill not found.';
+			if (error.isPreconditionFailed) {
+				return error.message || 'Bill changed elsewhere — reload and try again.';
+			}
+			if (error.isValidationError) {
+				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
+				return error.message;
+			}
+			return error.message || fallback;
+		}
+		return fallback;
+	}
+
+	interface RequestEpoch {
+		orgId: string | null;
+		generation: number;
+		billId: string;
+	}
+
+	const liveEpoch: RequestEpoch = {
+		orgId: null,
+		generation: -1,
+		billId: ''
+	};
+
+	$effect(() => {
+		liveEpoch.orgId = session.selectedOrgId;
+		liveEpoch.generation = session.cacheGeneration;
+		liveEpoch.billId = billId;
+	});
+
+	function captureEpoch(): RequestEpoch {
+		return {
+			orgId: liveEpoch.orgId,
+			generation: liveEpoch.generation,
+			billId: liveEpoch.billId
+		};
+	}
+
+	function isStale(epoch: RequestEpoch): boolean {
+		return (
+			epoch.orgId !== liveEpoch.orgId ||
+			epoch.generation !== liveEpoch.generation ||
+			epoch.billId !== liveEpoch.billId
+		);
+	}
+
+	function resetOrgScopedState() {
+		bill = null;
+		lines = [];
+		vendorOptions = [];
+		products = [];
+		savedFingerprint = '';
+		viewState = { kind: 'loading' };
+	}
+
+	function mapLines(document: ApiBillDocument): LineItemRow[] {
+		return document.lines.map((line) => ({
+			id: line.id,
+			productSku: line.sku_snapshot ?? undefined,
+			productId: line.product_id,
+			description: line.description,
+			qty: String(line.quantity),
+			unitPrice: centsToAmountString(line.unit_price_cents) || '0',
+			total: centsToAmountString(line.total_cents) || '0',
+			discountPercent: line.discount_percent,
+			taxRatePercent: line.tax_rate_percent
+		}));
+	}
+
+	function applyDocument(document: ApiBillDocument) {
+		bill = document;
+		const formData = toBillFormData(document);
+		billForm.form.set(formData);
+		const mapped = mapLines(document);
+		lines = mapped;
+		savedFingerprint = fingerprintFrom(formData, mapped);
+	}
+
+	async function loadAll() {
+		if (!session.selectedOrgId) {
+			onMissingOrg?.();
+			viewState = {
+				kind: 'forbidden',
+				message: 'Select an organisation before opening bills.'
+			};
+			return;
+		}
+
+		const epoch = captureEpoch();
+		viewState = { kind: 'loading' };
+		try {
+			if (session.memberships.length === 0) {
+				const membershipRows = await api.organisations.list();
+				if (isStale(epoch)) return;
+				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
+			}
+
+			const [result, vendors, catalog] = await Promise.all([
+				api.bills.get(billId),
+				api.vendors.list({ limit: 100 }),
+				api.products.list({ limit: 100, status: 'active' })
+			]);
+			if (isStale(epoch)) return;
+
+			applyDocument(result.data);
+			vendorOptions = vendors.data.map((v) => ({
+				id: v.id,
+				name: v.name,
+				defaultCurrency: v.default_currency
+			}));
+			products = catalog.data.map(toCatalogProductOption);
+
+			const selectedVendorId = result.data.vendor_id;
+			if (selectedVendorId && !vendorOptions.some((v) => v.id === selectedVendorId)) {
+				try {
+					const pinned = await api.vendors.get(selectedVendorId);
+					if (isStale(epoch)) return;
+					vendorOptions.push({
+						id: pinned.data.id,
+						name: pinned.data.name,
+						defaultCurrency: pinned.data.default_currency
+					});
+				} catch {
+					// Keep form vendorId; never clear solely because the option page truncated.
+				}
+				if (isStale(epoch)) return;
+			}
+
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			bill = null;
+			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
+				viewState = { kind: 'not_found', message: 'Bill not found.' };
+				return;
+			}
+			if (isApiClientError(error) && error.isForbidden) {
+				viewState = { kind: 'forbidden', message: userMessage(error, 'Forbidden') };
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not load bill.')
+			};
+		}
+	}
+
+	async function onSaveBill(): Promise<boolean> {
+		if (!bill || bill.status !== 'draft') return false;
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.bills.update(
+				bill.id,
+				{
+					...toBillUpdateBody(get(billForm.form)),
+					lines: lineItemRowsToBillLineInputs(lines)
+				},
+				bill.version
+			);
+			if (isStale(epoch)) return false;
+			applyDocument(updated);
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not save bill — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onAddLine(): Promise<boolean> {
+		if (!bill || bill.status !== 'draft') return false;
+		const epoch = captureEpoch();
+		const draftLine = get(lineForm.form);
+		const nextInputs = [
+			...lineItemRowsToBillLineInputs(lines),
+			toBillLineInput(draftLine, lines.length)
+		];
+		try {
+			const updated = await api.bills.update(
+				bill.id,
+				{
+					...toBillUpdateBody(get(billForm.form)),
+					lines: nextInputs
+				},
+				bill.version
+			);
+			if (isStale(epoch)) return false;
+			applyDocument(updated);
+			lineForm.form.set({ productId: '', description: '', qty: '1', unitPrice: '0' });
+			lineDrawerOpen = false;
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not add line — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onRemoveLine(id: string) {
+		if (!bill || bill.status !== 'draft') return;
+		const epoch = captureEpoch();
+		const next = lines.filter((line) => line.id !== id);
+		try {
+			const updated = await api.bills.update(
+				bill.id,
+				{
+					...toBillUpdateBody(get(billForm.form)),
+					lines: lineItemRowsToBillLineInputs(next)
+				},
+				bill.version
+			);
+			if (isStale(epoch)) return;
+			applyDocument(updated);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not remove line — try again.')
+			};
+		}
+	}
+
+	async function runLifecycle(
+		action: () => Promise<ApiBillDocument>,
+		fallback: string
+	): Promise<void> {
+		if (!bill) return;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			const updated = await action();
+			if (isStale(epoch)) return;
+			applyDocument(updated);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, fallback)
+			};
+		} finally {
+			actionPending = false;
+		}
+	}
+
+	async function onReceive() {
+		if (!bill || bill.status !== 'draft') return;
+		if (isDirty) {
+			viewState = {
+				kind: 'validation',
+				message: 'Save your changes before receiving this bill.'
+			};
+			return;
+		}
+		const version = bill.version;
+		await runLifecycle(
+			() => api.bills.receive(bill!.id, version),
+			'Could not receive bill — try again.'
+		);
+	}
+
+	async function onVoid() {
+		if (!bill) return;
+		const reason = window.prompt('Void reason (required):')?.trim();
+		if (!reason) return;
+		const version = bill.version;
+		await runLifecycle(
+			() => api.bills.void(bill!.id, { void_reason: reason }, version),
+			'Could not void bill — try again.'
+		);
+	}
+
+	async function onDelete() {
+		if (!bill || bill.status !== 'draft') return;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			await api.bills.delete(bill.id, bill.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete draft — try again.')
+			};
+		} finally {
+			actionPending = false;
+		}
+	}
+
+	async function onCreateVendor(): Promise<boolean> {
+		const epoch = captureEpoch();
+		const data = get(vendorForm.form);
+		try {
+			const created = await api.vendors.create(toVendorCreateBody(data));
+			if (isStale(epoch)) return false;
+			vendorOptions = [
+				...vendorOptions,
+				{ id: created.id, name: created.name, defaultCurrency: created.default_currency }
+			];
+			billForm.form.update((current) => ({
+				...current,
+				vendorId: created.id,
+				vendorName: created.name
+			}));
+			vendorForm.form.set({ name: '' });
+			vendorDrawerOpen = false;
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not create vendor — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	function onSwitchOrg(orgId: string) {
+		switchError = null;
+		busy = true;
+		resetOrgScopedState();
+		session.selectOrg(orgId);
+		onSwitchNavigate?.(orgId);
+		busy = false;
+	}
+
+	async function onValidCreate(data: OrganisationCreateData): Promise<boolean> {
+		createError = null;
+		try {
+			const result = await api.organisations.create(toOrganisationCreateBody(data));
+			const membership = membershipFromCreateResult(result);
+			session.setMemberships([...session.memberships, membership]);
+			resetOrgScopedState();
+			session.selectOrg(membership.org_id);
+			onSwitchNavigate?.(membership.org_id);
+			return true;
+		} catch (error) {
+			createError = userMessage(error, 'Could not create organisation — try again.');
+			return false;
+		}
+	}
+
+	$effect(() => {
+		void session.selectedOrgId;
+		void session.cacheGeneration;
+		void billId;
+		void loadAll();
+	});
+</script>
+
+{#if currentOrgId}
+	<div class={className} data-testid="bill-page">
+		<AppShell
+			{currentOrgId}
+			memberships={session.memberships}
+			{orgName}
+			{navGroups}
+			{switchError}
+			{busy}
+			{createError}
+			{onSwitchOrg}
+			{onLogout}
+			{onValidCreate}
+		>
+			<div class="flex min-h-0 flex-1 flex-col">
+				{#if viewState.kind !== 'ready'}
+					<div class="px-6 pt-6 md:px-8">
+						<ResourceStateBanner state={viewState} onReload={loadAll} />
+					</div>
+				{:else if bill}
+					<BillDetailPage
+						{orgName}
+						{navGroups}
+						title={bill.number}
+						status={billStatusLabel(bill.status)}
+						{billForm}
+						vendorForm={vendorForm}
+						{lineForm}
+						{products}
+						{vendorOptions}
+						{isDraft}
+						{isDirty}
+						{actionPending}
+						moneyTotals={{
+							subtotalCents: bill.subtotal_cents,
+							discountCents: bill.discount_cents,
+							taxCents: bill.tax_cents,
+							totalCents: bill.total_cents
+						}}
+						bind:lines
+						bind:lineDrawerOpen
+						bind:vendorDrawerOpen
+						onSaveBill={onSaveBill}
+						onAddLine={onAddLine}
+						onRemoveLine={onRemoveLine}
+						onReceive={onReceive}
+						onVoid={onVoid}
+						onDelete={onDelete}
+						onValidVendorCreate={onCreateVendor}
+						showNav={false}
+						class="min-h-0 flex-1"
+					/>
+				{/if}
+			</div>
+		</AppShell>
+	</div>
+{:else}
+	<div class="p-6" data-testid="bill-page">
+		<p class="text-destructive text-sm" role="alert">
+			Select an organisation before opening bills.
+		</p>
+	</div>
+{/if}

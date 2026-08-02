@@ -21,6 +21,8 @@ import type {
 	InvoiceFormData,
 	InvoiceListItem
 } from '$lib/schemas/invoice.js';
+import type { BillFormData, BillListItem } from '$lib/schemas/bill.js';
+import type { VendorFormData } from '$lib/schemas/vendor.js';
 import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 import type { ProductFormData } from '$lib/schemas/product.js';
 import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
@@ -42,6 +44,13 @@ import type {
 	ApiInvoiceDocument,
 	ApiInvoiceLineInput,
 	ApiInvoiceUpdateBody,
+	ApiBill,
+	ApiBillCreateBody,
+	ApiBillDocument,
+	ApiBillLineInput,
+	ApiBillUpdateBody,
+	ApiVendor,
+	ApiVendorCreateBody,
 	ApiLead,
 	ApiLeadConvertBody,
 	ApiLeadCreateBody,
@@ -579,6 +588,153 @@ export function lineItemRowsToInvoiceLineInputs(
 		}
 		return input;
 	});
+}
+
+export function billStatusLabel(status: ApiBill['status']): string {
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function toBillListItem(bill: ApiBill): BillListItem {
+	return {
+		id: bill.id,
+		number: bill.number,
+		vendor: partyNameFromSnapshot(bill.party_snapshot),
+		total: formatMoney(bill.total_cents, bill.currency),
+		status: billStatusLabel(bill.status),
+		dueOn: bill.due_on
+	};
+}
+
+export function toBillFormData(
+	bill: ApiBill | ApiBillDocument,
+	vendorNameFallback = ''
+): BillFormData {
+	const currency =
+		bill.currency === 'USD' || bill.currency === 'EUR' || bill.currency === 'GBP'
+			? bill.currency
+			: 'GBP';
+	const status =
+		bill.status === 'received' ||
+		bill.status === 'scheduled' ||
+		bill.status === 'partial' ||
+		bill.status === 'paid' ||
+		bill.status === 'void' ||
+		bill.status === 'draft'
+			? bill.status
+			: 'draft';
+	return {
+		vendorId: bill.vendor_id,
+		vendorName: partyNameFromSnapshot(bill.party_snapshot) || vendorNameFallback,
+		number: bill.number,
+		internalReference: bill.internal_reference ?? '',
+		currency,
+		issueOn: bill.issue_on ?? '',
+		receivedOn: bill.received_on ?? '',
+		dueOn: bill.due_on,
+		notes: bill.notes ?? '',
+		status
+	};
+}
+
+export function toBillCreateBody(data: BillFormData): ApiBillCreateBody {
+	return {
+		vendor_id: data.vendorId,
+		number: data.number.trim(),
+		internal_reference: data.internalReference?.trim() || null,
+		currency: data.currency,
+		issue_on: data.issueOn?.trim() || null,
+		received_on: data.receivedOn?.trim() || null,
+		due_on: data.dueOn,
+		notes: data.notes?.trim() || null,
+		lines: []
+	};
+}
+
+export function toBillUpdateBody(data: BillFormData): ApiBillUpdateBody {
+	return {
+		vendor_id: data.vendorId,
+		number: data.number.trim(),
+		internal_reference: data.internalReference?.trim() || null,
+		currency: data.currency,
+		issue_on: data.issueOn?.trim() || null,
+		received_on: data.receivedOn?.trim() || null,
+		due_on: data.dueOn,
+		notes: data.notes?.trim() || null
+	};
+}
+
+export function toBillLineInput(data: LineItemFormData, position?: number): ApiBillLineInput {
+	const quantity = Number(data.qty);
+	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
+	const productId = data.productId?.trim();
+	if (productId) {
+		return {
+			product_id: productId,
+			quantity,
+			description: data.description.trim(),
+			unit_price_cents: unitPriceCents,
+			...(position === undefined ? {} : { position })
+		};
+	}
+	return {
+		product_id: null,
+		description: data.description.trim(),
+		quantity,
+		unit_price_cents: unitPriceCents,
+		...(position === undefined ? {} : { position })
+	};
+}
+
+export function lineItemRowsToBillLineInputs(
+	lines: {
+		productId?: string | null;
+		productSku?: string;
+		description: string;
+		qty: string;
+		unitPrice: string;
+		discountPercent?: number;
+		taxRatePercent?: number;
+	}[]
+): ApiBillLineInput[] {
+	return lines.map((line, index) => {
+		const quantity = Number(line.qty);
+		const unitPriceCents = amountStringToCents(line.unitPrice) ?? 0;
+		const productId = line.productId?.trim() ? line.productId.trim() : null;
+		const input: ApiBillLineInput = productId
+			? {
+					product_id: productId,
+					quantity,
+					description: line.description,
+					unit_price_cents: unitPriceCents,
+					position: index
+				}
+			: {
+					product_id: null,
+					description: line.description,
+					quantity,
+					unit_price_cents: unitPriceCents,
+					position: index
+				};
+		if (line.discountPercent !== undefined) {
+			input.discount_percent = line.discountPercent;
+		}
+		if (line.taxRatePercent !== undefined) {
+			input.tax_rate_percent = line.taxRatePercent;
+		}
+		return input;
+	});
+}
+
+export function toVendorCreateBody(data: VendorFormData): ApiVendorCreateBody {
+	return {
+		name: data.name.trim()
+	};
+}
+
+export function toVendorFormData(vendor: ApiVendor): VendorFormData {
+	return {
+		name: vendor.name
+	};
 }
 
 export function clientStatusLabel(status: ApiClient['status']): string {

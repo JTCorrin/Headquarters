@@ -1,4 +1,5 @@
 import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { createBillsEndpoints } from './endpoints/bills.js';
 import { createClientsEndpoints } from './endpoints/clients.js';
 import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
@@ -13,7 +14,9 @@ import { createProfilePreferencesEndpoints } from './endpoints/profile-preferenc
 import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
+import { createVendorsEndpoints } from './endpoints/vendors.js';
 import type {
+	BillsEndpoints,
 	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
@@ -27,7 +30,8 @@ import type {
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
-	TaxRatesEndpoints
+	TaxRatesEndpoints,
+	VendorsEndpoints
 } from './endpoints/types.js';
 import type { ApiRequestFn, ApiRequestOptions, ApiResult } from './request.js';
 import type { ApiEnvelope, ApiErrorBody } from './types.js';
@@ -59,6 +63,8 @@ export interface ApiV1Client {
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
 	invoices: InvoicesEndpoints;
+	vendors: VendorsEndpoints;
+	bills: BillsEndpoints;
 	contacts: ContactsEndpoints;
 	clients: ClientsEndpoints;
 	leads: LeadsEndpoints;
@@ -236,6 +242,8 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		invoices: createInvoicesEndpoints(request),
+		vendors: createVendorsEndpoints(request),
+		bills: createBillsEndpoints(request),
 		contacts: createContactsEndpoints(request),
 		clients: createClientsEndpoints(request),
 		leads: createLeadsEndpoints(request),

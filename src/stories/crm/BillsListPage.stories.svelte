@@ -3,6 +3,8 @@
 	import BillsListPage from '$lib/components/crm/bills-list-page.svelte';
 	import { navGroupsWithActive } from './story-fixtures.js';
 
+	const VENDOR_ID = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
+
 	const rows = [
 		{
 			id: '1',
@@ -62,7 +64,11 @@
 		args: {
 			orgName: 'Acme Org',
 			navGroups: navGroupsWithActive('Bills'),
-			rows
+			rows,
+			vendorOptions: [
+				{ id: VENDOR_ID, name: 'Cloudflare', defaultCurrency: 'GBP' },
+				{ id: 'dddddddd-dddd-4eee-8fff-000000000001', name: 'Figma', defaultCurrency: 'GBP' }
+			]
 		}
 	});
 </script>
@@ -74,11 +80,16 @@
 
 	const data = defaults(
 		{
-			vendorName: '',
+			vendorId: VENDOR_ID,
+			vendorName: 'Cloudflare',
 			number: '',
+			internalReference: '',
 			currency: 'GBP',
-			dueOn: '',
-			status: 'received'
+			issueOn: '',
+			receivedOn: '2026-03-01',
+			dueOn: '2026-03-31',
+			notes: '',
+			status: 'draft'
 		},
 		zod4(billFormSchema)
 	);
