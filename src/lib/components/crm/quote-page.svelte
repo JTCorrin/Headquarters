@@ -5,17 +5,24 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		lineItemRowsToQuoteLineInputs,
 		membershipFromCreateResult,
 		quoteStatusLabel,
+		toCatalogProductOption,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toQuoteFormData,
+		toQuoteLineInput,
 		toQuoteUpdateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiQuoteDocument } from '$lib/api/v1/types.js';
+	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import { lineItemFormSchema } from '$lib/schemas/line-item.js';
+	import {
+		lineItemFormSchema,
+		type CatalogProductOption
+	} from '$lib/schemas/line-item.js';
 	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import { quoteFormSchema, type QuoteClientOption } from '$lib/schemas/quote.js';
 	import type { LineItemRow } from './line-items-table.svelte';
@@ -30,6 +37,7 @@
 		quoteId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onConverted?: (invoiceId: string) => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -40,6 +48,7 @@
 		quoteId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onConverted,
 		onLogout,
 		class: className
 	}: QuotePageProps = $props();
@@ -47,10 +56,12 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let quote = $state<ApiQuoteDocument | null>(null);
 	let clientOptions = $state<QuoteClientOption[]>([]);
+	let products = $state<CatalogProductOption[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
 
 	const quoteForm = superForm(
@@ -90,12 +101,18 @@
 	);
 	const navGroups = $derived(appNavGroups('Quotes'));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
+	const canEditLines = $derived(quote?.status === 'draft' || quote?.status === 'sent');
+	const canAccept = $derived(quote?.status === 'draft' || quote?.status === 'sent');
+	const canConvert = $derived(quote?.status === 'accepted');
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
 			if (error.isNetworkError) return 'Network error — check your connection and retry.';
 			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
 			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Quote not found.';
+			if (error.isPreconditionFailed) {
+				return error.message || 'Quote changed elsewhere — reload and try again.';
+			}
 			if (error.isValidationError) {
 				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
 				return error.message;
@@ -143,17 +160,28 @@
 		quote = null;
 		lines = [];
 		clientOptions = [];
+		products = [];
 		viewState = { kind: 'loading' };
 	}
 
 	function mapLines(document: ApiQuoteDocument): LineItemRow[] {
 		return document.lines.map((line) => ({
 			id: line.id,
+			productSku: line.sku_snapshot ?? undefined,
+			productId: line.product_id,
 			description: line.description,
 			qty: String(line.quantity),
-			unitPrice: (line.unit_price_cents / 100).toFixed(2),
-			total: (line.total_cents / 100).toFixed(2)
+			unitPrice: centsToAmountString(line.unit_price_cents) || '0',
+			total: centsToAmountString(line.total_cents) || '0',
+			discountPercent: line.discount_percent,
+			taxRatePercent: line.tax_rate_percent
 		}));
+	}
+
+	function applyDocument(document: ApiQuoteDocument) {
+		quote = document;
+		quoteForm.form.set(toQuoteFormData(document));
+		lines = mapLines(document);
 	}
 
 	async function loadAll() {
@@ -175,16 +203,16 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients] = await Promise.all([
+			const [result, clients, catalog] = await Promise.all([
 				api.quotes.get(quoteId),
-				api.clients.list({ limit: 100 })
+				api.clients.list({ limit: 100 }),
+				api.products.list({ limit: 100, status: 'active' })
 			]);
 			if (isStale(epoch)) return;
 
-			quote = result.data;
+			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
-			quoteForm.form.set(toQuoteFormData(result.data));
-			lines = mapLines(result.data);
+			products = catalog.data.map(toCatalogProductOption);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -205,18 +233,19 @@
 	}
 
 	async function onSaveQuote(): Promise<boolean> {
-		if (!quote) return false;
+		if (!quote || !canEditLines) return false;
 		const epoch = captureEpoch();
 		try {
 			const updated = await api.quotes.update(
 				quote.id,
-				toQuoteUpdateBody(get(quoteForm.form)),
+				{
+					...toQuoteUpdateBody(get(quoteForm.form)),
+					lines: lineItemRowsToQuoteLineInputs(lines)
+				},
 				quote.version
 			);
 			if (isStale(epoch)) return false;
-			quote = updated;
-			quoteForm.form.set(toQuoteFormData(updated));
-			lines = mapLines(updated);
+			applyDocument(updated);
 			viewState = { kind: 'ready' };
 			return true;
 		} catch (error) {
@@ -234,6 +263,125 @@
 				fields: isApiClientError(error) ? error.fields : undefined
 			};
 			return false;
+		}
+	}
+
+	async function onAddLine(): Promise<boolean> {
+		if (!quote || !canEditLines) return false;
+		const epoch = captureEpoch();
+		const draftLine = get(lineForm.form);
+		const nextInputs = [
+			...lineItemRowsToQuoteLineInputs(lines),
+			toQuoteLineInput(draftLine, lines.length)
+		];
+		try {
+			const updated = await api.quotes.update(
+				quote.id,
+				{
+					...toQuoteUpdateBody(get(quoteForm.form)),
+					lines: nextInputs
+				},
+				quote.version
+			);
+			if (isStale(epoch)) return false;
+			applyDocument(updated);
+			lineForm.form.set({ productId: '', description: '', qty: '1', unitPrice: '0' });
+			lineDrawerOpen = false;
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Quote changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not add line — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onRemoveLine(id: string) {
+		if (!quote || !canEditLines) return;
+		const epoch = captureEpoch();
+		const next = lines.filter((line) => line.id !== id);
+		try {
+			const updated = await api.quotes.update(
+				quote.id,
+				{
+					...toQuoteUpdateBody(get(quoteForm.form)),
+					lines: lineItemRowsToQuoteLineInputs(next)
+				},
+				quote.version
+			);
+			if (isStale(epoch)) return;
+			applyDocument(updated);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Quote changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not remove line — try again.')
+			};
+		}
+	}
+
+	async function onAccept() {
+		if (!quote || !canAccept) return;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			const updated = await api.quotes.accept(quote.id, quote.version);
+			if (isStale(epoch)) return;
+			applyDocument(updated);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Quote changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not accept quote — try again.')
+			};
+		} finally {
+			actionPending = false;
+		}
+	}
+
+	async function onConvert() {
+		if (!quote || !canConvert) return;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			const invoice = await api.invoices.createFromQuote({ quote_id: quote.id });
+			if (isStale(epoch)) return;
+			onConverted?.(invoice.id);
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not convert quote — try again.')
+			};
+		} finally {
+			actionPending = false;
 		}
 	}
 
@@ -297,10 +445,19 @@
 						status={quoteStatusLabel(quote.status)}
 						{quoteForm}
 						{lineForm}
+						{products}
 						{clientOptions}
+						{canAccept}
+						{canConvert}
+						{canEditLines}
+						{actionPending}
 						bind:lines
 						bind:lineDrawerOpen
 						onSaveQuote={onSaveQuote}
+						onAddLine={onAddLine}
+						onRemoveLine={onRemoveLine}
+						onAccept={onAccept}
+						onConvert={onConvert}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>

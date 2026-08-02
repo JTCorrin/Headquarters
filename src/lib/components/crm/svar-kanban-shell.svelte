@@ -123,4 +123,31 @@
 		height: 100%;
 		min-height: 420px;
 	}
+
+	/* Keep empty columns usable as full-height drop targets. */
+	.crm-svar-kanban-theme :global(.wx-column:not(.wx-collapsed)) {
+		min-height: 420px;
+	}
+
+	.crm-svar-kanban-theme :global(.wx-column-cards),
+	.crm-svar-kanban-theme :global(.wx-list),
+	.crm-svar-kanban-theme :global(.wx-column .wx-body) {
+		flex: 1 1 auto;
+		min-height: 280px;
+	}
+
+	/*
+	  Collapsed columns rotate the title over the expand control.
+	  Keep the title decorative so .wx-expand stays clickable.
+	*/
+	.crm-svar-kanban-theme :global(.wx-column.wx-collapsed .wx-body),
+	.crm-svar-kanban-theme :global(.wx-column.wx-collapsed .wx-title) {
+		pointer-events: none;
+	}
+
+	.crm-svar-kanban-theme :global(.wx-column.wx-collapsed .wx-expand) {
+		position: relative;
+		z-index: 2;
+		pointer-events: auto;
+	}
 </style>

@@ -8,6 +8,7 @@
 		invoiceStatusLabel,
 		lineItemRowsToInvoiceLineInputs,
 		membershipFromCreateResult,
+		toCatalogProductOption,
 		toInvoiceFormData,
 		toInvoiceLineInput,
 		toInvoiceUpdateBody,
@@ -18,7 +19,10 @@
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import { lineItemFormSchema } from '$lib/schemas/line-item.js';
+	import {
+		lineItemFormSchema,
+		type CatalogProductOption
+	} from '$lib/schemas/line-item.js';
 	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import {
 		invoiceFormSchema,
@@ -58,6 +62,7 @@
 	let invoice = $state<ApiInvoiceDocument | null>(null);
 	let clientOptions = $state<InvoiceClientOption[]>([]);
 	let contactOptions = $state<InvoiceContactOption[]>([]);
+	let products = $state<CatalogProductOption[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let savedFingerprint = $state('');
 	let switchError = $state<string | null>(null);
@@ -192,6 +197,7 @@
 		lines = [];
 		clientOptions = [];
 		contactOptions = [];
+		products = [];
 		savedFingerprint = '';
 		viewState = { kind: 'loading' };
 	}
@@ -238,15 +244,17 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, contacts] = await Promise.all([
+			const [result, clients, contacts, catalog] = await Promise.all([
 				api.invoices.get(invoiceId),
 				api.clients.list({ limit: 100 }),
-				api.contacts.list({ limit: 100 })
+				api.contacts.list({ limit: 100 }),
+				api.products.list({ limit: 100, status: 'active' })
 			]);
 			if (isStale(epoch)) return;
 
 			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			products = catalog.data.map(toCatalogProductOption);
 			const options: InvoiceContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
@@ -540,6 +548,7 @@
 						status={invoiceStatusLabel(invoice.status)}
 						{invoiceForm}
 						{lineForm}
+						{products}
 						{clientOptions}
 						{contactOptions}
 						{isDraft}
