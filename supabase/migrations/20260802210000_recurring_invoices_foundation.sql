@@ -1713,8 +1713,8 @@ declare
   period_end date;
   config_snapshot jsonb;
   invoice_doc jsonb;
-  response_headers jsonb;
-  response_body jsonb;
+  v_response_headers jsonb;
+  v_response_body jsonb;
   lines_snapshot jsonb;
 begin
   if v_actor_id is null then
@@ -1868,10 +1868,10 @@ begin
   set last_run_at = now(), updated_by = v_actor_id
   where id = schedule_row.id;
 
-  response_headers := jsonb_build_object(
+  v_response_headers := jsonb_build_object(
     'etag', '"' || (private.recurring_schedule_document(schedule_row.id, p_org_id) -> 'schedule' ->> 'version') || '"'
   );
-  response_body := jsonb_build_object(
+  v_response_body := jsonb_build_object(
     'status', 200,
     'body', jsonb_build_object(
       'data', jsonb_build_object(
@@ -1881,13 +1881,13 @@ begin
         'schedule', private.recurring_schedule_document(schedule_row.id, p_org_id) -> 'schedule'
       )
     ),
-    'headers', response_headers
+    'headers', v_response_headers
   );
 
   update public.api_idempotency_keys
   set
     response_status = 200,
-    response_body = response_body,
+    response_body = v_response_body,
     resource_type = 'recurring_invoice_run',
     resource_id = run_row.id
   where api_idempotency_keys.org_id = p_org_id
@@ -1898,8 +1898,8 @@ begin
   return jsonb_build_object(
     'replay', false,
     'response_status', 200,
-    'response_body', response_body -> 'body',
-    'response_headers', response_headers
+    'response_body', v_response_body -> 'body',
+    'response_headers', v_response_headers
   );
 end;
 $$;
