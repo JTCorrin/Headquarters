@@ -1,21 +1,32 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { PaymentFormData } from '$lib/schemas/payment.js';
+	import type {
+		PaymentBillOption,
+		PaymentClientOption,
+		PaymentFormData,
+		PaymentInvoiceOption,
+		PaymentListItem,
+		PaymentVendorOption
+	} from '$lib/schemas/payment.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import PaymentsTable from './payments-table.svelte';
-	import type { PaymentRow } from './payments-columns.js';
 	import PaymentFormDrawer from './payment-form-drawer.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface PaymentsListPageProps {
 		orgName: string;
 		navGroups: AppNavGroup[];
-		rows: PaymentRow[];
+		rows: PaymentListItem[];
 		form: SuperForm<PaymentFormData>;
+		clientOptions?: PaymentClientOption[];
+		vendorOptions?: PaymentVendorOption[];
+		invoiceOptions?: PaymentInvoiceOption[];
+		billOptions?: PaymentBillOption[];
 		drawerOpen?: boolean;
+		showNav?: boolean;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -23,27 +34,46 @@
 		navGroups,
 		rows,
 		form,
+		clientOptions = [],
+		vendorOptions = [],
+		invoiceOptions = [],
+		billOptions = [],
 		drawerOpen = $bindable(false),
-		class: className
+		showNav = true,
+		class: className,
+		onValidSubmit
 	}: PaymentsListPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
 			<PageHeader
 				breadcrumb="Accounting"
 				title="Payments"
-				description="Incoming money — match to invoices or leave unallocated."
+				description="Money in and out — allocate to invoices or bills, or leave unallocated."
 			>
 				{#snippet actions()}
-					<PaymentFormDrawer bind:open={drawerOpen} {form}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">Record payment</Button>
-						{/snippet}
-					</PaymentFormDrawer>
+					<PaymentFormDrawer
+						bind:open={drawerOpen}
+						{form}
+						{clientOptions}
+						{vendorOptions}
+						{invoiceOptions}
+						{billOptions}
+						{onValidSubmit}
+						triggerLabel="Record payment"
+					/>
 				{/snippet}
 			</PageHeader>
 

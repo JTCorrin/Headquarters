@@ -11,7 +11,20 @@
 
 	const variant = $derived.by(() => {
 		const key = status.toLowerCase();
-		if (['paid', 'won', 'active', 'client', 'primary', 'ready', 'completed', 'done'].includes(key))
+		if (
+			[
+				'paid',
+				'won',
+				'active',
+				'client',
+				'primary',
+				'ready',
+				'completed',
+				'done',
+				'allocated',
+				'matched'
+			].includes(key)
+		)
 			return 'default' as const;
 		if (
 			[
@@ -26,12 +39,27 @@
 				'scheduled',
 				'part paid',
 				'partial',
+				'part allocated',
+				'unallocated',
+				'pending',
 				'draft',
 				'open'
 			].includes(key)
 		)
 			return 'secondary' as const;
-		if (['lost', 'void', 'overdue', 'suspended', 'missing', 'cancelled'].includes(key))
+		if (
+			[
+				'lost',
+				'void',
+				'overdue',
+				'suspended',
+				'missing',
+				'cancelled',
+				'reversed',
+				'refunded',
+				'failed'
+			].includes(key)
+		)
 			return 'destructive' as const;
 		return 'outline' as const;
 	});
