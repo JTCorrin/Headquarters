@@ -175,11 +175,12 @@ export function validateMailboxTestBody(
 }
 
 function assertNoSecretEcho(payload: unknown): void {
+  // Match JSON *keys* only. Values like config.auth_mode = "api_key" must not trip this.
   const text = JSON.stringify(payload)
   if (
-    text.includes('"secret_ref"') ||
-    text.includes('"password"') ||
-    text.includes('"api_key"')
+    /"secret_ref"\s*:/.test(text) ||
+    /"password"\s*:/.test(text) ||
+    /"api_key"\s*:/.test(text)
   ) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Mailbox response contained a forbidden secret field')
   }
