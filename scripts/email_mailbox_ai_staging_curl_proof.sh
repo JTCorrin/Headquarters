@@ -98,7 +98,7 @@ ORG_ID="$(printf '%s' "$create_json" | jq -r '.data.organisation.id // empty')"
 [[ -n "$ORG_ID" ]] || die "organisation create failed: ${create_json}"
 log "org ${ORG_ID}"
 
-log "GET mailbox (expect 404)"
+log "GET mailbox (expect 404 Mailbox not found — not Route not found)"
 get_missing_code="$(
 	curl -sS --max-time 30 -o /tmp/mailai-missing.json -w '%{http_code}' \
 		-X GET "${API_BASE}/api/v1/me/mailbox" \
@@ -107,6 +107,9 @@ get_missing_code="$(
 		-H "X-Org-Id: ${ORG_ID}"
 )"
 [[ "$get_missing_code" == "404" ]] || die "expected 404 before mailbox create, got ${get_missing_code}"
+missing_msg="$(jq -r '.error.message // empty' /tmp/mailai-missing.json 2>/dev/null || true)"
+[[ "$missing_msg" == "Mailbox not found" ]] \
+	|| die "expected Mailbox not found before create (stale edge?), got: ${missing_msg:-$(cat /tmp/mailai-missing.json)}"
 
 log "PUT mailbox"
 put_json="$(
