@@ -10,7 +10,11 @@ import {
   parseLimit,
   parseVersion,
 } from './http.ts'
-import { parseAiProvider, validateAiConnectBody } from './integrations.ts'
+import {
+  parseAiProvider,
+  payloadHasForbiddenSecretKey,
+  validateAiConnectBody,
+} from './integrations.ts'
 import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
@@ -906,4 +910,18 @@ Deno.test('AI connect validation requires api_key and parses providers', () => {
   assertEquals(parseAiProvider('openai'), 'openai')
   assertEquals(parseAiProvider('openrouter'), 'openrouter')
   assertThrows(() => parseAiProvider('azure'), ApiError)
+})
+
+Deno.test('secret-echo guard treats auth_mode api_key value as safe, keys as forbidden', () => {
+  assertEquals(
+    payloadHasForbiddenSecretKey({
+      provider: 'openai',
+      config: { auth_mode: 'api_key' },
+      credentials_configured: true,
+    }),
+    false,
+  )
+  assertEquals(payloadHasForbiddenSecretKey({ api_key: 'sk-leaked' }), true)
+  assertEquals(payloadHasForbiddenSecretKey({ secret_ref: 'x' }), true)
+  assertEquals(payloadHasForbiddenSecretKey({ password: 'x' }), true)
 })
