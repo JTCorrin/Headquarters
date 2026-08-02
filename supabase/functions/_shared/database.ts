@@ -345,6 +345,131 @@ export type InvoiceRow = {
   void_reason: string | null
 }
 
+export type RecurringInvoiceScheduleRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  client_id: string
+  contact_id: string | null
+  owner_membership_id: string | null
+  status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled'
+  currency: string
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  interval_count: number
+  anchor_on: string
+  rule_version: number
+  weekdays: number[] | null
+  day_of_month: number | null
+  month_of_year: number | null
+  month_end_policy: 'clamp' | 'last_day' | 'skip'
+  timezone: string
+  local_run_time: string
+  start_on: string
+  end_on: string | null
+  max_occurrences: number | null
+  scheduled_occurrence_count: number
+  next_run_at: string | null
+  last_run_at: string | null
+  due_days: number
+  delivery_mode: 'draft' | 'auto_send'
+  pricing_mode: 'fixed' | 'catalog_at_generation'
+  catch_up_policy: 'skip' | 'latest' | 'all'
+  max_catch_up_runs: number
+  purchase_order_number: string | null
+  payment_terms: string | null
+  notes: string | null
+  internal_notes: string | null
+  activated_at: string | null
+  paused_at: string | null
+  completed_at: string | null
+  cancelled_at: string | null
+  cancelled_by: string | null
+}
+
+export type RecurringInvoiceLineRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  schedule_id: string
+  product_id: string | null
+  sku_snapshot: string | null
+  description_template: string
+  quantity: number
+  unit_price_cents: number
+  discount_percent: number
+  tax_rate_percent: number
+  position: number
+  active: boolean
+}
+
+export type RecurringInvoiceRunRow = {
+  id: string
+  org_id: string
+  schedule_id: string
+  occurrence_sequence: number | null
+  occurrence_key: string
+  scheduled_for: string
+  occurrence_local_date: string
+  occurrence_timezone: string
+  schedule_version: number
+  configuration_snapshot: Json
+  period_start: string
+  period_end: string
+  trigger: 'scheduled' | 'manual' | 'catch_up'
+  status:
+    | 'pending'
+    | 'processing'
+    | 'generated'
+    | 'delivery_pending'
+    | 'sent'
+    | 'skipped'
+    | 'generation_failed'
+    | 'delivery_failed'
+    | 'delivery_unknown'
+  attempt_count: number
+  available_at: string
+  claimed_at: string | null
+  claimed_by: string | null
+  lease_expires_at: string | null
+  generated_at: string | null
+  sent_at: string | null
+  error_code: string | null
+  error_message: string | null
+  request_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type RecurringInvoiceScheduleInsert = Partial<RecurringInvoiceScheduleRow> & {
+  org_id: string
+  name: string
+  client_id: string
+  currency: string
+  frequency: RecurringInvoiceScheduleRow['frequency']
+  anchor_on: string
+  start_on: string
+}
+
+export type RecurringInvoiceLineInsert = Partial<RecurringInvoiceLineRow> & {
+  org_id: string
+  schedule_id: string
+  description_template: string
+  quantity: number
+  unit_price_cents: number
+  position: number
+}
+
 export type VendorRow = {
   id: string
   org_id: string
@@ -896,6 +1021,24 @@ export type Database = {
         Update: Partial<BillLineInsert>
         Relationships: []
       }
+      recurring_invoice_schedules: {
+        Row: RecurringInvoiceScheduleRow
+        Insert: RecurringInvoiceScheduleInsert
+        Update: Partial<RecurringInvoiceScheduleInsert>
+        Relationships: []
+      }
+      recurring_invoice_lines: {
+        Row: RecurringInvoiceLineRow
+        Insert: RecurringInvoiceLineInsert
+        Update: Partial<RecurringInvoiceLineInsert>
+        Relationships: []
+      }
+      recurring_invoice_runs: {
+        Row: RecurringInvoiceRunRow
+        Insert: Partial<RecurringInvoiceRunRow>
+        Update: Partial<RecurringInvoiceRunRow>
+        Relationships: []
+      }
       tasks: {
         Row: TaskRow
         Insert: TaskInsert
@@ -1128,6 +1271,91 @@ export type Database = {
           p_vendor_id: string
         }
         Returns: undefined
+      }
+      create_recurring_schedule_draft: {
+        Args: {
+          p_lines?: Json
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      get_recurring_schedule_document: {
+        Args: {
+          p_org_id: string
+          p_schedule_id: string
+        }
+        Returns: Json
+      }
+      save_recurring_schedule_draft: {
+        Args: {
+          p_expected_version: number
+          p_lines?: Json | null
+          p_org_id: string
+          p_payload: Json
+          p_schedule_id: string
+        }
+        Returns: Json
+      }
+      soft_delete_recurring_schedule_draft: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_schedule_id: string
+        }
+        Returns: undefined
+      }
+      activate_recurring_schedule: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_schedule_id: string
+        }
+        Returns: Json
+      }
+      pause_recurring_schedule: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_schedule_id: string
+        }
+        Returns: Json
+      }
+      resume_recurring_schedule: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_schedule_id: string
+        }
+        Returns: Json
+      }
+      cancel_recurring_schedule: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_schedule_id: string
+        }
+        Returns: Json
+      }
+      preview_recurring_schedule: {
+        Args: {
+          p_lines?: Json
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      run_now_recurring_schedule: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_request_hash: string
+          p_route: string
+          p_schedule_id: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
       }
       soft_delete_task: {
         Args: {

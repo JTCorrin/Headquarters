@@ -12,6 +12,7 @@ import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
+import { handleRecurringInvoices } from './recurring-invoices.ts'
 import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleMailbox, listEntityEmailMessages } from './mailbox.ts'
@@ -88,6 +89,15 @@ function assertCanAccessTasks(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify tasks')
+  }
+}
+
+function assertCanAccessRecurringInvoices(role: MembershipRole, method: string): void {
+  if (role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read recurring invoices')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify recurring invoices')
   }
 }
 
@@ -358,6 +368,14 @@ export default {
             membership.id,
             requestId,
           )
+        }
+
+        if (
+          path === '/api/v1/recurring-invoice-schedules' ||
+          path.startsWith('/api/v1/recurring-invoice-schedules/')
+        ) {
+          assertCanAccessRecurringInvoices(membership.role, req.method)
+          return await handleRecurringInvoices(req, db, path, orgId, requestId)
         }
 
         if (

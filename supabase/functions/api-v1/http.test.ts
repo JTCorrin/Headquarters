@@ -24,6 +24,7 @@ import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
 import { validateBillBody } from './bills.ts'
 import { validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
+import { validateRecurringScheduleBody } from './recurring-invoices.ts'
 import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -1033,4 +1034,58 @@ Deno.test('AI email_reply generate/decide validation', () => {
   assertEquals(validateDecideBody({ accepted_text: 'Edited' }), { accepted_text: 'Edited' })
   assertThrows(() => validateDecideBody({ accepted_text: 1 }), ApiError)
   assertThrows(() => validateDecideBody({ send: true }), ApiError)
+})
+
+Deno.test('recurring schedule validation defaults and frequency fields', () => {
+  const clientId = '11111111-1111-4111-8111-111111111111'
+  const body = validateRecurringScheduleBody({
+    name: 'Monthly retainer',
+    client_id: clientId,
+    frequency: 'monthly',
+    day_of_month: 1,
+    lines: [{
+      description_template: 'Retainer {{period_start}}',
+      quantity: 1,
+      unit_price_cents: 1000,
+    }],
+  }, false)
+  assertEquals(body.month_end_policy, 'clamp')
+  assertEquals(body.catch_up_policy, 'latest')
+  assertEquals(body.max_catch_up_runs, 1)
+  assertEquals(body.pricing_mode, 'fixed')
+  assertEquals(body.local_run_time, '09:00:00')
+  assertEquals(body.delivery_mode, 'draft')
+  assertEquals(body.lines.length, 1)
+
+  assertThrows(
+    () =>
+      validateRecurringScheduleBody({
+        name: 'Weekly',
+        client_id: clientId,
+        frequency: 'weekly',
+        lines: [],
+      }, false),
+    ApiError,
+  )
+
+  const weekly = validateRecurringScheduleBody({
+    name: 'Weekly',
+    client_id: clientId,
+    frequency: 'weekly',
+    weekdays: [1, 3],
+    lines: [{ description: 'Hours', quantity: 2, unit_price_cents: 5000 }],
+  }, false)
+  assertEquals(weekly.weekdays, [1, 3])
+  assertEquals(weekly.lines[0].description_template, 'Hours')
+
+  assertThrows(
+    () =>
+      validateRecurringScheduleBody({
+        name: 'X',
+        client_id: clientId,
+        frequency: 'hourly',
+        lines: [],
+      }, false),
+    ApiError,
+  )
 })
