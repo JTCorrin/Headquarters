@@ -146,9 +146,12 @@ describe('InvoicesPage integration', () => {
 			'GET /api/v1/contacts': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
-			'GET /api/v1/quotes': async () => ({
-				body: { data: [], meta: { next_cursor: null } }
-			}),
+			'GET /api/v1/quotes': async (request) => {
+				expect(new URL(request.url, 'http://local').searchParams.get('status')).toBe(
+					'accepted'
+				);
+				return { body: { data: [], meta: { next_cursor: null } } };
+			},
 			'POST /api/v1/invoices': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				createBody = await request.json();
@@ -188,5 +191,106 @@ describe('InvoicesPage integration', () => {
 			lines: []
 		});
 		expect(createdId).toBe('22222222-3333-4444-8555-666666666666');
+	});
+
+	it('loads accepted quotes server-side across pages', async () => {
+		const quoteCalls: Array<{ status: string | null; cursor: string | null }> = [];
+		const QUOTE_A = 'aaaaaaaa-aaaa-4bbb-8ccc-dddddddddddd';
+		const QUOTE_B = 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					logo_url: null,
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+
+		const quote = (id: string, number: string) => ({
+			id,
+			org_id: ORG_A,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			number,
+			title: `Quote ${number}`,
+			client_id: CLIENT_ID,
+			lead_id: null,
+			contact_id: null,
+			owner_membership_id: null,
+			status: 'accepted',
+			currency: 'GBP',
+			issue_on: '2026-01-15',
+			valid_until: null,
+			subtotal_cents: 0,
+			discount_cents: 0,
+			tax_cents: 0,
+			total_cents: 0,
+			party_snapshot: null,
+			terms: null,
+			notes: null,
+			internal_notes: null,
+			sent_at: null,
+			viewed_at: null,
+			accepted_at: '2026-02-01T00:00:00Z',
+			rejected_at: null,
+			converted_invoice_id: null
+		});
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/invoices': async () => ({
+				body: { data: [sampleInvoice()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/quotes': async (request) => {
+				const url = new URL(request.url, 'http://local');
+				const status = url.searchParams.get('status');
+				const cursor = url.searchParams.get('cursor');
+				quoteCalls.push({ status, cursor });
+				if (!cursor) {
+					return {
+						body: {
+							data: [quote(QUOTE_A, 'Q-0001')],
+							meta: { next_cursor: 'cursor-2' }
+						}
+					};
+				}
+				return {
+					body: {
+						data: [quote(QUOTE_B, 'Q-0002')],
+						meta: { next_cursor: null }
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(InvoicesPage, { api, session });
+
+		await expect.element(page.getByRole('link', { name: 'INV-0001' })).toBeInTheDocument();
+		await page.getByRole('button', { name: 'New invoice' }).click();
+		await expect.element(page.getByLabelText('From accepted quote')).toBeInTheDocument();
+		await page.getByLabelText('From accepted quote').click();
+		await expect.element(page.getByText('Q-0001 · Quote Q-0001')).toBeInTheDocument();
+		await expect.element(page.getByText('Q-0002 · Quote Q-0002')).toBeInTheDocument();
+		expect(quoteCalls).toEqual([
+			{ status: 'accepted', cursor: null },
+			{ status: 'accepted', cursor: 'cursor-2' }
+		]);
 	});
 });

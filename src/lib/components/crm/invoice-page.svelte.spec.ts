@@ -226,6 +226,134 @@ describe('InvoicePage detail flows', () => {
 		expect(sendCalled).toBe(false);
 	});
 
+	it('includes unsaved header fields when adding a line', async () => {
+		let patchBody: unknown;
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/invoices/${INVOICE_ID}`]: async () => ({
+				body: { data: sampleInvoice() }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			[`PATCH /api/v1/invoices/${INVOICE_ID}`]: async (request) => {
+				patchBody = await request.json();
+				return {
+					body: {
+						data: sampleInvoice({
+							version: 2,
+							purchase_order_number: 'PO-KEEP',
+							lines: [
+								...sampleInvoice().lines,
+								{
+									id: 'ffffffff-ffff-4fff-8000-222222222222',
+									org_id: ORG_A,
+									created_at: '2026-01-01T00:00:00Z',
+									updated_at: '2026-01-01T00:00:00Z',
+									created_by: null,
+									updated_by: null,
+									version: 1,
+									invoice_id: INVOICE_ID,
+									product_id: null,
+									sku_snapshot: null,
+									description: 'Extra line',
+									quantity: 1,
+									unit_price_cents: 500,
+									discount_percent: 0,
+									tax_rate_percent: 0,
+									subtotal_cents: 500,
+									tax_cents: 0,
+									total_cents: 500,
+									position: 1
+								}
+							]
+						})
+					}
+				};
+			}
+		});
+
+		const session = sessionForOrg();
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(InvoicePage, { api, session, invoiceId: INVOICE_ID });
+
+		await expect.element(page.getByRole('heading', { name: 'INV-0001' })).toBeInTheDocument();
+		await page.getByLabelText('PO number').fill('PO-KEEP');
+		await page.getByRole('button', { name: 'Add line item' }).first().click();
+		await page.getByLabelText('Description').fill('Extra line');
+		await page.getByLabelText('Unit price').fill('5.00');
+		await page.getByTestId('line-item-form').getByRole('button', { name: 'Add line' }).click();
+
+		await expect.poll(() => patchBody).toMatchObject({
+			purchase_order_number: 'PO-KEEP',
+			client_id: CLIENT_ID,
+			lines: expect.arrayContaining([
+				expect.objectContaining({
+					product_id: PRODUCT_ID,
+					discount_percent: 5,
+					tax_rate_percent: 20
+				}),
+				expect.objectContaining({ description: 'Extra line' })
+			])
+		});
+	});
+
+	it('keeps a billing contact outside the first contacts page', async () => {
+		const CONTACT_ID = 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/invoices/${INVOICE_ID}`]: async () => ({
+				body: { data: sampleInvoice({ contact_id: CONTACT_ID }) }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: 'page-2' } }
+			}),
+			[`GET /api/v1/contacts/${CONTACT_ID}`]: async () => ({
+				body: {
+					data: {
+						id: CONTACT_ID,
+						org_id: ORG_A,
+						created_at: '2026-01-01T00:00:00Z',
+						updated_at: '2026-01-01T00:00:00Z',
+						created_by: null,
+						updated_by: null,
+						deleted_at: null,
+						version: 1,
+						first_name: 'Ada',
+						last_name: 'Billing',
+						display_name: 'Ada Billing',
+						primary_email: 'ada@example.com',
+						primary_phone: null,
+						job_title: null,
+						company_name: null,
+						client_id: CLIENT_ID,
+						owner_membership_id: null,
+						lifecycle_status: 'active',
+						source: null,
+						notes: null,
+						last_contacted_at: null,
+						metadata: {}
+					}
+				}
+			})
+		});
+
+		const session = sessionForOrg();
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(InvoicePage, { api, session, invoiceId: INVOICE_ID });
+
+		await expect.element(page.getByRole('heading', { name: 'INV-0001' })).toBeInTheDocument();
+		await expect.element(page.getByText('Ada Billing')).toBeInTheDocument();
+		await expect.element(page.getByTestId('line-items-total')).toHaveTextContent('GBP');
+		await expect.element(page.getByTestId('line-items-total')).toHaveTextContent('22.80');
+	});
+
 	it('surfaces ETag conflict on send and still loads after void lifecycle', async () => {
 		const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Duplicate');
 

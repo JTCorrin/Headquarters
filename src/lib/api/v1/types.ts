@@ -250,8 +250,8 @@ export type ApiQuoteUpdateBody = ApiQuoteWritableFields & {
 export interface ApiQuoteListParams {
 	limit?: number;
 	cursor?: string;
-	/** This release only supports draft listing when set. */
-	status?: 'draft';
+	/** Optional status filter (`draft` or `accepted`). */
+	status?: 'draft' | 'accepted';
 }
 
 export type ApiInvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'void';

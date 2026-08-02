@@ -68,7 +68,9 @@
 		)
 	);
 	const contactLabel = $derived(
-		contactsForClient.find((o) => o.id === $formData.contactId)?.label ?? 'No contact'
+		contactsForClient.find((o) => o.id === $formData.contactId)?.label ??
+			contactOptions.find((o) => o.id === $formData.contactId)?.label ??
+			($formData.contactId ? 'Selected contact' : 'No contact')
 	);
 	const quoteLabel = $derived(
 		quoteOptions.find((o) => o.id === $formData.quoteId)?.label ?? 'Blank draft (no quote)'
@@ -84,8 +86,12 @@
 
 	$effect(() => {
 		if (!$formData.contactId) return;
-		const stillValid = contactsForClient.some((c) => c.id === $formData.contactId);
-		if (!stillValid) $formData.contactId = '';
+		const match = contactOptions.find((c) => c.id === $formData.contactId);
+		// Missing from the loaded page must not clear a persisted selection.
+		if (!match) return;
+		if (match.clientId && $formData.clientId && match.clientId !== $formData.clientId) {
+			$formData.contactId = '';
+		}
 	});
 </script>
 
