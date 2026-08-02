@@ -6,10 +6,12 @@ import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { handleDocuments } from './documents.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { handleAiSuggestions } from './ai-suggestions.ts'
+import { handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
-import { handleMailbox, listEntityEmailMessagesStub } from './mailbox.ts'
+import { handleMailbox, listEntityEmailMessages } from './mailbox.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
@@ -162,6 +164,17 @@ export default {
           )
         }
 
+        if (path === '/api/v1/me/mailbox/sync') {
+          return await handleEmailMessages(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
         if (path === '/api/v1/me/mailbox' || path.startsWith('/api/v1/me/mailbox/')) {
           return await handleMailbox(
             req,
@@ -175,6 +188,30 @@ export default {
 
         if (path === '/api/v1/integrations' || path.startsWith('/api/v1/integrations/')) {
           return await handleIntegrations(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
+        if (
+          path.startsWith('/api/v1/email-messages/') ||
+          path.startsWith('/api/v1/ai-suggestions')
+        ) {
+          if (path.startsWith('/api/v1/ai-suggestions')) {
+            return await handleAiSuggestions(
+              req,
+              db,
+              path,
+              orgId,
+              membership.role,
+              requestId,
+            )
+          }
+          return await handleEmailMessages(
             req,
             db,
             path,
@@ -209,7 +246,7 @@ export default {
           if (!entityType) {
             throw new ApiError(404, 'NOT_FOUND', 'Route not found')
           }
-          return await listEntityEmailMessagesStub(
+          return await listEntityEmailMessages(
             db,
             orgId,
             entityType,
