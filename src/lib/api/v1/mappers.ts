@@ -1470,7 +1470,11 @@ export function toRecurringInvoiceUpdateBody(
 	};
 }
 
-export function toRecurringInvoiceRunListItem(run: ApiRecurringInvoiceRun): RecurringInvoiceRunListItem {
+export function toRecurringInvoiceRunListItem(
+	run: ApiRecurringInvoiceRun,
+	invoiceByRunId?: Map<string, { id: string; number: string }>
+): RecurringInvoiceRunListItem {
+	const linked = invoiceByRunId?.get(run.id);
 	return {
 		id: run.id,
 		scheduledFor: formatNextRunAt(run.scheduled_for),
@@ -1478,7 +1482,7 @@ export function toRecurringInvoiceRunListItem(run: ApiRecurringInvoiceRun): Recu
 		status: run.status.replace(/_/g, ' '),
 		periodStart: run.period_start,
 		periodEnd: run.period_end,
-		invoiceId: run.invoice_id ?? null,
-		invoiceNumber: run.invoice_number ?? null
+		invoiceId: linked?.id ?? run.invoice_id ?? null,
+		invoiceNumber: linked?.number ?? run.invoice_number ?? null
 	};
 }

@@ -90,6 +90,7 @@ import type {
 	ApiRecurringInvoiceRun,
 	ApiRecurringInvoiceRunDocument,
 	ApiRecurringInvoiceRunListParams,
+	ApiRecurringInvoiceRunNowResult,
 	ApiRecurringInvoiceSchedule,
 	ApiRecurringInvoiceUpdateBody
 } from '../types.js';
@@ -347,7 +348,7 @@ export interface RecurringInvoiceSchedulesEndpoints {
 		id: string,
 		version: number,
 		signal?: AbortSignal
-	): Promise<ApiRecurringInvoiceRunDocument>;
+	): Promise<ApiRecurringInvoiceRunNowResult>;
 }
 
 export interface DocumentsEndpoints {

@@ -1305,6 +1305,14 @@ export type ApiRecurringInvoiceRunDocument = ApiRecurringInvoiceRun & {
 	invoice_number?: string | null;
 };
 
+/** `POST .../run-now` body — invoice is linked via `invoices.recurring_run_id`, not on the run row. */
+export interface ApiRecurringInvoiceRunNowResult {
+	run: ApiRecurringInvoiceRun;
+	invoice: ApiInvoice;
+	lines?: ApiInvoiceLine[];
+	schedule: ApiRecurringInvoiceSchedule;
+}
+
 export interface ApiRecurringInvoiceListParams {
 	limit?: number;
 	cursor?: string;
