@@ -103,9 +103,17 @@ log "Supabase API ${PUBLIC_SUPABASE_URL}"
 # Edge runtime mounts supabase/functions but keeps a stale module graph across
 # git resets when the stack was already up. Bounce it so api-v1 matches this SHA
 # (Wave A mailbox/AI routes otherwise stay Route not found after migration up).
-edge_ids="$(docker ps -q --filter name=edge-runtime --filter status=running || true)"
+# Supabase local names vary: edge-runtime, supabase_edge_runtime_<id>, etc.
+edge_ids="$(
+	docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null \
+		| awk 'tolower($0) ~ /edge.runtime|edge-runtime|supabase_edge/ { print $1 }' \
+		| sort -u \
+		| tr '\n' ' ' \
+		| sed 's/[[:space:]]*$//'
+	|| true
+)"
 if [[ -n "$edge_ids" ]]; then
-	log "restarting edge-runtime to load api-v1 @ ${SHA}"
+	log "restarting edge-runtime to load api-v1 @ ${SHA} (${edge_ids})"
 	# shellcheck disable=SC2086
 	docker restart $edge_ids >/dev/null
 	ready=0

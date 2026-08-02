@@ -9,7 +9,11 @@ import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './htt
 import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
-import { handleMailbox, listEntityEmailMessagesStub } from './mailbox.ts'
+import {
+  entityTypeFromEmailPathSegment,
+  handleMailbox,
+  listEntityEmailMessagesStub,
+} from './mailbox.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
@@ -198,10 +202,14 @@ export default {
           if (req.method !== 'GET') {
             throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for entity email')
           }
+          const entityType = entityTypeFromEmailPathSegment(entityEmailMatch[1])
+          if (!entityType) {
+            throw new ApiError(404, 'NOT_FOUND', 'Route not found')
+          }
           return await listEntityEmailMessagesStub(
             db,
             orgId,
-            entityEmailMatch[1].toLowerCase() as 'contact' | 'lead' | 'client',
+            entityType,
             entityEmailMatch[2],
             requestId,
           )

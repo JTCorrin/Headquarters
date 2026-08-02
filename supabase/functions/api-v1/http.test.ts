@@ -11,7 +11,11 @@ import {
   parseVersion,
 } from './http.ts'
 import { parseAiProvider, validateAiConnectBody } from './integrations.ts'
-import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
+import {
+  entityTypeFromEmailPathSegment,
+  validateMailboxBody,
+  validateMailboxTestBody,
+} from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
@@ -897,6 +901,14 @@ Deno.test('mailbox test body accepts optional password only', () => {
   assertEquals(validateMailboxTestBody({ password: 'x' }), { password: 'x' })
   assertThrows(() => validateMailboxTestBody({ password: '' }), ApiError)
   assertThrows(() => validateMailboxTestBody({ host: 'nope' }), ApiError)
+})
+
+Deno.test('entity email path segments map plural routes to singular stub types', () => {
+  assertEquals(entityTypeFromEmailPathSegment('contacts'), 'contact')
+  assertEquals(entityTypeFromEmailPathSegment('leads'), 'lead')
+  assertEquals(entityTypeFromEmailPathSegment('clients'), 'client')
+  assertEquals(entityTypeFromEmailPathSegment('Contacts'), 'contact')
+  assertEquals(entityTypeFromEmailPathSegment('contact'), null)
 })
 
 Deno.test('AI connect validation requires api_key and parses providers', () => {

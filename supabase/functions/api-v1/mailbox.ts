@@ -293,6 +293,22 @@ async function testMailbox(
   return jsonResponse({ data: { ok: true, error_code: null } }, 200, requestId)
 }
 
+/** Map `/api/v1/{contacts|leads|clients}/…/email-messages` segment → stub entity type. */
+export function entityTypeFromEmailPathSegment(
+  segment: string,
+): 'contact' | 'lead' | 'client' | null {
+  switch (segment.toLowerCase()) {
+    case 'contacts':
+      return 'contact'
+    case 'leads':
+      return 'lead'
+    case 'clients':
+      return 'client'
+    default:
+      return null
+  }
+}
+
 export async function listEntityEmailMessagesStub(
   db: DatabaseClient,
   orgId: string,
