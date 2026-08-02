@@ -545,6 +545,86 @@ export type BillLineRow = {
   position: number
 }
 
+export type PaymentRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  direction: 'inbound' | 'outbound'
+  client_id: string | null
+  vendor_id: string | null
+  amount_cents: number
+  currency: string
+  method: 'bank' | 'card' | 'cash' | 'stripe' | 'other'
+  status:
+    | 'pending'
+    | 'completed'
+    | 'unallocated'
+    | 'part_allocated'
+    | 'allocated'
+    | 'refunded'
+    | 'reversed'
+    | 'failed'
+  occurred_on: string
+  reference: string | null
+  provider: string
+  provider_payment_id: string | null
+  notes: string | null
+  reverses_payment_id: string | null
+  completed_at: string | null
+  metadata: Json
+}
+
+export type PaymentInsert = {
+  org_id: string
+  direction: PaymentRow['direction']
+  client_id?: string | null
+  vendor_id?: string | null
+  amount_cents: number
+  currency: string
+  method: PaymentRow['method']
+  status?: PaymentRow['status']
+  occurred_on?: string
+  reference?: string | null
+  provider?: string
+  provider_payment_id?: string | null
+  notes?: string | null
+  reverses_payment_id?: string | null
+  completed_at?: string | null
+  metadata?: Json
+}
+
+export type PaymentAllocationRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  payment_id: string
+  invoice_id: string | null
+  bill_id: string | null
+  amount_cents: number
+  allocated_at: string
+  reversed_at: string | null
+  reversal_reason: string | null
+}
+
+export type PaymentAllocationInsert = {
+  org_id: string
+  payment_id: string
+  invoice_id?: string | null
+  bill_id?: string | null
+  amount_cents: number
+  allocated_at?: string
+  reversed_at?: string | null
+  reversal_reason?: string | null
+}
+
 export type TaskRow = {
   id: string
   org_id: string
@@ -1039,6 +1119,18 @@ export type Database = {
         Update: Partial<RecurringInvoiceRunRow>
         Relationships: []
       }
+      payments: {
+        Row: PaymentRow
+        Insert: PaymentInsert
+        Update: Partial<PaymentInsert>
+        Relationships: []
+      }
+      payment_allocations: {
+        Row: PaymentAllocationRow
+        Insert: PaymentAllocationInsert
+        Update: Partial<PaymentAllocationInsert>
+        Relationships: []
+      }
       tasks: {
         Row: TaskRow
         Insert: TaskInsert
@@ -1353,6 +1445,77 @@ export type Database = {
           p_request_hash: string
           p_route: string
           p_schedule_id: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      get_payment: {
+        Args: {
+          p_org_id: string
+          p_payment_id: string
+        }
+        Returns: Json
+      }
+      create_payment: {
+        Args: {
+          p_allocations?: Json
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      create_payment_idempotent: {
+        Args: {
+          p_allocations?: Json
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_payload: Json
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      allocate_payment: {
+        Args: {
+          p_allocations: Json
+          p_expected_version: number
+          p_org_id: string
+          p_payment_id: string
+        }
+        Returns: Json
+      }
+      allocate_payment_idempotent: {
+        Args: {
+          p_allocations: Json
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_payment_id: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      reverse_payment: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_payment_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      reverse_payment_idempotent: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_payment_id: string
+          p_reason: string
+          p_request_hash: string
+          p_route: string
           p_ttl_seconds?: number
         }
         Returns: Json

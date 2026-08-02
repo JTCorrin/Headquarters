@@ -13,6 +13,7 @@ import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
 import { handleRecurringInvoices } from './recurring-invoices.ts'
+import { handlePayments } from './payments.ts'
 import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleMailbox, listEntityEmailMessages } from './mailbox.ts'
@@ -98,6 +99,15 @@ function assertCanAccessRecurringInvoices(role: MembershipRole, method: string):
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify recurring invoices')
+  }
+}
+
+function assertCanAccessPayments(role: MembershipRole, method: string): void {
+  if (role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read payments')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify payments')
   }
 }
 
@@ -376,6 +386,11 @@ export default {
         ) {
           assertCanAccessRecurringInvoices(membership.role, req.method)
           return await handleRecurringInvoices(req, db, path, orgId, requestId)
+        }
+
+        if (path === '/api/v1/payments' || path.startsWith('/api/v1/payments/')) {
+          assertCanAccessPayments(membership.role, req.method)
+          return await handlePayments(req, db, path, orgId, requestId)
         }
 
         if (

@@ -29,6 +29,13 @@ import {
   validateRecurringScheduleBody,
 } from './recurring-invoices.ts'
 import {
+  decodePaymentCursor,
+  paymentMutationIdempotencyPayload,
+  validateAllocateBody,
+  validateCreateBody,
+  validateReverseBody,
+} from './payments.ts'
+import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
 } from './organisations.ts'
@@ -1114,6 +1121,87 @@ Deno.test('run-now idempotency payload omits expected_version', async () => {
   const hashV2 = await hashIdempotencyRequest(
     route,
     recurringLifecycleIdempotencyPayload('run-now', scheduleId, 2),
+  )
+  assertEquals(hashV1, hashV2)
+})
+
+Deno.test('payment create validation requires direction party and money fields', () => {
+  const clientId = '11111111-1111-4111-8111-111111111111'
+  const invoiceId = '22222222-2222-4222-8222-222222222222'
+  assertEquals(
+    validateCreateBody({
+      direction: 'inbound',
+      client_id: clientId,
+      amount_cents: 1200,
+      currency: 'gbp',
+      method: 'bank',
+      allocations: [{ invoice_id: invoiceId, amount_cents: 1200 }],
+    }),
+    {
+      direction: 'inbound',
+      client_id: clientId,
+      amount_cents: 1200,
+      currency: 'GBP',
+      method: 'bank',
+      provider: 'manual',
+      allocations: [{ invoice_id: invoiceId, amount_cents: 1200 }],
+    },
+  )
+  assertThrows(
+    () =>
+      validateCreateBody({
+        direction: 'inbound',
+        amount_cents: 100,
+        currency: 'GBP',
+        method: 'bank',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateCreateBody({
+        direction: 'outbound',
+        amount_cents: 100,
+        currency: 'GBP',
+        method: 'bank',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateAllocateBody({
+        allocations: [{ invoice_id: invoiceId, bill_id: clientId, amount_cents: 1 }],
+      }),
+    ApiError,
+  )
+  assertEquals(validateReverseBody({ reason: ' Duplicate ' }), 'Duplicate')
+  assertThrows(() => validateReverseBody({}), ApiError)
+  assertThrows(
+    () =>
+      decodePaymentCursor(
+        btoa(JSON.stringify({ created_at: 'not-a-date', id: clientId }))
+          .replaceAll('+', '-')
+          .replaceAll('/', '_')
+          .replace(/=+$/, ''),
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('payment allocate/reverse idempotency payload omits expected_version', async () => {
+  const paymentId = '33333333-3333-4333-8333-333333333333'
+  assertEquals(
+    paymentMutationIdempotencyPayload(paymentId, { reason: 'oops' }),
+    { payment_id: paymentId, reason: 'oops' },
+  )
+  const route = `/api/v1/payments/${paymentId}/reverse`
+  const hashV1 = await hashIdempotencyRequest(
+    route,
+    paymentMutationIdempotencyPayload(paymentId, { reason: 'oops' }),
+  )
+  const hashV2 = await hashIdempotencyRequest(
+    route,
+    paymentMutationIdempotencyPayload(paymentId, { reason: 'oops' }),
   )
   assertEquals(hashV1, hashV2)
 })
