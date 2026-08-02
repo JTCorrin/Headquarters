@@ -10,6 +10,7 @@ export { createLeadsEndpoints } from './leads.js';
 export { createMailboxEndpoints } from './mailbox.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
+export { createPaymentsEndpoints } from './payments.js';
 export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
@@ -28,6 +29,7 @@ export type {
 	MailboxEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
+	PaymentsEndpoints,
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,

@@ -1,6 +1,12 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { PaymentFormData } from '$lib/schemas/payment.js';
+	import type {
+		PaymentBillOption,
+		PaymentClientOption,
+		PaymentFormData,
+		PaymentInvoiceOption,
+		PaymentVendorOption
+	} from '$lib/schemas/payment.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import PaymentForm from './payment-form.svelte';
@@ -14,19 +20,31 @@
 		description?: string;
 		submitLabel?: string;
 		triggerLabel?: string;
+		clientOptions?: PaymentClientOption[];
+		vendorOptions?: PaymentVendorOption[];
+		invoiceOptions?: PaymentInvoiceOption[];
+		billOptions?: PaymentBillOption[];
+		lockDirection?: boolean;
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
 		form,
 		open = $bindable(false),
 		title = 'Record payment',
-		description = 'Match a payment to a client / invoice, or leave it unallocated.',
+		description = 'Ledger entry for money in or out — allocate to an invoice or bill, or leave unallocated.',
 		submitLabel = 'Save payment',
 		triggerLabel = 'Record payment',
+		clientOptions = [],
+		vendorOptions = [],
+		invoiceOptions = [],
+		billOptions = [],
+		lockDirection = false,
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: PaymentFormDrawerProps = $props();
 </script>
 
@@ -37,7 +55,9 @@
 		</Drawer.Trigger>
 	{:else}
 		<Drawer.Trigger>
-			<Button type="button">{triggerLabel}</Button>
+			{#snippet child({ props })}
+				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+			{/snippet}
 		</Drawer.Trigger>
 	{/if}
 
@@ -47,7 +67,16 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<PaymentForm {form} {submitLabel} />
+			<PaymentForm
+				{form}
+				{clientOptions}
+				{vendorOptions}
+				{invoiceOptions}
+				{billOptions}
+				{lockDirection}
+				{submitLabel}
+				{onValidSubmit}
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>
