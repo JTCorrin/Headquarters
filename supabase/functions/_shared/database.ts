@@ -397,6 +397,58 @@ export type DocumentFolderRow = {
   name: string
 }
 
+export type MailboxAccountRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  membership_id: string
+  email_address: string
+  from_name: string | null
+  imap_host: string
+  imap_port: number
+  imap_security: 'tls' | 'starttls' | 'none'
+  smtp_host: string
+  smtp_port: number
+  smtp_security: 'tls' | 'starttls' | 'none'
+  username: string
+  status: 'pending' | 'active' | 'error' | 'disabled'
+  last_checked_at: string | null
+  last_error_code: string | null
+  credentials_updated_at: string | null
+  sync_lookback_days: number
+  sync_max_messages: number
+  sync_max_body_bytes: number
+  sync_attachments_metadata_only: boolean
+  sync_lease_until: string | null
+  sync_lease_holder: string | null
+  consecutive_auth_failures: number
+}
+
+export type IntegrationRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  type: 'ai_openai' | 'ai_anthropic' | 'ai_google' | 'ai_openrouter'
+  name: string
+  status: 'pending' | 'active' | 'error' | 'disabled'
+  config: Json
+  external_account_id: string | null
+  connected_by: string | null
+  last_sync_at: string | null
+  last_error_code: string | null
+  credentials_updated_at: string | null
+}
+
 export type DocumentLinkRow = {
   id: string
   org_id: string
@@ -683,6 +735,18 @@ export type Database = {
         Row: DocumentLinkRow
         Insert: Partial<DocumentLinkRow>
         Update: Partial<DocumentLinkRow>
+        Relationships: []
+      }
+      mailbox_accounts: {
+        Row: MailboxAccountRow
+        Insert: Partial<MailboxAccountRow>
+        Update: Partial<MailboxAccountRow>
+        Relationships: []
+      }
+      integrations: {
+        Row: IntegrationRow
+        Insert: Partial<IntegrationRow>
+        Update: Partial<IntegrationRow>
         Relationships: []
       }
     }
@@ -997,6 +1061,46 @@ export type Database = {
       reap_expired_document_uploads: {
         Args: Record<string, never>
         Returns: Json
+      }
+      get_mailbox_account: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      upsert_mailbox_account: {
+        Args: {
+          p_org_id: string
+          p_email_address: string
+          p_from_name: string | null
+          p_imap_host: string
+          p_imap_port: number
+          p_imap_security: string
+          p_smtp_host: string
+          p_smtp_port: number
+          p_smtp_security: string
+          p_username: string
+          p_password?: string | null
+        }
+        Returns: Json
+      }
+      disconnect_mailbox_account: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      mailbox_credentials_present: {
+        Args: { p_org_id: string; p_password?: string | null }
+        Returns: boolean
+      }
+      list_ai_integrations: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      upsert_ai_integration: {
+        Args: { p_org_id: string; p_provider: string; p_api_key: string }
+        Returns: Json
+      }
+      disconnect_ai_integration: {
+        Args: { p_org_id: string; p_provider: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>
