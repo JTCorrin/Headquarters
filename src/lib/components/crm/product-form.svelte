@@ -13,14 +13,24 @@
 		form: SuperForm<ProductFormData>;
 		submitLabel?: string;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
-	let { form, submitLabel = 'Save product', class: className }: ProductFormProps = $props();
+	let {
+		form,
+		submitLabel = 'Save product',
+		class: className,
+		onValidSubmit
+	}: ProductFormProps = $props();
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let pendingSubmit = $state(false);
+	let submitLock = false;
+	const busy = $derived($submitting || pendingSubmit);
 
 	const statusOptions = [
 		{ value: 'active', label: 'Active' },
@@ -32,7 +42,28 @@
 	);
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)}>
+<form
+	method="POST"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (!onValidSubmit) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+	class={cn('space-y-4', className)}
+	data-testid="product-form"
+>
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="product-sku">SKU</Label>
@@ -98,7 +129,7 @@
 			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
 		</div>
 		<div class="space-y-2">
-			<Label for="product-stock">Stock qty</Label>
+			<Label for="product-stock">Opening stock</Label>
 			<Input
 				id="product-stock"
 				name="stockQty"
@@ -121,5 +152,5 @@
 		Track inventory for this product
 	</label>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={busy}>{submitLabel}</Button>
 </form>

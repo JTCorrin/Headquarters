@@ -119,3 +119,44 @@ describe('LeadsBoard keyboard moves', () => {
 		await expect.element(page.getByTestId(`lead-move-down-${leadB}`)).toBeDisabled();
 	});
 });
+
+describe('LeadsBoard column affordances', () => {
+	it('keeps empty columns tall enough for drop targets and expand controls clickable', async () => {
+		render(LeadsBoard, {
+			leads: leads.filter((lead) => lead.stage !== 'qualified')
+		});
+
+		const board = page.getByTestId('leads-board').element() as HTMLElement;
+		const theme = board.querySelector('.crm-svar-kanban-theme') as HTMLElement | null;
+		expect(theme).toBeTruthy();
+
+		const columns = [...board.querySelectorAll('.wx-column')] as HTMLElement[];
+		expect(columns.length).toBeGreaterThan(0);
+
+		const emptyQualified = columns.find((column) =>
+			column.textContent?.toLowerCase().includes('qualified')
+		);
+		expect(emptyQualified).toBeTruthy();
+		expect(emptyQualified!.classList.contains('wx-collapsed')).toBe(false);
+		expect(emptyQualified!.getBoundingClientRect().height).toBeGreaterThanOrEqual(280);
+
+		const collapse = emptyQualified!.querySelector('.wx-toggle') as HTMLButtonElement | null;
+		expect(collapse).toBeTruthy();
+		collapse!.click();
+
+		await expect
+			.poll(() => emptyQualified!.classList.contains('wx-collapsed'))
+			.toBe(true);
+
+		const expand = emptyQualified!.querySelector('.wx-expand') as HTMLButtonElement | null;
+		expect(expand).toBeTruthy();
+		const title = emptyQualified!.querySelector('.wx-title') as HTMLElement | null;
+		expect(getComputedStyle(title!).pointerEvents).toBe('none');
+		expect(getComputedStyle(expand!).pointerEvents).toBe('auto');
+
+		expand!.click();
+		await expect
+			.poll(() => emptyQualified!.classList.contains('wx-collapsed'))
+			.toBe(false);
+	});
+});

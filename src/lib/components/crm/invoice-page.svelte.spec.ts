@@ -150,6 +150,9 @@ describe('InvoicePage detail flows', () => {
 			'GET /api/v1/contacts': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`PATCH /api/v1/invoices/${INVOICE_ID}`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"1"');
 				patchBody = await request.json();
@@ -201,6 +204,9 @@ describe('InvoicePage detail flows', () => {
 			'GET /api/v1/contacts': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`POST /api/v1/invoices/${INVOICE_ID}/send`]: async () => {
 				sendCalled = true;
 				return {
@@ -237,6 +243,9 @@ describe('InvoicePage detail flows', () => {
 				body: { data: [sampleClient()], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/products': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			[`PATCH /api/v1/invoices/${INVOICE_ID}`]: async (request) => {
@@ -313,6 +322,9 @@ describe('InvoicePage detail flows', () => {
 			}),
 			'GET /api/v1/contacts': async () => ({
 				body: { data: [], meta: { next_cursor: 'page-2' } }
+			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
 			}),
 			[`GET /api/v1/contacts/${CONTACT_ID}`]: async () => ({
 				body: {
@@ -405,6 +417,9 @@ describe('InvoicePage detail flows', () => {
 			'GET /api/v1/contacts': async () => ({
 				body: { data: [], meta: { next_cursor: 'page-2' } }
 			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`GET /api/v1/contacts/${CONTACT_ID}`]: async () => {
 				pinStarted = true;
 				await pinGate;
@@ -446,6 +461,9 @@ describe('InvoicePage detail flows', () => {
 				body: { data: [sampleClient()], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/products': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			[`POST /api/v1/invoices/${INVOICE_ID}/void`]: async (request) => {

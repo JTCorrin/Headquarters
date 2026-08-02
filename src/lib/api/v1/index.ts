@@ -19,6 +19,7 @@ export type {
 	LeadsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
+	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
 	TaxRatesEndpoints

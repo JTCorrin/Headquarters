@@ -31,6 +31,11 @@ export { default as QuotesPage } from './quotes-page.svelte';
 export { default as QuotePage } from './quote-page.svelte';
 export { default as QuoteNumberLink } from './quote-number-link.svelte';
 export { default as ProductsListPage } from './products-list-page.svelte';
+export { default as ProductsPage } from './products-page.svelte';
+export { default as ProductPage } from './product-page.svelte';
+export { default as ProductDetailPage } from './product-detail-page.svelte';
+export { default as ProductSkuLink } from './product-sku-link.svelte';
+
 export { default as DataTableShell } from './data-table-shell.svelte';
 export { default as LeadsBoard } from './leads-board.svelte';
 export { default as LeadsBoardPage } from './leads-board-page.svelte';
