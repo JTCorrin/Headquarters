@@ -81,6 +81,12 @@
 			$formData.clientName = selected.name;
 		}
 	});
+
+	$effect(() => {
+		if (!$formData.contactId) return;
+		const stillValid = contactsForClient.some((c) => c.id === $formData.contactId);
+		if (!stillValid) $formData.contactId = '';
+	});
 </script>
 
 <form

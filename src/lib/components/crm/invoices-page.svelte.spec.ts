@@ -119,7 +119,25 @@ describe('InvoicesPage integration', () => {
 		const fetchMock = createMockFetch({
 			'GET /api/v1/invoices': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
-				return { body: { data: [sampleInvoice()], meta: { next_cursor: null } } };
+				expect(new URL(request.url, 'http://local').searchParams.get('status')).toBeNull();
+				return {
+					body: {
+						data: [
+							sampleInvoice(),
+							sampleInvoice({
+								id: '33333333-3333-4444-8555-666666666666',
+								number: 'INV-0003',
+								status: 'sent'
+							}),
+							sampleInvoice({
+								id: '44444444-4444-4555-8666-777777777777',
+								number: 'INV-0004',
+								status: 'void'
+							})
+						],
+						meta: { next_cursor: null }
+					}
+				};
 			},
 			'GET /api/v1/clients': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
@@ -156,6 +174,8 @@ describe('InvoicesPage integration', () => {
 		});
 
 		await expect.element(page.getByRole('link', { name: 'INV-0001' })).toBeInTheDocument();
+		await expect.element(page.getByRole('link', { name: 'INV-0003' })).toBeInTheDocument();
+		await expect.element(page.getByRole('link', { name: 'INV-0004' })).toBeInTheDocument();
 		expect(seenOrgHeaders[0]).toBe(ORG_A);
 
 		await page.getByRole('button', { name: 'New invoice' }).click();

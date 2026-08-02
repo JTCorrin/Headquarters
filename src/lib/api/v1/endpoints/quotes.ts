@@ -1,5 +1,6 @@
 import type { ApiRequestFn } from '../request.js';
 import type {
+	ApiInvoiceDocument,
 	ApiQuote,
 	ApiQuoteCreateBody,
 	ApiQuoteDocument,
@@ -53,6 +54,18 @@ export function createQuotesEndpoints(request: ApiRequestFn): QuotesEndpoints {
 				ifMatchVersion: version,
 				signal
 			});
+		},
+		createInvoice: async (quoteId, signal) => {
+			const { data } = await request<ApiInvoiceDocument>(
+				`/api/v1/quotes/${quoteId}/create-invoice`,
+				{
+					method: 'POST',
+					body: {},
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
 		}
 	};
 }

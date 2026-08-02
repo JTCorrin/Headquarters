@@ -404,30 +404,44 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 	};
 }
 
+/** Preserve product link + discount/tax when rebuilding PATCH line payloads. */
 export function lineItemRowsToInvoiceLineInputs(
-	lines: { productSku?: string; description: string; qty: string; unitPrice: string }[],
-	productIdBySku?: Map<string, string>
+	lines: {
+		productId?: string | null;
+		productSku?: string;
+		description: string;
+		qty: string;
+		unitPrice: string;
+		discountPercent?: number;
+		taxRatePercent?: number;
+	}[]
 ): ApiInvoiceLineInput[] {
 	return lines.map((line, index) => {
-		const productId = line.productSku ? productIdBySku?.get(line.productSku) : undefined;
 		const quantity = Number(line.qty);
 		const unitPriceCents = amountStringToCents(line.unitPrice) ?? 0;
-		if (productId) {
-			return {
-				product_id: productId,
-				quantity,
-				description: line.description,
-				unit_price_cents: unitPriceCents,
-				position: index
-			};
+		const productId = line.productId?.trim() ? line.productId.trim() : null;
+		const input: ApiInvoiceLineInput = productId
+			? {
+					product_id: productId,
+					quantity,
+					description: line.description,
+					unit_price_cents: unitPriceCents,
+					position: index
+				}
+			: {
+					product_id: null,
+					description: line.description,
+					quantity,
+					unit_price_cents: unitPriceCents,
+					position: index
+				};
+		if (line.discountPercent !== undefined) {
+			input.discount_percent = line.discountPercent;
 		}
-		return {
-			product_id: null,
-			description: line.description,
-			quantity,
-			unit_price_cents: unitPriceCents,
-			position: index
-		};
+		if (line.taxRatePercent !== undefined) {
+			input.tax_rate_percent = line.taxRatePercent;
+		}
+		return input;
 	});
 }
 
