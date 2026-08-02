@@ -24,7 +24,8 @@
 			phone: '',
 			company: '',
 			title: '',
-			status: 'active'
+			status: 'active',
+			clientId: ''
 		},
 		zod4(contactFormSchema)
 	);

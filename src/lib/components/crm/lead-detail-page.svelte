@@ -1,6 +1,11 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ConvertLeadFormData, LeadFormData, LeadResource } from '$lib/schemas/lead.js';
+	import type {
+		ConvertLeadFormData,
+		LeadClientOption,
+		LeadFormData,
+		LeadResource
+	} from '$lib/schemas/lead.js';
 	import type { ClientResource } from '$lib/schemas/client.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
@@ -26,6 +31,8 @@
 		lead?: LeadResource | null;
 		leadForm: SuperForm<LeadFormData>;
 		convertForm: SuperForm<ConvertLeadFormData>;
+		clientOptions?: LeadClientOption[];
+		orgCurrency?: string | null;
 		viewState?: ResourceViewState;
 		convertOpen?: boolean;
 		converting?: boolean;
@@ -36,6 +43,7 @@
 		onSave?: () => boolean | void | Promise<boolean | void>;
 		onConvert?: () => void;
 		onOpenClient?: (clientId: string) => void;
+		onCreateClient?: () => void;
 		onReload?: () => void;
 	}
 
@@ -45,6 +53,8 @@
 		lead = null,
 		leadForm,
 		convertForm,
+		clientOptions = [],
+		orgCurrency = null,
 		viewState = { kind: 'ready' },
 		convertOpen = $bindable(false),
 		converting = false,
@@ -54,6 +64,7 @@
 		onSave,
 		onConvert,
 		onOpenClient,
+		onCreateClient,
 		onReload
 	}: LeadDetailPageProps = $props();
 
@@ -168,8 +179,11 @@
 						{:else}
 							<LeadForm
 								form={leadForm}
+								{clientOptions}
+								{orgCurrency}
 								submitLabel="Save lead"
 								onValidSubmit={() => onSave?.()}
+								{onCreateClient}
 							/>
 						{/if}
 					</section>

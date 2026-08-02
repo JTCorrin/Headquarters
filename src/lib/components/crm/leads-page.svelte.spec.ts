@@ -8,6 +8,7 @@ import LeadsPage from './leads-page.svelte';
 
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const LEAD_ID = '11111111-2222-4333-8444-555555555555';
+const LEAD_B = '22222222-3333-4444-8555-666666666666';
 
 function sampleLead(overrides: Record<string, unknown> = {}) {
 	return {
@@ -54,31 +55,64 @@ function memoryStorage(seed: Record<string, string> = {}) {
 	};
 }
 
+const orgConfigBody = {
+	id: ORG_A,
+	name: 'Corrin Data',
+	legal_name: null,
+	slug: 'corrin-data',
+	logo_path: null,
+	billing_email: null,
+	phone: null,
+	website_url: null,
+	tax_identifier: null,
+	registration_number: null,
+	default_currency: 'GBP',
+	timezone: 'UTC',
+	locale: 'en-GB',
+	country_code: 'GB',
+	theme_default: 'system',
+	settings: {},
+	version: 1,
+	created_at: '2026-01-01T00:00:00Z',
+	updated_at: '2026-01-01T00:00:00Z',
+	deleted_at: null
+};
+
+function sessionForOrg() {
+	return createOrgSession({
+		storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+		initialOrgId: ORG_A,
+		initialMemberships: [
+			{
+				org_id: ORG_A,
+				org_name: 'Corrin Data',
+				org_slug: 'corrin-data',
+				logo_url: null,
+				role: 'owner',
+				theme_default: 'system'
+			}
+		]
+	});
+}
+
 describe('LeadsPage integration', () => {
 	it('lists leads with X-Org-Id and creates a lead', async () => {
 		const seenOrgHeaders: string[] = [];
 		let createBody: unknown;
 
-		const session = createOrgSession({
-			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
-			initialOrgId: ORG_A,
-			initialMemberships: [
-				{
-					org_id: ORG_A,
-					org_name: 'Corrin Data',
-					org_slug: 'corrin-data',
-					logo_url: null,
-					role: 'owner',
-					theme_default: 'system'
-				}
-			]
-		});
+		const session = sessionForOrg();
 
 		const fetchMock = createMockFetch({
 			'GET /api/v1/leads': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				return { body: { data: [sampleLead()], meta: { next_cursor: null } } };
 			},
+			'GET /api/v1/clients': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/organisation/configuration': async () => ({
+				body: { data: orgConfigBody }
+			}),
 			'POST /api/v1/leads': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				createBody = await request.json();
@@ -86,7 +120,7 @@ describe('LeadsPage integration', () => {
 					status: 201,
 					body: {
 						data: sampleLead({
-							id: '22222222-3333-4444-8555-666666666666',
+							id: LEAD_B,
 							name: 'Northwind pilot'
 						})
 					}
@@ -97,18 +131,103 @@ describe('LeadsPage integration', () => {
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
 		render(LeadsPage, { api, session });
 
-		await expect.element(page.getByText('Contoso expansion')).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId(`lead-move-row-${LEAD_ID}`))
+			.toHaveTextContent('Contoso expansion');
 		expect(seenOrgHeaders[0]).toBe(ORG_A);
 
 		await page.getByRole('button', { name: 'New lead' }).click();
 		await page.getByLabelText('Name').fill('Northwind pilot');
 		await page.getByTestId('lead-form').getByRole('button', { name: 'Save lead' }).click();
 
-		await expect.element(page.getByText('Northwind pilot')).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId(`lead-move-row-${LEAD_B}`))
+			.toHaveTextContent('Northwind pilot');
 		expect(createBody).toMatchObject({
 			name: 'Northwind pilot',
 			stage: 'new',
 			currency: 'GBP'
 		});
+	});
+
+	it('keyboard move PATCHes stage+position and rolls back visibly on failure', async () => {
+		const session = sessionForOrg();
+		let patchCount = 0;
+		let lastPatch: { body: unknown; ifMatch: string | null } | null = null;
+
+		const boardLeads = [
+			sampleLead({ id: LEAD_ID, name: 'Alpha deal', stage: 'new', position: 0, version: 1 }),
+			sampleLead({
+				id: LEAD_B,
+				name: 'Bravo deal',
+				stage: 'new',
+				position: 1000,
+				version: 2
+			})
+		];
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/leads': async () => ({
+				body: { data: boardLeads, meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/organisation/configuration': async () => ({
+				body: { data: orgConfigBody }
+			}),
+			[`PATCH /api/v1/leads/${LEAD_B}`]: async (request) => {
+				patchCount += 1;
+				lastPatch = {
+					body: await request.json(),
+					ifMatch: request.headers.get('if-match')
+				};
+				if (patchCount === 1) {
+					return {
+						body: {
+							data: sampleLead({
+								id: LEAD_B,
+								name: 'Bravo deal',
+								stage: 'new',
+								position: -500,
+								version: 3
+							})
+						}
+					};
+				}
+				return {
+					status: 409,
+					body: {
+						error: {
+							code: 'CONFLICT',
+							message: 'Lead version does not match If-Match'
+						}
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(LeadsPage, { api, session });
+
+		await expect
+			.element(page.getByTestId(`lead-move-row-${LEAD_B}`))
+			.toHaveTextContent('Bravo deal');
+		await page.getByTestId(`lead-move-up-${LEAD_B}`).click();
+
+		await expect.poll(() => patchCount).toBe(1);
+		expect(lastPatch?.ifMatch).toBe('"2"');
+		expect(lastPatch?.body).toMatchObject({
+			stage: 'new',
+			position: expect.any(Number)
+		});
+
+		// Second move fails — board error visible and prior stage/order preserved in controls.
+		await page.getByTestId(`lead-move-down-${LEAD_B}`).click();
+		await expect.poll(() => patchCount).toBe(2);
+		await expect
+			.element(page.getByTestId('leads-board-error'))
+			.toHaveTextContent(/restored|match|conflict|could not move/i);
+		await expect.element(page.getByTestId(`lead-move-row-${LEAD_B}`)).toHaveTextContent(/new/i);
 	});
 });
