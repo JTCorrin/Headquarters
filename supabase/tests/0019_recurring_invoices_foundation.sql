@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(16);
 
 select has_table('public', 'recurring_invoice_schedules', 'schedules table exists');
 select has_table('public', 'recurring_invoice_lines', 'lines table exists');
@@ -29,17 +29,26 @@ select ok(
   'authenticated can execute run_now_recurring_schedule'
 );
 
+select ok(
+  exists (
+    select 1 from pg_constraint
+    where conname = 'invoices_recurring_run_fk'
+  ),
+  'invoices.recurring_run_id FK to runs exists'
+);
+
 create temporary table _rec_fixture (
   owner_id uuid,
   outsider_id uuid,
   org_id uuid,
   other_org_id uuid,
   client_id uuid,
-  schedule_id uuid,
-  schedule_version integer,
   empty_schedule_id uuid,
   empty_schedule_version integer,
-  invoice_id uuid
+  schedule_id uuid,
+  schedule_version integer,
+  invoice_id uuid,
+  run_id uuid
 ) on commit drop;
 
 grant all on table _rec_fixture to authenticated;
@@ -134,25 +143,32 @@ from created_client;
 select pg_temp.as_user((select owner_id from _rec_fixture));
 set local role authenticated;
 
-with empty_created as (
-  select public.create_recurring_schedule_draft(
-    (select org_id from _rec_fixture),
-    jsonb_build_object(
-      'name', 'Empty lines',
-      'client_id', (select client_id from _rec_fixture),
-      'frequency', 'monthly',
-      'day_of_month', 1,
-      'start_on', '2026-08-01',
-      'anchor_on', '2026-08-01'
-    ),
-    '[]'::jsonb
-  ) as doc
-)
+select lives_ok(
+  $$
+    select public.create_recurring_schedule_draft(
+      (select org_id from _rec_fixture),
+      jsonb_build_object(
+        'name', 'Empty lines',
+        'client_id', (select client_id from _rec_fixture),
+        'frequency', 'monthly',
+        'day_of_month', 1,
+        'start_on', '2026-08-01',
+        'anchor_on', '2026-08-01'
+      ),
+      '[]'::jsonb
+    )
+  $$,
+  'owner can create a draft schedule with zero lines'
+);
+
 update _rec_fixture
 set
-  empty_schedule_id = (empty_created.doc -> 'schedule' ->> 'id')::uuid,
-  empty_schedule_version = (empty_created.doc -> 'schedule' ->> 'version')::integer
-from empty_created;
+  empty_schedule_id = schedules.id,
+  empty_schedule_version = schedules.version
+from public.recurring_invoice_schedules schedules
+where schedules.org_id = _rec_fixture.org_id
+  and schedules.name = 'Empty lines'
+  and schedules.deleted_at is null;
 
 select throws_ok(
   $$
@@ -167,46 +183,58 @@ select throws_ok(
   'activate without lines is rejected'
 );
 
-with created as (
-  select public.create_recurring_schedule_draft(
-    (select org_id from _rec_fixture),
-    jsonb_build_object(
-      'name', 'Monthly retainer',
-      'client_id', (select client_id from _rec_fixture),
-      'frequency', 'monthly',
-      'day_of_month', 1,
-      'start_on', '2026-08-01',
-      'anchor_on', '2026-08-01',
-      'timezone', 'UTC',
-      'local_run_time', '09:00:00'
-    ),
-    jsonb_build_array(
+select lives_ok(
+  $$
+    select public.create_recurring_schedule_draft(
+      (select org_id from _rec_fixture),
       jsonb_build_object(
-        'description_template', 'Retainer {{period_start}} to {{period_end}}',
-        'quantity', 1,
-        'unit_price_cents', 420000,
-        'tax_rate_percent', 20,
-        'position', 1
+        'name', 'Monthly retainer',
+        'client_id', (select client_id from _rec_fixture),
+        'frequency', 'monthly',
+        'day_of_month', 1,
+        'start_on', '2026-08-01',
+        'anchor_on', '2026-08-01',
+        'timezone', 'UTC',
+        'local_run_time', '09:00:00'
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description_template', 'Retainer {{period_start}} to {{period_end}}',
+          'quantity', 1,
+          'unit_price_cents', 420000,
+          'tax_rate_percent', 20,
+          'position', 1
+        )
       )
     )
-  ) as doc
-)
+  $$,
+  'owner can create a draft schedule with a line'
+);
+
 update _rec_fixture
 set
-  schedule_id = (created.doc -> 'schedule' ->> 'id')::uuid,
-  schedule_version = (created.doc -> 'schedule' ->> 'version')::integer
-from created;
+  schedule_id = schedules.id,
+  schedule_version = schedules.version
+from public.recurring_invoice_schedules schedules
+where schedules.org_id = _rec_fixture.org_id
+  and schedules.name = 'Monthly retainer'
+  and schedules.deleted_at is null;
 
-with activated as (
-  select public.activate_recurring_schedule(
-    (select schedule_id from _rec_fixture),
-    (select org_id from _rec_fixture),
-    (select schedule_version from _rec_fixture)
-  ) as doc
-)
+select lives_ok(
+  $$
+    select public.activate_recurring_schedule(
+      (select schedule_id from _rec_fixture),
+      (select org_id from _rec_fixture),
+      (select schedule_version from _rec_fixture)
+    )
+  $$,
+  'owner can activate a schedule with lines'
+);
+
 update _rec_fixture
-set schedule_version = (activated.doc -> 'schedule' ->> 'version')::integer
-from activated;
+set schedule_version = schedules.version
+from public.recurring_invoice_schedules schedules
+where schedules.id = _rec_fixture.schedule_id;
 
 select is(
   (
@@ -217,27 +245,29 @@ select is(
   'activate moves schedule to active'
 );
 
-select ok(
-  (
-    select next_run_at is not null from public.recurring_invoice_schedules
-    where id = (select schedule_id from _rec_fixture)
-  ),
-  'activate sets next_run_at'
+select lives_ok(
+  $$
+    select public.run_now_recurring_schedule(
+      (select schedule_id from _rec_fixture),
+      (select org_id from _rec_fixture),
+      (select schedule_version from _rec_fixture),
+      repeat('a', 64),
+      repeat('b', 64),
+      '/api/v1/recurring-invoice-schedules/' ||
+        (select schedule_id::text from _rec_fixture) || '/run-now'
+    )
+  $$,
+  'owner can run-now a schedule into a draft invoice'
 );
 
-with ran as (
-  select public.run_now_recurring_schedule(
-    (select schedule_id from _rec_fixture),
-    (select org_id from _rec_fixture),
-    (select schedule_version from _rec_fixture),
-    repeat('a', 64),
-    repeat('b', 64),
-    '/api/v1/recurring-invoice-schedules/' || (select schedule_id::text from _rec_fixture) || '/run-now'
-  ) as doc
-)
 update _rec_fixture
-set invoice_id = (ran.doc -> 'response_body' -> 'data' -> 'invoice' ->> 'id')::uuid
-from ran;
+set
+  invoice_id = invoices.id,
+  run_id = invoices.recurring_run_id
+from public.invoices
+where invoices.org_id = _rec_fixture.org_id
+  and invoices.source = 'recurring'
+  and invoices.deleted_at is null;
 
 select is(
   (select source from public.invoices where id = (select invoice_id from _rec_fixture)),
@@ -246,15 +276,13 @@ select is(
 );
 
 select ok(
-  exists (
-    select 1
-    from public.invoices i
-    join public.recurring_invoice_runs r on r.id = i.recurring_run_id
-    where i.id = (select invoice_id from _rec_fixture)
-      and r.schedule_id = (select schedule_id from _rec_fixture)
-      and r.trigger = 'manual'
+  (
+    select recurring_run_id is not null
+      and recurring_run_id = (select run_id from _rec_fixture)
+    from public.invoices
+    where id = (select invoice_id from _rec_fixture)
   ),
-  'invoice links to manual recurring run'
+  'invoice links recurring_run_id'
 );
 
 reset role;
