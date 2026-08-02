@@ -1,12 +1,16 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { InvoiceFormData } from '$lib/schemas/invoice.js';
+	import type {
+		InvoiceClientOption,
+		InvoiceContactOption,
+		InvoiceFormData,
+		InvoiceQuoteOption
+	} from '$lib/schemas/invoice.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import InvoicesTable from './invoices-table.svelte';
 	import type { InvoiceRow } from './invoices-columns.js';
 	import InvoiceFormDrawer from './invoice-form-drawer.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface InvoicesListPageProps {
@@ -15,7 +19,13 @@
 		rows: InvoiceRow[];
 		form: SuperForm<InvoiceFormData>;
 		drawerOpen?: boolean;
+		clientOptions?: InvoiceClientOption[];
+		contactOptions?: InvoiceContactOption[];
+		quoteOptions?: InvoiceQuoteOption[];
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -24,26 +34,43 @@
 		rows,
 		form,
 		drawerOpen = $bindable(false),
-		class: className
+		clientOptions = [],
+		contactOptions = [],
+		quoteOptions = [],
+		showNav = true,
+		class: className,
+		onValidSubmit
 	}: InvoicesListPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
 			<PageHeader
 				breadcrumb="Accounting"
 				title="Invoices"
-				description="Track sent, partial, and paid invoices."
+				description="Draft, send, and void invoices. Payments come later."
 			>
 				{#snippet actions()}
-					<InvoiceFormDrawer bind:open={drawerOpen} {form}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">New invoice</Button>
-						{/snippet}
-					</InvoiceFormDrawer>
+					<InvoiceFormDrawer
+						bind:open={drawerOpen}
+						{form}
+						{clientOptions}
+						{contactOptions}
+						{quoteOptions}
+						{onValidSubmit}
+						triggerLabel="New invoice"
+					/>
 				{/snippet}
 			</PageHeader>
 

@@ -17,11 +17,15 @@
 
 	const data = defaults(
 		{
+			clientId: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 			clientName: 'Northwind',
-			number: 'INV-0900',
+			contactId: '',
 			currency: 'GBP',
+			issueOn: '2026-03-01',
 			dueOn: '2026-04-01',
-			status: 'draft'
+			purchaseOrderNumber: '',
+			status: 'draft',
+			quoteId: ''
 		},
 		zod4(invoiceFormSchema)
 	);

@@ -35,6 +35,13 @@ import type {
 	ApiOrganisationMembership,
 	ApiProfilePreferences,
 	ApiProfilePreferencesPatch,
+	ApiInvoice,
+	ApiInvoiceCreateBody,
+	ApiInvoiceDocument,
+	ApiInvoiceFromQuoteBody,
+	ApiInvoiceListParams,
+	ApiInvoiceUpdateBody,
+	ApiInvoiceVoidBody,
 	ApiQuote,
 	ApiQuoteCreateBody,
 	ApiQuoteDocument,
@@ -91,6 +98,33 @@ export interface QuotesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiQuoteDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface InvoicesEndpoints {
+	list(
+		params?: ApiInvoiceListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiInvoice[]>>;
+	create(body: ApiInvoiceCreateBody, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
+	createFromQuote(
+		body: ApiInvoiceFromQuoteBody,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiInvoiceDocument>>;
+	update(
+		id: string,
+		body: ApiInvoiceUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	send(id: string, version: number, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
+	void(
+		id: string,
+		body: ApiInvoiceVoidBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
 }
 
 export interface ContactsEndpoints {

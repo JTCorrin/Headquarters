@@ -461,6 +461,152 @@ describe('createApiV1Client', () => {
 		await client.quotes.delete(QUOTE_ID, 2);
 	});
 
+	it('supports invoice draft CRUD, send/void, and from-quote with ETag / If-Match', async () => {
+		const INVOICE_ID = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb';
+		const sampleInvoiceDocument = {
+			id: INVOICE_ID,
+			org_id: ORG_A,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			number: 'INV-0001',
+			client_id: CLIENT_ID,
+			contact_id: null,
+			quote_id: null,
+			owner_membership_id: null,
+			source: 'manual' as const,
+			recurring_run_id: null,
+			billing_period_start: null,
+			billing_period_end: null,
+			status: 'draft' as const,
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			due_on: '2026-04-01',
+			purchase_order_number: null,
+			subtotal_cents: 1000,
+			discount_cents: 0,
+			tax_cents: 200,
+			total_cents: 1200,
+			paid_cents: 0,
+			balance_due_cents: 1200,
+			party_snapshot: { name: 'Northwind' },
+			payment_terms: null,
+			notes: null,
+			internal_notes: null,
+			sent_at: null,
+			viewed_at: null,
+			paid_at: null,
+			voided_at: null,
+			void_reason: null,
+			lines: []
+		};
+
+		const fetchMock = createMockFetch({
+			'POST /api/v1/invoices': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const body = await request.json();
+				expect(body.client_id).toBe(CLIENT_ID);
+				expect(body.lines).toEqual([]);
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: { data: sampleInvoiceDocument }
+				};
+			},
+			'POST /api/v1/invoices/from-quote': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				const body = await request.json();
+				expect(body.quote_id).toBe(QUOTE_ID);
+				return {
+					status: 201,
+					headers: { etag: '"1"' },
+					body: {
+						data: {
+							...sampleInvoiceDocument,
+							source: 'quote',
+							quote_id: QUOTE_ID
+						}
+					}
+				};
+			},
+			[`GET /api/v1/invoices/${INVOICE_ID}`]: async () => ({
+				headers: { etag: '"1"' },
+				body: { data: sampleInvoiceDocument }
+			}),
+			[`PATCH /api/v1/invoices/${INVOICE_ID}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				return {
+					headers: { etag: '"2"' },
+					body: { data: { ...sampleInvoiceDocument, version: 2, due_on: '2026-05-01' } }
+				};
+			},
+			[`POST /api/v1/invoices/${INVOICE_ID}/send`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return {
+					headers: { etag: '"3"' },
+					body: {
+						data: {
+							...sampleInvoiceDocument,
+							version: 3,
+							status: 'sent',
+							sent_at: '2026-03-02T00:00:00Z'
+						}
+					}
+				};
+			},
+			[`POST /api/v1/invoices/${INVOICE_ID}/void`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"3"');
+				const body = await request.json();
+				expect(body.void_reason).toBe('Duplicate');
+				return {
+					headers: { etag: '"4"' },
+					body: {
+						data: {
+							...sampleInvoiceDocument,
+							version: 4,
+							status: 'void',
+							void_reason: 'Duplicate'
+						}
+					}
+				};
+			},
+			[`DELETE /api/v1/invoices/${INVOICE_ID}`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				return { status: 204 };
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const created = await client.invoices.create({
+			client_id: CLIENT_ID,
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			due_on: '2026-04-01',
+			lines: []
+		});
+		expect(created.number).toBe('INV-0001');
+
+		const fromQuote = await client.invoices.createFromQuote({ quote_id: QUOTE_ID });
+		expect(fromQuote.quote_id).toBe(QUOTE_ID);
+
+		const got = await client.invoices.get(INVOICE_ID);
+		expect(got.etag).toBe('"1"');
+
+		const updated = await client.invoices.update(INVOICE_ID, { due_on: '2026-05-01' }, 1);
+		expect(updated.version).toBe(2);
+
+		const sent = await client.invoices.send(INVOICE_ID, 2);
+		expect(sent.status).toBe('sent');
+
+		const voided = await client.invoices.void(INVOICE_ID, { void_reason: 'Duplicate' }, 3);
+		expect(voided.status).toBe('void');
+
+		await client.invoices.delete(INVOICE_ID, 1);
+	});
+
 	it('retains initiating org when token resolve races with an org switch', async () => {
 		let selectedOrg = ORG_A;
 		let releaseToken!: (token: string) => void;

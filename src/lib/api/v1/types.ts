@@ -254,6 +254,135 @@ export interface ApiQuoteListParams {
 	status?: 'draft';
 }
 
+export type ApiInvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'void';
+export type ApiInvoiceSource = 'manual' | 'quote' | 'recurring';
+
+export interface ApiInvoice {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	number: string;
+	client_id: string;
+	contact_id: string | null;
+	quote_id: string | null;
+	owner_membership_id: string | null;
+	source: ApiInvoiceSource;
+	recurring_run_id: string | null;
+	billing_period_start: string | null;
+	billing_period_end: string | null;
+	status: ApiInvoiceStatus;
+	currency: string;
+	issue_on: string;
+	due_on: string;
+	purchase_order_number: string | null;
+	subtotal_cents: number;
+	discount_cents: number;
+	tax_cents: number;
+	total_cents: number;
+	paid_cents: number;
+	balance_due_cents: number;
+	party_snapshot: unknown;
+	payment_terms: string | null;
+	notes: string | null;
+	internal_notes: string | null;
+	sent_at: string | null;
+	viewed_at: string | null;
+	paid_at: string | null;
+	voided_at: string | null;
+	void_reason: string | null;
+}
+
+export interface ApiInvoiceLine {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	version: number;
+	invoice_id: string;
+	product_id: string | null;
+	sku_snapshot: string | null;
+	description: string;
+	quantity: number;
+	unit_price_cents: number;
+	discount_percent: number;
+	tax_rate_percent: number;
+	subtotal_cents: number;
+	tax_cents: number;
+	total_cents: number;
+	position: number;
+}
+
+export type ApiInvoiceDocument = ApiInvoice & { lines: ApiInvoiceLine[] };
+
+/** Product line — description/unit price may be inherited server-side from the product. */
+export interface ApiInvoiceProductLineInput {
+	product_id: string;
+	quantity: number;
+	description?: string;
+	unit_price_cents?: number;
+	discount_percent?: number;
+	tax_rate_percent?: number;
+	position?: number;
+}
+
+/** Free-text line — description and unit_price_cents are required by the API. */
+export interface ApiInvoiceFreeTextLineInput {
+	product_id?: null;
+	description: string;
+	quantity: number;
+	unit_price_cents: number;
+	discount_percent?: number;
+	tax_rate_percent?: number;
+	position?: number;
+}
+
+export type ApiInvoiceLineInput = ApiInvoiceProductLineInput | ApiInvoiceFreeTextLineInput;
+
+interface ApiInvoiceWritableFields {
+	currency?: string;
+	contact_id?: string | null;
+	owner_membership_id?: string | null;
+	issue_on?: string;
+	due_on?: string;
+	purchase_order_number?: string | null;
+	discount_cents?: number;
+	payment_terms?: string | null;
+	notes?: string | null;
+	internal_notes?: string | null;
+}
+
+export type ApiInvoiceCreateBody = ApiInvoiceWritableFields & {
+	client_id: string;
+	lines: ApiInvoiceLineInput[];
+};
+
+export type ApiInvoiceUpdateBody = ApiInvoiceWritableFields & {
+	client_id?: string;
+	lines?: ApiInvoiceLineInput[];
+};
+
+export interface ApiInvoiceFromQuoteBody {
+	quote_id: string;
+}
+
+export interface ApiInvoiceVoidBody {
+	void_reason: string;
+}
+
+export interface ApiInvoiceListParams {
+	limit?: number;
+	cursor?: string;
+	/** This release only supports draft listing when set. */
+	status?: 'draft';
+}
+
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
 export interface ApiClient {

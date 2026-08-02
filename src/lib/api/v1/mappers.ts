@@ -15,6 +15,11 @@ import type {
 	ThemeOption,
 	ThemePreferenceOption
 } from '$lib/schemas/organisation.js';
+import type {
+	InvoiceFormData,
+	InvoiceListItem
+} from '$lib/schemas/invoice.js';
+import type { LineItemFormData } from '$lib/schemas/line-item.js';
 import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
 import type { ClientRow } from '$lib/components/crm/clients-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
@@ -25,6 +30,11 @@ import type {
 	ApiContact,
 	ApiContactCreateBody,
 	ApiContactUpdateBody,
+	ApiInvoice,
+	ApiInvoiceCreateBody,
+	ApiInvoiceDocument,
+	ApiInvoiceLineInput,
+	ApiInvoiceUpdateBody,
 	ApiLead,
 	ApiLeadConvertBody,
 	ApiLeadCreateBody,
@@ -297,6 +307,128 @@ export function toQuoteUpdateBody(data: QuoteFormData): ApiQuoteUpdateBody {
 		client_id: data.clientId,
 		currency: data.currency
 	};
+}
+
+export function invoiceStatusLabel(status: ApiInvoice['status']): string {
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function toInvoiceListItem(invoice: ApiInvoice): InvoiceListItem {
+	return {
+		id: invoice.id,
+		number: invoice.number,
+		client: partyNameFromSnapshot(invoice.party_snapshot),
+		total: formatMoney(invoice.total_cents, invoice.currency),
+		status: invoiceStatusLabel(invoice.status),
+		dueOn: invoice.due_on
+	};
+}
+
+export function toInvoiceFormData(
+	invoice: ApiInvoice | ApiInvoiceDocument,
+	clientNameFallback = ''
+): InvoiceFormData {
+	const currency =
+		invoice.currency === 'USD' || invoice.currency === 'EUR' || invoice.currency === 'GBP'
+			? invoice.currency
+			: 'GBP';
+	const status =
+		invoice.status === 'sent' ||
+		invoice.status === 'partial' ||
+		invoice.status === 'paid' ||
+		invoice.status === 'void' ||
+		invoice.status === 'draft'
+			? invoice.status
+			: 'draft';
+	return {
+		clientId: invoice.client_id,
+		clientName: partyNameFromSnapshot(invoice.party_snapshot) || clientNameFallback,
+		contactId: invoice.contact_id ?? '',
+		currency,
+		issueOn: invoice.issue_on,
+		dueOn: invoice.due_on,
+		purchaseOrderNumber: invoice.purchase_order_number ?? '',
+		status,
+		quoteId: invoice.quote_id ?? ''
+	};
+}
+
+function optionalContactId(value: string | undefined): string | null | undefined {
+	if (value === undefined) return undefined;
+	const trimmed = value.trim();
+	return trimmed ? trimmed : null;
+}
+
+export function toInvoiceCreateBody(data: InvoiceFormData): ApiInvoiceCreateBody {
+	return {
+		client_id: data.clientId,
+		contact_id: optionalContactId(data.contactId) ?? null,
+		currency: data.currency,
+		issue_on: data.issueOn,
+		due_on: data.dueOn,
+		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		lines: []
+	};
+}
+
+export function toInvoiceUpdateBody(data: InvoiceFormData): ApiInvoiceUpdateBody {
+	return {
+		client_id: data.clientId,
+		contact_id: optionalContactId(data.contactId) ?? null,
+		currency: data.currency,
+		issue_on: data.issueOn,
+		due_on: data.dueOn,
+		purchase_order_number: data.purchaseOrderNumber?.trim() || null
+	};
+}
+
+export function toInvoiceLineInput(data: LineItemFormData, position?: number): ApiInvoiceLineInput {
+	const quantity = Number(data.qty);
+	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
+	const productId = data.productId?.trim();
+	if (productId) {
+		return {
+			product_id: productId,
+			quantity,
+			description: data.description.trim(),
+			unit_price_cents: unitPriceCents,
+			...(position === undefined ? {} : { position })
+		};
+	}
+	return {
+		product_id: null,
+		description: data.description.trim(),
+		quantity,
+		unit_price_cents: unitPriceCents,
+		...(position === undefined ? {} : { position })
+	};
+}
+
+export function lineItemRowsToInvoiceLineInputs(
+	lines: { productSku?: string; description: string; qty: string; unitPrice: string }[],
+	productIdBySku?: Map<string, string>
+): ApiInvoiceLineInput[] {
+	return lines.map((line, index) => {
+		const productId = line.productSku ? productIdBySku?.get(line.productSku) : undefined;
+		const quantity = Number(line.qty);
+		const unitPriceCents = amountStringToCents(line.unitPrice) ?? 0;
+		if (productId) {
+			return {
+				product_id: productId,
+				quantity,
+				description: line.description,
+				unit_price_cents: unitPriceCents,
+				position: index
+			};
+		}
+		return {
+			product_id: null,
+			description: line.description,
+			quantity,
+			unit_price_cents: unitPriceCents,
+			position: index
+		};
+	});
 }
 
 export function clientStatusLabel(status: ApiClient['status']): string {
