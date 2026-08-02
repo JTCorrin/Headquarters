@@ -425,3 +425,11 @@ entrypoint = "./functions/api-v1/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/api-v1/*.html" ]
+
+# Wave B: bounded mailbox sync cron entry (service-role RPCs inside).
+# Schedule externally (e.g. every 5m) against /functions/v1/mailbox-sync.
+[functions.mailbox-sync]
+enabled = true
+verify_jwt = false
+import_map = "./functions/mailbox-sync/deno.json"
+entrypoint = "./functions/mailbox-sync/index.ts"

@@ -16,8 +16,8 @@ function assertCanReadIntegrations(role: MembershipRole): void {
 
 function assertCanWriteAiIntegrations(role: MembershipRole): void {
   assertCanReadIntegrations(role)
-  if (role !== 'owner' && role !== 'admin') {
-    throw new ApiError(403, 'FORBIDDEN', 'Only owners and admins can connect AI providers')
+  if (role !== 'owner') {
+    throw new ApiError(403, 'FORBIDDEN', 'Only owners can connect AI providers')
   }
 }
 
