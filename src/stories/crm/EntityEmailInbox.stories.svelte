@@ -115,7 +115,16 @@
 	});
 </script>
 
-<Story name="Default" args={{ messages: sampleEmailMessages }}>
+<Story
+	name="Default"
+	args={{
+		messages: sampleEmailMessages,
+		mailboxConnected: true,
+		aiProviderConnected: true,
+		smtpReady: true,
+		role: 'owner'
+	}}
+>
 	{#snippet template(args)}
 		{@const props =
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
@@ -127,7 +136,16 @@
 	{/snippet}
 </Story>
 
-<Story name="ScrollableInbox" args={{ messages: overflowMessages }}>
+<Story
+	name="ScrollableInbox"
+	args={{
+		messages: overflowMessages,
+		mailboxConnected: true,
+		aiProviderConnected: true,
+		smtpReady: true,
+		role: 'owner'
+	}}
+>
 	{#snippet template(args)}
 		{@const props =
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
@@ -139,7 +157,79 @@
 	{/snippet}
 </Story>
 
-<Story name="Empty" args={{ messages: [] }}>
+<Story
+	name="EmptyNoMailbox"
+	args={{
+		messages: [],
+		emptyState: 'no_mailbox',
+		mailboxConnected: false,
+		aiProviderConnected: false,
+		role: 'owner'
+	}}
+>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
+				args
+			)}
+		<div class="bg-background h-screen p-4">
+			<EntityEmailInbox {...props} class="h-full" />
+		</div>
+	{/snippet}
+</Story>
+
+<Story
+	name="EmptyNoMatches"
+	args={{
+		messages: [],
+		emptyState: 'no_matches',
+		mailboxConnected: true,
+		aiProviderConnected: true,
+		role: 'owner'
+	}}
+>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
+				args
+			)}
+		<div class="bg-background h-screen p-4">
+			<EntityEmailInbox {...props} class="h-full" />
+		</div>
+	{/snippet}
+</Story>
+
+<Story
+	name="EmptyTeammateNothingShared"
+	args={{
+		messages: [],
+		emptyState: 'teammate_nothing_shared',
+		mailboxConnected: false,
+		aiProviderConnected: false,
+		role: 'member'
+	}}
+>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
+				args
+			)}
+		<div class="bg-background h-screen p-4">
+			<EntityEmailInbox {...props} class="h-full" />
+		</div>
+	{/snippet}
+</Story>
+
+<Story
+	name="DraftGatedForMember"
+	args={{
+		messages: sampleEmailMessages,
+		mailboxConnected: true,
+		aiProviderConnected: false,
+		smtpReady: false,
+		role: 'member'
+	}}
+>
 	{#snippet template(args)}
 		{@const props =
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (

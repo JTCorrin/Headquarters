@@ -786,3 +786,55 @@ export interface ApiDocumentMoveBody {
 	entity_id: string;
 	folder_id?: string | null;
 }
+
+/** Personal IMAP/SMTP mailbox for the current membership — secrets never returned. */
+export interface ApiMailboxAccount {
+	id: string;
+	email_address: string;
+	username: string;
+	from_name: string | null;
+	imap_host: string;
+	imap_port: number;
+	imap_security: 'ssl' | 'starttls' | 'none';
+	smtp_host: string;
+	smtp_port: number;
+	smtp_security: 'ssl' | 'starttls' | 'none';
+	credentials_configured: boolean;
+	status: 'disconnected' | 'configured' | 'ok' | 'error' | 'auth_failed';
+	last_checked_at: string | null;
+	last_error_code: string | null;
+}
+
+export interface ApiMailboxPutBody {
+	email_address: string;
+	username: string;
+	/** Omit or empty to keep the existing secret. */
+	password?: string;
+	from_name?: string | null;
+	imap_host: string;
+	imap_port: number;
+	imap_security: 'ssl' | 'starttls' | 'none';
+	smtp_host: string;
+	smtp_port: number;
+	smtp_security: 'ssl' | 'starttls' | 'none';
+}
+
+export interface ApiMailboxTestResult {
+	ok: boolean;
+	error_code?: string | null;
+	message?: string | null;
+}
+
+export type ApiAiProvider = 'openai' | 'anthropic' | 'google' | 'openrouter';
+
+export interface ApiAiIntegration {
+	provider: ApiAiProvider;
+	credentials_configured: boolean;
+	status: 'disconnected' | 'connected' | 'error';
+	last_verified_at: string | null;
+	last_error_code: string | null;
+}
+
+export interface ApiAiIntegrationConnectBody {
+	api_key: string;
+}

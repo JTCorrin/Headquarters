@@ -7,7 +7,10 @@
 	import ProfileTabs from './profile-tabs.svelte';
 	import InfoCard, { type InfoCardField } from './info-card.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
-	import EntityEmailInbox, { type EmailMessage } from './entity-email-inbox.svelte';
+	import EntityEmailInbox, {
+		type EmailMessage,
+		type EntityEmailEmptyState
+	} from './entity-email-inbox.svelte';
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
 	import EntityProjects, { type EntityProject } from './entity-projects.svelte';
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
@@ -18,6 +21,7 @@
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+	import type { MembershipRole } from '$lib/schemas/organisation.js';
 
 	export interface RelatedContact {
 		id: string;
@@ -38,6 +42,11 @@
 		relatedContacts?: RelatedContact[];
 		timelineEvents?: TimelineEvent[];
 		emailMessages?: EmailMessage[];
+		emailEmptyState?: EntityEmailEmptyState;
+		mailboxConnected?: boolean;
+		aiProviderConnected?: boolean;
+		smtpReady?: boolean;
+		role?: MembershipRole;
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
@@ -65,6 +74,11 @@
 		relatedContacts = [],
 		timelineEvents = $bindable<TimelineEvent[]>([]),
 		emailMessages = [],
+		emailEmptyState = 'no_mailbox',
+		mailboxConnected = false,
+		aiProviderConnected = false,
+		smtpReady = false,
+		role = 'member',
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
 		documentDrawerOpen = $bindable(false),
@@ -161,7 +175,15 @@
 							/>
 						</div>
 					{:else if active === 'email'}
-						<EntityEmailInbox messages={emailMessages} class="min-h-0 flex-1" />
+						<EntityEmailInbox
+							messages={emailMessages}
+							emptyState={emailEmptyState}
+							{mailboxConnected}
+							{aiProviderConnected}
+							{smtpReady}
+							{role}
+							class="min-h-0 flex-1"
+						/>
 					{:else if active === 'documents'}
 						{#if documentForm}
 							<EntityDocuments
