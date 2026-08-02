@@ -6,6 +6,7 @@
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
+		toClientCreateBody,
 		toContactCreateBody,
 		toContactListItem,
 		toOrganisationCreateBody,
@@ -13,10 +14,13 @@
 	} from '$lib/api/v1/mappers.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
 	import { contactFormSchema, type ContactListItem } from '$lib/schemas/contact.js';
+	import type { LeadClientOption } from '$lib/schemas/lead.js';
 	import type { OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
+	import ClientFormDrawer from './client-form-drawer.svelte';
 	import ContactsListPage from './contacts-list-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
@@ -40,31 +44,53 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let rows = $state<ContactListItem[]>([]);
+	let clientOptions = $state<LeadClientOption[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let drawerOpen = $state(false);
+	let clientDrawerOpen = $state(false);
 
-	const contactForm = superForm(
-		defaults(
-			{
-				name: '',
-				email: '',
-				phone: '',
-				company: '',
-				title: '',
-				status: 'active' as const
-			},
-			zod4(contactFormSchema)
-		),
-		{
-			validators: zod4(contactFormSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
+	const emptyContactForm = () => ({
+		name: '',
+		email: '',
+		phone: '',
+		company: '',
+		title: '',
+		status: 'active' as const,
+		clientId: ''
+	});
+
+	const emptyClientForm = (): ClientFormData => ({
+		name: '',
+		status: 'active',
+		websiteUrl: '',
+		industry: '',
+		primaryEmail: '',
+		phone: '',
+		taxIdentifier: '',
+		registrationNumber: '',
+		defaultCurrency: '',
+		paymentTermsDays: '',
+		renewalOn: '',
+		notes: ''
+	});
+
+	const contactForm = superForm(defaults(emptyContactForm(), zod4(contactFormSchema)), {
+		validators: zod4(contactFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
+
+	const clientForm = superForm(defaults(emptyClientForm(), zod4(clientFormSchema)), {
+		validators: zod4(clientFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -111,7 +137,9 @@
 
 	function resetOrgScopedState() {
 		rows = [];
+		clientOptions = [];
 		drawerOpen = false;
+		clientDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
 
@@ -134,9 +162,19 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const listed = await api.contacts.list({ limit: 50 });
+			const [listed, clientsListed] = await Promise.all([
+				api.contacts.list({ limit: 50 }),
+				api.clients.list({ limit: 100 })
+			]);
 			if (isStale(epoch)) return;
 
+			clientOptions = clientsListed.data
+				.filter((c) => c.status !== 'archived')
+				.map((c) => ({
+					id: c.id,
+					name: c.name,
+					defaultCurrency: c.default_currency
+				}));
 			rows = listed.data.map(toContactListItem);
 			viewState =
 				rows.length === 0
@@ -162,14 +200,7 @@
 			if (isStale(epoch)) return false;
 			rows = [toContactListItem(created), ...rows];
 			viewState = { kind: 'ready' };
-			contactForm.form.set({
-				name: '',
-				email: '',
-				phone: '',
-				company: '',
-				title: '',
-				status: 'active'
-			});
+			contactForm.form.set(emptyContactForm());
 			drawerOpen = false;
 			return true;
 		} catch (error) {
@@ -177,6 +208,35 @@
 			viewState = {
 				kind: 'validation',
 				message: userMessage(error, 'Could not create contact — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onCreateClientFromContact(): Promise<boolean> {
+		const epoch = captureEpoch();
+		try {
+			const created = await api.clients.create(toClientCreateBody(get(clientForm.form)));
+			if (isStale(epoch)) return false;
+			const option: LeadClientOption = {
+				id: created.id,
+				name: created.name,
+				defaultCurrency: created.default_currency
+			};
+			clientOptions = [option, ...clientOptions.filter((c) => c.id !== option.id)];
+			contactForm.form.update((current) => ({
+				...current,
+				clientId: option.id
+			}));
+			clientForm.form.set(emptyClientForm());
+			clientDrawerOpen = false;
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not create client — try again.'),
 				fields: isApiClientError(error) ? error.fields : undefined
 			};
 			return false;
@@ -240,10 +300,23 @@
 					{navGroups}
 					{rows}
 					form={contactForm}
+					{clientOptions}
 					bind:drawerOpen
 					onValidSubmit={onCreateContact}
+					onCreateClient={() => {
+						clientForm.form.set(emptyClientForm());
+						clientDrawerOpen = true;
+					}}
 					showNav={false}
 					class="min-h-0 flex-1"
+				/>
+				<ClientFormDrawer
+					bind:open={clientDrawerOpen}
+					form={clientForm}
+					showTrigger={false}
+					title="New client"
+					description="Create a client and link it to this contact."
+					onValidSubmit={onCreateClientFromContact}
 				/>
 			</div>
 		</AppShell>

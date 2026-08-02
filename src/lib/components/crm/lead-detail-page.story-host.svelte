@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
+	import { centsToAmountString } from '$lib/money.js';
 	import {
 		convertLeadFormSchema,
 		leadFormSchema,
@@ -41,8 +42,9 @@
 			{
 				name: lead?.name ?? '',
 				companyName: lead?.company_name ?? '',
+				clientId: lead?.client_id ?? '',
 				stage: lead?.stage === 'won' ? 'proposal' : (lead?.stage ?? 'new'),
-				valueCents: lead?.value_cents != null ? String(lead.value_cents) : '',
+				valueAmount: centsToAmountString(lead?.value_cents),
 				currency: lead?.currency ?? 'GBP',
 				probabilityPercent:
 					lead?.probability_percent != null ? String(lead.probability_percent) : '',
