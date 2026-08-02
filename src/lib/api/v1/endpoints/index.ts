@@ -1,3 +1,4 @@
+export { createBillsEndpoints } from './bills.js';
 export { createClientsEndpoints } from './clients.js';
 export { createContactsEndpoints } from './contacts.js';
 export { createDocumentsEndpoints } from './documents.js';
@@ -12,7 +13,9 @@ export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
 export { createTaxRatesEndpoints } from './tax-rates.js';
+export { createVendorsEndpoints } from './vendors.js';
 export type {
+	BillsEndpoints,
 	ClientsEndpoints,
 	ContactsEndpoints,
 	DocumentsEndpoints,
@@ -26,5 +29,6 @@ export type {
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,
-	TaxRatesEndpoints
+	TaxRatesEndpoints,
+	VendorsEndpoints
 } from './types.js';
