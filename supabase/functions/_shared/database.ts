@@ -746,6 +746,47 @@ export type MeetingAttendeeRow = {
   organiser: boolean
 }
 
+export type MeetingTranscriptRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  meeting_id: string
+  document_id: string | null
+  provider: string | null
+  language_code: string | null
+  status: 'uploaded' | 'processing' | 'ready' | 'failed'
+  plain_text: string | null
+  segments: Json | null
+  processed_at: string | null
+  error_code: string | null
+}
+
+export type MeetingTaskProposalRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  meeting_id: string
+  title: string
+  description: string | null
+  suggested_assignee_membership_id: string | null
+  suggested_due_at: string | null
+  confidence: number | null
+  status: 'proposed' | 'accepted' | 'dismissed'
+  accepted_task_id: string | null
+  decided_by: string | null
+  decided_at: string | null
+}
+
 export type ProjectRow = {
   id: string
   org_id: string
@@ -1125,6 +1166,12 @@ type MeetingInsert =
 type MeetingAttendeeInsert =
   & Pick<MeetingAttendeeRow, 'org_id' | 'meeting_id' | 'email'>
   & Partial<Omit<MeetingAttendeeRow, 'id' | 'org_id' | 'meeting_id' | 'email'>>
+type MeetingTranscriptInsert =
+  & Pick<MeetingTranscriptRow, 'org_id' | 'meeting_id' | 'status'>
+  & Partial<Omit<MeetingTranscriptRow, 'id' | 'org_id' | 'meeting_id' | 'status'>>
+type MeetingTaskProposalInsert =
+  & Pick<MeetingTaskProposalRow, 'org_id' | 'meeting_id' | 'title'>
+  & Partial<Omit<MeetingTaskProposalRow, 'id' | 'org_id' | 'meeting_id' | 'title'>>
 
 export type Database = {
   public: {
@@ -1316,6 +1363,18 @@ export type Database = {
         Row: MeetingAttendeeRow
         Insert: MeetingAttendeeInsert
         Update: Partial<MeetingAttendeeInsert>
+        Relationships: []
+      }
+      meeting_transcripts: {
+        Row: MeetingTranscriptRow
+        Insert: MeetingTranscriptInsert
+        Update: Partial<MeetingTranscriptInsert>
+        Relationships: []
+      }
+      meeting_task_proposals: {
+        Row: MeetingTaskProposalRow
+        Insert: MeetingTaskProposalInsert
+        Update: Partial<MeetingTaskProposalInsert>
         Relationships: []
       }
       projects: {
