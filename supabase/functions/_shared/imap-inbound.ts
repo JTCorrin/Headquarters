@@ -1,9 +1,22 @@
 /**
  * Bounded IMAP inbound fetch for mailbox sync.
  * Supports tls / starttls / none. Body truncated to maxBodyBytes; attachments not fetched.
+ * Connect / command / overall deadlines map to error code `timeout` (not imap_connection_failed).
  */
 
 export type ImapSecurity = 'tls' | 'starttls' | 'none'
+
+/** Defaults — Edge sync/probe should finish or fail honestly before platform kill. */
+export const IMAP_CONNECT_TIMEOUT_MS = 10_000
+export const IMAP_COMMAND_TIMEOUT_MS = 30_000
+export const IMAP_PROBE_TIMEOUT_MS = 15_000
+export const IMAP_SYNC_OVERALL_TIMEOUT_MS = 90_000
+
+export type ImapTimeoutOptions = {
+  connectTimeoutMs?: number
+  commandTimeoutMs?: number
+  overallTimeoutMs?: number
+}
 
 export type ImapFetchOptions = {
   host: string
@@ -14,7 +27,15 @@ export type ImapFetchOptions = {
   lookbackDays: number
   maxMessages: number
   maxBodyBytes: number
-}
+} & ImapTimeoutOptions
+
+export type ImapProbeOptions = {
+  host: string
+  port: number
+  security: ImapSecurity
+  username: string
+  password: string
+} & ImapTimeoutOptions
 
 export type InboundImapMessage = {
   provider_message_id: string
@@ -44,6 +65,38 @@ export class ImapSyncError extends Error {
 export function isSyntheticImapHost(host: string): boolean {
   const h = host.trim().toLowerCase()
   return h === 'imap.example.test' || h.endsWith('.example.test')
+}
+
+/** Race a promise against a deadline; maps expiry / AbortError → `timeout`. */
+export async function withImapTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  const budget = Math.max(1, Math.floor(ms))
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new ImapSyncError('timeout', `${label} timed out after ${budget}ms`))
+        }, budget)
+      }),
+    ])
+  } catch (error) {
+    if (error instanceof ImapSyncError) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`)
+    }
+    const message = error instanceof Error ? error.message : String(error)
+    if (/timed?\s*out|aborted|abort/i.test(message)) {
+      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`)
+    }
+    throw error
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
 }
 
 const MONTHS = [
@@ -135,9 +188,11 @@ class ImapSession {
   private tagSeq = 0
   private readonly decoder = new TextDecoder()
   private readonly encoder = new TextEncoder()
+  private readonly commandTimeoutMs: number
 
-  constructor(conn: ByteConn) {
+  constructor(conn: ByteConn, commandTimeoutMs = IMAP_COMMAND_TIMEOUT_MS) {
     this.conn = conn
+    this.commandTimeoutMs = commandTimeoutMs
   }
 
   close() {
@@ -190,6 +245,12 @@ class ImapSession {
   }
 
   async command(payload: string): Promise<{ status: string; text: string; untagged: string[] }> {
+    return await withImapTimeout(this.commandInner(payload), this.commandTimeoutMs, 'IMAP command')
+  }
+
+  private async commandInner(
+    payload: string,
+  ): Promise<{ status: string; text: string; untagged: string[] }> {
     const tag = `A${String(++this.tagSeq).padStart(4, '0')}`
     await this.conn.write(this.encoder.encode(`${tag} ${payload}\r\n`))
 
@@ -224,22 +285,50 @@ class ImapSession {
   }
 }
 
+/** Minimal session surface for probe/sync + test doubles. */
+export type ImapSessionLike = {
+  command(payload: string): Promise<{ status: string; text: string; untagged: string[] }>
+  readGreeting(): Promise<void>
+  close(): void
+}
+
+export type OpenImapFn = (
+  host: string,
+  port: number,
+  security: ImapSecurity,
+  connectTimeoutMs: number,
+  commandTimeoutMs: number,
+) => Promise<ImapSessionLike>
+
 async function openImapConnection(
   host: string,
   port: number,
   security: ImapSecurity,
-): Promise<ImapSession> {
+  connectTimeoutMs = IMAP_CONNECT_TIMEOUT_MS,
+  commandTimeoutMs = IMAP_COMMAND_TIMEOUT_MS,
+): Promise<ImapSessionLike> {
+  const deadline = Date.now() + Math.max(1, connectTimeoutMs)
+  const remaining = () => Math.max(1, deadline - Date.now())
+
   try {
     if (security === 'tls') {
-      const conn = await Deno.connectTls({ hostname: host, port })
-      const session = new ImapSession(conn)
-      await session.readGreeting()
+      const conn = await withImapTimeout(
+        Deno.connectTls({ hostname: host, port }),
+        remaining(),
+        'IMAP connect',
+      )
+      const session = new ImapSession(conn, commandTimeoutMs)
+      await withImapTimeout(session.readGreeting(), remaining(), 'IMAP greeting')
       return session
     }
 
-    const plain = await Deno.connect({ hostname: host, port })
-    const session = new ImapSession(plain)
-    await session.readGreeting()
+    const plain = await withImapTimeout(
+      Deno.connect({ hostname: host, port }),
+      remaining(),
+      'IMAP connect',
+    )
+    const session = new ImapSession(plain, commandTimeoutMs)
+    await withImapTimeout(session.readGreeting(), remaining(), 'IMAP greeting')
 
     if (security === 'none') return session
 
@@ -250,14 +339,31 @@ async function openImapConnection(
     }
 
     // Upgrade the same TCP connection. Do not close `session` first (would close plain).
-    const tlsConn = await Deno.startTls(plain, { hostname: host })
-    return new ImapSession(tlsConn)
+    const tlsConn = await withImapTimeout(
+      Deno.startTls(plain, { hostname: host }),
+      remaining(),
+      'IMAP STARTTLS upgrade',
+    )
+    return new ImapSession(tlsConn, commandTimeoutMs)
   } catch (error) {
     if (error instanceof ImapSyncError) throw error
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ImapSyncError('timeout', 'IMAP connect timed out')
+    }
     const message = error instanceof Error ? error.message : 'connection failed'
+    if (/timed?\s*out|aborted|abort/i.test(message)) {
+      throw new ImapSyncError('timeout', message)
+    }
     const code = /tls|certificate|ssl/i.test(message) ? 'imap_tls_failed' : 'imap_connection_failed'
     throw new ImapSyncError(code, message)
   }
+}
+
+let openImapConnectionImpl: OpenImapFn = openImapConnection
+
+/** Test seam — pass null to restore the real opener. */
+export function setOpenImapConnectionForTests(fn: OpenImapFn | null): void {
+  openImapConnectionImpl = fn ?? openImapConnection
 }
 
 function extractUidList(untagged: string[]): number[] {
@@ -308,10 +414,67 @@ function splitFetchBlocks(untagged: string[]): string[] {
   return parts
 }
 
+/**
+ * Live IMAP probe: connect + LOGIN + LOGOUT.
+ * Throws ImapSyncError (`timeout` / `imap_auth_failed` / `imap_connection_failed` / `imap_tls_failed`).
+ */
+export async function probeImap(options: ImapProbeOptions): Promise<void> {
+  const connectTimeoutMs = options.connectTimeoutMs ?? IMAP_CONNECT_TIMEOUT_MS
+  const commandTimeoutMs = options.commandTimeoutMs ?? IMAP_COMMAND_TIMEOUT_MS
+  const overallTimeoutMs = options.overallTimeoutMs ?? IMAP_PROBE_TIMEOUT_MS
+
+  await withImapTimeout(
+    (async () => {
+      const session = await openImapConnectionImpl(
+        options.host,
+        options.port,
+        options.security,
+        connectTimeoutMs,
+        commandTimeoutMs,
+      )
+      try {
+        const login = await session.command(
+          `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
+        )
+        if (login.status !== 'OK') {
+          throw new ImapSyncError('imap_auth_failed', `IMAP LOGIN failed: ${login.text}`, true)
+        }
+        await session.command('LOGOUT').catch(() => undefined)
+      } finally {
+        session.close()
+      }
+    })(),
+    overallTimeoutMs,
+    'IMAP probe',
+  )
+}
+
 export async function fetchInboundFromImap(
   options: ImapFetchOptions,
 ): Promise<InboundImapMessage[]> {
-  const session = await openImapConnection(options.host, options.port, options.security)
+  const connectTimeoutMs = options.connectTimeoutMs ?? IMAP_CONNECT_TIMEOUT_MS
+  const commandTimeoutMs = options.commandTimeoutMs ?? IMAP_COMMAND_TIMEOUT_MS
+  const overallTimeoutMs = options.overallTimeoutMs ?? IMAP_SYNC_OVERALL_TIMEOUT_MS
+
+  return await withImapTimeout(
+    fetchInboundFromImapInner(options, connectTimeoutMs, commandTimeoutMs),
+    overallTimeoutMs,
+    'IMAP sync',
+  )
+}
+
+async function fetchInboundFromImapInner(
+  options: ImapFetchOptions,
+  connectTimeoutMs: number,
+  commandTimeoutMs: number,
+): Promise<InboundImapMessage[]> {
+  const session = await openImapConnectionImpl(
+    options.host,
+    options.port,
+    options.security,
+    connectTimeoutMs,
+    commandTimeoutMs,
+  )
   try {
     const login = await session.command(
       `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
