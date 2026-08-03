@@ -1039,6 +1039,10 @@ export interface ApiMailboxSyncResult {
 	ok: boolean;
 	ingested: number;
 	error_code: string | null;
+	/** Present on failure — short safe copy from the API (no secrets). */
+	message?: string | null;
+	/** Present on failure — pipeline step (connect/login/select/search/fetch/…). */
+	step?: string | null;
 }
 
 export type ApiAiProvider = 'openai' | 'anthropic' | 'google' | 'openrouter';
