@@ -21,6 +21,7 @@ import {
 	toProductCreateBody,
 	toProductRow,
 	toQuoteLineInput,
+	toRecurringLineInput,
 	toInvoiceListItem,
 	toLeadCard,
 	toLeadCreateBody,
@@ -343,6 +344,41 @@ describe('api mappers', () => {
 			description: 'Catalog line',
 			quantity: 3,
 			unit_price_cents: 1200
+		});
+		expect(
+			toRecurringLineInput({
+				productId: '',
+				descriptionTemplate: 'Retainer {{period_start}}',
+				qty: '1.5',
+				unitPrice: '100.00',
+				taxRatePercent: '20'
+			})
+		).toEqual({
+			description_template: 'Retainer {{period_start}}',
+			quantity: 1.5,
+			unit_price_cents: 10000,
+			discount_percent: 0,
+			tax_rate_percent: 20
+		});
+		expect(
+			toRecurringLineInput(
+				{
+					productId: 'dddddddd-dddd-4eee-8fff-000000000001',
+					descriptionTemplate: 'Catalog line',
+					qty: '2',
+					unitPrice: '10.00',
+					taxRatePercent: ''
+				},
+				1
+			)
+		).toEqual({
+			product_id: 'dddddddd-dddd-4eee-8fff-000000000001',
+			description_template: 'Catalog line',
+			quantity: 2,
+			unit_price_cents: 1000,
+			discount_percent: 0,
+			tax_rate_percent: 0,
+			position: 1
 		});
 		expect(
 			lineItemRowsToQuoteLineInputs([

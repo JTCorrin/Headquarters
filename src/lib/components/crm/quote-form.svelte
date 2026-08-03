@@ -38,21 +38,19 @@
 		{ value: 'USD', label: 'USD' },
 		{ value: 'EUR', label: 'EUR' }
 	] as const;
-	const statusOptions = [
-		{ value: 'draft', label: 'Draft' },
-		{ value: 'sent', label: 'Sent' },
-		{ value: 'accepted', label: 'Accepted' },
-		{ value: 'rejected', label: 'Rejected' },
-		{ value: 'expired', label: 'Expired' },
-		{ value: 'void', label: 'Void' }
-	] as const;
+	const statusLabels: Record<string, string> = {
+		draft: 'Draft',
+		sent: 'Sent',
+		accepted: 'Accepted',
+		rejected: 'Rejected',
+		expired: 'Expired',
+		void: 'Void'
+	};
 
 	const currencyLabel = $derived(
 		currencyOptions.find((o) => o.value === $formData.currency)?.label ?? 'Currency'
 	);
-	const statusLabel = $derived(
-		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Status'
-	);
+	const statusLabel = $derived(statusLabels[$formData.status] ?? 'Draft');
 	const clientLabel = $derived(
 		clientOptions.find((o) => o.id === $formData.clientId)?.name ??
 			($formData.clientName || 'Select client')
@@ -144,14 +142,19 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="quote-status">Status</Label>
-			<Select.Root type="single" bind:value={$formData.status} name="status">
-				<Select.Trigger id="quote-status" class="w-full">{statusLabel}</Select.Trigger>
-				<Select.Content>
-					{#each statusOptions as option (option.value)}
-						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
+			<Input
+				id="quote-status"
+				name="status"
+				value={statusLabel}
+				readonly
+				tabindex={-1}
+				class="bg-muted/40"
+				data-testid="quote-status-readonly"
+			/>
+			<p class="text-muted-foreground text-xs">
+				Status is server-managed. Use <span class="font-medium">Accept</span>, then
+				<span class="font-medium">Convert to invoice</span>.
+			</p>
 		</div>
 	</div>
 
