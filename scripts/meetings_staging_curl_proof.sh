@@ -78,6 +78,34 @@ fi
 [[ -n "$MEMBERSHIP_ID" && "$MEMBERSHIP_ID" != null ]] || die "could not resolve membership id"
 log "membership ${MEMBERSHIP_ID}"
 
+log "POST clients (related entity + project link)"
+create_client="$(
+	curl -fsS --max-time 30 \
+		-X POST "${API_BASE}/api/v1/clients" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d '{"name":"Proof Client","status":"active"}'
+)"
+CLIENT_ID="$(printf '%s' "$create_client" | jq -r '.data.id // empty')"
+[[ -n "$CLIENT_ID" ]] || die "client create: ${create_client}"
+log "client ${CLIENT_ID}"
+
+log "POST projects (meeting related entity target)"
+create_project="$(
+	curl -fsS --max-time 30 \
+		-X POST "${API_BASE}/api/v1/projects" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg c "$CLIENT_ID" '{client_id:$c, name:"Proof project"}')"
+)"
+PROJECT_ID="$(printf '%s' "$create_project" | jq -r '.data.id // empty')"
+[[ -n "$PROJECT_ID" ]] || die "project create: ${create_project}"
+log "project ${PROJECT_ID}"
+
 log "POST contacts (related entity)"
 create_contact="$(
 	curl -fsS --max-time 30 \
@@ -162,7 +190,24 @@ PATCH_EMAIL="$(printf '%s' "$patch_meeting" | jq -r '.data.attendees[0].email //
 	|| die "meeting patch: ${patch_meeting}"
 log "patched v${MEETING_VER2}"
 
-log "POST related_entity_type=project → expect 422"
+log "POST related_entity_type=project with valid project → expect 201"
+project_ok_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/project-ok.json" -w '%{http_code}' \
+		-X POST "${API_BASE}/api/v1/meetings" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg starts "$STARTS" --arg ends "$ENDS" --arg p "$PROJECT_ID" \
+			'{title:"Project link", starts_at:$starts, ends_at:$ends,
+			  related_entity_type:"project", related_entity_id:$p}')"
+)"
+project_ok_body="$(cat "${TMPDIR_PROOF}/project-ok.json")"
+[[ "$project_ok_code" == "201" ]] || die "expected 201 for valid project related entity, got ${project_ok_code}: ${project_ok_body}"
+PROJECT_LABEL="$(printf '%s' "$project_ok_body" | jq -r '.data.related_entity_label // empty')"
+[[ "$PROJECT_LABEL" == "Proof project" ]] || die "project related_entity_label missing: ${project_ok_body}"
+
+log "POST related_entity_type=project missing uuid → expect 422"
 project_code="$(
 	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/project.json" -w '%{http_code}' \
 		-X POST "${API_BASE}/api/v1/meetings" \
@@ -171,10 +216,10 @@ project_code="$(
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H 'content-type: application/json' \
 		-d "$(jq -n --arg starts "$STARTS" --arg ends "$ENDS" \
-			'{title:"Project link", starts_at:$starts, ends_at:$ends,
+			'{title:"Missing project", starts_at:$starts, ends_at:$ends,
 			  related_entity_type:"project", related_entity_id:"11111111-1111-4111-8111-111111111111"}')"
 )"
-[[ "$project_code" == "422" ]] || die "expected 422 for project related entity, got ${project_code}: $(cat "${TMPDIR_PROOF}/project.json")"
+[[ "$project_code" == "422" ]] || die "expected 422 for missing project related entity, got ${project_code}: $(cat "${TMPDIR_PROOF}/project.json")"
 
 log "PATCH stale If-Match → expect 412"
 stale_code="$(
