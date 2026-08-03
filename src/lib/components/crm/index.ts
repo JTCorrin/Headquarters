@@ -64,6 +64,7 @@ export { default as OrgIntegrationsPage } from './org-integrations-page.svelte';
 export { default as OrgIntegrationsController } from './org-integrations-controller.svelte';
 export { default as AiProviderConnectDrawer } from './ai-provider-connect-drawer.svelte';
 export { default as DashboardPage } from './dashboard-page.svelte';
+export { default as DashboardHomePage } from './dashboard-home-page.svelte';
 export { default as QuoteForm } from './quote-form.svelte';
 export { default as QuoteFormDrawer } from './quote-form-drawer.svelte';
 export { default as InvoiceForm } from './invoice-form.svelte';
