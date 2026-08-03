@@ -33,6 +33,7 @@
 	import {
 		describeMailboxSyncResult,
 		emptyMailboxFormData,
+		humanizeMailboxSyncError,
 		mailboxFormSchema,
 		type MailboxAccountResource,
 		type MailboxTestFeedback
@@ -287,9 +288,18 @@
 			const result = await api.mailbox.test();
 			if (isStale(epoch)) return false;
 			if (!result.ok) {
+				const humanized = humanizeMailboxSyncError(result.error_code);
+				// Prefer known code copy (e.g. timeout); keep API message for unknown codes.
+				const known =
+					humanized != null && !humanized.startsWith('Sync issue (');
 				return {
 					ok: false,
-					message: result.message || result.error_code || 'Mailbox test failed.'
+					message:
+						(known ? humanized : null) ||
+						result.message ||
+						humanized ||
+						result.error_code ||
+						'Mailbox test failed.'
 				};
 			}
 			void loadAll();
