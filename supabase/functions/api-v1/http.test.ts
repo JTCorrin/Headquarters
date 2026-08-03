@@ -30,6 +30,7 @@ import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
 import { validateBillBody } from './bills.ts'
 import { validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
+import { decodeMeetingCursor, validateMeetingBody } from './meetings.ts'
 import {
   recurringLifecycleIdempotencyPayload,
   validateRecurringScheduleBody,
@@ -883,6 +884,81 @@ Deno.test('task cursor round-trip shape', () => {
   assertEquals(decoded.created_at, createdAt)
   assertEquals(decoded.id, id)
   assertThrows(() => decodeTaskCursor('not-a-cursor'), ApiError)
+})
+
+Deno.test('meeting create validation accepts structured attendees and rejects project related entity', () => {
+  const starts = '2026-08-10T10:00:00.000Z'
+  const ends = '2026-08-10T11:00:00.000Z'
+  const body = validateMeetingBody(
+    {
+      title: 'Kickoff',
+      starts_at: starts,
+      ends_at: ends,
+      timezone: 'Europe/London',
+      status: 'in_progress',
+      attendees: [
+        { email: 'ada@example.test', name: 'Ada', organiser: true },
+        { email: 'bob@example.test' },
+      ],
+    },
+    false,
+  )
+  assertEquals(body.title, 'Kickoff')
+  assertEquals(body.status, 'in_progress')
+  assertEquals(body.timezone, 'Europe/London')
+  assertEquals(body.attendees?.length, 2)
+  assertEquals(body.attendees?.[0]?.email, 'ada@example.test')
+  assertEquals(body.attendees?.[0]?.organiser, true)
+  assertThrows(
+    () =>
+      validateMeetingBody(
+        {
+          title: 'Bad',
+          starts_at: starts,
+          ends_at: ends,
+          related_entity_type: 'project',
+          related_entity_id: '11111111-1111-4111-8111-111111111111',
+        },
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateMeetingBody(
+        { title: 'Bad', starts_at: starts, ends_at: '2026-08-10T09:00:00.000Z' },
+        false,
+      ),
+    ApiError,
+  )
+  const patched = validateMeetingBody(
+    {
+      attendees: [{ email: 'only@example.test', organiser: false }],
+    },
+    true,
+  )
+  assertEquals(patched.attendees?.length, 1)
+})
+
+Deno.test('meeting cursor round-trip shape', () => {
+  const createdAt = '2026-08-03T18:00:00.000Z'
+  const startsAt = '2026-08-11T09:00:00.000Z'
+  const id = '22222222-2222-4222-8222-222222222222'
+  const encodedCreated = btoa(JSON.stringify({ created_at: createdAt, id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+  const decodedCreated = decodeMeetingCursor(encodedCreated, false)
+  assertEquals(decodedCreated.created_at, createdAt)
+  assertEquals(decodedCreated.id, id)
+  const encodedStarts = btoa(JSON.stringify({ starts_at: startsAt, id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+  const decodedStarts = decodeMeetingCursor(encodedStarts, true)
+  assertEquals(decodedStarts.starts_at, startsAt)
+  assertEquals(decodedStarts.id, id)
+  assertThrows(() => decodeMeetingCursor('not-a-cursor', false), ApiError)
 })
 
 Deno.test('tax rate and profile preference validation', () => {
