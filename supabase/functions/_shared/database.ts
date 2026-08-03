@@ -208,7 +208,7 @@ export type ClientContactRow = {
 export type TimelineEventRow = {
   id: string
   org_id: string
-  entity_type: 'contact' | 'lead' | 'client'
+  entity_type: 'contact' | 'lead' | 'client' | 'quote' | 'invoice' | 'bill'
   entity_id: string
   kind:
     | 'note'
@@ -1224,6 +1224,18 @@ export type Database = {
           p_lead_id: string
         }
         Returns: Json
+      }
+      create_timeline_event: {
+        Args: {
+          p_body?: string | null
+          p_entity_id: string
+          p_entity_type: string
+          p_kind: string
+          p_org_id: string
+          p_payload?: Json
+          p_title: string
+        }
+        Returns: TimelineEventRow
       }
       adjust_product_stock: {
         Args: {
