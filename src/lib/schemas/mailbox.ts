@@ -127,8 +127,18 @@ export function emptyMailboxFormData(preset: MailboxPreset = 'custom'): MailboxF
 	};
 }
 
+export type MailboxSyncErrorContext = {
+	/** Pipeline step hint from Sync (connect/login/select/search/fetch/…). */
+	step?: string | null;
+	/** Safe API failure message — preferred for timeout when present. */
+	message?: string | null;
+};
+
 /** Plain-language sync / connection errors for Mail settings. */
-export function humanizeMailboxSyncError(code: string | null | undefined): string | null {
+export function humanizeMailboxSyncError(
+	code: string | null | undefined,
+	context?: MailboxSyncErrorContext
+): string | null {
 	if (!code) return null;
 	switch (code) {
 		case 'auth_failed':
@@ -140,8 +150,15 @@ export function humanizeMailboxSyncError(code: string | null | undefined): strin
 		case 'imap_connection_failed':
 		case 'smtp_connection_failed':
 			return 'Could not reach the mail server — check host, port, and security settings.';
-		case 'timeout':
+		case 'timeout': {
+			const apiMessage = context?.message?.trim();
+			if (apiMessage) return apiMessage;
+			const step = context?.step?.trim();
+			if (step) {
+				return `The mail server timed out during ${step} — check host, port, and security, or try again.`;
+			}
 			return 'The mail server timed out — check host, port, and security, or try again. Sync allows up to about 90 seconds.';
+		}
 		case 'tls_failed':
 		case 'certificate_error':
 			return 'Secure connection failed — try a different security setting (SSL / STARTTLS).';
@@ -164,8 +181,13 @@ export function describeMailboxSyncResult(result: {
 	ok: boolean;
 	ingested: number;
 	error_code: string | null;
+	message?: string | null;
+	step?: string | null;
 }): string {
-	const hint = humanizeMailboxSyncError(result.error_code);
+	const hint = humanizeMailboxSyncError(result.error_code, {
+		message: result.message,
+		step: result.step
+	});
 	if (result.ingested > 0) {
 		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${hint ? ` ${hint}` : ''}`;
 	}
