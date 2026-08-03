@@ -1,5 +1,8 @@
 import { parseDate, type DateValue } from '@internationalized/date';
 
+/** Preset chips offered inside the date picker popover. */
+export type DateFieldPreset = 'today' | 'plus7' | 'endOfMonth';
+
 /** Parse a CRM form date string (`YYYY-MM-DD`) into a calendar value. */
 export function parseYmd(value: string | undefined | null): DateValue | undefined {
 	if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;

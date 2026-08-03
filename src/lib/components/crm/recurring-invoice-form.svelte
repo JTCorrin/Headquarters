@@ -12,6 +12,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import DateField from './date-field.svelte';
+	import DateRangeField from './date-range-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface RecurringInvoiceFormProps {
@@ -330,26 +331,18 @@
 				readonly={readonly}
 			/>
 		</div>
-		<div class="space-y-2">
-			<Label for="ri-start">Start on</Label>
-			<DateField
-				id="ri-start"
-				name="startOn"
-				bind:value={$formData.startOn}
-				disabled={readonly}
-				readonly={readonly}
-			/>
-		</div>
-		<div class="space-y-2">
-			<Label for="ri-end">End on (optional)</Label>
-			<DateField
-				id="ri-end"
-				name="endOn"
-				bind:value={$formData.endOn}
-				disabled={readonly}
-				readonly={readonly}
-			/>
-		</div>
+		<DateRangeField
+			class="sm:col-span-2"
+			startId="ri-start"
+			endId="ri-end"
+			startName="startOn"
+			endName="endOn"
+			bind:startValue={$formData.startOn}
+			bind:endValue={$formData.endOn}
+			disabled={readonly}
+			readonly={readonly}
+			data-testid="ri-date-range"
+		/>
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
