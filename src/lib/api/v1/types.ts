@@ -722,9 +722,66 @@ export interface ApiMeeting {
 	related_entity_label?: string | null;
 }
 
+export type ApiMeetingTranscriptRowStatus = 'uploaded' | 'processing' | 'ready' | 'failed';
+
+export interface ApiMeetingTranscript {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	meeting_id: string;
+	document_id: string | null;
+	provider: string | null;
+	language_code: string | null;
+	status: ApiMeetingTranscriptRowStatus;
+	plain_text: string | null;
+	segments: unknown | null;
+	processed_at: string | null;
+	error_code: string | null;
+}
+
+export type ApiMeetingTaskProposalStatus = 'proposed' | 'accepted' | 'dismissed';
+
+export interface ApiMeetingTaskProposal {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	meeting_id: string;
+	title: string;
+	description: string | null;
+	suggested_assignee_membership_id: string | null;
+	suggested_due_at: string | null;
+	confidence: number | null;
+	status: ApiMeetingTaskProposalStatus;
+	accepted_task_id: string | null;
+	decided_by: string | null;
+	decided_at: string | null;
+	/** Optional resolved label from the API host. */
+	suggested_assignee_label?: string | null;
+}
+
 export type ApiMeetingDocument = ApiMeeting & {
 	attendees: ApiMeetingAttendee[];
+	/** Nested when present (M2). */
+	transcript?: ApiMeetingTranscript | null;
+	/** Nested when present (M2). */
+	task_proposals?: ApiMeetingTaskProposal[];
 };
+
+export interface ApiMeetingTranscriptAttachBody {
+	document_id?: string | null;
+	plain_text?: string | null;
+	status?: ApiMeetingTranscriptRowStatus;
+}
 
 export interface ApiMeetingAttendeeInput {
 	email: string;
