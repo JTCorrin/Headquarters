@@ -18,6 +18,9 @@ import type {
 	ApiDocumentBrowseResult,
 	ApiDocumentDownloadResult,
 	ApiDocumentEntityType,
+	ApiTimelineEntityType,
+	ApiTimelineEvent,
+	ApiTimelineEventCreateBody,
 	ApiDocumentFinalizeBody,
 	ApiDocumentFolderCreateBody,
 	ApiDocumentFolderPatchBody,
@@ -501,4 +504,18 @@ export interface EmailTemplatesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiEmailTemplate>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface TimelineEventsEndpoints {
+	list(
+		entityType: ApiTimelineEntityType,
+		entityId: string,
+		signal?: AbortSignal
+	): Promise<ApiTimelineEvent[]>;
+	create(
+		entityType: ApiTimelineEntityType,
+		entityId: string,
+		body: ApiTimelineEventCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiTimelineEvent>;
 }

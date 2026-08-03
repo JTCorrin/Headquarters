@@ -22,6 +22,8 @@
 		type EmailMessage,
 		type EntityEmailEmptyState
 	} from './entity-email-inbox.svelte';
+	import Timeline, { type TimelineEvent } from './timeline.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -43,6 +45,8 @@
 		convertOpen?: boolean;
 		converting?: boolean;
 		lastConvertResult?: LeadConvertResult | null;
+		timelineEvents?: TimelineEvent[];
+		composerActor?: string;
 		emailMessages?: EmailMessage[];
 		emailEmptyState?: EntityEmailEmptyState;
 		mailboxConnected?: boolean;
@@ -59,6 +63,7 @@
 		onOpenClient?: (clientId: string) => void;
 		onCreateClient?: () => void;
 		onReload?: () => void;
+		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
@@ -83,6 +88,8 @@
 		convertOpen = $bindable(false),
 		converting = false,
 		lastConvertResult = null,
+		timelineEvents = $bindable<TimelineEvent[]>([]),
+		composerActor = 'You',
 		emailMessages = [],
 		emailEmptyState = 'no_mailbox',
 		mailboxConnected = false,
@@ -98,6 +105,7 @@
 		onOpenClient,
 		onCreateClient,
 		onReload,
+		onTimelineAdd,
 		onAddToTimeline,
 		onDraftResponse,
 		onUseSuggestion,
@@ -244,6 +252,13 @@
 											{ label: 'Lost at', value: lead.lost_at ?? '—' },
 											{ label: 'Won at', value: lead.won_at ?? '—' }
 										]}
+									/>
+									<Timeline
+										bind:events={timelineEvents}
+										title="Activity"
+										composable
+										{composerActor}
+										onAdd={onTimelineAdd}
 									/>
 								</section>
 							</div>

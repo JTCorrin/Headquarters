@@ -31,6 +31,8 @@
 	<FileTextIcon class={cn('size-3.5', className)} />
 {:else if name === 'status'}
 	<ArrowRightLeftIcon class={cn('size-3.5', className)} />
+{:else if name === 'conversion'}
+	<ArrowRightLeftIcon class={cn('size-3.5', className)} />
 {:else if name === 'meeting'}
 	<UsersIcon class={cn('size-3.5', className)} />
 {:else if name === 'task'}

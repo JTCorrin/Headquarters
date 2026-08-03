@@ -49,6 +49,8 @@ import type { ClientRow } from '$lib/components/crm/clients-columns.js';
 import type { EmailTemplateRow } from '$lib/components/crm/email-templates-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
 import type { ProductRow } from '$lib/components/crm/products-columns.js';
+import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
+import type { TimelineComposerSubmit } from '$lib/components/crm/timeline-composer.svelte';
 import type { EmailTemplateFormData } from '$lib/schemas/email-template.js';
 import type {
 	ApiAiIntegration,
@@ -107,7 +109,9 @@ import type {
 	ApiTaxRateCreateBody,
 	ApiTask,
 	ApiTaskCreateBody,
-	ApiTaskUpdateBody
+	ApiTaskUpdateBody,
+	ApiTimelineEvent,
+	ApiTimelineEventCreateBody
 } from './types.js';
 
 export function toOrgMembershipSummary(
@@ -1719,4 +1723,53 @@ export function toDocumentPaymentCreateBody(options: {
 		reference: options.reference ?? '',
 		notes: options.notes ?? ''
 	});
+}
+
+function formatTimelineOccurredAt(iso: string): string {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return iso;
+	return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function timelineActorLabel(row: ApiTimelineEvent): string | undefined {
+	const named = row.payload?.actor_name;
+	if (typeof named === 'string' && named.trim()) return named.trim();
+	if (row.actor_type === 'system') return 'System';
+	if (row.actor_type === 'agent') return 'Agent';
+	if (row.actor_type === 'integration') return 'Integration';
+	if (row.actor_type === 'user') return 'Team';
+	return undefined;
+}
+
+/** Map API timeline row → FE `TimelineEvent` card model. */
+export function toTimelineEvent(row: ApiTimelineEvent): TimelineEvent {
+	const accent = row.payload?.accent;
+	const icon = row.payload?.icon;
+	const kindIcon = typeof row.kind === 'string' ? row.kind : undefined;
+	return {
+		id: row.id,
+		kind: row.kind,
+		title: row.title,
+		body: row.body?.trim() ? row.body : undefined,
+		occurredAt: formatTimelineOccurredAt(row.occurred_at),
+		actor: timelineActorLabel(row),
+		accent: typeof accent === 'string' ? accent : undefined,
+		// System writers often omit payload.icon — fall back to kind so conversion/status cards aren't bare.
+		icon: typeof icon === 'string' ? icon : kindIcon
+	};
+}
+
+/** Map composer submit → create body (accent/icon in payload). */
+export function toTimelineEventCreateBody(
+	submit: TimelineComposerSubmit
+): ApiTimelineEventCreateBody {
+	return {
+		kind: submit.kind,
+		title: submit.title,
+		body: submit.body.trim() ? submit.body : null,
+		payload: {
+			accent: submit.accent,
+			icon: submit.icon
+		}
+	};
 }
