@@ -134,34 +134,48 @@ PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 EOF
 log "wrote PUBLIC_SUPABASE_URL into supabase/functions/.env for Edge storage URL rewrite"
 
-# Edge runtime mounts supabase/functions but keeps a stale module graph across
-# git resets when the stack was already up. Bounce it so api-v1 matches this SHA
-# (Wave A mailbox/AI routes otherwise stay Route not found after migration up).
-edge_ids="$(docker ps -q --filter name=edge-runtime --filter status=running || true)"
-if [[ -n "$edge_ids" ]]; then
-	log "restarting edge-runtime to load api-v1 @ ${SHA}"
-	# shellcheck disable=SC2086
-	docker restart $edge_ids >/dev/null
-	ready=0
-	for _ in $(seq 1 60); do
-		code="$(
-			curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
-				-H "apikey: ${PUBLIC_SUPABASE_ANON_KEY}" \
-				"${PUBLIC_SUPABASE_URL}/functions/v1/api-v1/api/v1/organisations" || true
-		)"
-		if [[ "$code" =~ ^[0-9]{3}$ ]]; then
-			log "edge-runtime ready (HTTP ${code})"
-			ready=1
-			break
-		fi
-		sleep 1
-	done
-	if [[ "$ready" -ne 1 ]]; then
-		log "edge-runtime did not become ready after restart"
-		exit 1
+# Edge loads supabase/functions/.env on container create (supabase start), not on a
+# plain restart. CLI names use underscores (supabase_edge_runtime_*) or hyphens —
+# match like PostgREST discovery, then recreate so PUBLIC_SUPABASE_URL is injected.
+if ! command -v docker >/dev/null 2>&1; then
+	log "docker not available — cannot recreate edge-runtime after functions/.env write"
+	exit 1
+fi
+edge_lines="$(
+	docker ps --format '{{.ID}} {{.Names}}' \
+		| awk 'tolower($0) ~ /edge[_-]runtime/ { print }' \
+		| sort -u
+)"
+edge_ids="$(printf '%s\n' "$edge_lines" | awk '{ print $1 }' | tr '\n' ' ')"
+edge_ids="${edge_ids%"${edge_ids##*[![:space:]]}"}"
+edge_names="$(printf '%s\n' "$edge_lines" | awk '{ print $2 }' | paste -sd',' -)"
+if [[ -z "$edge_ids" ]]; then
+	log "no edge-runtime container matched edge[_-]runtime — refusing silent skip"
+	docker ps --format '{{.ID}} {{.Names}}' >&2 || true
+	exit 1
+fi
+log "recreating edge-runtime to load functions/.env + api-v1 @ ${SHA} (names=${edge_names})"
+# shellcheck disable=SC2086
+docker rm -f $edge_ids >/dev/null
+# Stack is already up — recreate the missing Edge service only.
+supabase start
+ready=0
+for _ in $(seq 1 90); do
+	code="$(
+		curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
+			-H "apikey: ${PUBLIC_SUPABASE_ANON_KEY}" \
+			"${PUBLIC_SUPABASE_URL}/functions/v1/api-v1/api/v1/organisations" || true
+	)"
+	if [[ "$code" =~ ^[0-9]{3}$ ]]; then
+		log "edge-runtime ready (HTTP ${code})"
+		ready=1
+		break
 	fi
-else
-	log "no running edge-runtime container — skip restart"
+	sleep 1
+done
+if [[ "$ready" -ne 1 ]]; then
+	log "edge-runtime did not become ready after recreate"
+	exit 1
 fi
 
 # Ensure user services survive SSH disconnects / reboot.
@@ -363,6 +377,17 @@ if [[ -x scripts/email_templates_inbox_staging_curl_proof.sh ]]; then
 		scripts/email_templates_inbox_staging_curl_proof.sh
 else
 	log "email templates/inbox curl proof script missing — skipped"
+fi
+
+# Documents upload-intent signed_url must use LAN Kong (${APP_HOST}:54321), not kong.
+if [[ -x scripts/documents_signed_url_staging_curl_proof.sh ]]; then
+	log "running documents signed upload URL host curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/documents_signed_url_staging_curl_proof.sh
+else
+	log "documents signed URL curl proof script missing — skipped"
 fi
 
 log "done"
