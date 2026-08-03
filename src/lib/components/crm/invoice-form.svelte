@@ -11,6 +11,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface InvoiceFormProps {
@@ -233,23 +234,25 @@
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="invoice-issue">Issue on</Label>
-			<Input
+			<DateField
 				id="invoice-issue"
 				name="issueOn"
-				type="date"
 				bind:value={$formData.issueOn}
 				disabled={readonly}
+				readonly={readonly}
 			/>
 			{#if $errors.issueOn}<p class="text-destructive text-xs">{$errors.issueOn}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="invoice-due">Due on</Label>
-			<Input
+			<DateField
 				id="invoice-due"
 				name="dueOn"
-				type="date"
 				bind:value={$formData.dueOn}
 				disabled={readonly}
+				readonly={readonly}
+				min={$formData.issueOn}
+				presets={['today', 'plus7', 'endOfMonth']}
 			/>
 			{#if $errors.dueOn}<p class="text-destructive text-xs">{$errors.dueOn}</p>{/if}
 		</div>
