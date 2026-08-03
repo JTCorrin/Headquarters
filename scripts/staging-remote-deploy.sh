@@ -347,6 +347,17 @@ else
 	log "tasks curl proof script missing — skipped"
 fi
 
+# Meetings foundation: CRUD + nested attendees + upcoming + ETag.
+if [[ -x scripts/meetings_staging_curl_proof.sh ]]; then
+	log "running meetings foundation curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/meetings_staging_curl_proof.sh
+else
+	log "meetings curl proof script missing — skipped"
+fi
+
 # Recurring invoices foundation: schedule CRUD + lifecycle + run-now draft invoice.
 if [[ -x scripts/recurring_invoices_staging_curl_proof.sh ]]; then
 	log "running recurring invoices foundation curl proof"

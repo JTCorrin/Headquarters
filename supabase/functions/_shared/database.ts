@@ -700,6 +700,52 @@ export type TaskRow = {
   metadata: Json
 }
 
+export type MeetingRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  title: string
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+  starts_at: string
+  ends_at: string
+  timezone: string
+  location: string | null
+  meeting_url: string | null
+  organiser_membership_id: string | null
+  related_entity_type: 'client' | 'contact' | 'lead' | 'project' | null
+  related_entity_id: string | null
+  calendar_provider: string | null
+  external_event_id: string | null
+  transcript_status: 'none' | 'uploaded' | 'processing' | 'ready' | 'failed'
+  summary_status: 'none' | 'generating' | 'ready' | 'failed'
+  summary: string | null
+  metadata: Json
+}
+
+export type MeetingAttendeeRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  meeting_id: string
+  contact_id: string | null
+  membership_id: string | null
+  name: string | null
+  email: string
+  response_status: 'needs_action' | 'accepted' | 'declined' | 'tentative' | null
+  attended: boolean | null
+  organiser: boolean
+}
+
 export type InvoiceLineRow = {
   id: string
   org_id: string
@@ -1017,6 +1063,12 @@ type BillLineInsert =
 type TaskInsert =
   & Pick<TaskRow, 'org_id' | 'title'>
   & Partial<Omit<TaskRow, 'id' | 'org_id' | 'title'>>
+type MeetingInsert =
+  & Pick<MeetingRow, 'org_id' | 'title' | 'starts_at' | 'ends_at' | 'timezone'>
+  & Partial<Omit<MeetingRow, 'id' | 'org_id' | 'title' | 'starts_at' | 'ends_at' | 'timezone'>>
+type MeetingAttendeeInsert =
+  & Pick<MeetingAttendeeRow, 'org_id' | 'meeting_id' | 'email'>
+  & Partial<Omit<MeetingAttendeeRow, 'id' | 'org_id' | 'meeting_id' | 'email'>>
 
 export type Database = {
   public: {
@@ -1196,6 +1248,18 @@ export type Database = {
         Row: TaskRow
         Insert: TaskInsert
         Update: Partial<TaskInsert>
+        Relationships: []
+      }
+      meetings: {
+        Row: MeetingRow
+        Insert: MeetingInsert
+        Update: Partial<MeetingInsert>
+        Relationships: []
+      }
+      meeting_attendees: {
+        Row: MeetingAttendeeRow
+        Insert: MeetingAttendeeInsert
+        Update: Partial<MeetingAttendeeInsert>
         Relationships: []
       }
       documents: {
@@ -1598,6 +1662,14 @@ export type Database = {
           p_expected_version: number
           p_org_id: string
           p_task_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_meeting: {
+        Args: {
+          p_expected_version: number
+          p_meeting_id: string
+          p_org_id: string
         }
         Returns: undefined
       }
