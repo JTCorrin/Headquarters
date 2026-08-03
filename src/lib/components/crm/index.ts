@@ -119,6 +119,10 @@ export { default as EmailTemplateFormDrawer } from './email-template-form-drawer
 export { default as EmailTemplatesTable } from './email-templates-table.svelte';
 export { default as EmailTemplatesListPage } from './email-templates-list-page.svelte';
 export { default as EmailTemplateEditorPage } from './email-template-editor-page.svelte';
+export { default as EmailTemplatesPage } from './email-templates-page.svelte';
+export { default as EmailTemplatePage } from './email-template-page.svelte';
+export { default as EmailInboxPage } from './email-inbox-page.svelte';
+export { default as EmailTemplateNameLink } from './email-template-name-link.svelte';
 export { default as MyTasksPanel } from './my-tasks-panel.svelte';
 export { default as MeetingForm } from './meeting-form.svelte';
 export { default as MeetingFormDrawer } from './meeting-form-drawer.svelte';
