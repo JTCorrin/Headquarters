@@ -16,7 +16,8 @@ import { handleRecurringInvoices } from './recurring-invoices.ts'
 import { handlePayments } from './payments.ts'
 import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
-import { handleMailbox, listEntityEmailMessages } from './mailbox.ts'
+import { handleEmailTemplates } from './email-templates.ts'
+import { handleMailbox, listEntityEmailMessages, listMyEmailMessages } from './mailbox.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
@@ -219,8 +220,32 @@ export default {
           )
         }
 
+        if (path === '/api/v1/me/email-messages') {
+          return await listMyEmailMessages(
+            req,
+            db,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
         if (path === '/api/v1/me/mailbox' || path.startsWith('/api/v1/me/mailbox/')) {
           return await handleMailbox(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
+        if (
+          path === '/api/v1/email-templates' ||
+          path.startsWith('/api/v1/email-templates/')
+        ) {
+          return await handleEmailTemplates(
             req,
             db,
             path,

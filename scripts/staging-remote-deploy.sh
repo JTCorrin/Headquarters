@@ -336,4 +336,15 @@ else
 	log "mailbox/AI curl proof script missing — skipped"
 fi
 
+# Email templates CRUD + personal working inbox list.
+if [[ -x scripts/email_templates_inbox_staging_curl_proof.sh ]]; then
+	log "running email templates + personal inbox curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/email_templates_inbox_staging_curl_proof.sh
+else
+	log "email templates/inbox curl proof script missing — skipped"
+fi
+
 log "done"
