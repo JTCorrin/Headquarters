@@ -224,6 +224,11 @@ select is(
   'default column keys are backlog, doing, review, done'
 );
 
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claim.role', '', true);
+select set_config('request.jwt.claims', '', true);
+
 update _projects_fixture
 set backlog_column_id = project_columns.id
 from public.project_columns
