@@ -16,11 +16,12 @@
 		toQuoteLineInput,
 		toQuoteUpdateBody
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiQuoteDocument } from '$lib/api/v1/types.js';
+	import type { ApiQuoteDocument, ApiTaxRate } from '$lib/api/v1/types.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
+		defaultTaxRatePercentString,
 		lineItemFormSchema,
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
@@ -58,12 +59,23 @@
 	let quote = $state<ApiQuoteDocument | null>(null);
 	let clientOptions = $state<QuoteClientOption[]>([]);
 	let products = $state<CatalogProductOption[]>([]);
+	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
+
+	function emptyLineForm() {
+		return {
+			productId: '',
+			description: '',
+			qty: '1',
+			unitPrice: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates)
+		};
+	}
 
 	const quoteForm = superForm(
 		defaults(
@@ -85,16 +97,13 @@
 		}
 	);
 
-	const lineForm = superForm(
-		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
-		{
-			validators: zod4(lineItemFormSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
+	const lineForm = superForm(defaults(emptyLineForm(), zod4(lineItemFormSchema)), {
+		validators: zod4(lineItemFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -208,16 +217,19 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, catalog] = await Promise.all([
+			const [result, clients, catalog, rates] = await Promise.all([
 				api.quotes.get(quoteId),
 				api.clients.list({ limit: 100 }),
-				api.products.list({ limit: 100, status: 'active' })
+				api.products.list({ limit: 100, status: 'active' }),
+				api.taxRates.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
+			taxRates = rates;
 			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
-			products = catalog.data.map(toCatalogProductOption);
+			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
+			lineForm.form.set(emptyLineForm());
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -290,7 +302,7 @@
 			);
 			if (isStale(epoch)) return false;
 			applyDocument(updated);
-			lineForm.form.set({ productId: '', description: '', qty: '1', unitPrice: '0' });
+			lineForm.form.set(emptyLineForm());
 			lineDrawerOpen = false;
 			viewState = { kind: 'ready' };
 			return true;

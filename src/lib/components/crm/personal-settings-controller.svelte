@@ -31,6 +31,7 @@
 		shouldRetainMailboxDraft
 	} from '$lib/personal-settings/mailbox-draft.js';
 	import {
+		describeMailboxSyncResult,
 		emptyMailboxFormData,
 		mailboxFormSchema,
 		type MailboxAccountResource,
@@ -306,6 +307,26 @@
 		}
 	}
 
+	async function onSyncMailbox(): Promise<MailboxTestFeedback | false> {
+		const epoch = captureEpoch();
+		try {
+			const result = await api.mailbox.sync();
+			if (isStale(epoch)) return false;
+			void loadAll({ forceMailboxReload: true });
+			viewState = { kind: 'ready' };
+			return {
+				ok: result.ok,
+				message: describeMailboxSyncResult(result)
+			};
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			return {
+				ok: false,
+				message: userMessage(error, 'Mailbox sync failed.')
+			};
+		}
+	}
+
 	async function onDisconnectMailbox() {
 		const epoch = captureEpoch();
 		try {
@@ -397,6 +418,7 @@
 				{onSavePreferences}
 				{onSaveMailbox}
 				{onTestMailbox}
+				{onSyncMailbox}
 				{onDisconnectMailbox}
 				showNav={false}
 			/>

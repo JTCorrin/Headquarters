@@ -72,6 +72,7 @@ import type {
 	ApiTaskUpdateBody,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
+	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
@@ -444,6 +445,7 @@ export interface MailboxEndpoints {
 	get(signal?: AbortSignal): Promise<ApiMailboxAccount | null>;
 	put(body: ApiMailboxPutBody, signal?: AbortSignal): Promise<ApiMailboxAccount>;
 	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
+	sync(signal?: AbortSignal): Promise<ApiMailboxSyncResult>;
 	disconnect(signal?: AbortSignal): Promise<void>;
 }
 

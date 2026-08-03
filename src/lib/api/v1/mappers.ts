@@ -385,12 +385,20 @@ export function toProductRow(product: ApiProduct): ProductRow {
 	};
 }
 
-export function toCatalogProductOption(product: ApiProduct): CatalogProductOption {
+export function toCatalogProductOption(
+	product: ApiProduct,
+	taxRates?: { id: string; rate_percent: number }[]
+): CatalogProductOption {
+	const rate = product.tax_rate_id
+		? taxRates?.find((r) => r.id === product.tax_rate_id)
+		: undefined;
 	return {
 		id: product.id,
 		sku: product.sku,
 		name: product.name,
-		unitPrice: centsToAmountString(product.unit_price_cents) || '0'
+		unitPrice: centsToAmountString(product.unit_price_cents) || '0',
+		taxRateId: product.tax_rate_id,
+		taxRatePercent: rate != null ? String(rate.rate_percent) : undefined
 	};
 }
 
@@ -400,6 +408,7 @@ export function toProductFormData(product: ApiProduct): ProductFormData {
 		name: product.name,
 		description: product.description ?? '',
 		unitPrice: centsToAmountString(product.unit_price_cents) || '0',
+		taxRateId: product.tax_rate_id ?? '',
 		trackStock: product.track_stock,
 		stockQty: product.track_stock ? String(product.stock_qty) : '',
 		status: product.status
@@ -407,6 +416,7 @@ export function toProductFormData(product: ApiProduct): ProductFormData {
 }
 
 export function toProductCreateBody(data: ProductFormData): ApiProductCreateBody {
+	const taxRateId = data.taxRateId?.trim();
 	return {
 		sku: data.sku.trim(),
 		name: data.name.trim(),
@@ -414,32 +424,45 @@ export function toProductCreateBody(data: ProductFormData): ApiProductCreateBody
 		product_type: 'product',
 		unit_price_cents: amountStringToCents(data.unitPrice) ?? 0,
 		currency: 'GBP',
+		tax_rate_id: taxRateId ? taxRateId : null,
 		track_stock: data.trackStock,
 		status: data.status
 	};
 }
 
 export function toProductUpdateBody(data: ProductFormData): ApiProductUpdateBody {
+	const taxRateId = data.taxRateId?.trim();
 	return {
 		sku: data.sku.trim(),
 		name: data.name.trim(),
 		description: data.description?.trim() || null,
 		unit_price_cents: amountStringToCents(data.unitPrice) ?? 0,
+		tax_rate_id: taxRateId ? taxRateId : null,
 		track_stock: data.trackStock,
 		status: data.status
 	};
+}
+
+function lineTaxRatePercent(data: LineItemFormData): number | undefined {
+	const raw = data.taxRatePercent?.trim();
+	if (!raw) return undefined;
+	const value = Number(raw);
+	return Number.isFinite(value) ? value : undefined;
 }
 
 export function toQuoteLineInput(data: LineItemFormData, position?: number): ApiQuoteLineInput {
 	const quantity = Number(data.qty);
 	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
 	const productId = data.productId?.trim();
+	const taxRatePercent = lineTaxRatePercent(data);
+	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			...tax,
 			...(position === undefined ? {} : { position })
 		};
 	}
@@ -448,6 +471,7 @@ export function toQuoteLineInput(data: LineItemFormData, position?: number): Api
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		...tax,
 		...(position === undefined ? {} : { position })
 	};
 }
@@ -569,12 +593,15 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 	const quantity = Number(data.qty);
 	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
 	const productId = data.productId?.trim();
+	const taxRatePercent = lineTaxRatePercent(data);
+	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			...tax,
 			...(position === undefined ? {} : { position })
 		};
 	}
@@ -583,6 +610,7 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		...tax,
 		...(position === undefined ? {} : { position })
 	};
 }
