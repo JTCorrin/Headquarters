@@ -3,11 +3,10 @@
 	import type { TaskAssigneeOption, TaskFormData } from '$lib/schemas/task.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
-	import TasksTable from './tasks-table.svelte';
 	import TasksBoard from './tasks-board.svelte';
 	import type { TaskBoardCard } from './tasks-board.svelte';
 	import TaskFormDrawer from './task-form-drawer.svelte';
-	import type { TaskRow } from './tasks-columns.js';
+	import MyTasksPanel, { type DashboardTask } from './my-tasks-panel.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -16,7 +15,8 @@
 	export interface TasksListPageProps {
 		orgName: string;
 		navGroups: AppNavGroup[];
-		rows: TaskRow[];
+		/** Dense My-tasks-panel list (preferred list view). */
+		listTasks?: DashboardTask[];
 		boardTasks?: TaskBoardCard[];
 		viewMode?: TasksViewMode;
 		form?: SuperForm<TaskFormData>;
@@ -30,13 +30,14 @@
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onValidEdit?: () => boolean | void | Promise<boolean | void>;
 		onEditTask?: (id: string) => void;
+		onToggleDone?: (id: string) => void;
 		onViewModeChange?: (mode: TasksViewMode) => void;
 	}
 
 	let {
 		orgName,
 		navGroups,
-		rows,
+		listTasks = [],
 		boardTasks = [],
 		viewMode = 'list',
 		form,
@@ -49,6 +50,7 @@
 		onValidSubmit,
 		onValidEdit,
 		onEditTask,
+		onToggleDone,
 		onViewModeChange
 	}: TasksListPageProps = $props();
 </script>
@@ -85,7 +87,7 @@
 								size="sm"
 								onclick={() => onViewModeChange?.('list')}
 							>
-								Table view
+								List view
 							</Button>
 						{:else}
 							<Button
@@ -114,7 +116,15 @@
 			{#if viewMode === 'board'}
 				<TasksBoard tasks={boardTasks} class="min-h-0 flex-1" />
 			{:else}
-				<TasksTable {rows} {onEditTask} />
+				<MyTasksPanel
+					title="All tasks"
+					tasks={listTasks}
+					emptyMessage="No tasks yet — create your first task."
+					onToggleDone={onToggleDone}
+					onSelectTask={onEditTask}
+					showViewAll={false}
+					class="max-w-3xl"
+				/>
 			{/if}
 		</div>
 	</main>

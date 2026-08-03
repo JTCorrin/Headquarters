@@ -22,6 +22,7 @@ export function isOnboardingPath(pathname: string): boolean {
  */
 export function requiresSelectedOrg(pathname: string): boolean {
 	if (pathname === '/select-org') return false;
+	if (pathname === '/') return true;
 	if (pathname.startsWith('/org/')) return true;
 	if (pathname === '/settings' || pathname.startsWith('/settings/')) return true;
 	if (pathname === '/contacts' || pathname.startsWith('/contacts/')) return true;
@@ -41,16 +42,16 @@ export function requiresSelectedOrg(pathname: string): boolean {
 }
 
 /**
- * Decide where a signed-in user should go after auth or from `/`.
- * Default into personal settings — org Config is Owner-only.
+ * Decide where a signed-in user should go after auth or when leaving public/onboarding routes.
+ * With an org selected, land on the Home dashboard (`/`).
  */
 export function postAuthDestination(options: {
 	membershipCount: number;
 	selectedOrgId: string | null;
 }): string {
 	if (options.membershipCount === 0) return '/onboarding/create-org';
-	if (options.membershipCount === 1 && options.selectedOrgId) return '/settings';
+	if (options.membershipCount === 1 && options.selectedOrgId) return '/';
 	if (options.membershipCount === 1) return '/select-org';
-	if (options.selectedOrgId) return '/settings';
+	if (options.selectedOrgId) return '/';
 	return '/select-org';
 }
