@@ -5,6 +5,7 @@ import { createClientsEndpoints } from './endpoints/clients.js';
 import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
 import { createEmailMessagesEndpoints } from './endpoints/email-messages.js';
+import { createEmailTemplatesEndpoints } from './endpoints/email-templates.js';
 import { createIntegrationsEndpoints } from './endpoints/integrations.js';
 import { createInvoicesEndpoints } from './endpoints/invoices.js';
 import { createLeadsEndpoints } from './endpoints/leads.js';
@@ -24,6 +25,7 @@ import type {
 	ContactsEndpoints,
 	DocumentsEndpoints,
 	EmailMessagesEndpoints,
+	EmailTemplatesEndpoints,
 	IntegrationsEndpoints,
 	InvoicesEndpoints,
 	LeadsEndpoints,
@@ -79,6 +81,7 @@ export interface ApiV1Client {
 	tasks: TasksEndpoints;
 	documents: DocumentsEndpoints;
 	emailMessages: EmailMessagesEndpoints;
+	emailTemplates: EmailTemplatesEndpoints;
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
@@ -260,6 +263,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		leads: createLeadsEndpoints(request),
 		tasks: createTasksEndpoints(request),
 		documents: createDocumentsEndpoints(request),
-		emailMessages: createEmailMessagesEndpoints(request)
+		emailMessages: createEmailMessagesEndpoints(request),
+		emailTemplates: createEmailTemplatesEndpoints(request)
 	};
 }

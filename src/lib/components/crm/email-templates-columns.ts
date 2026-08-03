@@ -4,6 +4,7 @@ import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import EmailTemplateNameLink from './email-template-name-link.svelte';
 
 export interface EmailTemplateRow {
 	id: string;
@@ -12,6 +13,8 @@ export interface EmailTemplateRow {
 	category: string;
 	status: string;
 	updatedAt: string;
+	/** Optimistic concurrency token for PATCH/DELETE — not shown in the table. */
+	version: number;
 }
 
 export const emailTemplateColumns: ColumnDef<EmailTemplateRow>[] = [
@@ -39,6 +42,11 @@ export const emailTemplateColumns: ColumnDef<EmailTemplateRow>[] = [
 			renderComponent(DataTableSortHeader, {
 				label: 'Name',
 				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) =>
+			renderComponent(EmailTemplateNameLink, {
+				id: row.original.id,
+				name: row.original.name
 			})
 	},
 	{

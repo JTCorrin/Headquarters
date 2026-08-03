@@ -32,6 +32,9 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/products/abc')).toBe(true);
 		expect(requiresSelectedOrg('/documents')).toBe(true);
 		expect(requiresSelectedOrg('/documents/abc')).toBe(true);
+		expect(requiresSelectedOrg('/email')).toBe(true);
+		expect(requiresSelectedOrg('/email/templates')).toBe(true);
+		expect(requiresSelectedOrg('/email/templates/abc')).toBe(true);
 		expect(requiresSelectedOrg('/leads')).toBe(true);
 		expect(requiresSelectedOrg('/leads/abc')).toBe(true);
 		expect(requiresSelectedOrg('/clients')).toBe(true);
