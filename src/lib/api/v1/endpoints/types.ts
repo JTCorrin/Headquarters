@@ -81,7 +81,12 @@ import type {
 	ApiEmailMessage,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
+	ApiEmailTemplate,
+	ApiEmailTemplateCreateBody,
+	ApiEmailTemplateListParams,
+	ApiEmailTemplateUpdateBody,
 	ApiEntityEmailType,
+	ApiMyEmailMessageListParams,
 	ApiRecurringInvoiceCreateBody,
 	ApiRecurringInvoiceDocument,
 	ApiRecurringInvoiceListParams,
@@ -454,6 +459,10 @@ export interface IntegrationsEndpoints {
 
 
 export interface EmailMessagesEndpoints {
+	listMine(
+		params?: ApiMyEmailMessageListParams,
+		signal?: AbortSignal
+	): Promise<ApiEmailMessage[]>;
 	listForEntity(
 		entityType: ApiEntityEmailType,
 		entityId: string,
@@ -474,4 +483,20 @@ export interface EmailMessagesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiAiSuggestion>;
 	discardDraft(suggestionId: string, signal?: AbortSignal): Promise<void>;
+}
+
+export interface EmailTemplatesEndpoints {
+	list(
+		params?: ApiEmailTemplateListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiEmailTemplate[]>>;
+	create(body: ApiEmailTemplateCreateBody, signal?: AbortSignal): Promise<ApiEmailTemplate>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiEmailTemplate>>;
+	update(
+		id: string,
+		body: ApiEmailTemplateUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiEmailTemplate>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 }
