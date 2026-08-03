@@ -16,7 +16,8 @@ export function createQuotesEndpoints(request: ApiRequestFn): QuotesEndpoints {
 				query: {
 					limit: params.limit,
 					cursor: params.cursor,
-					status: params.status
+					status: params.status,
+					client_id: params.client_id
 				},
 				signal
 			});

@@ -18,7 +18,8 @@ export function createInvoicesEndpoints(request: ApiRequestFn): InvoicesEndpoint
 				query: {
 					limit: params.limit,
 					cursor: params.cursor,
-					status: params.status
+					status: params.status,
+					client_id: params.client_id
 				},
 				signal
 			});

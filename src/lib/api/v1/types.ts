@@ -320,6 +320,8 @@ export interface ApiQuoteListParams {
 	cursor?: string;
 	/** Optional status filter (`draft` or `accepted`). */
 	status?: 'draft' | 'accepted';
+	/** Optional client filter for Client Money tab. */
+	client_id?: string;
 }
 
 export type ApiInvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'void';
@@ -449,6 +451,8 @@ export interface ApiInvoiceListParams {
 	cursor?: string;
 	/** Optional user-selected status filter; omit to list all statuses. */
 	status?: ApiInvoiceStatus;
+	/** Optional client filter for Client Money tab. */
+	client_id?: string;
 }
 
 export type ApiVendorStatus = 'active' | 'inactive' | 'archived';
