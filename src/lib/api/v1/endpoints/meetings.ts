@@ -4,6 +4,7 @@ import type {
 	ApiMeetingCreateBody,
 	ApiMeetingDocument,
 	ApiMeetingListParams,
+	ApiMeetingTranscriptAttachBody,
 	ApiMeetingUpdateBody
 } from '../types.js';
 import type { MeetingsEndpoints } from './types.js';
@@ -54,6 +55,60 @@ export function createMeetingsEndpoints(request: ApiRequestFn): MeetingsEndpoint
 				ifMatchVersion: version,
 				signal
 			});
+		},
+		attachTranscript: async (
+			id,
+			body: ApiMeetingTranscriptAttachBody,
+			version,
+			signal
+		) => {
+			const { data } = await request<ApiMeetingDocument>(
+				`/api/v1/meetings/${id}/transcript`,
+				{
+					method: 'POST',
+					body,
+					orgScoped: true,
+					ifMatchVersion: version,
+					signal
+				}
+			);
+			return data;
+		},
+		generateSummary: async (id, version, signal) => {
+			const { data } = await request<ApiMeetingDocument>(
+				`/api/v1/meetings/${id}/generate-summary`,
+				{
+					method: 'POST',
+					orgScoped: true,
+					ifMatchVersion: version,
+					signal
+				}
+			);
+			return data;
+		},
+		acceptTaskProposal: async (meetingId, proposalId, version, signal) => {
+			const { data } = await request<ApiMeetingDocument>(
+				`/api/v1/meetings/${meetingId}/task-proposals/${proposalId}/accept`,
+				{
+					method: 'POST',
+					orgScoped: true,
+					ifMatchVersion: version,
+					signal
+				}
+			);
+			return data;
+		},
+		dismissTaskProposal: async (meetingId, proposalId, version, signal) => {
+			const { data } = await request<ApiMeetingDocument>(
+				`/api/v1/meetings/${meetingId}/task-proposals/${proposalId}/dismiss`,
+				{
+					method: 'POST',
+					orgScoped: true,
+					ifMatchVersion: version,
+					signal
+				}
+			);
+			return data;
 		}
 	};
 }
