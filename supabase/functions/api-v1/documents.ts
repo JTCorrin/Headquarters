@@ -8,6 +8,7 @@ const ENTITY_TYPES = new Set([
   'lead',
   'organisation',
   'meeting',
+  'bill',
 ])
 
 const CATEGORIES = new Set([
@@ -70,7 +71,7 @@ function assertCanMutateDocuments(role: MembershipRole): void {
   }
 }
 
-function parseEntityType(value: string): string {
+export function parseDocumentEntityType(value: string): string {
   if (!ENTITY_TYPES.has(value)) {
     throw new ApiError(400, 'BAD_REQUEST', 'entity_type is invalid', {
       entity_type: 'Must be a supported entity type',
@@ -664,7 +665,7 @@ export function handleDocuments(
     /^\/api\/v1\/entities\/([a-z]+)\/([0-9a-f-]{36})\/(documents|folders)(?:\/(upload-intent))?$/i,
   )
   if (entityMatch) {
-    const entityType = parseEntityType(entityMatch[1])
+    const entityType = parseDocumentEntityType(entityMatch[1])
     const entityId = parseUuid(entityMatch[2], 'entity_id')
     const resource = entityMatch[3]
     const action = entityMatch[4]
