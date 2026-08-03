@@ -9,6 +9,10 @@
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
 	import {
+		preserveSelectedMessageId,
+		startVisibilityPoll
+	} from '$lib/browser/visibility-poll.js';
+	import {
 		emptyPersonalEmailInboxState,
 		loadPersonalEmailInbox,
 		type PersonalEmailInboxState
@@ -23,6 +27,9 @@
 	import EntityEmailInbox from './entity-email-inbox.svelte';
 	import PageHeader from './page-header.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
+
+	/** Quiet list refresh while the Email tab is visible (list only — never IMAP Sync). */
+	const INBOX_LIST_POLL_MS = 45_000;
 
 	export interface EmailInboxPageProps {
 		api: ApiV1Client;
@@ -44,6 +51,7 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let inbox = $state<PersonalEmailInboxState>(emptyPersonalEmailInboxState());
+	let selectedId = $state<string | undefined>(undefined);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -99,10 +107,11 @@
 
 	function resetOrgScopedState() {
 		inbox = emptyPersonalEmailInboxState();
+		selectedId = undefined;
 		viewState = { kind: 'loading' };
 	}
 
-	async function loadAll() {
+	async function loadAll(opts?: { quiet?: boolean }) {
 		if (!session.selectedOrgId) {
 			onMissingOrg?.();
 			viewState = {
@@ -113,7 +122,10 @@
 		}
 
 		const epoch = captureEpoch();
-		viewState = { kind: 'loading' };
+		const quiet = Boolean(opts?.quiet && viewState.kind === 'ready');
+		if (!quiet) {
+			viewState = { kind: 'loading' };
+		}
 		try {
 			if (session.memberships.length === 0) {
 				const membershipRows = await api.organisations.list();
@@ -124,6 +136,10 @@
 			const next = await loadPersonalEmailInbox(api);
 			if (isStale(epoch)) return;
 			inbox = next;
+			selectedId = preserveSelectedMessageId(
+				selectedId,
+				next.messages.map((m) => m.id)
+			);
 			if (next.listError) {
 				viewState = {
 					kind: 'validation',
@@ -143,6 +159,11 @@
 				message: userMessage(error, 'Could not load email inbox.')
 			};
 		}
+	}
+
+	function quietListRefresh() {
+		// List reload only — never mailbox.sync / IMAP Sync on a timer.
+		void loadAll({ quiet: true });
 	}
 
 	async function onSyncMailbox() {
@@ -221,6 +242,15 @@
 		void session.cacheGeneration;
 		void loadAll();
 	});
+
+	$effect(() => {
+		if (!session.selectedOrgId) return;
+		return startVisibilityPoll({
+			intervalMs: INBOX_LIST_POLL_MS,
+			onTick: quietListRefresh,
+			onVisible: quietListRefresh
+		});
+	});
 </script>
 
 {#if currentOrgId}
@@ -287,6 +317,7 @@
 							mailboxConnected={inbox.mailboxConnected}
 							aiProviderConnected={inbox.aiProviderConnected}
 							smtpReady={inbox.smtpReady}
+							bind:selectedId
 							{role}
 							canAddToTimeline={false}
 							{onDraftResponse}
