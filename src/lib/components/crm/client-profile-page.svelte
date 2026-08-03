@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
+	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import type { DocumentFormData } from '$lib/schemas/document.js';
 	import type { ClientFormData } from '$lib/schemas/client.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
@@ -11,6 +12,7 @@
 		type EmailMessage,
 		type EntityEmailEmptyState
 	} from './entity-email-inbox.svelte';
+	import DocumentWorkspaceApiHost from './document-workspace-api-host.svelte';
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
 	import EntityProjects, { type EntityProject } from './entity-projects.svelte';
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
@@ -49,6 +51,10 @@
 		role?: MembershipRole;
 		mailSettingsHref?: string;
 		sharingId?: string | null;
+		/** Live API workspace — preferred over Storybook mock props. */
+		documentsApi?: ApiV1Client;
+		documentsEntityId?: string;
+		documentsReloadKey?: string | number;
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
@@ -93,6 +99,9 @@
 		role = 'member',
 		mailSettingsHref = '/settings#mail',
 		sharingId = null,
+		documentsApi,
+		documentsEntityId,
+		documentsReloadKey = 0,
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
 		documentDrawerOpen = $bindable(false),
@@ -209,7 +218,17 @@
 							class="min-h-0 flex-1"
 						/>
 					{:else if active === 'documents'}
-						{#if documentForm}
+						{#if documentsApi && documentsEntityId}
+							<DocumentWorkspaceApiHost
+								client={documentsApi}
+								entityType="client"
+								entityId={documentsEntityId}
+								reloadKey={documentsReloadKey}
+								title="Documents"
+								emptyMessage="No documents yet — upload files for this client."
+								class="min-h-0 flex-1"
+							/>
+						{:else if documentForm}
 							<EntityDocuments
 								{documents}
 								form={documentForm}
@@ -217,7 +236,7 @@
 								class="min-h-0 flex-1"
 							/>
 						{:else}
-							<p class="text-muted-foreground text-sm">Documents list UI lands in a later wave.</p>
+							<p class="text-muted-foreground text-sm">Select a client to browse documents.</p>
 						{/if}
 					{:else if active === 'money'}
 						<MoneySummary items={moneyItems} />
