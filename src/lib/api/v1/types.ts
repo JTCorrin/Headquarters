@@ -1195,6 +1195,38 @@ export interface ApiTimelineEventListParams {
 	cursor?: string;
 }
 
+/** Row from `GET /api/v1/audit-events` (Owner/Admin only). */
+export interface ApiAuditEvent {
+	id: string;
+	org_id: string | null;
+	actor_type: 'user' | 'agent' | 'api_key' | 'system' | string;
+	actor_id: string | null;
+	action: string;
+	resource_type: string;
+	resource_id: string | null;
+	request_id: string | null;
+	ip_address: string | null;
+	user_agent: string | null;
+	before_data: Record<string, unknown> | null;
+	after_data: Record<string, unknown> | null;
+	metadata: Record<string, unknown>;
+	created_at: string;
+}
+
+export interface ApiAuditEventListParams {
+	limit?: number;
+	cursor?: string;
+	/** Inclusive lower bound on created_at (ISO-8601). */
+	from?: string;
+	/** Inclusive upper bound on created_at (ISO-8601). */
+	to?: string;
+	/** Exact action machine code (e.g. org.name_changed). */
+	action?: string;
+	/** Action namespace prefix (e.g. org → org.*). */
+	category?: string;
+	actor_id?: string;
+}
+
 export interface ApiAiSuggestionGenerateBody {
 	email_message_id: string;
 	/** BE field name — warm | neutral | firm. */

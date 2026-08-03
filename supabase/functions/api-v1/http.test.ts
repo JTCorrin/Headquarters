@@ -56,6 +56,11 @@ import {
 } from './quotes.ts'
 import { validateTaxRateBody } from './tax-rates.ts'
 import {
+  decodeAuditCursor,
+  parseAuditActionFilter,
+  parseAuditCategoryFilter,
+} from './audit-events.ts'
+import {
   decodeTimelineCursor,
   parseEntityType,
   validateTimelineNoteBody,
@@ -1286,6 +1291,27 @@ Deno.test('timeline cursor decode accepts occurred_at keyset', () => {
   assertEquals(decodeTimelineCursor(encoded), { occurred_at: occurredAt, id })
   assertEquals(decodeTimelineCursor(null), null)
   assertThrows(() => decodeTimelineCursor('%%%'), ApiError)
+})
+
+Deno.test('audit cursor decode accepts created_at keyset', () => {
+  const id = '22222222-2222-4222-8222-222222222222'
+  const createdAt = '2026-08-03T15:00:00.000Z'
+  const encoded = btoa(JSON.stringify({ created_at: createdAt, id }))
+  assertEquals(decodeAuditCursor(encoded), { created_at: createdAt, id })
+  assertEquals(decodeAuditCursor(null), null)
+  assertThrows(() => decodeAuditCursor('%%%'), ApiError)
+  assertThrows(
+    () => decodeAuditCursor(btoa(JSON.stringify({ created_at: 'nope', id }))),
+    ApiError,
+  )
+})
+
+Deno.test('audit action and category filters accept machine codes', () => {
+  assertEquals(parseAuditActionFilter(null), null)
+  assertEquals(parseAuditActionFilter('org.name_changed'), 'org.name_changed')
+  assertThrows(() => parseAuditActionFilter('Org.Name'), ApiError)
+  assertEquals(parseAuditCategoryFilter('org'), 'org')
+  assertThrows(() => parseAuditCategoryFilter('org.name'), ApiError)
 })
 
 Deno.test('email template create validation defaults status and merge_schema', () => {
