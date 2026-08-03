@@ -18,9 +18,12 @@
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
+	import BillSourceAttachment from './bill-source-attachment.svelte';
 	import VendorFormDrawer from './vendor-form-drawer.svelte';
 	import type { SuperForm as VendorSuperForm } from 'sveltekit-superforms';
 	import type { VendorFormData } from '$lib/schemas/vendor.js';
+	import type { BillSourceAttachmentMeta } from '$lib/crm/bill-source-attachment.js';
+	import type { DocumentPreviewState } from '$lib/api/v1/document-workspace-controller.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import {
@@ -47,6 +50,10 @@
 		isDraft?: boolean;
 		isDirty?: boolean;
 		actionPending?: boolean;
+		sourceAttachment?: BillSourceAttachmentMeta | null;
+		sourceAttachmentPending?: boolean;
+		sourceAttachmentError?: string | null;
+		sourcePreview?: DocumentPreviewState | null;
 		moneyTotals?: {
 			subtotalCents: number;
 			discountCents: number;
@@ -72,6 +79,11 @@
 		onRecordPayment?: () => boolean | void | Promise<boolean | void>;
 		onReversePayment?: (paymentId: string) => void | Promise<void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
+		onSourceUpload?: (file: File) => void | Promise<void>;
+		onSourceClear?: () => void | Promise<void>;
+		onSourcePreview?: () => void | Promise<void>;
+		onCloseSourcePreview?: () => void;
+		onDownloadSourcePreview?: () => void;
 		showNav?: boolean;
 		class?: string;
 	}
@@ -94,6 +106,10 @@
 		isDraft = true,
 		isDirty = false,
 		actionPending = false,
+		sourceAttachment = null,
+		sourceAttachmentPending = false,
+		sourceAttachmentError = null,
+		sourcePreview = null,
 		moneyTotals = null,
 		paymentForm,
 		paymentRows = [],
@@ -114,6 +130,11 @@
 		onRecordPayment,
 		onReversePayment,
 		onTimelineAdd,
+		onSourceUpload,
+		onSourceClear,
+		onSourcePreview,
+		onCloseSourcePreview,
+		onDownloadSourcePreview,
 		showNav = true,
 		class: className
 	}: BillDetailPageProps = $props();
@@ -239,6 +260,19 @@
 							}}
 						/>
 					</section>
+
+					<BillSourceAttachment
+						attachment={sourceAttachment}
+						canEdit={isDraft}
+						pending={sourceAttachmentPending || actionPending}
+						errorMessage={sourceAttachmentError}
+						preview={sourcePreview}
+						onUpload={onSourceUpload}
+						onClear={onSourceClear}
+						onPreview={onSourcePreview}
+						onClosePreview={onCloseSourcePreview}
+						onDownloadPreview={onDownloadSourcePreview}
+					/>
 
 					<LineItemsTable
 						rows={lines}
