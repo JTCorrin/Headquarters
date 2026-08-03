@@ -211,10 +211,14 @@ describe('BillPage detail flows', () => {
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
 		render(BillPage, { api, session, billId: BILL_ID });
 
-		await expect.element(page.getByRole('button', { name: 'Receive' })).toBeEnabled();
+		await expect
+			.element(page.getByRole('button', { name: 'Receive', exact: true }))
+			.toBeEnabled();
 		await page.getByLabelText('Internal reference').fill('DIRTY');
 		await expect.element(page.getByTestId('bill-dirty-hint')).toBeInTheDocument();
-		await expect.element(page.getByRole('button', { name: 'Receive' })).toBeDisabled();
+		await expect
+			.element(page.getByRole('button', { name: 'Receive', exact: true }))
+			.toBeDisabled();
 		expect(receiveCalled).toBe(false);
 	});
 
