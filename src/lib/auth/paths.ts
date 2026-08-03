@@ -39,6 +39,7 @@ export function requiresSelectedOrg(pathname: string): boolean {
 	if (pathname === '/clients' || pathname.startsWith('/clients/')) return true;
 	if (pathname === '/tasks' || pathname.startsWith('/tasks/')) return true;
 	if (pathname === '/meetings' || pathname.startsWith('/meetings/')) return true;
+	if (pathname === '/projects' || pathname.startsWith('/projects/')) return true;
 	return false;
 }
 
