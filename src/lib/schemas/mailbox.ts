@@ -139,8 +139,9 @@ export function humanizeMailboxSyncError(code: string | null | undefined): strin
 		case 'connection_failed':
 		case 'imap_connection_failed':
 		case 'smtp_connection_failed':
-		case 'timeout':
 			return 'Could not reach the mail server — check host, port, and security settings.';
+		case 'timeout':
+			return 'The mail server timed out — check host, port, and security, or try again. Sync allows up to about 90 seconds.';
 		case 'tls_failed':
 		case 'certificate_error':
 			return 'Secure connection failed — try a different security setting (SSL / STARTTLS).';
@@ -149,8 +150,6 @@ export function humanizeMailboxSyncError(code: string | null | undefined): strin
 			return 'Sync paused after repeated failures — fix credentials, then use Test connection.';
 		case 'quota_exceeded':
 			return 'The mail provider rejected the request (quota or rate limit). Try again later.';
-		case 'imap_not_configured_for_host':
-			return 'Real IMAP fetch is not enabled for this host yet — sync marked the mailbox checked. Use a *.example.test host for synthetic staging ingest.';
 		case 'credentials_missing':
 			return 'Mailbox credentials are missing — save a password, then try Sync again.';
 		case 'lease_error':
@@ -169,9 +168,6 @@ export function describeMailboxSyncResult(result: {
 	const hint = humanizeMailboxSyncError(result.error_code);
 	if (result.ingested > 0) {
 		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${hint ? ` ${hint}` : ''}`;
-	}
-	if (result.error_code === 'imap_not_configured_for_host') {
-		return hint ?? 'Sync completed — real IMAP for this host is not available yet.';
 	}
 	if (result.ok) {
 		return hint ?? 'Sync completed — no new messages.';
