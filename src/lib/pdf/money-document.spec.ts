@@ -37,4 +37,37 @@ describe('buildMoneyDocumentDef', () => {
 		expect(content).toContain('£10.00');
 		expect(content).toContain('£18.00');
 	});
+
+	it('shows Tax on quote PDFs when server totals include tax_cents', () => {
+		const def = buildMoneyDocumentDef({
+			kind: 'quote',
+			orgName: 'Corrin',
+			partyLabel: 'Bill to',
+			partyName: 'Northwind',
+			documentNumber: 'Q-0001',
+			subtitle: 'Q2 retainer',
+			currency: 'GBP',
+			status: 'draft',
+			lines: [
+				{
+					id: 'line-1',
+					description: 'Retainer',
+					qty: '1',
+					unitPrice: '100.00',
+					total: '100.00'
+				}
+			],
+			totals: {
+				subtotalCents: 10000,
+				discountCents: 0,
+				taxCents: 2000,
+				totalCents: 12000
+			}
+		});
+
+		const content = JSON.stringify(def.content);
+		expect(content).toContain('Tax');
+		expect(content).toContain('£20.00');
+		expect(content).toContain('£120.00');
+	});
 });
