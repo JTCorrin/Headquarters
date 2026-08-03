@@ -38,27 +38,42 @@ Billing contact still needs to be set up on the Northwind account.`;
 			{
 				id: 't1',
 				title: 'Send revised kickoff pack',
-				assignee: 'Joe'
+				assignee: 'Joe',
+				status: 'proposed'
 			},
 			{
 				id: 't2',
 				title: 'Chase quote Q-0142',
-				assignee: 'Joe'
+				assignee: 'Joe',
+				status: 'proposed'
 			},
 			{
 				id: 't3',
 				title: 'Add Northwind billing contact',
-				assignee: 'Maya'
+				assignee: 'Maya',
+				status: 'proposed'
 			}
 		];
 	}
 
 	function acceptTask(id: string) {
-		proposedTasks = proposedTasks.map((t) => (t.id === id ? { ...t, accepted: true } : t));
+		proposedTasks = proposedTasks.map((t) =>
+			t.id === id ? { ...t, status: 'accepted', accepted: true } : t
+		);
+	}
+
+	function dismissTask(id: string) {
+		proposedTasks = proposedTasks.map((t) =>
+			t.id === id ? { ...t, status: 'dismissed', accepted: false } : t
+		);
 	}
 
 	function acceptAll() {
-		proposedTasks = proposedTasks.map((t) => ({ ...t, accepted: true }));
+		proposedTasks = proposedTasks.map((t) => ({
+			...t,
+			status: 'accepted' as const,
+			accepted: true
+		}));
 	}
 </script>
 
@@ -89,6 +104,7 @@ Billing contact still needs to be set up on the Northwind account.`;
 				onUploadTranscript={uploadTranscript}
 				onGenerateSummary={generateSummary}
 				onAcceptTask={acceptTask}
+				onDismissTask={dismissTask}
 				onAcceptAllTasks={acceptAll}
 			/>
 		</div>
