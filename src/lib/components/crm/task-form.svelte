@@ -184,7 +184,12 @@
 
 		<div class="space-y-2">
 			<Label for="task-due">Due date</Label>
-			<DateField id="task-due" name="dueOn" bind:value={$formData.dueOn} />
+			<DateField
+				id="task-due"
+				name="dueOn"
+				bind:value={$formData.dueOn}
+				presets={['today', 'plus7', 'endOfMonth']}
+			/>
 		</div>
 	</div>
 

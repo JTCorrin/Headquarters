@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { DateFieldPreset } from '$lib/date-field.js';
 	import DateField from './date-field.svelte';
 
 	export interface DateFieldTestHostProps {
@@ -6,13 +7,19 @@
 		disabled?: boolean;
 		readonly?: boolean;
 		clearable?: boolean;
+		presets?: DateFieldPreset[];
+		min?: string;
+		max?: string;
 	}
 
 	let {
 		initial = '',
 		disabled = false,
 		readonly = false,
-		clearable = true
+		clearable = true,
+		presets = ['today'],
+		min = '',
+		max = ''
 	}: DateFieldTestHostProps = $props();
 
 	let value = $state(initial);
@@ -26,6 +33,9 @@
 		{disabled}
 		{readonly}
 		{clearable}
+		{presets}
+		{min}
+		{max}
 		data-testid="date-field"
 	/>
 	<p data-testid="date-field-value">{value}</p>
