@@ -14,6 +14,8 @@
 		title?: string;
 		emptyMessage?: string;
 		defaultCategory?: ApiDocumentCategory;
+		/** Bump to recreate the controller (e.g. org `cacheGeneration`). */
+		reloadKey?: string | number;
 		class?: string;
 	}
 
@@ -24,12 +26,14 @@
 		title = 'Documents',
 		emptyMessage,
 		defaultCategory = 'other',
+		reloadKey = 0,
 		class: className
 	}: Props = $props();
 
 	let controller = $state.raw<DocumentWorkspaceController | null>(null);
 
 	$effect(() => {
+		void reloadKey;
 		const next = createDocumentWorkspaceController({
 			client,
 			entityType,
