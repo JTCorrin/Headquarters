@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	applyMailboxPreset,
+	describeMailboxSyncResult,
 	emptyMailboxFormData,
+	humanizeMailboxSyncError,
 	mailboxFormSchema,
 	mailboxPresetDefaults,
 	mailboxSecurityOptions
@@ -57,5 +59,25 @@ describe('mailbox schema', () => {
 			smtpPort: '465'
 		};
 		expect(mailboxFormSchema.safeParse(data).success).toBe(false);
+	});
+
+	it('humanizes timeout distinctly from connection_failed', () => {
+		expect(humanizeMailboxSyncError('timeout')).toMatch(/timed out/i);
+		expect(humanizeMailboxSyncError('imap_connection_failed')).toMatch(/Could not reach/i);
+		expect(humanizeMailboxSyncError('timeout')).not.toBe(
+			humanizeMailboxSyncError('imap_connection_failed')
+		);
+		expect(humanizeMailboxSyncError('imap_not_configured_for_host')).toMatch(
+			/imap_not_configured_for_host/
+		);
+	});
+
+	it('describes sync timeout without the removed host stub branch', () => {
+		expect(
+			describeMailboxSyncResult({ ok: false, ingested: 0, error_code: 'timeout' })
+		).toMatch(/timed out/i);
+		expect(
+			describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null })
+		).toBe('Sync completed — no new messages.');
 	});
 });
