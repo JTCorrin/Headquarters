@@ -402,6 +402,17 @@ else
 	log "payments curl proof script missing — skipped"
 fi
 
+# Client Money tab: quotes + invoices list ?client_id= filters.
+if [[ -x scripts/client_money_staging_curl_proof.sh ]]; then
+	log "running client money tab curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/client_money_staging_curl_proof.sh
+else
+	log "client money curl proof script missing — skipped"
+fi
+
 # Product → quote line → accept → from-quote (product_id + SKU/price/tax snapshots).
 if [[ -x scripts/product_quote_invoice_staging_curl_proof.sh ]]; then
 	log "running product→quote→invoice convert curl proof"
