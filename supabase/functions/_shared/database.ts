@@ -746,6 +746,62 @@ export type MeetingAttendeeRow = {
   organiser: boolean
 }
 
+export type ProjectRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  client_id: string
+  name: string
+  description: string | null
+  status: 'planning' | 'active' | 'blocked' | 'done' | 'archived'
+  owner_membership_id: string | null
+  starts_on: string | null
+  due_on: string | null
+  completed_at: string | null
+  position: number
+}
+
+export type ProjectColumnRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  project_id: string
+  name: string
+  key: string
+  position: number
+  wip_limit: number | null
+}
+
+export type ProjectCardRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  project_id: string
+  column_id: string
+  title: string
+  description: string | null
+  assignee_membership_id: string | null
+  task_id: string | null
+  due_at: string | null
+  position: number
+  completed_at: string | null
+}
+
 export type InvoiceLineRow = {
   id: string
   org_id: string
@@ -1262,6 +1318,34 @@ export type Database = {
         Update: Partial<MeetingAttendeeInsert>
         Relationships: []
       }
+      projects: {
+        Row: ProjectRow
+        Insert: Partial<ProjectRow> & Pick<ProjectRow, 'org_id' | 'client_id' | 'name'>
+        Update: Partial<ProjectRow>
+        Relationships: []
+      }
+      project_columns: {
+        Row: ProjectColumnRow
+        Insert:
+          & Partial<ProjectColumnRow>
+          & Pick<
+            ProjectColumnRow,
+            'org_id' | 'project_id' | 'name' | 'key'
+          >
+        Update: Partial<ProjectColumnRow>
+        Relationships: []
+      }
+      project_cards: {
+        Row: ProjectCardRow
+        Insert:
+          & Partial<ProjectCardRow>
+          & Pick<
+            ProjectCardRow,
+            'org_id' | 'project_id' | 'column_id' | 'title'
+          >
+        Update: Partial<ProjectCardRow>
+        Relationships: []
+      }
       documents: {
         Row: DocumentRow
         Insert: Partial<DocumentRow>
@@ -1680,6 +1764,37 @@ export type Database = {
           p_org_id: string
         }
         Returns: Json
+      }
+      create_project_with_defaults: {
+        Args: {
+          p_org_id: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      soft_delete_project: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_project_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_project_card: {
+        Args: {
+          p_card_id: string
+          p_expected_version: number
+          p_org_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_project_column: {
+        Args: {
+          p_column_id: string
+          p_expected_version: number
+          p_org_id: string
+        }
+        Returns: undefined
       }
       create_invoice_from_quote: {
         Args: {

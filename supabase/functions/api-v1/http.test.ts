@@ -32,6 +32,12 @@ import { validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
 import { decodeMeetingCursor, validateMeetingBody } from './meetings.ts'
 import {
+  decodeProjectCursor,
+  parseProjectStatusFilter,
+  validateProjectBody,
+  validateProjectCardBody,
+} from './projects.ts'
+import {
   recurringLifecycleIdempotencyPayload,
   validateRecurringScheduleBody,
 } from './recurring-invoices.ts'
@@ -886,7 +892,7 @@ Deno.test('task cursor round-trip shape', () => {
   assertThrows(() => decodeTaskCursor('not-a-cursor'), ApiError)
 })
 
-Deno.test('meeting create validation accepts structured attendees and rejects project related entity', () => {
+Deno.test('meeting create validation accepts structured attendees and project related entity', () => {
   const starts = '2026-08-10T10:00:00.000Z'
   const ends = '2026-08-10T11:00:00.000Z'
   const body = validateMeetingBody(
@@ -909,20 +915,17 @@ Deno.test('meeting create validation accepts structured attendees and rejects pr
   assertEquals(body.attendees?.length, 2)
   assertEquals(body.attendees?.[0]?.email, 'ada@example.test')
   assertEquals(body.attendees?.[0]?.organiser, true)
-  assertThrows(
-    () =>
-      validateMeetingBody(
-        {
-          title: 'Bad',
-          starts_at: starts,
-          ends_at: ends,
-          related_entity_type: 'project',
-          related_entity_id: '11111111-1111-4111-8111-111111111111',
-        },
-        false,
-      ),
-    ApiError,
+  const withProject = validateMeetingBody(
+    {
+      title: 'Project sync',
+      starts_at: starts,
+      ends_at: ends,
+      related_entity_type: 'project',
+      related_entity_id: '11111111-1111-4111-8111-111111111111',
+    },
+    false,
   )
+  assertEquals(withProject.related_entity_type, 'project')
   assertThrows(
     () =>
       validateMeetingBody(
@@ -938,6 +941,60 @@ Deno.test('meeting create validation accepts structured attendees and rejects pr
     true,
   )
   assertEquals(patched.attendees?.length, 1)
+})
+
+Deno.test('project create validation requires client_id and accepts status enum', () => {
+  assertThrows(
+    () => validateProjectBody({ name: 'Rollout' }, false),
+    ApiError,
+  )
+  const created = validateProjectBody(
+    {
+      client_id: '11111111-1111-4111-8111-111111111111',
+      name: 'Website relaunch',
+      status: 'active',
+    },
+    false,
+  )
+  assertEquals(created.client_id, '11111111-1111-4111-8111-111111111111')
+  assertEquals(created.name, 'Website relaunch')
+  assertEquals(created.status, 'active')
+  assertThrows(
+    () =>
+      validateProjectBody(
+        {
+          client_id: '11111111-1111-4111-8111-111111111111',
+          name: 'Bad status',
+          status: 'paused',
+        },
+        false,
+      ),
+    ApiError,
+  )
+  const patched = validateProjectBody({ status: 'done', position: 42.5 }, true)
+  assertEquals(patched.status, 'done')
+  assertEquals(patched.position, 42.5)
+})
+
+Deno.test('project card validation requires title on create', () => {
+  assertThrows(() => validateProjectCardBody({}, false), ApiError)
+  const card = validateProjectCardBody({ title: 'Scope discovery' }, false)
+  assertEquals(card.title, 'Scope discovery')
+})
+
+Deno.test('project status filter and cursor round-trip', () => {
+  const url = new URL('https://example.test/api/v1/projects?status=active,archived&status=blocked')
+  assertEquals(parseProjectStatusFilter(url), ['active', 'archived', 'blocked'])
+  const createdAt = '2026-08-03T18:00:00.000Z'
+  const id = '33333333-3333-4333-8333-333333333333'
+  const encoded = btoa(JSON.stringify({ created_at: createdAt, id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+  const decoded = decodeProjectCursor(encoded)
+  assertEquals(decoded.created_at, createdAt)
+  assertEquals(decoded.id, id)
+  assertThrows(() => decodeProjectCursor('bad-cursor'), ApiError)
 })
 
 Deno.test('meeting cursor round-trip shape', () => {

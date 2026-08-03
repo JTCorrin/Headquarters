@@ -355,14 +355,6 @@ export function validateMeetingBody(
     }
   }
 
-  if (
-    output.related_entity_type === 'project' ||
-    (body.related_entity_type === 'project')
-  ) {
-    fields.related_entity_type =
-      'project related entities are not available until Projects foundation'
-  }
-
   if (!partial) {
     const type = output.related_entity_type ?? null
     const id = output.related_entity_id ?? null
@@ -483,9 +475,6 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (lower.includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Meeting version does not match If-Match')
   }
-  if (lower.includes('project is not available')) {
-    return new ApiError(422, 'VALIDATION_ERROR', message)
-  }
   if (
     lower.includes('organiser must be') ||
     lower.includes('related') ||
@@ -549,6 +538,16 @@ async function resolveRelatedEntityLabel(
   if (entityType === 'lead') {
     const { data } = await db
       .from('leads')
+      .select('name')
+      .eq('org_id', orgId)
+      .eq('id', entityId)
+      .is('deleted_at', null)
+      .maybeSingle()
+    return data?.name ?? null
+  }
+  if (entityType === 'project') {
+    const { data } = await db
+      .from('projects')
       .select('name')
       .eq('org_id', orgId)
       .eq('id', entityId)

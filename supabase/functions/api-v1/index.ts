@@ -13,6 +13,7 @@ import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
 import { handleMeetings } from './meetings.ts'
+import { handleProjects } from './projects.ts'
 import { handleRecurringInvoices } from './recurring-invoices.ts'
 import { handlePayments } from './payments.ts'
 import { handleVendors } from './vendors.ts'
@@ -103,6 +104,15 @@ function assertCanAccessMeetings(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify meetings')
+  }
+}
+
+function assertCanAccessProjects(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access projects')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify projects')
   }
 }
 
@@ -420,6 +430,18 @@ export default {
         if (path === '/api/v1/meetings' || path.startsWith('/api/v1/meetings/')) {
           assertCanAccessMeetings(membership.role, req.method)
           return await handleMeetings(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
+        if (path === '/api/v1/projects' || path.startsWith('/api/v1/projects/')) {
+          assertCanAccessProjects(membership.role, req.method)
+          return await handleProjects(
             req,
             db,
             path,
