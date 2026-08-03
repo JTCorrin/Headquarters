@@ -145,16 +145,17 @@ select is(
   'org.created audit row written on organisation insert'
 );
 
+-- Org writers: privileged UPDATE + as_user JWT (auth.uid for trigger). Do not
+-- set role authenticated or touch version (stamp trigger bumps it).
 select pg_temp.as_user((select owner_id from _audit_fixture));
-set local role authenticated;
 
 select lives_ok(
   $$
     update public.organisations
-    set name = 'Audit Org Renamed', version = version + 1
+    set name = 'Audit Org Renamed'
     where id = (select org_id from _audit_fixture)
   $$,
-  'owner can rename organisation'
+  'privileged rename with as_user claims succeeds'
 );
 
 select is(
@@ -171,10 +172,10 @@ select is(
 select lives_ok(
   $$
     update public.organisations
-    set theme_default = 'dark', version = version + 1
+    set theme_default = 'dark'
     where id = (select org_id from _audit_fixture)
   $$,
-  'owner can patch organisation config'
+  'privileged config patch with as_user claims succeeds'
 );
 
 select is(
@@ -187,6 +188,9 @@ select is(
   1,
   'org.config_updated written on non-name config update'
 );
+
+select pg_temp.as_user((select owner_id from _audit_fixture));
+set local role authenticated;
 
 select lives_ok(
   $$
