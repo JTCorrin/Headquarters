@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# Prove meetings CRUD, nested attendees replace-all, upcoming filter, and stale If-Match
+# against a live stack (JWT + X-Org-Id).
+#
+# Usage:
+#   SUPABASE_URL=http://192.168.5.136:54321 \
+#   SUPABASE_ANON_KEY=... \
+#   API_BASE=http://192.168.5.136:54321/functions/v1/api-v1 \
+#   ./scripts/meetings_staging_curl_proof.sh
+set -euo pipefail
+
+SUPABASE_URL="${SUPABASE_URL:?SUPABASE_URL is required}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}"
+API_BASE="${API_BASE:-${SUPABASE_URL}/functions/v1/api-v1}"
+API_BASE="${API_BASE%/}"
+
+EMAIL="${PROOF_EMAIL:-meetings-proof-$(date +%s)-$RANDOM@example.test}"
+PASSWORD="${PROOF_PASSWORD:-ProofPass123!}"
+SLUG="${PROOF_SLUG:-meetings-proof-$(date +%s)}"
+DISPLAY_NAME="${PROOF_DISPLAY_NAME:-Meetings Curl Proof}"
+
+log() { printf '[meetings-curl-proof] %s\n' "$*"; }
+die() { printf '[meetings-curl-proof] FAIL: %s\n' "$*" >&2; exit 1; }
+
+TMPDIR_PROOF="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR_PROOF}"' EXIT
+
+log "signup ${EMAIL}"
+signup_json="$(
+	curl -fsS --max-time 30 \
+		-X POST "${SUPABASE_URL}/auth/v1/signup" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg email "$EMAIL" --arg password "$PASSWORD" --arg name "$DISPLAY_NAME" \
+			'{email:$email, password:$password, data:{display_name:$name}}')"
+)"
+ACCESS_TOKEN="$(printf '%s' "$signup_json" | jq -r '.access_token // empty')"
+if [[ -z "$ACCESS_TOKEN" || "$ACCESS_TOKEN" == null ]]; then
+	token_json="$(
+		curl -fsS --max-time 30 \
+			-X POST "${SUPABASE_URL}/auth/v1/token?grant_type=password" \
+			-H "apikey: ${SUPABASE_ANON_KEY}" \
+			-H 'content-type: application/json' \
+			-d "$(jq -n --arg email "$EMAIL" --arg password "$PASSWORD" \
+				'{email:$email, password:$password}')"
+	)"
+	ACCESS_TOKEN="$(printf '%s' "$token_json" | jq -r '.access_token // empty')"
+fi
+[[ -n "$ACCESS_TOKEN" && "$ACCESS_TOKEN" != null ]] || die "no access_token after signup/password grant"
+log "got JWT"
+
+log "POST organisations"
+create_org="$(
+	curl -fsS --max-time 30 \
+		-X POST "${API_BASE}/api/v1/organisations" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg name "Meetings Proof Org ${SLUG}" --arg slug "$SLUG" \
+			'{name:$name, slug:$slug, country_code:"GB", default_currency:"GBP", locale:"en-GB", timezone:"Europe/London"}')"
+)"
+ORG_ID="$(printf '%s' "$create_org" | jq -r '.data.organisation.id // empty')"
+[[ -n "$ORG_ID" ]] || die "org create failed: ${create_org}"
+log "org ${ORG_ID}"
+
+MEMBERSHIP_ID="$(printf '%s' "$create_org" | jq -r '.data.membership.id // empty')"
+if [[ -z "$MEMBERSHIP_ID" || "$MEMBERSHIP_ID" == null ]]; then
+	orgs_json="$(
+		curl -fsS --max-time 30 \
+			"${API_BASE}/api/v1/organisations" \
+			-H "apikey: ${SUPABASE_ANON_KEY}" \
+			-H "Authorization: Bearer ${ACCESS_TOKEN}"
+	)"
+	MEMBERSHIP_ID="$(printf '%s' "$orgs_json" | jq -r --arg oid "$ORG_ID" '
+		[.data[]? | select(.organisation.id == $oid or .id == $oid) | .membership.id // .membership_id][0] // empty
+	')"
+fi
+[[ -n "$MEMBERSHIP_ID" && "$MEMBERSHIP_ID" != null ]] || die "could not resolve membership id"
+log "membership ${MEMBERSHIP_ID}"
+
+log "POST contacts (related entity)"
+create_contact="$(
+	curl -fsS --max-time 30 \
+		-X POST "${API_BASE}/api/v1/contacts" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d '{"display_name":"Proof Contact","primary_email":"contact@meetings-proof.test"}'
+)"
+CONTACT_ID="$(printf '%s' "$create_contact" | jq -r '.data.id // empty')"
+[[ -n "$CONTACT_ID" ]] || die "contact create: ${create_contact}"
+log "contact ${CONTACT_ID}"
+
+STARTS="$(date -u -d '+2 days' +%Y-%m-%dT10:00:00.000Z 2>/dev/null || date -u -v+2d +%Y-%m-%dT10:00:00.000Z)"
+ENDS="$(date -u -d '+2 days 1 hour' +%Y-%m-%dT11:00:00.000Z 2>/dev/null || date -u -v+2d -v+1H +%Y-%m-%dT11:00:00.000Z)"
+
+log "POST meetings"
+create_meeting="$(
+	curl -fsS --max-time 30 \
+		-X POST "${API_BASE}/api/v1/meetings" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n \
+			--arg starts "$STARTS" \
+			--arg ends "$ENDS" \
+			--arg c "$CONTACT_ID" \
+			--arg m "$MEMBERSHIP_ID" \
+			'{
+				title:"Proof standup",
+				starts_at:$starts,
+				ends_at:$ends,
+				related_entity_type:"contact",
+				related_entity_id:$c,
+				organiser_membership_id:$m,
+				attendees:[
+					{email:"contact@meetings-proof.test", name:"Proof Contact", contact_id:$c, organiser:true},
+					{email:"guest@meetings-proof.test", name:"Guest"}
+				]
+			}')"
+)"
+MEETING_ID="$(printf '%s' "$create_meeting" | jq -r '.data.id // empty')"
+MEETING_VER="$(printf '%s' "$create_meeting" | jq -r '.data.version // empty')"
+ATTENDEE_COUNT="$(printf '%s' "$create_meeting" | jq -r '.data.attendees | length')"
+TZ_VAL="$(printf '%s' "$create_meeting" | jq -r '.data.timezone // empty')"
+LABEL="$(printf '%s' "$create_meeting" | jq -r '.data.related_entity_label // empty')"
+[[ -n "$MEETING_ID" && -n "$MEETING_VER" && "$ATTENDEE_COUNT" == "2" && "$TZ_VAL" == "Europe/London" && "$LABEL" == "Proof Contact" ]] \
+	|| die "meeting create: ${create_meeting}"
+log "meeting ${MEETING_ID} v${MEETING_VER}"
+
+log "GET meetings?upcoming=true"
+list_up="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/meetings?upcoming=true&limit=5" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+LIST_COUNT="$(printf '%s' "$list_up" | jq -r --arg id "$MEETING_ID" '[.data[]? | select(.id == $id)] | length')"
+[[ "$LIST_COUNT" == "1" ]] || die "upcoming list missing meeting: ${list_up}"
+
+log "PATCH meetings attendees replace-all with If-Match"
+patch_meeting="$(
+	curl -fsS --max-time 30 \
+		-X PATCH "${API_BASE}/api/v1/meetings/${MEETING_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H "If-Match: \"${MEETING_VER}\"" \
+		-H 'content-type: application/json' \
+		-d '{"status":"in_progress","attendees":[{"email":"only@meetings-proof.test","organiser":true}]}'
+)"
+MEETING_VER2="$(printf '%s' "$patch_meeting" | jq -r '.data.version // empty')"
+PATCH_STATUS="$(printf '%s' "$patch_meeting" | jq -r '.data.status // empty')"
+PATCH_ATTENDEES="$(printf '%s' "$patch_meeting" | jq -r '.data.attendees | length')"
+PATCH_EMAIL="$(printf '%s' "$patch_meeting" | jq -r '.data.attendees[0].email // empty')"
+[[ "$PATCH_STATUS" == "in_progress" && -n "$MEETING_VER2" && "$MEETING_VER2" != "$MEETING_VER" && "$PATCH_ATTENDEES" == "1" && "$PATCH_EMAIL" == "only@meetings-proof.test" ]] \
+	|| die "meeting patch: ${patch_meeting}"
+log "patched v${MEETING_VER2}"
+
+log "POST related_entity_type=project → expect 422"
+project_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/project.json" -w '%{http_code}' \
+		-X POST "${API_BASE}/api/v1/meetings" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg starts "$STARTS" --arg ends "$ENDS" \
+			'{title:"Project link", starts_at:$starts, ends_at:$ends,
+			  related_entity_type:"project", related_entity_id:"11111111-1111-4111-8111-111111111111"}')"
+)"
+[[ "$project_code" == "422" ]] || die "expected 422 for project related entity, got ${project_code}: $(cat "${TMPDIR_PROOF}/project.json")"
+
+log "PATCH stale If-Match → expect 412"
+stale_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/stale.json" -w '%{http_code}' \
+		-X PATCH "${API_BASE}/api/v1/meetings/${MEETING_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H "If-Match: \"${MEETING_VER}\"" \
+		-H 'content-type: application/json' \
+		-d '{"title":"Stale"}'
+)"
+[[ "$stale_code" == "412" ]] || die "expected 412 for stale If-Match, got ${stale_code}: $(cat "${TMPDIR_PROOF}/stale.json")"
+
+log "DELETE meetings with If-Match"
+del_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/del.json" -w '%{http_code}' \
+		-X DELETE "${API_BASE}/api/v1/meetings/${MEETING_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H "If-Match: \"${MEETING_VER2}\""
+)"
+[[ "$del_code" == "204" ]] || die "expected 204 delete, got ${del_code}: $(cat "${TMPDIR_PROOF}/del.json")"
+
+log "GET deleted meeting → 404"
+gone_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/gone.json" -w '%{http_code}' \
+		"${API_BASE}/api/v1/meetings/${MEETING_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+[[ "$gone_code" == "404" ]] || die "expected 404 after delete, got ${gone_code}: $(cat "${TMPDIR_PROOF}/gone.json")"
+
+log "PASS"
