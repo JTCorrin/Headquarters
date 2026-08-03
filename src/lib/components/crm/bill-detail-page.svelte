@@ -16,6 +16,7 @@
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
 	import DocumentPaymentsPanel from './document-payments-panel.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
 	import VendorFormDrawer from './vendor-form-drawer.svelte';
 	import type { SuperForm as VendorSuperForm } from 'sveltekit-superforms';
@@ -40,6 +41,7 @@
 		vendorOptions?: BillVendorOption[];
 		lines?: LineItemRow[];
 		timelineEvents?: TimelineEvent[];
+		composerActor?: string;
 		lineDrawerOpen?: boolean;
 		vendorDrawerOpen?: boolean;
 		isDraft?: boolean;
@@ -69,6 +71,7 @@
 		onValidVendorCreate?: () => boolean | void | Promise<boolean | void>;
 		onRecordPayment?: () => boolean | void | Promise<boolean | void>;
 		onReversePayment?: (paymentId: string) => void | Promise<void>;
+		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		showNav?: boolean;
 		class?: string;
 	}
@@ -85,6 +88,7 @@
 		vendorOptions = [],
 		lines = $bindable<LineItemRow[]>([]),
 		timelineEvents = $bindable<TimelineEvent[]>([]),
+		composerActor = 'You',
 		lineDrawerOpen = $bindable(false),
 		vendorDrawerOpen = $bindable(false),
 		isDraft = true,
@@ -109,6 +113,7 @@
 		onValidVendorCreate,
 		onRecordPayment,
 		onReversePayment,
+		onTimelineAdd,
 		showNav = true,
 		class: className
 	}: BillDetailPageProps = $props();
@@ -281,7 +286,8 @@
 						bind:events={timelineEvents}
 						title="Activity"
 						composable
-						composerActor="Joe"
+						{composerActor}
+						onAdd={onTimelineAdd}
 						emptyMessage="No bill activity yet."
 						class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					/>
