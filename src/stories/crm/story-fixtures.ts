@@ -18,6 +18,9 @@ export function navGroupsWithActive(
 					{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') }
 				]
 			: []),
+		...(role === 'owner' || role === 'admin'
+			? [{ label: 'Audit log', href: '/org/audit-log', active: mark('Audit log') }]
+			: []),
 		...(role !== 'billing'
 			? [{ label: 'My settings', href: '/settings', active: mark('My settings') }]
 			: []),

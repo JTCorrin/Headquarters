@@ -51,6 +51,7 @@ import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
 import type { ProductRow } from '$lib/components/crm/products-columns.js';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 import type { TimelineComposerSubmit } from '$lib/components/crm/timeline-composer.svelte';
+import type { AuditLogListItem } from '$lib/schemas/audit-event.js';
 import type { EmailTemplateFormData } from '$lib/schemas/email-template.js';
 import type {
 	ApiAiIntegration,
@@ -110,6 +111,7 @@ import type {
 	ApiTask,
 	ApiTaskCreateBody,
 	ApiTaskUpdateBody,
+	ApiAuditEvent,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody
 } from './types.js';
@@ -1771,5 +1773,57 @@ export function toTimelineEventCreateBody(
 			accent: submit.accent,
 			icon: submit.icon
 		}
+	};
+}
+
+function shortId(id: string | null | undefined): string {
+	if (!id) return '—';
+	return id.length > 8 ? `${id.slice(0, 8)}…` : id;
+}
+
+/** Humanize `resource.verb` action codes for the audit table. */
+export function auditActionLabel(action: string): string {
+	const trimmed = action.trim();
+	if (!trimmed) return '—';
+	return trimmed
+		.split(/[._]/)
+		.filter(Boolean)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(' ');
+}
+
+function auditActorLabel(row: ApiAuditEvent): string {
+	const named = row.metadata?.actor_name;
+	if (typeof named === 'string' && named.trim()) return named.trim();
+	const typeLabel =
+		row.actor_type === 'user'
+			? 'User'
+			: row.actor_type === 'agent'
+				? 'Agent'
+				: row.actor_type === 'api_key'
+					? 'API key'
+					: row.actor_type === 'system'
+						? 'System'
+						: row.actor_type || 'Actor';
+	if (row.actor_id) return `${typeLabel} · ${shortId(row.actor_id)}`;
+	return typeLabel;
+}
+
+function auditTargetLabel(row: ApiAuditEvent): string {
+	const type = row.resource_type?.trim() || 'resource';
+	if (!row.resource_id) return type;
+	return `${type} · ${shortId(row.resource_id)}`;
+}
+
+/** Map API audit row → FE table model. */
+export function toAuditLogListItem(row: ApiAuditEvent): AuditLogListItem {
+	return {
+		id: row.id,
+		occurredAt: formatTimelineOccurredAt(row.created_at),
+		actor: auditActorLabel(row),
+		event: auditActionLabel(row.action),
+		action: row.action,
+		target: auditTargetLabel(row),
+		ip: row.ip_address?.trim() ? row.ip_address : '—'
 	};
 }
