@@ -223,6 +223,8 @@
 				bind:value={$formData.dueOn}
 				disabled={readonly}
 				readonly={readonly}
+				min={$formData.issueOn}
+				presets={['today', 'plus7', 'endOfMonth']}
 			/>
 			{#if $errors.dueOn}<p class="text-destructive text-xs">{$errors.dueOn}</p>{/if}
 		</div>

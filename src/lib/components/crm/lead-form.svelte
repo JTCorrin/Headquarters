@@ -217,6 +217,7 @@
 			name="expectedCloseOn"
 			bind:value={$formData.expectedCloseOn}
 			aria-invalid={!!$errors.expectedCloseOn}
+			presets={['today', 'plus7', 'endOfMonth']}
 		/>
 		{#if $errors.expectedCloseOn}
 			<p class="text-destructive text-xs">{$errors.expectedCloseOn}</p>
