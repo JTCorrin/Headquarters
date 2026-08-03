@@ -12,6 +12,7 @@ import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
+import { handleMeetings } from './meetings.ts'
 import { handleRecurringInvoices } from './recurring-invoices.ts'
 import { handlePayments } from './payments.ts'
 import { handleVendors } from './vendors.ts'
@@ -93,6 +94,15 @@ function assertCanAccessTasks(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify tasks')
+  }
+}
+
+function assertCanAccessMeetings(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access meetings')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify meetings')
   }
 }
 
@@ -403,6 +413,18 @@ export default {
             orgId,
             membership.role,
             membership.id,
+            requestId,
+          )
+        }
+
+        if (path === '/api/v1/meetings' || path.startsWith('/api/v1/meetings/')) {
+          assertCanAccessMeetings(membership.role, req.method)
+          return await handleMeetings(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
             requestId,
           )
         }
