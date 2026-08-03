@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProductFormData } from '$lib/schemas/product.js';
+	import type { ProductFormData, ProductTaxRateOption } from '$lib/schemas/product.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProductsTable from './products-table.svelte';
@@ -18,6 +18,7 @@
 		navGroups: AppNavGroup[];
 		rows: ProductRow[];
 		form: SuperForm<ProductFormData>;
+		taxRateOptions?: ProductTaxRateOption[];
 		drawerOpen?: boolean;
 		viewState?: ResourceViewState;
 		/** When false, omit AppNav (shell already renders it at full window height). */
@@ -32,6 +33,7 @@
 		navGroups,
 		rows,
 		form,
+		taxRateOptions = [],
 		drawerOpen = $bindable(false),
 		viewState = { kind: 'ready' },
 		showNav = true,
@@ -73,7 +75,7 @@
 				description="Catalog and inventory for quote and invoice lines."
 			>
 				{#snippet actions()}
-					<ProductFormDrawer bind:open={drawerOpen} {form} {onValidSubmit}>
+					<ProductFormDrawer bind:open={drawerOpen} {form} {taxRateOptions} {onValidSubmit}>
 						{#snippet trigger()}
 							<Button type="button" size="sm">New product</Button>
 						{/snippet}

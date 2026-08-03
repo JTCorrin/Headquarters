@@ -1034,6 +1034,13 @@ export interface ApiMailboxTestResult {
 	message?: string | null;
 }
 
+/** Result of `POST /api/v1/me/mailbox/sync`. */
+export interface ApiMailboxSyncResult {
+	ok: boolean;
+	ingested: number;
+	error_code: string | null;
+}
+
 export type ApiAiProvider = 'openai' | 'anthropic' | 'google' | 'openrouter';
 
 export interface ApiAiIntegration {

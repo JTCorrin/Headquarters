@@ -302,13 +302,15 @@ describe('api mappers', () => {
 				productId: '',
 				description: 'Consulting',
 				qty: '1.5',
-				unitPrice: '12.50'
+				unitPrice: '12.50',
+				taxRatePercent: '20'
 			})
 		).toEqual({
 			product_id: null,
 			description: 'Consulting',
 			quantity: 1.5,
-			unit_price_cents: 1250
+			unit_price_cents: 1250,
+			tax_rate_percent: 20
 		});
 		expect(
 			lineItemRowsToInvoiceLineInputs([
@@ -337,13 +339,15 @@ describe('api mappers', () => {
 				productId: 'dddddddd-dddd-4eee-8fff-000000000001',
 				description: 'Catalog line',
 				qty: '3',
-				unitPrice: '12.00'
+				unitPrice: '12.00',
+				taxRatePercent: '20'
 			})
 		).toEqual({
 			product_id: 'dddddddd-dddd-4eee-8fff-000000000001',
 			description: 'Catalog line',
 			quantity: 3,
-			unit_price_cents: 1200
+			unit_price_cents: 1200,
+			tax_rate_percent: 20
 		});
 		expect(
 			toRecurringLineInput({
@@ -408,6 +412,7 @@ describe('api mappers', () => {
 				name: 'Widget',
 				description: '',
 				unitPrice: '25.00',
+				taxRateId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
 				trackStock: true,
 				stockQty: '4',
 				status: 'active'
@@ -419,6 +424,7 @@ describe('api mappers', () => {
 			product_type: 'product',
 			unit_price_cents: 2500,
 			currency: 'GBP',
+			tax_rate_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
 			track_stock: true,
 			status: 'active'
 		});
@@ -475,18 +481,20 @@ describe('api mappers', () => {
 				unit_price_cents: 2500,
 				cost_price_cents: null,
 				currency: 'GBP',
-				tax_rate_id: null,
+				tax_rate_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
 				track_stock: false,
 				stock_qty: 0,
 				low_stock_at: null,
 				status: 'active',
 				metadata: {}
-			})
+			}, [{ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', rate_percent: 20 }])
 		).toEqual({
 			id: 'dddddddd-dddd-4eee-8fff-000000000001',
 			sku: 'WID-1',
 			name: 'Widget',
-			unitPrice: '25'
+			unitPrice: '25',
+			taxRateId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+			taxRatePercent: '20'
 		});
 	});
 

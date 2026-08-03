@@ -15,7 +15,9 @@
 	} from '$lib/crm/personal-email-inbox.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import { describeMailboxSyncResult } from '$lib/schemas/mailbox.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import EntityEmailInbox from './entity-email-inbox.svelte';
@@ -45,6 +47,8 @@
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let syncPending = $state(false);
+	let syncFeedback = $state<string | null>(null);
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -141,6 +145,28 @@
 		}
 	}
 
+	async function onSyncMailbox() {
+		if (syncPending || !inbox.mailboxConnected) return;
+		const epoch = captureEpoch();
+		syncPending = true;
+		syncFeedback = null;
+		try {
+			const result = await api.mailbox.sync();
+			if (isStale(epoch)) return;
+			syncFeedback = describeMailboxSyncResult(result);
+			await loadAll();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			syncFeedback = userMessage(error, 'Could not sync mailbox.');
+			viewState = {
+				kind: 'validation',
+				message: syncFeedback
+			};
+		} finally {
+			syncPending = false;
+		}
+	}
+
 	async function onDraftResponse(payload: {
 		messageId: string;
 		tone: 'warm' | 'neutral' | 'firm';
@@ -226,8 +252,35 @@
 						<PageHeader
 							breadcrumb="Comms"
 							title="Email"
-							description="Your personal working inbox for this organisation."
-						/>
+							description="Your personal working inbox for this organisation. Contact Email tabs show address matches separately."
+						>
+							{#snippet actions()}
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									disabled={syncPending || !inbox.mailboxConnected}
+									title={
+										inbox.mailboxConnected
+											? 'Fetch new mail for your connected mailbox'
+											: 'Connect a mailbox under My settings → Mail first'
+									}
+									data-testid="email-inbox-sync"
+									onclick={() => void onSyncMailbox()}
+								>
+									{syncPending ? 'Syncing…' : 'Sync now'}
+								</Button>
+							{/snippet}
+						</PageHeader>
+						{#if syncFeedback}
+							<p
+								class="text-muted-foreground mb-2 text-xs"
+								role="status"
+								data-testid="email-inbox-sync-feedback"
+							>
+								{syncFeedback}
+							</p>
+						{/if}
 						<EntityEmailInbox
 							messages={inbox.messages}
 							emptyState={inbox.emptyState}

@@ -14,7 +14,11 @@
 	} from '$lib/api/v1/mappers.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import { productFormSchema, type ProductFormData } from '$lib/schemas/product.js';
+	import {
+		productFormSchema,
+		type ProductFormData,
+		type ProductTaxRateOption
+	} from '$lib/schemas/product.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { ProductRow } from './products-columns.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -47,11 +51,14 @@
 	let busy = $state(false);
 	let drawerOpen = $state(false);
 
+	let taxRateOptions = $state<ProductTaxRateOption[]>([]);
+
 	const emptyProductForm = (): ProductFormData => ({
 		sku: '',
 		name: '',
 		description: '',
 		unitPrice: '',
+		taxRateId: '',
 		trackStock: false,
 		stockQty: '',
 		status: 'active'
@@ -137,9 +144,18 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const listed = await api.products.list({ limit: 100 });
+			const [listed, rates] = await Promise.all([
+				api.products.list({ limit: 100 }),
+				api.taxRates.list({ limit: 100 })
+			]);
 			if (isStale(epoch)) return;
 
+			taxRateOptions = rates
+				.filter((r) => r.active && !r.deleted_at)
+				.map((r) => ({
+					id: r.id,
+					label: `${r.name} (${r.rate_percent}%)${r.is_default ? ' · default' : ''}`
+				}));
 			rows = listed.data.map(toProductRow);
 			viewState =
 				rows.length === 0
@@ -244,6 +260,7 @@
 					{navGroups}
 					{rows}
 					form={productForm}
+					{taxRateOptions}
 					bind:drawerOpen
 					{viewState}
 					onReload={loadAll}
