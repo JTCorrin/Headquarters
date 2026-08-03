@@ -83,6 +83,43 @@ function isSha256(value: string): boolean {
   return /^[a-f0-9]{64}$/.test(value)
 }
 
+/** Prefer `STORAGE_PUBLIC_URL`, else `PUBLIC_SUPABASE_URL`; trim trailing slash. */
+export function resolveStoragePublicBase(
+  getEnv: (key: string) => string | undefined = (key) => Deno.env.get(key),
+): string | null {
+  const raw = getEnv('STORAGE_PUBLIC_URL') ?? getEnv('PUBLIC_SUPABASE_URL')
+  const base = raw?.trim().replace(/\/+$/, '')
+  return base || null
+}
+
+/**
+ * Edge `SUPABASE_URL` is often an internal Docker host (`http://kong:8000`).
+ * Browsers need the LAN/public Kong origin from `STORAGE_PUBLIC_URL` or `PUBLIC_SUPABASE_URL`.
+ * When unset, return the signed URL unchanged (local CI / single-host).
+ */
+export function rewriteStorageSignedUrl(
+  signedUrl: string,
+  publicBaseUrl: string | null | undefined = undefined,
+): string {
+  const base = publicBaseUrl !== undefined
+    ? (publicBaseUrl?.trim().replace(/\/+$/, '') || null)
+    : resolveStoragePublicBase()
+  if (!base) return signedUrl
+
+  let signed: URL
+  let publicBase: URL
+  try {
+    signed = new URL(signedUrl)
+    publicBase = new URL(base)
+  } catch {
+    return signedUrl
+  }
+
+  signed.protocol = publicBase.protocol
+  signed.host = publicBase.host
+  return signed.toString()
+}
+
 function serviceRoleClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL')
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -290,7 +327,7 @@ async function createUploadIntent(
       data: {
         ...payload,
         upload: {
-          signed_url: signed.signedUrl,
+          signed_url: rewriteStorageSignedUrl(signed.signedUrl),
           token: signed.token,
           path: signed.path,
           expires_in: SIGNED_UPLOAD_SECONDS,
@@ -390,7 +427,7 @@ async function downloadDocument(
     {
       data: {
         document_id: doc.id,
-        signed_url: signed.signedUrl,
+        signed_url: rewriteStorageSignedUrl(signed.signedUrl),
         expires_in: SIGNED_DOWNLOAD_SECONDS,
         mime_type: doc.mime_type,
         name: doc.name,

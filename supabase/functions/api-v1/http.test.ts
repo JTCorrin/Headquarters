@@ -1,7 +1,12 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
-import { validateFolderCreateBody, validateUploadIntentBody } from './documents.ts'
+import {
+  resolveStoragePublicBase,
+  rewriteStorageSignedUrl,
+  validateFolderCreateBody,
+  validateUploadIntentBody,
+} from './documents.ts'
 import {
   ApiError,
   apiPath,
@@ -895,6 +900,37 @@ Deno.test('tax rate and profile preference validation', () => {
     () => validateProfilePreferencesBody({ theme_preference: 'neon' }),
     ApiError,
   )
+})
+
+Deno.test('rewriteStorageSignedUrl rewrites kong origin to public base', () => {
+  const kong =
+    'http://kong:8000/storage/v1/object/upload/sign/org-documents/org/x/doc.pdf?token=abc'
+  assertEquals(
+    rewriteStorageSignedUrl(kong, 'http://192.168.5.136:54321'),
+    'http://192.168.5.136:54321/storage/v1/object/upload/sign/org-documents/org/x/doc.pdf?token=abc',
+  )
+  assertEquals(
+    rewriteStorageSignedUrl(kong, 'http://192.168.5.136:54321/'),
+    'http://192.168.5.136:54321/storage/v1/object/upload/sign/org-documents/org/x/doc.pdf?token=abc',
+  )
+})
+
+Deno.test('rewriteStorageSignedUrl is a no-op when public base unset', () => {
+  const kong = 'http://kong:8000/storage/v1/object/sign/org-documents/y?token=z'
+  assertEquals(rewriteStorageSignedUrl(kong, null), kong)
+  assertEquals(rewriteStorageSignedUrl(kong, ''), kong)
+  assertEquals(rewriteStorageSignedUrl(kong, '   '), kong)
+})
+
+Deno.test('resolveStoragePublicBase prefers STORAGE_PUBLIC_URL over PUBLIC_SUPABASE_URL', () => {
+  const env: Record<string, string> = {
+    PUBLIC_SUPABASE_URL: 'http://192.168.5.136:54321',
+    STORAGE_PUBLIC_URL: 'http://files.example.test:9000',
+  }
+  assertEquals(resolveStoragePublicBase((key) => env[key]), 'http://files.example.test:9000')
+  delete env.STORAGE_PUBLIC_URL
+  assertEquals(resolveStoragePublicBase((key) => env[key]), 'http://192.168.5.136:54321')
+  assertEquals(resolveStoragePublicBase(() => undefined), null)
 })
 
 Deno.test('document upload intent validation defaults and rejects bad digests/sizes', () => {
