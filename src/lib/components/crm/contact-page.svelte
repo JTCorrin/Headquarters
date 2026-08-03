@@ -280,6 +280,9 @@
 						smtpReady={emailTab.smtpReady}
 						{role}
 						{sharingId}
+						documentsApi={api}
+						documentsEntityId={contact.id}
+						documentsReloadKey={session.cacheGeneration}
 						{onAddToTimeline}
 						{onDraftResponse}
 						{onUseSuggestion}

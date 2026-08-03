@@ -26,6 +26,12 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/recurring-invoices/abc')).toBe(true);
 		expect(requiresSelectedOrg('/bills')).toBe(true);
 		expect(requiresSelectedOrg('/bills/abc')).toBe(true);
+		expect(requiresSelectedOrg('/payments')).toBe(true);
+		expect(requiresSelectedOrg('/payments/abc')).toBe(true);
+		expect(requiresSelectedOrg('/products')).toBe(true);
+		expect(requiresSelectedOrg('/products/abc')).toBe(true);
+		expect(requiresSelectedOrg('/documents')).toBe(true);
+		expect(requiresSelectedOrg('/documents/abc')).toBe(true);
 		expect(requiresSelectedOrg('/leads')).toBe(true);
 		expect(requiresSelectedOrg('/leads/abc')).toBe(true);
 		expect(requiresSelectedOrg('/clients')).toBe(true);
