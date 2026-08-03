@@ -3,9 +3,11 @@ import { createApiV1Client } from './client.js';
 import {
 	createDocumentWorkspaceController,
 	formatDocumentSizeLabel,
+	isInlineDocumentPreview,
 	mapBrowseToWorkspaceView,
 	sha256Hex
 } from './document-workspace-controller.svelte.js';
+import { sha256HexSync } from '$lib/crypto/sha256-hex.js';
 import { createMockFetch } from './mock-fetch.js';
 import type { ApiDocumentBrowseResult } from './types.js';
 
@@ -91,6 +93,36 @@ describe('document workspace helpers', () => {
 		expect(digest).toBe(
 			'2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
 		);
+	});
+
+	it('hashes via pure-JS when crypto.subtle is undefined', async () => {
+		const bytes = new TextEncoder().encode('hello');
+		const expected = sha256HexSync(bytes);
+		const originalCrypto = globalThis.crypto;
+		Object.defineProperty(globalThis, 'crypto', {
+			configurable: true,
+			value: { ...(originalCrypto ?? {}), subtle: undefined }
+		});
+		try {
+			const digest = await sha256Hex(bytes.buffer);
+			expect(digest).toBe(expected);
+			expect(digest).toBe(
+				'2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
+			);
+		} finally {
+			Object.defineProperty(globalThis, 'crypto', {
+				configurable: true,
+				value: originalCrypto
+			});
+		}
+	});
+
+	it('classifies inline preview mime types', () => {
+		expect(isInlineDocumentPreview('application/pdf')).toBe(true);
+		expect(isInlineDocumentPreview('image/png')).toBe(true);
+		expect(isInlineDocumentPreview('image/jpeg; charset=binary')).toBe(true);
+		expect(isInlineDocumentPreview('application/zip')).toBe(false);
+		expect(isInlineDocumentPreview(null)).toBe(false);
 	});
 
 	it('maps browse payload onto DocumentWorkspace view models', () => {
@@ -353,5 +385,81 @@ describe('createDocumentWorkspaceController', () => {
 			expect(controller.uploads[0]?.status).toBe('complete');
 		});
 		expect(intentCalls).toBe(2);
+	});
+
+	it('opens inline preview state for PDF downloads', async () => {
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/entities/client/${ENTITY_ID}/documents`]: async () => ({
+				body: { data: sampleBrowse }
+			}),
+			[`GET /api/v1/documents/${DOC_ID}/download`]: async () => ({
+				body: {
+					data: {
+						document_id: DOC_ID,
+						signed_url: 'https://storage.example.test/get-msa.pdf',
+						expires_in: 60,
+						mime_type: 'application/pdf',
+						name: 'msa.pdf'
+					}
+				}
+			})
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const controller = createDocumentWorkspaceController({
+			client,
+			entityType: 'client',
+			entityId: ENTITY_ID
+		});
+
+		await vi.waitFor(() => expect(controller.view.kind).toBe('ready'));
+		await controller.preview(DOC_ID);
+		expect(controller.previewState).toEqual({
+			documentId: DOC_ID,
+			url: 'https://storage.example.test/get-msa.pdf',
+			name: 'msa.pdf',
+			mimeType: 'application/pdf'
+		});
+		controller.closePreview();
+		expect(controller.previewState).toBeNull();
+	});
+
+	it('opens a new tab for unsupported preview mime types', async () => {
+		const openSpy = vi.fn(() => null);
+		vi.stubGlobal('window', { open: openSpy });
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/entities/client/${ENTITY_ID}/documents`]: async () => ({
+				body: { data: sampleBrowse }
+			}),
+			[`GET /api/v1/documents/${DOC_ID}/download`]: async () => ({
+				body: {
+					data: {
+						document_id: DOC_ID,
+						signed_url: 'https://storage.example.test/get-msa.zip',
+						expires_in: 60,
+						mime_type: 'application/zip',
+						name: 'msa.zip'
+					}
+				}
+			})
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const controller = createDocumentWorkspaceController({
+			client,
+			entityType: 'client',
+			entityId: ENTITY_ID
+		});
+
+		await vi.waitFor(() => expect(controller.view.kind).toBe('ready'));
+		await controller.preview(DOC_ID);
+		expect(controller.previewState).toBeNull();
+		expect(openSpy).toHaveBeenCalledWith(
+			'https://storage.example.test/get-msa.zip',
+			'_blank',
+			'noopener,noreferrer'
+		);
+		vi.unstubAllGlobals();
 	});
 });

@@ -27,8 +27,10 @@ export type {
 export {
 	createDocumentWorkspaceController,
 	formatDocumentSizeLabel,
+	isInlineDocumentPreview,
 	mapBrowseToWorkspaceView,
 	sha256Hex,
+	type DocumentPreviewState,
 	type DocumentWorkspaceController,
 	type DocumentWorkspaceControllerOptions
 } from './document-workspace-controller.svelte.js';

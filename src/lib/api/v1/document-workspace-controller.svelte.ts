@@ -7,6 +7,7 @@ import type {
 	DocumentWorkspaceView,
 	EntityDocumentsProps
 } from '$lib/components/crm/entity-documents.svelte';
+import { digestBytesToHex, sha256HexSync } from '$lib/crypto/sha256-hex.js';
 import type { ApiV1Client } from './client.js';
 import { isApiClientError } from './errors.js';
 import type {
@@ -24,6 +25,21 @@ interface CachedEntryMeta {
 	version: number;
 	/** Link version — required for document move If-Match. */
 	linkVersion?: number;
+}
+
+/** Inline preview target for image/* and application/pdf. */
+export type DocumentPreviewState = {
+	documentId: string;
+	url: string;
+	name: string;
+	mimeType: string;
+};
+
+/** True when Preview should open an in-app lightbox instead of a new tab. */
+export function isInlineDocumentPreview(mimeType: string | null | undefined): boolean {
+	if (!mimeType) return false;
+	const mime = mimeType.toLowerCase().split(';')[0]?.trim() ?? '';
+	return mime.startsWith('image/') || mime === 'application/pdf';
 }
 
 export interface DocumentWorkspaceControllerOptions {
@@ -45,7 +61,9 @@ export interface DocumentWorkspaceController {
 	readonly uploads: DocumentUploadItem[];
 	readonly moveTargets: DocumentMoveTarget[];
 	readonly folderId: string | null;
+	readonly previewState: DocumentPreviewState | null;
 	setViewMode(mode: DocumentViewMode): void;
+	closePreview(): void;
 	refresh(): Promise<void>;
 	navigate(folderId: string | null): Promise<void>;
 	uploadFiles(files: File[]): void;
@@ -86,9 +104,27 @@ export function formatDocumentSizeLabel(sizeBytes: number): string {
 	return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
 }
 
+/**
+ * SHA-256 as lowercase hex. Uses `crypto.subtle` in secure contexts; falls back to
+ * pure-JS SHA-256 when subtle is missing (plain HTTP staging / LAN demos).
+ */
 export async function sha256Hex(data: ArrayBuffer): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', data);
-	return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+	const subtle = globalThis.crypto?.subtle;
+	if (subtle && typeof subtle.digest === 'function') {
+		try {
+			const digest = await subtle.digest('SHA-256', data);
+			return digestBytesToHex(digest);
+		} catch {
+			// Fall through to pure-JS (some environments expose a broken subtle).
+		}
+	}
+	try {
+		return sha256HexSync(data);
+	} catch {
+		throw new Error(
+			'SHA-256 is unavailable in this browser. Open the app over HTTPS (or localhost), or try another browser.'
+		);
+	}
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -192,6 +228,7 @@ export function createDocumentWorkspaceController(
 	let moveTargets = $state<DocumentMoveTarget[]>([{ id: null, name: 'Entity root' }]);
 	let folderId = $state<string | null>(null);
 	let breadcrumbs = $state<DocumentBreadcrumb[]>([{ id: null, name: 'Documents' }]);
+	let previewState = $state<DocumentPreviewState | null>(null);
 	let metaById = new Map<string, CachedEntryMeta>();
 	const pendingByUploadId = new Map<string, PendingUpload>();
 	let loadGeneration = 0;
@@ -454,13 +491,26 @@ export function createDocumentWorkspaceController(
 		if (!meta || meta.kind !== 'file') return;
 		try {
 			const result = await docs.download(id);
-			if (typeof document !== 'undefined' && mode === 'download') {
-				const anchor = document.createElement('a');
-				anchor.href = result.signed_url;
-				anchor.download = result.name;
-				anchor.rel = 'noopener';
-				anchor.click();
-			} else if (typeof window !== 'undefined') {
+			if (mode === 'download') {
+				if (typeof document !== 'undefined') {
+					const anchor = document.createElement('a');
+					anchor.href = result.signed_url;
+					anchor.download = result.name;
+					anchor.rel = 'noopener';
+					anchor.click();
+				}
+				return;
+			}
+			if (isInlineDocumentPreview(result.mime_type)) {
+				previewState = {
+					documentId: id,
+					url: result.signed_url,
+					name: result.name,
+					mimeType: result.mime_type
+				};
+				return;
+			}
+			if (typeof window !== 'undefined') {
 				window.open(result.signed_url, '_blank', 'noopener,noreferrer');
 			}
 		} catch (error) {
@@ -510,8 +560,14 @@ export function createDocumentWorkspaceController(
 		get folderId() {
 			return folderId;
 		},
+		get previewState() {
+			return previewState;
+		},
 		setViewMode(mode) {
 			viewMode = mode;
+		},
+		closePreview() {
+			previewState = null;
 		},
 		refresh: () => load(folderId),
 		navigate,
