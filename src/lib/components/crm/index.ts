@@ -87,6 +87,7 @@ export { default as BillsListPage } from './bills-list-page.svelte';
 export { default as BillsPage } from './bills-page.svelte';
 export { default as BillPage } from './bill-page.svelte';
 export { default as BillDetailPage } from './bill-detail-page.svelte';
+export { default as BillSourceAttachment } from './bill-source-attachment.svelte';
 export { default as VendorForm } from './vendor-form.svelte';
 export { default as VendorFormDrawer } from './vendor-form-drawer.svelte';
 export { default as VendorPicker } from './vendor-picker.svelte';
