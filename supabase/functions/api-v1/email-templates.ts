@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, EmailTemplateInsert, EmailTemplateRow, MembershipRow } from '../_shared/database.ts'
+import type {
+  Database,
+  EmailTemplateInsert,
+  EmailTemplateRow,
+  MembershipRow,
+} from '../_shared/database.ts'
 import {
   ApiError,
   etag,
