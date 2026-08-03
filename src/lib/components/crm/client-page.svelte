@@ -352,6 +352,9 @@
 						smtpReady={emailTab.smtpReady}
 						{role}
 						{sharingId}
+						documentsApi={api}
+						documentsEntityId={client.id}
+						documentsReloadKey={session.cacheGeneration}
 						{onAddToTimeline}
 						{onDraftResponse}
 						{onUseSuggestion}
