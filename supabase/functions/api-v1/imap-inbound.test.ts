@@ -5,15 +5,37 @@ import {
   formatImapSinceDate,
   IMAP_CONNECT_TIMEOUT_MS,
   IMAP_FETCH_BATCH_SIZE,
+  type ImapByteConn,
   ImapSyncError,
   isSyntheticImapHost,
   parseAddressList,
   parseHeaderBlock,
   probeImap,
+  runImapCommandForTests,
   safeMailboxSyncFailureMessage,
   setOpenImapConnectionForTests,
   withImapTimeout,
 } from '../_shared/imap-inbound.ts'
+
+/** Scripted IMAP server bytes for one command (tag A0001). */
+function scriptedConn(responseUtf8: string): ImapByteConn {
+  const encoder = new TextEncoder()
+  const inbound = encoder.encode(responseUtf8)
+  let offset = 0
+  return {
+    read(p: Uint8Array) {
+      if (offset >= inbound.length) return Promise.resolve(null)
+      const n = Math.min(p.length, inbound.length - offset)
+      p.set(inbound.subarray(offset, offset + n))
+      offset += n
+      return Promise.resolve(n)
+    },
+    write(p: Uint8Array) {
+      return Promise.resolve(p.length)
+    },
+    close() {},
+  }
+}
 
 Deno.test('isSyntheticImapHost matches *.example.test only', () => {
   assertEquals(isSyntheticImapHost('imap.example.test'), true)
@@ -131,12 +153,34 @@ Deno.test('probeImap maps LOGIN NO to imap_auth_failed', async () => {
   }
 })
 
-Deno.test('chunkUids batches into groups of 1–5 (default 5)', () => {
-  assertEquals(IMAP_FETCH_BATCH_SIZE, 5)
+Deno.test('chunkUids batches into groups of 1–5 (default 1 until stable)', () => {
+  assertEquals(IMAP_FETCH_BATCH_SIZE, 1)
+  assertEquals(chunkUids([10, 11, 12]), [[10], [11], [12]])
   assertEquals(chunkUids([1, 2, 3, 4, 5, 6, 7], 5), [[1, 2, 3, 4, 5], [6, 7]])
-  assertEquals(chunkUids([10, 11, 12], 1), [[10], [11], [12]])
   assertEquals(chunkUids([1, 2, 3, 4, 5, 6], 99), [[1, 2, 3, 4, 5], [6]])
   assertEquals(chunkUids([], 5), [])
+})
+
+Deno.test('Dovecot-style FETCH literals: no phantom post-literal CRLF', async () => {
+  // Wire: {n}CRLF + n octets, then continuation immediately (no extra CRLF after literal).
+  const header = 'From: a@b\r\n' // 12 octets
+  const text = 'Hello world' // 11 octets
+  const response = `* 1 FETCH (UID 9 BODY[HEADER.FIELDS (FROM)] {${header.length}}\r\n` +
+    `${header} BODY[TEXT]<0.100> {${text.length}}\r\n` +
+    `${text})\r\n` +
+    `A0001 OK FETCH completed\r\n`
+
+  const result = await runImapCommandForTests(
+    scriptedConn(response),
+    'UID FETCH 9 (BODY.PEEK[])',
+    'IMAP FETCH',
+    2_000,
+  )
+  assertEquals(result.status, 'OK')
+
+  const combined = result.untagged.join('\n')
+  assertEquals(extractBodyLiteral(combined, 'HEADER.FIELDS'), header)
+  assertEquals(extractBodyLiteral(combined, 'TEXT'), text)
 })
 
 Deno.test('safeMailboxSyncFailureMessage keeps select/search/fetch distinct', () => {

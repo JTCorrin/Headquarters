@@ -65,8 +65,11 @@ export class ImapSyncError extends Error {
   }
 }
 
-/** Max UIDs per UID FETCH command (keeps each command under the command deadline). */
-export const IMAP_FETCH_BATCH_SIZE = 5
+/**
+ * Max UIDs per UID FETCH command (keeps each command under the command deadline).
+ * Held at 1 until Mailcow/Dovecot FETCH literal framing is proven stable in staging.
+ */
+export const IMAP_FETCH_BATCH_SIZE = 1
 
 /** Split UIDs into batches of 1–5 (default {@link IMAP_FETCH_BATCH_SIZE}). */
 export function chunkUids(uids: number[], batchSize = IMAP_FETCH_BATCH_SIZE): number[][] {
@@ -250,10 +253,30 @@ function quoteImapString(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
-type ByteConn = {
+export type ImapByteConn = {
   read(p: Uint8Array): Promise<number | null>
   write(p: Uint8Array): Promise<number>
   close(): void
+}
+
+type ByteConn = ImapByteConn
+
+/**
+ * Test helper: run one IMAP command against a scripted byte stream.
+ * Caller supplies the server response (no greeting); first tag is A0001.
+ */
+export async function runImapCommandForTests(
+  conn: ImapByteConn,
+  payload: string,
+  label = 'IMAP FETCH',
+  commandTimeoutMs = 5_000,
+): Promise<{ status: string; text: string; untagged: string[] }> {
+  const session = new ImapSession(conn, commandTimeoutMs)
+  try {
+    return await session.command(payload, label)
+  } finally {
+    session.close()
+  }
 }
 
 class ImapSession {
@@ -338,9 +361,9 @@ class ImapSession {
       const literalMatch = line.match(/\{(\d+)\}$/)
       if (literalMatch) {
         const size = Number(literalMatch[1])
+        // RFC 3501: `{n} CRLF` then exactly n octets; response continues immediately
+        // (often `)` or the next BODY token). Do NOT consume a phantom post-literal CRLF.
         const literal = await this.readExact(size)
-        // Consume CRLF after literal body (IMAP wire format)
-        await this.readExact(2)
         line = `${line}\n${this.decoder.decode(literal)}`
         untagged.push(line)
         continue
