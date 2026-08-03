@@ -72,6 +72,12 @@ Billing contact still needs to be set up on the Northwind account.`;
 				status="Scheduled"
 				when="Today · 15:00–15:45"
 				relatedTo="Northwind"
+				scheduleFields={[
+					{ label: 'When', value: 'Today · 15:00–15:45' },
+					{ label: 'Timezone', value: 'Europe/London' },
+					{ label: 'Location', value: 'Boardroom' },
+					{ label: 'Related', value: 'Northwind' }
+				]}
 				attendeeFields={[
 					{ label: 'Primary', value: 'Ava Chen · ava@northwind.com' },
 					{ label: 'Internal', value: 'Joe' },

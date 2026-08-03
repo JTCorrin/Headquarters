@@ -23,10 +23,15 @@
 		status: string;
 		when: string;
 		relatedTo: string;
+		/** Schedule metadata (when, timezone, location, URL, related). */
+		scheduleFields?: InfoCardField[];
 		attendeeFields: InfoCardField[];
 		transcript?: string;
 		summary?: string;
 		proposedTasks?: ProposedMeetingTask[];
+		/** When false, omit AppNav (shell already renders it). */
+		showNav?: boolean;
+		/** M1: leave unset so transcript/AI chrome stays inert. */
 		onUploadTranscript?: () => void;
 		onGenerateSummary?: () => void;
 		onAcceptTask?: (id: string) => void;
@@ -41,20 +46,32 @@
 		status = 'Scheduled',
 		when,
 		relatedTo,
+		scheduleFields = [],
 		attendeeFields,
 		transcript = '',
 		summary = '',
 		proposedTasks = $bindable<ProposedMeetingTask[]>([]),
+		showNav = true,
 		onUploadTranscript,
 		onGenerateSummary,
 		onAcceptTask,
 		onAcceptAllTasks,
 		class: className
 	}: MeetingWorkspacePageProps = $props();
+
+	const aiEnabled = $derived(Boolean(onUploadTranscript || onGenerateSummary));
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -65,7 +82,12 @@
 				description="{when} · {relatedTo}"
 			>
 				{#snippet actions()}
-					<Button variant="outline" size="sm" onclick={() => onUploadTranscript?.()}>
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={!onUploadTranscript}
+						onclick={() => onUploadTranscript?.()}
+					>
 						<UploadIcon class="size-3.5" />
 						Upload transcript
 					</Button>
@@ -73,6 +95,7 @@
 						label="Generate summary"
 						variant="secondary"
 						size="default"
+						disabled={!onGenerateSummary}
 						onclick={() => onGenerateSummary?.()}
 					/>
 				{/snippet}
@@ -80,6 +103,9 @@
 
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
 				<div class="space-y-6">
+					{#if scheduleFields.length}
+						<InfoCard title="Schedule" fields={scheduleFields} />
+					{/if}
 					<InfoCard title="Attendees" fields={attendeeFields} />
 
 					<section
@@ -98,13 +124,23 @@
 								class="bg-muted/50 max-h-72 overflow-y-auto rounded-2xl p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap">{transcript}</pre>
 						{:else}
 							<p class="text-muted-foreground text-sm">
-								Upload a transcript file or pull from a transcription service. Storybook mocks the
-								upload.
+								{#if aiEnabled}
+									Upload a transcript file or pull from a transcription service.
+								{:else}
+									Transcript upload arrives in a later slice — schedule and attendees are live now.
+								{/if}
 							</p>
-							<Button type="button" variant="outline" size="sm" onclick={() => onUploadTranscript?.()}>
-								<UploadIcon class="size-3.5" />
-								Add transcript
-							</Button>
+							{#if onUploadTranscript}
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onclick={() => onUploadTranscript?.()}
+								>
+									<UploadIcon class="size-3.5" />
+									Add transcript
+								</Button>
+							{/if}
 						{/if}
 					</section>
 				</div>
@@ -127,7 +163,11 @@
 							</div>
 						{:else}
 							<p class="text-muted-foreground text-sm">
-								Generate a summary once a transcript is attached. Action items land below.
+								{#if aiEnabled}
+									Generate a summary once a transcript is attached. Action items land below.
+								{:else}
+									AI summary stays empty until the meeting assistant slice.
+								{/if}
 							</p>
 						{/if}
 					</section>
@@ -137,7 +177,7 @@
 					>
 						<div class="flex items-center justify-between gap-2">
 							<h2 class="text-sm font-semibold tracking-tight">Proposed tasks</h2>
-							{#if proposedTasks.length}
+							{#if proposedTasks.length && onAcceptAllTasks}
 								<Button type="button" size="sm" variant="outline" onclick={() => onAcceptAllTasks?.()}>
 									Accept all
 								</Button>
@@ -168,7 +208,7 @@
 										</div>
 										{#if task.accepted}
 											<StatusBadge status="Done" />
-										{:else}
+										{:else if onAcceptTask}
 											<Button
 												type="button"
 												size="sm"
