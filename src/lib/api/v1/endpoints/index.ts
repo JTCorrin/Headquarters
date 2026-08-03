@@ -1,3 +1,4 @@
+export { createAuditEventsEndpoints } from './audit-events.js';
 export { createRecurringInvoiceSchedulesEndpoints } from './recurring-invoice-schedules.js';
 export { createBillsEndpoints } from './bills.js';
 export { createClientsEndpoints } from './clients.js';
@@ -20,6 +21,7 @@ export { createTaxRatesEndpoints } from './tax-rates.js';
 export { createTimelineEventsEndpoints } from './timeline-events.js';
 export { createVendorsEndpoints } from './vendors.js';
 export type {
+	AuditEventsEndpoints,
 	BillsEndpoints,
 	ClientsEndpoints,
 	ContactsEndpoints,

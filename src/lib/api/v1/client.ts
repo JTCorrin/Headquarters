@@ -1,4 +1,5 @@
 import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { createAuditEventsEndpoints } from './endpoints/audit-events.js';
 import { createRecurringInvoiceSchedulesEndpoints } from './endpoints/recurring-invoice-schedules.js';
 import { createBillsEndpoints } from './endpoints/bills.js';
 import { createClientsEndpoints } from './endpoints/clients.js';
@@ -21,6 +22,7 @@ import { createTasksEndpoints } from './endpoints/tasks.js';
 import { createTimelineEventsEndpoints } from './endpoints/timeline-events.js';
 import { createVendorsEndpoints } from './endpoints/vendors.js';
 import type {
+	AuditEventsEndpoints,
 	BillsEndpoints,
 	ClientsEndpoints,
 	ContactsEndpoints,
@@ -85,6 +87,7 @@ export interface ApiV1Client {
 	emailMessages: EmailMessagesEndpoints;
 	emailTemplates: EmailTemplatesEndpoints;
 	timelineEvents: TimelineEventsEndpoints;
+	auditEvents: AuditEventsEndpoints;
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
@@ -268,6 +271,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		documents: createDocumentsEndpoints(request),
 		emailMessages: createEmailMessagesEndpoints(request),
 		emailTemplates: createEmailTemplatesEndpoints(request),
-		timelineEvents: createTimelineEventsEndpoints(request)
+		timelineEvents: createTimelineEventsEndpoints(request),
+		auditEvents: createAuditEventsEndpoints(request)
 	};
 }

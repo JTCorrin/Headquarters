@@ -1,6 +1,7 @@
 import type { AppNavGroup } from '$lib/components/crm/app-nav.svelte';
 import type { MembershipRole } from '$lib/schemas/organisation.js';
 import {
+	canAccessAuditLog,
 	canAccessOrgConfigRoutes,
 	canAccessPersonalConfig
 } from '$lib/schemas/organisation.js';
@@ -17,6 +18,13 @@ export function appNavGroups(
 			{ label: 'Config', href: '/org/config', active: mark('Config') },
 			{ label: 'Integrations', href: '/org/integrations', active: mark('Integrations') }
 		);
+	}
+	if (canAccessAuditLog(role)) {
+		organisationItems.push({
+			label: 'Audit log',
+			href: '/org/audit-log',
+			active: mark('Audit log')
+		});
 	}
 	if (canAccessPersonalConfig(role)) {
 		organisationItems.push({
