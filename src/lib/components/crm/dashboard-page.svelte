@@ -39,6 +39,9 @@
 		upcomingMeetings?: DashboardMeeting[];
 		recentActivity: TimelineEvent[];
 		onToggleTask?: (id: string) => void;
+		onSelectTask?: (id: string) => void;
+		/** When false, omit AppNav (shell already renders it at full window height). */
+		showNav?: boolean;
 		class?: string;
 	}
 
@@ -51,12 +54,22 @@
 		upcomingMeetings = [],
 		recentActivity,
 		onToggleTask,
+		onSelectTask,
+		showNav = true,
 		class: className
 	}: DashboardPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -66,7 +79,6 @@
 				description="Your pulse for the day — tasks, money that needs a nudge, and what’s coming up."
 			>
 				{#snippet actions()}
-					<Button variant="outline" size="sm">Quick create</Button>
 					<Button size="sm" href="/tasks">New task</Button>
 				{/snippet}
 			</PageHeader>
@@ -78,7 +90,12 @@
 			</div>
 
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.85fr)]">
-				<MyTasksPanel tasks={myTasks} onToggleDone={onToggleTask} class="self-start" />
+				<MyTasksPanel
+					tasks={myTasks}
+					onToggleDone={onToggleTask}
+					{onSelectTask}
+					class="self-start"
+				/>
 
 				<div class="space-y-6">
 					<section
@@ -138,6 +155,7 @@
 			<Timeline
 				events={recentActivity}
 				title="Recent activity"
+				emptyMessage="No org-wide activity feed yet — open a record to see its timeline."
 				class="bg-card rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 			/>
 		</div>
