@@ -30,6 +30,9 @@ export function requiresSelectedOrg(pathname: string): boolean {
 	if (pathname === '/recurring-invoices' || pathname.startsWith('/recurring-invoices/'))
 		return true;
 	if (pathname === '/bills' || pathname.startsWith('/bills/')) return true;
+	if (pathname === '/payments' || pathname.startsWith('/payments/')) return true;
+	if (pathname === '/products' || pathname.startsWith('/products/')) return true;
+	if (pathname === '/documents' || pathname.startsWith('/documents/')) return true;
 	if (pathname === '/leads' || pathname.startsWith('/leads/')) return true;
 	if (pathname === '/clients' || pathname.startsWith('/clients/')) return true;
 	if (pathname === '/tasks' || pathname.startsWith('/tasks/')) return true;
