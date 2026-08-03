@@ -16,6 +16,7 @@
 		toRecurringInvoiceFormData,
 		toRecurringInvoiceRunListItem,
 		toRecurringInvoiceUpdateBody,
+		toRecurringLineFormData,
 		toRecurringLineInput,
 		type RecurringLineRow
 	} from '$lib/api/v1/mappers.js';
@@ -28,7 +29,8 @@
 		recurringLineFormSchema,
 		type RecurringInvoiceClientOption,
 		type RecurringInvoiceContactOption,
-		type RecurringInvoiceRunListItem
+		type RecurringInvoiceRunListItem,
+		type RecurringLineFormData
 	} from '$lib/schemas/recurring-invoice.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -71,6 +73,87 @@
 	let actionPending = $state(false);
 	let actionError = $state<string | null>(null);
 	let lineDrawerOpen = $state(false);
+	/** When set, line drawer updates this index instead of appending. */
+	let lineEditIndex = $state<number | null>(null);
+
+	const LINE_API_TO_FORM: Record<string, keyof RecurringLineFormData> = {
+		quantity: 'qty',
+		tax_rate_percent: 'taxRatePercent',
+		unit_price_cents: 'unitPrice',
+		description_template: 'descriptionTemplate',
+		product_id: 'productId'
+	};
+
+	const SCHEDULE_API_TO_FORM: Record<string, string> = {
+		name: 'name',
+		client_id: 'clientId',
+		contact_id: 'contactId',
+		currency: 'currency',
+		frequency: 'frequency',
+		interval_count: 'intervalCount',
+		anchor_on: 'anchorOn',
+		day_of_month: 'dayOfMonth',
+		month_of_year: 'monthOfYear',
+		month_end_policy: 'monthEndPolicy',
+		timezone: 'timezone',
+		local_run_time: 'localRunTime',
+		start_on: 'startOn',
+		end_on: 'endOn',
+		max_occurrences: 'maxOccurrences',
+		due_days: 'dueDays',
+		delivery_mode: 'deliveryMode',
+		pricing_mode: 'pricingMode',
+		catch_up_policy: 'catchUpPolicy',
+		max_catch_up_runs: 'maxCatchUpRuns',
+		purchase_order_number: 'purchaseOrderNumber',
+		payment_terms: 'paymentTerms',
+		notes: 'notes',
+		internal_notes: 'internalNotes'
+	};
+
+	function applyApiFieldsToForms(fields: Record<string, string>) {
+		const scheduleErrors: Record<string, string> = {};
+		const lineBuckets = new Map<number, Partial<Record<keyof RecurringLineFormData, string>>>();
+
+		for (const [key, message] of Object.entries(fields)) {
+			const lineMatch = /^lines\.(\d+)\.([a-z_]+)$/.exec(key);
+			if (lineMatch) {
+				const idx = Number(lineMatch[1]);
+				const formKey = LINE_API_TO_FORM[lineMatch[2]];
+				if (!formKey) continue;
+				const bucket = lineBuckets.get(idx) ?? {};
+				bucket[formKey] = message;
+				lineBuckets.set(idx, bucket);
+				continue;
+			}
+			const scheduleKey = SCHEDULE_API_TO_FORM[key];
+			if (scheduleKey) scheduleErrors[scheduleKey] = message;
+		}
+
+		if (Object.keys(scheduleErrors).length > 0) {
+			scheduleForm.errors.update((current) => ({
+				...current,
+				...Object.fromEntries(
+					Object.entries(scheduleErrors).map(([field, msg]) => [field, msg])
+				)
+			}));
+		}
+
+		if (lineBuckets.size > 0) {
+			const [idx, lineErrors] = [...lineBuckets.entries()].sort(([a], [b]) => a - b)[0]!;
+			const row = lines[idx];
+			if (row) {
+				lineEditIndex = idx;
+				lineForm.form.set(toRecurringLineFormData(row));
+				lineForm.errors.set(
+					Object.fromEntries(
+						Object.entries(lineErrors).map(([field, msg]) => [field, msg])
+					) as never
+				);
+				lineDrawerOpen = true;
+			}
+		}
+	}
 
 	const scheduleForm = superForm(
 		defaults(emptyRecurringInvoiceFormData(), zod4(recurringInvoiceFormSchema)),
@@ -146,8 +229,8 @@
 				return error.message || 'Schedule changed elsewhere — reload and try again.';
 			}
 			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
+				// Prefer Superforms field placement — do not join opaque banners.
+				return error.message || fallback;
 			}
 			return error.message || fallback;
 		}
@@ -295,9 +378,18 @@
 			if (isStale(epoch)) return false;
 			applyDocument(updated);
 			actionError = null;
+			lineEditIndex = null;
 			return true;
 		} catch (error) {
 			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isValidationError && error.fields) {
+				applyApiFieldsToForms(error.fields);
+				actionError = userMessage(
+					error,
+					'Could not save schedule — fix the highlighted fields.'
+				);
+				return false;
+			}
 			actionError = userMessage(error, 'Could not save schedule.');
 			return false;
 		}
@@ -365,10 +457,6 @@
 	}
 
 	async function onAddLine(): Promise<boolean> {
-		const id =
-			typeof crypto !== 'undefined' && 'randomUUID' in crypto
-				? crypto.randomUUID()
-				: `line-${Date.now()}`;
 		const data = get(lineForm.form);
 		try {
 			toRecurringLineInput(data);
@@ -376,17 +464,25 @@
 			actionError = 'Invalid line values.';
 			return false;
 		}
-		lines = [
-			...lines,
-			{
-				id,
-				productId: data.productId || null,
-				descriptionTemplate: data.descriptionTemplate,
-				qty: data.qty,
-				unitPrice: data.unitPrice,
-				taxRatePercent: data.taxRatePercent || '0'
-			}
-		];
+		const nextRow: RecurringLineRow = {
+			id:
+				lineEditIndex != null && lines[lineEditIndex]
+					? lines[lineEditIndex]!.id
+					: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+						? crypto.randomUUID()
+						: `line-${Date.now()}`,
+			productId: data.productId || null,
+			descriptionTemplate: data.descriptionTemplate,
+			qty: data.qty,
+			unitPrice: data.unitPrice,
+			taxRatePercent: data.taxRatePercent || '0'
+		};
+		if (lineEditIndex != null && lines[lineEditIndex]) {
+			lines = lines.map((row, index) => (index === lineEditIndex ? nextRow : row));
+		} else {
+			lines = [...lines, nextRow];
+		}
+		lineEditIndex = null;
 		lineForm.form.set({
 			productId: '',
 			descriptionTemplate: '',
@@ -394,7 +490,9 @@
 			unitPrice: '0',
 			taxRatePercent: ''
 		});
+		lineForm.errors.set({});
 		lineDrawerOpen = false;
+		actionError = null;
 		return true;
 	}
 
@@ -429,6 +527,18 @@
 		void scheduleId;
 		void loadAll();
 	});
+
+	function onPrepareAddLine() {
+		lineEditIndex = null;
+		lineForm.errors.set({});
+		lineForm.form.set({
+			productId: '',
+			descriptionTemplate: '',
+			qty: '1',
+			unitPrice: '0',
+			taxRatePercent: ''
+		});
+	}
 </script>
 
 {#if currentOrgId}
@@ -470,8 +580,10 @@
 						{isDirty}
 						{actionPending}
 						{actionError}
+						lineEditing={lineEditIndex != null}
 						{onRemoveLine}
 						{onAddLine}
+						{onPrepareAddLine}
 						onSaveSchedule={persistSchedule}
 						onActivate={() => runLifecycle((v) => api.recurringInvoiceSchedules.activate(scheduleId, v))}
 						onPause={() => runLifecycle((v) => api.recurringInvoiceSchedules.pause(scheduleId, v))}

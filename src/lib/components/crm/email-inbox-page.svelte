@@ -120,6 +120,13 @@
 			const next = await loadPersonalEmailInbox(api);
 			if (isStale(epoch)) return;
 			inbox = next;
+			if (next.listError) {
+				viewState = {
+					kind: 'validation',
+					message: next.listError
+				};
+				return;
+			}
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
