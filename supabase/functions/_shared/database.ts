@@ -231,6 +231,23 @@ export type TimelineEventRow = {
   created_at: string
 }
 
+export type AuditEventRow = {
+  id: string
+  org_id: string | null
+  actor_type: 'user' | 'agent' | 'api_key' | 'system'
+  actor_id: string | null
+  action: string
+  resource_type: string
+  resource_id: string | null
+  request_id: string | null
+  ip_address: string | null
+  user_agent: string | null
+  before_data: Json | null
+  after_data: Json | null
+  metadata: Json
+  created_at: string
+}
+
 export type ProductCategoryRow = {
   id: string
   org_id: string
@@ -1062,6 +1079,14 @@ export type Database = {
         Row: TimelineEventRow
         Insert: TimelineEventInsert
         Update: Partial<TimelineEventInsert>
+        Relationships: []
+      }
+      audit_events: {
+        Row: AuditEventRow
+        Insert:
+          & Partial<AuditEventRow>
+          & Pick<AuditEventRow, 'actor_type' | 'action' | 'resource_type'>
+        Update: Partial<AuditEventRow>
         Relationships: []
       }
       email_messages: {
