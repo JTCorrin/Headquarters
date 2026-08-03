@@ -11,10 +11,12 @@
 		membershipFromCreateResult,
 		toClientFormData,
 		toClientUpdateBody,
+		toEntityProject,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiClient } from '$lib/api/v1/types.js';
+	import type { EntityProject } from './entity-projects.svelte';
 	import {
 		emptyEntityEmailTabState,
 		loadEntityEmailTab,
@@ -58,6 +60,7 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let client = $state<ApiClient | null>(null);
+	let projects = $state<EntityProject[]>([]);
 	let emailTab = $state<EntityEmailTabState>(emptyEntityEmailTabState());
 	let timelineEvents = $state<TimelineEvent[]>([]);
 	let sharingId = $state<string | null>(null);
@@ -178,6 +181,7 @@
 
 	function resetOrgScopedState() {
 		client = null;
+		projects = [];
 		emailTab = emptyEntityEmailTabState();
 		timelineEvents = [];
 		sharingId = null;
@@ -211,16 +215,21 @@
 			clientForm.form.set(toClientFormData(result.data));
 			viewState = { kind: 'ready' };
 
-			const [tab, timeline] = await Promise.all([
+			const [tab, timeline, projectList] = await Promise.all([
 				loadEntityEmailTab(api, 'client', clientId),
-				loadEntityTimeline(api, 'client', clientId)
+				loadEntityTimeline(api, 'client', clientId),
+				api.projects.list({ client_id: clientId, limit: 50 }).catch(() => ({
+					data: [] as Awaited<ReturnType<typeof api.projects.list>>['data']
+				}))
 			]);
 			if (isStale(epoch)) return;
 			emailTab = tab;
 			timelineEvents = timeline;
+			projects = projectList.data.map(toEntityProject);
 		} catch (error) {
 			if (isStale(epoch)) return;
 			client = null;
+			projects = [];
 			emailTab = emptyEntityEmailTabState();
 			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
@@ -379,6 +388,7 @@
 						documentsApi={api}
 						documentsEntityId={client.id}
 						documentsReloadKey={session.cacheGeneration}
+						{projects}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onDraftResponse}

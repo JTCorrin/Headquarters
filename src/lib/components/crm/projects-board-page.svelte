@@ -3,10 +3,12 @@
 	import type { ProjectFormData } from '$lib/schemas/project.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
-	import ProjectsBoard, { type ProjectCard } from './projects-board.svelte';
+	import ProjectsBoard, {
+		type ProjectBoardMove,
+		type ProjectCard
+	} from './projects-board.svelte';
 	import ProjectFormDrawer from './project-form-drawer.svelte';
 	import type { ProjectClientOption } from './project-form.svelte';
-	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface ProjectsBoardPageProps {
@@ -17,7 +19,12 @@
 		form: SuperForm<ProjectFormData>;
 		drawerOpen?: boolean;
 		clientFilter?: string;
+		/** When false, omit AppNav (shell already renders it). */
+		showNav?: boolean;
 		class?: string;
+		onSelectProject?: (id: string) => void;
+		onMoveProject?: (move: ProjectBoardMove) => void | Promise<void>;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -28,7 +35,11 @@
 		form,
 		drawerOpen = $bindable(false),
 		clientFilter = $bindable('all'),
-		class: className
+		showNav = true,
+		class: className,
+		onSelectProject,
+		onMoveProject,
+		onValidSubmit
 	}: ProjectsBoardPageProps = $props();
 
 	const filtered = $derived(
@@ -38,8 +49,16 @@
 	);
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
+<div
+	class={cn(
+		'bg-background text-foreground flex',
+		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
+		className
+	)}
+>
+	{#if showNav}
+		<AppNav {orgName} groups={navGroups} class="shrink-0" />
+	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
@@ -49,11 +68,12 @@
 				description="Client-attachable boards — drag projects between stages, open one for its inner kanban."
 			>
 				{#snippet actions()}
-					<ProjectFormDrawer bind:open={drawerOpen} {form} {clients}>
-						{#snippet trigger()}
-							<Button type="button" size="sm">New project</Button>
-						{/snippet}
-					</ProjectFormDrawer>
+					<ProjectFormDrawer
+						bind:open={drawerOpen}
+						{form}
+						{clients}
+						{onValidSubmit}
+					/>
 				{/snippet}
 			</PageHeader>
 
@@ -89,7 +109,12 @@
 				{/each}
 			</div>
 
-			<ProjectsBoard projects={filtered} class="min-h-[480px]" />
+			<ProjectsBoard
+				projects={filtered}
+				{onSelectProject}
+				{onMoveProject}
+				class="min-h-[480px]"
+			/>
 		</div>
 	</main>
 </div>
