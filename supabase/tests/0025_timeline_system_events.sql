@@ -79,7 +79,6 @@ begin
     json_build_object('sub', p_user_id::text, 'role', 'authenticated')::text,
     true
   );
-  perform set_config('role', 'authenticated', true);
 end;
 $$;
 grant execute on function pg_temp.as_user(uuid) to authenticated;

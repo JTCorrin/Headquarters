@@ -91,9 +91,14 @@ as $$
 begin
   perform set_config('request.jwt.claim.sub', p_user_id::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
-  perform set_config('role', 'authenticated', true);
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('sub', p_user_id::text, 'role', 'authenticated')::text,
+    true
+  );
 end;
 $$;
+grant execute on function pg_temp.as_user(uuid) to authenticated;
 
 do $$
 declare
