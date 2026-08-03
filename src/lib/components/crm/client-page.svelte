@@ -17,6 +17,7 @@
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiClient } from '$lib/api/v1/types.js';
 	import type { EntityProject } from './entity-projects.svelte';
+	import { loadClientMoneyItems } from '$lib/crm/client-money-tab.js';
 	import {
 		emptyEntityEmailTabState,
 		loadEntityEmailTab,
@@ -31,6 +32,7 @@
 	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
+	import type { MoneySummaryItem } from './money-summary.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
 	import type { TimelineEvent } from './timeline.svelte';
@@ -61,6 +63,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let client = $state<ApiClient | null>(null);
 	let projects = $state<EntityProject[]>([]);
+	let moneyItems = $state<MoneySummaryItem[]>([]);
 	let emailTab = $state<EntityEmailTabState>(emptyEntityEmailTabState());
 	let timelineEvents = $state<TimelineEvent[]>([]);
 	let sharingId = $state<string | null>(null);
@@ -182,6 +185,7 @@
 	function resetOrgScopedState() {
 		client = null;
 		projects = [];
+		moneyItems = [];
 		emailTab = emptyEntityEmailTabState();
 		timelineEvents = [];
 		sharingId = null;
@@ -215,21 +219,24 @@
 			clientForm.form.set(toClientFormData(result.data));
 			viewState = { kind: 'ready' };
 
-			const [tab, timeline, projectList] = await Promise.all([
+			const [tab, timeline, projectList, money] = await Promise.all([
 				loadEntityEmailTab(api, 'client', clientId),
 				loadEntityTimeline(api, 'client', clientId),
 				api.projects.list({ client_id: clientId, limit: 50 }).catch(() => ({
 					data: [] as Awaited<ReturnType<typeof api.projects.list>>['data']
-				}))
+				})),
+				loadClientMoneyItems(api, clientId)
 			]);
 			if (isStale(epoch)) return;
 			emailTab = tab;
 			timelineEvents = timeline;
 			projects = projectList.data.map(toEntityProject);
+			moneyItems = money;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			client = null;
 			projects = [];
+			moneyItems = [];
 			emailTab = emptyEntityEmailTabState();
 			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
@@ -389,6 +396,7 @@
 						documentsEntityId={client.id}
 						documentsReloadKey={session.cacheGeneration}
 						{projects}
+						{moneyItems}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onDraftResponse}
