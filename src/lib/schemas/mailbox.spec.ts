@@ -72,10 +72,30 @@ describe('mailbox schema', () => {
 		);
 	});
 
-	it('describes sync timeout without the removed host stub branch', () => {
+	it('prefers Sync API timeout message, else includes step', () => {
 		expect(
-			describeMailboxSyncResult({ ok: false, ingested: 0, error_code: 'timeout' })
-		).toMatch(/timed out/i);
+			humanizeMailboxSyncError('timeout', {
+				message: 'Mailbox sync timed out during fetch. Try Sync again, or reduce inbox load.',
+				step: 'fetch'
+			})
+		).toBe('Mailbox sync timed out during fetch. Try Sync again, or reduce inbox load.');
+		expect(humanizeMailboxSyncError('timeout', { step: 'fetch' })).toMatch(/during fetch/i);
+		expect(humanizeMailboxSyncError('timeout', { step: 'search' })).toMatch(/during search/i);
+	});
+
+	it('describes sync timeout with step from the API payload', () => {
+		expect(
+			describeMailboxSyncResult({
+				ok: false,
+				ingested: 0,
+				error_code: 'timeout',
+				step: 'fetch',
+				message: 'Mailbox sync timed out during fetch. Try Sync again, or reduce inbox load.'
+			})
+		).toMatch(/during fetch/i);
+		expect(
+			describeMailboxSyncResult({ ok: false, ingested: 0, error_code: 'timeout', step: 'fetch' })
+		).toMatch(/during fetch/i);
 		expect(
 			describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null })
 		).toBe('Sync completed — no new messages.');
