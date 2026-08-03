@@ -358,6 +358,17 @@ else
 	log "meetings curl proof script missing — skipped"
 fi
 
+# Meeting assistant M2: transcript → summary stub → accept proposal → task.
+if [[ -x scripts/meeting_assistant_staging_curl_proof.sh ]]; then
+	log "running meeting assistant M2 curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/meeting_assistant_staging_curl_proof.sh
+else
+	log "meeting assistant curl proof script missing — skipped"
+fi
+
 # Projects foundation: CRUD + nested workspace + board/card drag + ETag.
 if [[ -x scripts/projects_staging_curl_proof.sh ]]; then
 	log "running projects foundation curl proof"

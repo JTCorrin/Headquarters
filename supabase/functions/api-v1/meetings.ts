@@ -1,5 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, Json, MeetingAttendeeRow, MeetingRow } from '../_shared/database.ts'
+import type {
+  Database,
+  Json,
+  MeetingAttendeeRow,
+  MeetingRow,
+  MeetingTaskProposalRow,
+  MeetingTranscriptRow,
+} from '../_shared/database.ts'
 import {
   ApiError,
   etag,
@@ -15,6 +22,15 @@ const MEETING_SELECT =
 
 const ATTENDEE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,meeting_id,contact_id,membership_id,name,email,response_status,attended,organiser'
+
+const TRANSCRIPT_SELECT =
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,meeting_id,document_id,provider,language_code,status,plain_text,segments,processed_at,error_code'
+
+const PROPOSAL_SELECT =
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,meeting_id,title,description,suggested_assignee_membership_id,suggested_due_at,confidence,status,accepted_task_id,decided_by,decided_at'
+
+const TRANSCRIPT_STATUSES = new Set(['uploaded', 'processing', 'ready', 'failed'])
+const UUID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 
 const WRITABLE_FIELDS = new Set([
   'title',
@@ -93,7 +109,12 @@ interface DatabaseError {
 type MeetingHost = MeetingRow & {
   related_entity_label: string | null
   attendees: MeetingAttendeeRow[]
+  transcript: MeetingTranscriptRow | null
+  task_proposals: MeetingTaskProposalRow[]
 }
+
+type TranscriptStatus = MeetingTranscriptRow['status']
+type MeetingTranscriptStatus = MeetingRow['transcript_status']
 
 function isValidTimezone(value: string): boolean {
   try {
@@ -605,6 +626,41 @@ async function replaceAttendees(
   return data as MeetingAttendeeRow[]
 }
 
+async function listTranscript(
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  requestId: string,
+): Promise<MeetingTranscriptRow | null> {
+  const { data, error } = await db
+    .from('meeting_transcripts')
+    .select(TRANSCRIPT_SELECT)
+    .eq('org_id', orgId)
+    .eq('meeting_id', meetingId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (error) throw databaseError(error, requestId)
+  return data
+}
+
+async function listTaskProposals(
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  requestId: string,
+): Promise<MeetingTaskProposalRow[]> {
+  const { data, error } = await db
+    .from('meeting_task_proposals')
+    .select(PROPOSAL_SELECT)
+    .eq('org_id', orgId)
+    .eq('meeting_id', meetingId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+  if (error) throw databaseError(error, requestId)
+  return data ?? []
+}
+
 async function hostMeeting(
   db: DatabaseMeeting,
   orgId: string,
@@ -612,7 +668,7 @@ async function hostMeeting(
   requestId: string,
   attendees?: MeetingAttendeeRow[],
 ): Promise<MeetingHost> {
-  const [related_entity_label, nested] = await Promise.all([
+  const [related_entity_label, nested, transcript, task_proposals] = await Promise.all([
     resolveRelatedEntityLabel(
       db,
       orgId,
@@ -620,8 +676,426 @@ async function hostMeeting(
       meeting.related_entity_id,
     ),
     attendees ? Promise.resolve(attendees) : listAttendees(db, orgId, meeting.id, requestId),
+    listTranscript(db, orgId, meeting.id, requestId),
+    listTaskProposals(db, orgId, meeting.id, requestId),
   ])
-  return { ...meeting, related_entity_label, attendees: nested }
+  return {
+    ...meeting,
+    related_entity_label,
+    attendees: nested,
+    transcript,
+    task_proposals,
+  }
+}
+
+function mapTranscriptToMeetingStatus(status: TranscriptStatus): MeetingTranscriptStatus {
+  return status
+}
+
+function buildStubSummary(plainText: string): string {
+  const trimmed = plainText.trim().replace(/\s+/g, ' ')
+  const excerpt = trimmed.slice(0, 280)
+  return `Meeting summary (stub): ${excerpt}${trimmed.length > 280 ? '…' : ''}`
+}
+
+function buildStubProposals(
+  plainText: string,
+): Array<{ title: string; description: string; confidence: number }> {
+  const lines = plainText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+  const seeds = lines.length > 0
+    ? lines.slice(0, 3)
+    : [plainText.trim().slice(0, 80) || 'Follow up from meeting']
+  return seeds.map((seed, index) => {
+    const title = seed.length > 120 ? `${seed.slice(0, 117)}…` : seed
+    return {
+      title: title || `Follow-up ${index + 1}`,
+      description: `Proposed from transcript line ${index + 1}.`,
+      confidence: Number((0.9 - index * 0.1).toFixed(4)),
+    }
+  })
+}
+
+function assertMeetingWritable(meeting: MeetingRow, version: number): void {
+  if (meeting.version !== version) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Meeting version does not match If-Match')
+  }
+}
+
+async function updateMeetingAssistantFields(
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  version: number,
+  patch: Partial<Pick<MeetingRow, 'transcript_status' | 'summary_status' | 'summary'>>,
+  requestId: string,
+): Promise<MeetingRow> {
+  const { data, error } = await db
+    .from('meetings')
+    .update(patch)
+    .eq('org_id', orgId)
+    .eq('id', meetingId)
+    .eq('version', version)
+    .is('deleted_at', null)
+    .select(MEETING_SELECT)
+    .maybeSingle()
+  if (error) throw databaseError(error, requestId)
+  if (!data) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Meeting changed during this request')
+  }
+  return data
+}
+
+async function attachTranscript(
+  req: Request,
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const meeting = await findMeeting(db, orgId, meetingId, requestId)
+  assertMeetingWritable(meeting, version)
+
+  const body = await jsonBody(req)
+  const documentIdRaw = body.document_id
+  const plainTextRaw = body.plain_text
+  const documentId = documentIdRaw === undefined || documentIdRaw === null
+    ? null
+    : parseUuid(String(documentIdRaw), 'document_id')
+  const plainText = plainTextRaw === undefined || plainTextRaw === null
+    ? null
+    : String(plainTextRaw)
+  if (plainText !== null && plainText.length > 500000) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Transcript validation failed', {
+      plain_text: 'Must be at most 500000 characters',
+    })
+  }
+  if (!documentId && (plainText === null || plainText.trim() === '')) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Transcript validation failed', {
+      document_id: 'Provide document_id and/or plain_text',
+      plain_text: 'Provide document_id and/or plain_text',
+    })
+  }
+
+  let status: TranscriptStatus = plainText && plainText.trim() !== '' ? 'ready' : 'uploaded'
+  if (body.status !== undefined && body.status !== null) {
+    const statusValue = String(body.status)
+    if (!TRANSCRIPT_STATUSES.has(statusValue)) {
+      throw new ApiError(422, 'VALIDATION_ERROR', 'Transcript validation failed', {
+        status: 'Must be uploaded, processing, ready, or failed',
+      })
+    }
+    status = statusValue as TranscriptStatus
+  }
+
+  if (documentId) {
+    const { data: document, error: documentError } = await db
+      .from('documents')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('id', documentId)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (documentError) throw databaseError(documentError, requestId)
+    if (!document) {
+      throw new ApiError(422, 'VALIDATION_ERROR', 'Transcript validation failed', {
+        document_id: 'Document not found in this organisation',
+      })
+    }
+    const { data: link, error: linkError } = await db
+      .from('document_links')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('document_id', documentId)
+      .eq('entity_type', 'meeting')
+      .eq('entity_id', meetingId)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (linkError) throw databaseError(linkError, requestId)
+    if (!link) {
+      throw new ApiError(422, 'VALIDATION_ERROR', 'Transcript validation failed', {
+        document_id: 'Document must be linked to this meeting',
+      })
+    }
+  }
+
+  const provider = body.provider === undefined || body.provider === null
+    ? null
+    : String(body.provider)
+  const languageCode = body.language_code === undefined || body.language_code === null
+    ? null
+    : String(body.language_code)
+
+  const existing = await listTranscript(db, orgId, meetingId, requestId)
+  const processedAt = status === 'ready' ? new Date().toISOString() : null
+  if (existing) {
+    const { error } = await db
+      .from('meeting_transcripts')
+      .update({
+        document_id: documentId,
+        plain_text: plainText,
+        status,
+        provider,
+        language_code: languageCode,
+        processed_at: processedAt,
+        error_code: status === 'failed' && typeof body.error_code === 'string'
+          ? body.error_code
+          : null,
+      })
+      .eq('org_id', orgId)
+      .eq('id', existing.id)
+      .is('deleted_at', null)
+      .select(TRANSCRIPT_SELECT)
+      .single()
+    if (error) throw databaseError(error, requestId)
+  } else {
+    const { error } = await db
+      .from('meeting_transcripts')
+      .insert({
+        org_id: orgId,
+        meeting_id: meetingId,
+        document_id: documentId,
+        plain_text: plainText,
+        status,
+        provider,
+        language_code: languageCode,
+        processed_at: processedAt,
+      })
+      .select(TRANSCRIPT_SELECT)
+      .single()
+    if (error) throw databaseError(error, requestId)
+  }
+
+  const updatedMeeting = await updateMeetingAssistantFields(
+    db,
+    orgId,
+    meetingId,
+    version,
+    { transcript_status: mapTranscriptToMeetingStatus(status) },
+    requestId,
+  )
+  const host = await hostMeeting(db, orgId, updatedMeeting, requestId)
+  return jsonResponse({ data: host }, 200, requestId, { etag: etag(updatedMeeting.version) })
+}
+
+async function generateSummary(
+  req: Request,
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  let meeting = await findMeeting(db, orgId, meetingId, requestId)
+  assertMeetingWritable(meeting, version)
+
+  const body = await jsonBody(req)
+  const stubPlain = typeof body.plain_text === 'string' ? body.plain_text : null
+  let transcript = await listTranscript(db, orgId, meetingId, requestId)
+
+  if (stubPlain && stubPlain.trim() !== '') {
+    // Explicit stub path: ensure a ready transcript exists from the provided text.
+    const attachReq = new Request(req.url, {
+      method: 'POST',
+      headers: req.headers,
+      body: JSON.stringify({
+        plain_text: stubPlain,
+        status: 'ready',
+        document_id: transcript?.document_id ?? null,
+      }),
+    })
+    const attachResponse = await attachTranscript(attachReq, db, orgId, meetingId, requestId)
+    if (!attachResponse.ok) return attachResponse
+    const attachJson = await attachResponse.json() as { data: MeetingHost }
+    meeting = attachJson.data
+    transcript = attachJson.data.transcript
+  }
+
+  const plainText = transcript?.plain_text?.trim() ?? ''
+  if (!transcript || transcript.status !== 'ready' || plainText === '') {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Summary generation requires a ready transcript', {
+      transcript: 'Attach a ready transcript (or pass plain_text stub) before generating a summary',
+    })
+  }
+
+  // Refresh version after optional stub attach.
+  const currentVersion = meeting.version
+  meeting = await updateMeetingAssistantFields(
+    db,
+    orgId,
+    meetingId,
+    currentVersion,
+    { summary_status: 'generating' },
+    requestId,
+  )
+
+  const summary = buildStubSummary(plainText)
+  const proposals = buildStubProposals(plainText)
+
+  // Replace only still-proposed rows so accepted/dismissed history is preserved.
+  const { data: openProposals, error: openError } = await db
+    .from('meeting_task_proposals')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('meeting_id', meetingId)
+    .eq('status', 'proposed')
+    .is('deleted_at', null)
+  if (openError) throw databaseError(openError, requestId)
+  if ((openProposals ?? []).length > 0) {
+    const { error: softError } = await db
+      .from('meeting_task_proposals')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('org_id', orgId)
+      .eq('meeting_id', meetingId)
+      .eq('status', 'proposed')
+      .is('deleted_at', null)
+    if (softError) throw databaseError(softError, requestId)
+  }
+
+  if (proposals.length > 0) {
+    const { error: insertError } = await db.from('meeting_task_proposals').insert(
+      proposals.map((proposal) => ({
+        org_id: orgId,
+        meeting_id: meetingId,
+        title: proposal.title,
+        description: proposal.description,
+        confidence: proposal.confidence,
+        status: 'proposed' as const,
+      })),
+    )
+    if (insertError) throw databaseError(insertError, requestId)
+  }
+
+  meeting = await updateMeetingAssistantFields(
+    db,
+    orgId,
+    meetingId,
+    meeting.version,
+    { summary_status: 'ready', summary },
+    requestId,
+  )
+
+  const host = await hostMeeting(db, orgId, meeting, requestId)
+  return jsonResponse({ data: host }, 200, requestId, { etag: etag(meeting.version) })
+}
+
+async function findProposal(
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  proposalId: string,
+  requestId: string,
+): Promise<MeetingTaskProposalRow> {
+  const { data, error } = await db
+    .from('meeting_task_proposals')
+    .select(PROPOSAL_SELECT)
+    .eq('org_id', orgId)
+    .eq('meeting_id', meetingId)
+    .eq('id', proposalId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (error) throw databaseError(error, requestId)
+  if (!data) throw new ApiError(404, 'NOT_FOUND', 'Task proposal not found')
+  return data
+}
+
+async function acceptProposal(
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  proposalId: string,
+  requestId: string,
+  userId: string,
+): Promise<Response> {
+  await findMeeting(db, orgId, meetingId, requestId)
+  const proposal = await findProposal(db, orgId, meetingId, proposalId, requestId)
+  if (proposal.status !== 'proposed') {
+    throw new ApiError(409, 'CONFLICT', 'Task proposal is not open for accept')
+  }
+
+  const { data: task, error: taskError } = await db
+    .from('tasks')
+    .insert({
+      org_id: orgId,
+      title: proposal.title,
+      description: proposal.description,
+      assignee_membership_id: proposal.suggested_assignee_membership_id,
+      due_at: proposal.suggested_due_at,
+      source: 'meeting',
+      meeting_id: meetingId,
+      status: 'open',
+      priority: 'p3',
+    })
+    .select('id')
+    .single()
+  if (taskError) throw databaseError(taskError, requestId)
+
+  const decidedAt = new Date().toISOString()
+  const { data: updated, error } = await db
+    .from('meeting_task_proposals')
+    .update({
+      status: 'accepted',
+      accepted_task_id: task.id,
+      decided_at: decidedAt,
+      decided_by: userId,
+    })
+    .eq('org_id', orgId)
+    .eq('id', proposalId)
+    .eq('status', 'proposed')
+    .is('deleted_at', null)
+    .select(PROPOSAL_SELECT)
+    .maybeSingle()
+  if (error) throw databaseError(error, requestId)
+  if (!updated) {
+    throw new ApiError(409, 'CONFLICT', 'Task proposal changed during this request')
+  }
+
+  const meeting = await findMeeting(db, orgId, meetingId, requestId)
+  const host = await hostMeeting(db, orgId, meeting, requestId)
+  return jsonResponse({ data: host, meta: { accepted_task_id: task.id } }, 200, requestId, {
+    etag: etag(meeting.version),
+  })
+}
+
+async function dismissProposal(
+  db: DatabaseMeeting,
+  orgId: string,
+  meetingId: string,
+  proposalId: string,
+  requestId: string,
+  userId: string,
+): Promise<Response> {
+  await findMeeting(db, orgId, meetingId, requestId)
+  const proposal = await findProposal(db, orgId, meetingId, proposalId, requestId)
+  if (proposal.status !== 'proposed') {
+    throw new ApiError(409, 'CONFLICT', 'Task proposal is not open for dismiss')
+  }
+
+  const decidedAt = new Date().toISOString()
+  const { data: updated, error } = await db
+    .from('meeting_task_proposals')
+    .update({
+      status: 'dismissed',
+      decided_at: decidedAt,
+      decided_by: userId,
+    })
+    .eq('org_id', orgId)
+    .eq('id', proposalId)
+    .eq('status', 'proposed')
+    .is('deleted_at', null)
+    .select(PROPOSAL_SELECT)
+    .maybeSingle()
+  if (error) throw databaseError(error, requestId)
+  if (!updated) {
+    throw new ApiError(409, 'CONFLICT', 'Task proposal changed during this request')
+  }
+
+  const meeting = await findMeeting(db, orgId, meetingId, requestId)
+  const host = await hostMeeting(db, orgId, meeting, requestId)
+  return jsonResponse({ data: host }, 200, requestId, { etag: etag(meeting.version) })
 }
 
 async function defaultOrgTimezone(
@@ -884,6 +1358,7 @@ export function handleMeetings(
   orgId: string,
   _role: MembershipRole,
   requestId: string,
+  userId: string,
 ): Promise<Response> {
   if (path === '/api/v1/meetings') {
     if (req.method === 'GET') return listMeetings(req, db, orgId, requestId)
@@ -891,9 +1366,53 @@ export function handleMeetings(
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for meetings')
   }
 
-  const itemMatch = path.match(
-    /^\/api\/v1\/meetings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i,
+  const transcriptMatch = path.match(
+    new RegExp(`^/api/v1/meetings/(${UUID_RE})/transcript$`, 'i'),
   )
+  if (transcriptMatch) {
+    if (req.method === 'POST') {
+      return attachTranscript(req, db, orgId, transcriptMatch[1], requestId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for meeting transcript')
+  }
+
+  const summaryMatch = path.match(
+    new RegExp(`^/api/v1/meetings/(${UUID_RE})/generate-summary$`, 'i'),
+  )
+  if (summaryMatch) {
+    if (req.method === 'POST') {
+      return generateSummary(req, db, orgId, summaryMatch[1], requestId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for meeting summary')
+  }
+
+  const acceptMatch = path.match(
+    new RegExp(
+      `^/api/v1/meetings/(${UUID_RE})/task-proposals/(${UUID_RE})/accept$`,
+      'i',
+    ),
+  )
+  if (acceptMatch) {
+    if (req.method === 'POST') {
+      return acceptProposal(db, orgId, acceptMatch[1], acceptMatch[2], requestId, userId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for proposal accept')
+  }
+
+  const dismissMatch = path.match(
+    new RegExp(
+      `^/api/v1/meetings/(${UUID_RE})/task-proposals/(${UUID_RE})/dismiss$`,
+      'i',
+    ),
+  )
+  if (dismissMatch) {
+    if (req.method === 'POST') {
+      return dismissProposal(db, orgId, dismissMatch[1], dismissMatch[2], requestId, userId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for proposal dismiss')
+  }
+
+  const itemMatch = path.match(new RegExp(`^/api/v1/meetings/(${UUID_RE})$`, 'i'))
   if (!itemMatch) throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 
   const meetingId = itemMatch[1]
