@@ -24,6 +24,7 @@ import { handleProducts } from './products.ts'
 import { handleProfilePreferences } from './profile-preferences.ts'
 import { handleQuotes } from './quotes.ts'
 import { handleTaxRates } from './tax-rates.ts'
+import { handleTimelineEvents } from './timeline-events.ts'
 
 const corsOrigin = Deno.env.get('API_CORS_ORIGIN') ?? '*'
 
@@ -416,6 +417,18 @@ export default {
         if (path === '/api/v1/payments' || path.startsWith('/api/v1/payments/')) {
           assertCanAccessPayments(membership.role, req.method)
           return await handlePayments(req, db, path, orgId, requestId)
+        }
+
+        if (/^\/api\/v1\/entities\/[^/]+\/[^/]+\/timeline-events$/.test(path)) {
+          return await handleTimelineEvents(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            userId,
+            requestId,
+          )
         }
 
         if (
