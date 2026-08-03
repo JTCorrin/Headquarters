@@ -1,6 +1,6 @@
 begin;
 
-select plan(17);
+select plan(18);
 
 select has_table('public', 'meetings', 'meetings table exists');
 select has_table('public', 'meeting_attendees', 'meeting_attendees table exists');
@@ -43,6 +43,8 @@ create temporary table _meetings_fixture (
   org_id uuid,
   other_org_id uuid,
   contact_id uuid,
+  client_id uuid,
+  project_id uuid,
   owner_meeting_id uuid,
   owner_meeting_version integer,
   member_meeting_id uuid,
@@ -151,6 +153,34 @@ update _meetings_fixture
 set contact_id = created_contact.id
 from created_contact;
 
+with created_client as (
+  insert into public.clients (org_id, name, status, created_by, updated_by)
+  select org_id, 'Meetings Client', 'active', owner_id, owner_id
+  from _meetings_fixture
+  returning id
+)
+update _meetings_fixture
+set client_id = created_client.id
+from created_client;
+
+select pg_temp.as_user((select owner_id from _meetings_fixture));
+set local role authenticated;
+
+with created_project as (
+  select public.create_project_with_defaults(
+    (select org_id from _meetings_fixture),
+    jsonb_build_object(
+      'client_id', (select client_id from _meetings_fixture),
+      'name', 'Meetings linked project'
+    )
+  ) as doc
+)
+update _meetings_fixture
+set project_id = (created_project.doc ->> 'id')::uuid
+from created_project;
+
+reset role;
+
 with owner_meeting as (
   insert into public.meetings (
     org_id, title, status, starts_at, ends_at, timezone,
@@ -237,7 +267,7 @@ select throws_ok(
   )
   select
     org_id,
-    'Project link',
+    'Missing project',
     now() + interval '3 days',
     now() + interval '3 days 1 hour',
     'UTC',
@@ -247,9 +277,30 @@ select throws_ok(
     owner_id
   from _meetings_fixture;
   $$,
-  '22023',
+  '23514',
   null,
-  'related_entity_type project is rejected until P1'
+  'related project must resolve in organisation'
+);
+
+select lives_ok(
+  $$
+  insert into public.meetings (
+    org_id, title, starts_at, ends_at, timezone,
+    related_entity_type, related_entity_id, created_by, updated_by
+  )
+  select
+    org_id,
+    'Linked project',
+    now() + interval '3 days',
+    now() + interval '3 days 1 hour',
+    'UTC',
+    'project',
+    project_id,
+    owner_id,
+    owner_id
+  from _meetings_fixture;
+  $$,
+  'meeting may relate to an active project'
 );
 
 select throws_ok(
