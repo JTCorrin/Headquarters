@@ -1673,6 +1673,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      replace_meeting_attendees: {
+        Args: {
+          p_attendees: Json
+          p_meeting_id: string
+          p_org_id: string
+        }
+        Returns: Json
+      }
       create_invoice_from_quote: {
         Args: {
           p_org_id: string
