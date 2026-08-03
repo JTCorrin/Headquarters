@@ -52,6 +52,9 @@
 		if (!match) return;
 		$formData.description = match.name;
 		$formData.unitPrice = match.unitPrice;
+		if (match.taxRatePercent != null && match.taxRatePercent !== '') {
+			$formData.taxRatePercent = match.taxRatePercent;
+		}
 		if (!$formData.qty) $formData.qty = '1';
 	}
 </script>
@@ -115,7 +118,7 @@
 		{#if $errors.description}<p class="text-destructive text-xs">{$errors.description}</p>{/if}
 	</div>
 
-	<div class="grid gap-4 sm:grid-cols-2">
+	<div class="grid gap-4 sm:grid-cols-3">
 		<div class="space-y-2">
 			<Label for="line-qty">Qty</Label>
 			<Input id="line-qty" name="qty" bind:value={$formData.qty} placeholder="1" />
@@ -130,6 +133,20 @@
 				placeholder="4200.00"
 			/>
 			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
+		</div>
+		<div class="space-y-2">
+			<Label for="line-tax">Tax %</Label>
+			<Input
+				id="line-tax"
+				name="taxRatePercent"
+				bind:value={$formData.taxRatePercent}
+				placeholder="20"
+				aria-invalid={!!$errors.taxRatePercent}
+				data-testid="line-tax"
+			/>
+			{#if $errors.taxRatePercent}
+				<p class="text-destructive text-xs">{$errors.taxRatePercent}</p>
+			{/if}
 		</div>
 	</div>
 

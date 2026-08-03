@@ -20,9 +20,10 @@
 		toRecurringLineInput,
 		type RecurringLineRow
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiRecurringInvoiceDocument } from '$lib/api/v1/types.js';
+	import type { ApiRecurringInvoiceDocument, ApiTaxRate } from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import { defaultTaxRatePercentString } from '$lib/schemas/line-item.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import {
 		recurringInvoiceFormSchema,
@@ -64,6 +65,7 @@
 	let clientOptions = $state<RecurringInvoiceClientOption[]>([]);
 	let contactOptions = $state<RecurringInvoiceContactOption[]>([]);
 	let products = $state<ReturnType<typeof toCatalogProductOption>[]>([]);
+	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<RecurringLineRow[]>([]);
 	let runs = $state<RecurringInvoiceRunListItem[]>([]);
 	let savedFingerprint = $state('');
@@ -75,6 +77,16 @@
 	let lineDrawerOpen = $state(false);
 	/** When set, line drawer updates this index instead of appending. */
 	let lineEditIndex = $state<number | null>(null);
+
+	function emptyRecurringLineForm(): RecurringLineFormData {
+		return {
+			productId: '',
+			descriptionTemplate: '',
+			qty: '1',
+			unitPrice: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates)
+		};
+	}
 
 	const LINE_API_TO_FORM: Record<string, keyof RecurringLineFormData> = {
 		quantity: 'qty',
@@ -166,19 +178,13 @@
 		}
 	);
 
-	const lineForm = superForm(
-		defaults(
-			{ productId: '', descriptionTemplate: '', qty: '1', unitPrice: '0', taxRatePercent: '' },
-			zod4(recurringLineFormSchema)
-		),
-		{
-			validators: zod4(recurringLineFormSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
+	const lineForm = superForm(defaults(emptyRecurringLineForm(), zod4(recurringLineFormSchema)), {
+		validators: zod4(recurringLineFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const formSnapshot = fromStore(scheduleForm.form);
 
@@ -214,10 +220,8 @@
 
 	const isDirty = $derived.by(() => {
 		if (!schedule || !isEditable || !savedFingerprint) return false;
-		return (
-			fingerprintFrom(formSnapshot.current, lines) !==
-			fingerprintFrom(toRecurringInvoiceFormData(schedule), recurringLineRowsFromDocument(schedule))
-		);
+		// Compare against the fingerprint written in applyDocument (includes clientName).
+		return fingerprintFrom(formSnapshot.current, lines) !== savedFingerprint;
 	});
 
 	function userMessage(error: unknown, fallback: string): string {
@@ -331,22 +335,25 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [document, clients, contacts, productList] = await Promise.all([
+			const [document, clients, contacts, productList, rates] = await Promise.all([
 				api.recurringInvoiceSchedules.get(scheduleId),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
-				api.products.list({ limit: 100 })
+				api.products.list({ limit: 100 }),
+				api.taxRates.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
+			taxRates = rates;
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
 			contactOptions = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
 				clientId: c.client_id ?? null
 			}));
-			products = productList.data.map(toCatalogProductOption);
+			products = productList.data.map((p) => toCatalogProductOption(p, taxRates));
 			applyDocument(document.data);
+			lineForm.form.set(emptyRecurringLineForm());
 			await loadRuns(epoch);
 			viewState = { kind: 'ready' };
 		} catch (error) {
@@ -396,9 +403,18 @@
 	}
 
 	async function runLifecycle(
-		action: (version: number) => Promise<ApiRecurringInvoiceDocument>
+		action: (version: number) => Promise<ApiRecurringInvoiceDocument>,
+		opts?: { requireLines?: boolean }
 	): Promise<void> {
 		if (!schedule) return;
+		if (opts?.requireLines && lines.length === 0) {
+			actionError = 'Add at least one line and save the schedule before activating.';
+			return;
+		}
+		if (opts?.requireLines && isDirty) {
+			actionError = 'Save your changes before activating.';
+			return;
+		}
 		const epoch = captureEpoch();
 		actionPending = true;
 		actionError = null;
@@ -483,13 +499,7 @@
 			lines = [...lines, nextRow];
 		}
 		lineEditIndex = null;
-		lineForm.form.set({
-			productId: '',
-			descriptionTemplate: '',
-			qty: '1',
-			unitPrice: '0',
-			taxRatePercent: ''
-		});
+		lineForm.form.set(emptyRecurringLineForm());
 		lineForm.errors.set({});
 		lineDrawerOpen = false;
 		actionError = null;
@@ -531,13 +541,7 @@
 	function onPrepareAddLine() {
 		lineEditIndex = null;
 		lineForm.errors.set({});
-		lineForm.form.set({
-			productId: '',
-			descriptionTemplate: '',
-			qty: '1',
-			unitPrice: '0',
-			taxRatePercent: ''
-		});
+		lineForm.form.set(emptyRecurringLineForm());
 	}
 </script>
 
@@ -585,7 +589,11 @@
 						{onAddLine}
 						{onPrepareAddLine}
 						onSaveSchedule={persistSchedule}
-						onActivate={() => runLifecycle((v) => api.recurringInvoiceSchedules.activate(scheduleId, v))}
+						onActivate={() =>
+							runLifecycle((v) => api.recurringInvoiceSchedules.activate(scheduleId, v), {
+								requireLines: true
+							})
+						}
 						onPause={() => runLifecycle((v) => api.recurringInvoiceSchedules.pause(scheduleId, v))}
 						onResume={() => runLifecycle((v) => api.recurringInvoiceSchedules.resume(scheduleId, v))}
 						onCancel={() => runLifecycle((v) => api.recurringInvoiceSchedules.cancel(scheduleId, v))}

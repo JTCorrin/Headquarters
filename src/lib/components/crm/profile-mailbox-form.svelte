@@ -25,6 +25,7 @@
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onTest?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
+		onSync?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnect?: () => boolean | void | Promise<boolean | void>;
 	}
 
@@ -35,6 +36,7 @@
 		class: className,
 		onValidSubmit,
 		onTest,
+		onSync,
 		onDisconnect
 	}: ProfileMailboxFormProps = $props();
 
@@ -45,10 +47,14 @@
 
 	let pendingSubmit = $state(false);
 	let pendingTest = $state(false);
+	let pendingSync = $state(false);
 	let pendingDisconnect = $state(false);
 	let testFeedback = $state<MailboxTestFeedback | null>(null);
+	let syncFeedback = $state<MailboxTestFeedback | null>(null);
 	let submitLock = false;
-	const busy = $derived($submitting || pendingSubmit || pendingTest || pendingDisconnect);
+	const busy = $derived(
+		$submitting || pendingSubmit || pendingTest || pendingSync || pendingDisconnect
+	);
 
 	const presetLabels: Record<MailboxPreset, string> = {
 		gmail: 'Gmail',
@@ -90,6 +96,20 @@
 			}
 		} finally {
 			pendingTest = false;
+		}
+	}
+
+	async function handleSync() {
+		if (pendingSync || !onSync) return;
+		pendingSync = true;
+		syncFeedback = null;
+		try {
+			const result = await onSync();
+			if (result && typeof result === 'object' && 'ok' in result) {
+				syncFeedback = result;
+			}
+		} finally {
+			pendingSync = false;
 		}
 	}
 
@@ -316,6 +336,21 @@
 		</p>
 	{/if}
 
+	{#if syncFeedback}
+		<p
+			class={cn(
+				'rounded-2xl px-3 py-2 text-xs',
+				syncFeedback.ok
+					? 'bg-emerald-500/10 text-emerald-900 ring-1 ring-emerald-500/20 dark:text-emerald-100'
+					: 'bg-destructive/10 text-destructive ring-1 ring-destructive/20'
+			)}
+			role="status"
+			data-testid="mailbox-sync-feedback"
+		>
+			{syncFeedback.message}
+		</p>
+	{/if}
+
 	<div class="flex flex-wrap justify-end gap-2">
 		{#if account && onDisconnect}
 			<Button
@@ -326,6 +361,17 @@
 				data-testid="mailbox-disconnect"
 			>
 				{pendingDisconnect ? 'Disconnecting…' : 'Disconnect'}
+			</Button>
+		{/if}
+		{#if onSync}
+			<Button
+				type="button"
+				variant="outline"
+				disabled={busy || !account?.credentials_configured}
+				onclick={handleSync}
+				data-testid="mailbox-sync"
+			>
+				{pendingSync ? 'Syncing…' : 'Sync now'}
 			</Button>
 		{/if}
 		{#if onTest}

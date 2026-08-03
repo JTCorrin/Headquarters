@@ -18,11 +18,12 @@
 		toPaymentCreateBody,
 		toPaymentListItem
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiInvoiceDocument } from '$lib/api/v1/types.js';
+	import type { ApiInvoiceDocument, ApiTaxRate } from '$lib/api/v1/types.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
+		defaultTaxRatePercentString,
 		lineItemFormSchema,
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
@@ -70,6 +71,7 @@
 	let clientOptions = $state<InvoiceClientOption[]>([]);
 	let contactOptions = $state<InvoiceContactOption[]>([]);
 	let products = $state<CatalogProductOption[]>([]);
+	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
@@ -79,6 +81,16 @@
 	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
 	let paymentDrawerOpen = $state(false);
+
+	function emptyLineForm() {
+		return {
+			productId: '',
+			description: '',
+			qty: '1',
+			unitPrice: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates)
+		};
+	}
 
 	function todayIso(): string {
 		return new Date().toISOString().slice(0, 10);
@@ -116,16 +128,13 @@
 		}
 	);
 
-	const lineForm = superForm(
-		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
-		{
-			validators: zod4(lineItemFormSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
+	const lineForm = superForm(defaults(emptyLineForm(), zod4(lineItemFormSchema)), {
+		validators: zod4(lineItemFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const paymentForm = superForm(
 		defaults(
@@ -324,17 +333,20 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, contacts, catalog] = await Promise.all([
+			const [result, clients, contacts, catalog, rates] = await Promise.all([
 				api.invoices.get(invoiceId),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
-				api.products.list({ limit: 100, status: 'active' })
+				api.products.list({ limit: 100, status: 'active' }),
+				api.taxRates.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
+			taxRates = rates;
 			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
-			products = catalog.data.map(toCatalogProductOption);
+			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
+			lineForm.form.set(emptyLineForm());
 
 			const listedPayments = await api.payments.list({
 				limit: 50,
@@ -443,7 +455,7 @@
 			);
 			if (isStale(epoch)) return false;
 			applyDocument(updated);
-			lineForm.form.set({ productId: '', description: '', qty: '1', unitPrice: '0' });
+			lineForm.form.set(emptyLineForm());
 			lineDrawerOpen = false;
 			viewState = { kind: 'ready' };
 			return true;
