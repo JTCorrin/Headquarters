@@ -53,13 +53,29 @@ export type InboundImapMessage = {
 export class ImapSyncError extends Error {
   readonly code: string
   readonly authFailed: boolean
+  /** Sync pipeline step hint for API clients (connect/login/select/search/fetch/…). */
+  readonly step: string | null
 
-  constructor(code: string, message: string, authFailed = false) {
+  constructor(code: string, message: string, authFailed = false, step: string | null = null) {
     super(message)
     this.name = 'ImapSyncError'
     this.code = code
     this.authFailed = authFailed
+    this.step = step
   }
+}
+
+/** Max UIDs per UID FETCH command (keeps each command under the command deadline). */
+export const IMAP_FETCH_BATCH_SIZE = 5
+
+/** Split UIDs into batches of 1–5 (default {@link IMAP_FETCH_BATCH_SIZE}). */
+export function chunkUids(uids: number[], batchSize = IMAP_FETCH_BATCH_SIZE): number[][] {
+  const size = Math.max(1, Math.min(5, Math.floor(batchSize)))
+  const batches: number[][] = []
+  for (let i = 0; i < uids.length; i += size) {
+    batches.push(uids.slice(i, i + size))
+  }
+  return batches
 }
 
 export function isSyntheticImapHost(host: string): boolean {
@@ -67,11 +83,25 @@ export function isSyntheticImapHost(host: string): boolean {
   return h === 'imap.example.test' || h.endsWith('.example.test')
 }
 
+function timeoutStepFromLabel(label: string): string | null {
+  const lower = label.toLowerCase()
+  if (lower.includes('fetch')) return 'fetch'
+  if (lower.includes('search')) return 'search'
+  if (lower.includes('select')) return 'select'
+  if (lower.includes('login') || lower.includes('probe')) return 'login'
+  if (lower.includes('connect') || lower.includes('greeting') || lower.includes('starttls')) {
+    return 'connect'
+  }
+  if (lower.includes('sync')) return 'sync'
+  return null
+}
+
 /** Race a promise against a deadline; maps expiry / AbortError → `timeout`. */
 export async function withImapTimeout<T>(
   promise: Promise<T>,
   ms: number,
   label: string,
+  step: string | null = timeoutStepFromLabel(label),
 ): Promise<T> {
   const budget = Math.max(1, Math.floor(ms))
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -80,22 +110,66 @@ export async function withImapTimeout<T>(
       promise,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
-          reject(new ImapSyncError('timeout', `${label} timed out after ${budget}ms`))
+          reject(new ImapSyncError('timeout', `${label} timed out after ${budget}ms`, false, step))
         }, budget)
       }),
     ])
   } catch (error) {
     if (error instanceof ImapSyncError) throw error
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`)
+      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`, false, step)
     }
     const message = error instanceof Error ? error.message : String(error)
     if (/timed?\s*out|aborted|abort/i.test(message)) {
-      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`)
+      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`, false, step)
     }
     throw error
   } finally {
     if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
+/** Short safe copy for Sync API clients (no host/password/body). */
+export function safeMailboxSyncFailureMessage(
+  code: string,
+  step: string | null = null,
+): { message: string; step: string | null } {
+  const resolvedStep = step ??
+    ({
+      imap_auth_failed: 'login',
+      imap_select_failed: 'select',
+      imap_search_failed: 'search',
+      imap_fetch_failed: 'fetch',
+      imap_tls_failed: 'connect',
+      imap_connection_failed: 'connect',
+      credentials_missing: 'credentials',
+      lease_error: 'lease',
+      not_claimed: 'lease',
+      timeout: null,
+      sync_failed: 'sync',
+    }[code] ?? null)
+
+  const byCode: Record<string, string> = {
+    timeout: resolvedStep
+      ? `Mailbox sync timed out during ${resolvedStep}. Try Sync again, or reduce inbox load.`
+      : 'Mailbox sync timed out. Try Sync again, or reduce inbox load.',
+    imap_auth_failed: 'IMAP sign-in failed — check email and password (or app password).',
+    imap_select_failed: 'Could not open the inbox (SELECT failed).',
+    imap_search_failed: 'Could not search the inbox for recent messages.',
+    imap_fetch_failed: 'Could not download message contents from the mail server.',
+    imap_tls_failed:
+      'Secure connection failed — try a different security setting (SSL / STARTTLS).',
+    imap_connection_failed:
+      'Could not reach the mail server — check host, port, and security settings.',
+    credentials_missing: 'Mailbox credentials are missing — save a password, then try Sync again.',
+    lease_error: 'Could not start sync — try again in a moment.',
+    not_claimed: 'Another sync is already running — wait a moment and try again.',
+    sync_failed: 'Mailbox sync failed — try again or check mailbox settings.',
+  }
+
+  return {
+    message: byCode[code] ?? `Mailbox sync failed (${code}).`,
+    step: resolvedStep,
   }
 }
 
@@ -244,8 +318,11 @@ class ImapSession {
     }
   }
 
-  async command(payload: string): Promise<{ status: string; text: string; untagged: string[] }> {
-    return await withImapTimeout(this.commandInner(payload), this.commandTimeoutMs, 'IMAP command')
+  async command(
+    payload: string,
+    label = 'IMAP command',
+  ): Promise<{ status: string; text: string; untagged: string[] }> {
+    return await withImapTimeout(this.commandInner(payload), this.commandTimeoutMs, label)
   }
 
   private async commandInner(
@@ -287,7 +364,10 @@ class ImapSession {
 
 /** Minimal session surface for probe/sync + test doubles. */
 export type ImapSessionLike = {
-  command(payload: string): Promise<{ status: string; text: string; untagged: string[] }>
+  command(
+    payload: string,
+    label?: string,
+  ): Promise<{ status: string; text: string; untagged: string[] }>
   readGreeting(): Promise<void>
   close(): void
 }
@@ -463,6 +543,42 @@ export async function fetchInboundFromImap(
   )
 }
 
+function parseFetchBlockToMessage(
+  block: string,
+  maxBodyBytes: number,
+): InboundImapMessage | null {
+  const uid = extractUid(block)
+  if (!uid) return null
+  const headerRaw = extractBodyLiteral(block, 'HEADER.FIELDS') ?? ''
+  const bodyRaw = extractBodyLiteral(block, 'TEXT') ?? ''
+  const headers = parseHeaderBlock(headerRaw)
+  const from = parseAddressList(headers['from'])[0] ?? {
+    email: 'unknown@invalid',
+    name: null,
+  }
+  const to = parseAddressList(headers['to'])
+  const messageId = headers['message-id']?.trim()
+  const inReplyTo = headers['in-reply-to']?.trim()
+  const references = headers['references']?.trim()?.split(/\s+/).filter(Boolean) ?? []
+  const providerMessageId = (messageId && messageId.length > 0 ? messageId : `imap-uid-${uid}`)
+    .slice(0, 500)
+  const providerThreadId = (inReplyTo || references[0] || providerMessageId).slice(0, 500)
+  const truncated = bodyRaw.length >= maxBodyBytes
+  const bodyText = bodyRaw.slice(0, maxBodyBytes)
+  return {
+    provider_message_id: providerMessageId,
+    provider_thread_id: providerThreadId,
+    from_address: from.email,
+    from_name: from.name,
+    to_addresses: to,
+    subject: (headers['subject'] ?? '').slice(0, 998),
+    body_text: bodyText,
+    preview_text: bodyText.replace(/\s+/g, ' ').trim().slice(0, 160),
+    received_at: parseInternalDate(extractInternalDate(block)),
+    body_truncated: truncated,
+  }
+}
+
 async function fetchInboundFromImapInner(
   options: ImapFetchOptions,
   connectTimeoutMs: number,
@@ -480,18 +596,28 @@ async function fetchInboundFromImapInner(
       `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
     )
     if (login.status !== 'OK') {
-      throw new ImapSyncError('imap_auth_failed', `IMAP LOGIN failed: ${login.text}`, true)
+      throw new ImapSyncError('imap_auth_failed', `IMAP LOGIN failed: ${login.text}`, true, 'login')
     }
 
-    const selected = await session.command('SELECT INBOX')
+    const selected = await session.command('SELECT INBOX', 'IMAP SELECT')
     if (selected.status !== 'OK') {
-      throw new ImapSyncError('imap_connection_failed', `SELECT INBOX failed: ${selected.text}`)
+      throw new ImapSyncError(
+        'imap_select_failed',
+        `SELECT INBOX failed: ${selected.text}`,
+        false,
+        'select',
+      )
     }
 
     const since = formatImapSinceDate(options.lookbackDays)
-    const search = await session.command(`UID SEARCH SINCE ${since}`)
+    const search = await session.command(`UID SEARCH SINCE ${since}`, 'IMAP SEARCH')
     if (search.status !== 'OK') {
-      throw new ImapSyncError('imap_connection_failed', `UID SEARCH failed: ${search.text}`)
+      throw new ImapSyncError(
+        'imap_search_failed',
+        `UID SEARCH failed: ${search.text}`,
+        false,
+        'search',
+      )
     }
 
     let uids = extractUidList(search.untagged)
@@ -502,43 +628,25 @@ async function fetchInboundFromImapInner(
     const fetchSpec = `UID INTERNALDATE BODY.PEEK[${headerSection}] BODY.PEEK[TEXT]<0.${
       Math.max(1, options.maxBodyBytes)
     }>`
-    const fetch = await session.command(`UID FETCH ${uids.join(',')} (${fetchSpec})`)
-    if (fetch.status !== 'OK') {
-      throw new ImapSyncError('imap_connection_failed', `UID FETCH failed: ${fetch.text}`)
-    }
 
     const messages: InboundImapMessage[] = []
-    for (const block of splitFetchBlocks(fetch.untagged)) {
-      const uid = extractUid(block)
-      if (!uid) continue
-      const headerRaw = extractBodyLiteral(block, 'HEADER.FIELDS') ?? ''
-      const bodyRaw = extractBodyLiteral(block, 'TEXT') ?? ''
-      const headers = parseHeaderBlock(headerRaw)
-      const from = parseAddressList(headers['from'])[0] ?? {
-        email: 'unknown@invalid',
-        name: null,
+    for (const batch of chunkUids(uids, IMAP_FETCH_BATCH_SIZE)) {
+      const fetch = await session.command(
+        `UID FETCH ${batch.join(',')} (${fetchSpec})`,
+        'IMAP FETCH',
+      )
+      if (fetch.status !== 'OK') {
+        throw new ImapSyncError(
+          'imap_fetch_failed',
+          `UID FETCH failed: ${fetch.text}`,
+          false,
+          'fetch',
+        )
       }
-      const to = parseAddressList(headers['to'])
-      const messageId = headers['message-id']?.trim()
-      const inReplyTo = headers['in-reply-to']?.trim()
-      const references = headers['references']?.trim()?.split(/\s+/).filter(Boolean) ?? []
-      const providerMessageId = (messageId && messageId.length > 0 ? messageId : `imap-uid-${uid}`)
-        .slice(0, 500)
-      const providerThreadId = (inReplyTo || references[0] || providerMessageId).slice(0, 500)
-      const truncated = bodyRaw.length >= options.maxBodyBytes
-      const bodyText = bodyRaw.slice(0, options.maxBodyBytes)
-      messages.push({
-        provider_message_id: providerMessageId,
-        provider_thread_id: providerThreadId,
-        from_address: from.email,
-        from_name: from.name,
-        to_addresses: to,
-        subject: (headers['subject'] ?? '').slice(0, 998),
-        body_text: bodyText,
-        preview_text: bodyText.replace(/\s+/g, ' ').trim().slice(0, 160),
-        received_at: parseInternalDate(extractInternalDate(block)),
-        body_truncated: truncated,
-      })
+      for (const block of splitFetchBlocks(fetch.untagged)) {
+        const message = parseFetchBlockToMessage(block, options.maxBodyBytes)
+        if (message) messages.push(message)
+      }
     }
 
     await session.command('LOGOUT').catch(() => undefined)
