@@ -126,7 +126,14 @@
 						<Button
 							size="sm"
 							disabled={actionPending || isDirty}
-							title={isDirty ? 'Save changes before activating' : undefined}
+							title={
+								isDirty
+									? 'Save changes before activating'
+									: lines.length === 0
+										? 'Add and save at least one line before activating'
+										: undefined
+							}
+							data-testid="recurring-activate"
 							onclick={() => onActivate?.()}
 						>
 							Activate

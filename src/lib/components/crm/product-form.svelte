@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProductFormData } from '$lib/schemas/product.js';
+	import type { ProductFormData, ProductTaxRateOption } from '$lib/schemas/product.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -11,6 +11,7 @@
 
 	export interface ProductFormProps {
 		form: SuperForm<ProductFormData>;
+		taxRateOptions?: ProductTaxRateOption[];
 		submitLabel?: string;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -18,6 +19,7 @@
 
 	let {
 		form,
+		taxRateOptions = [],
 		submitLabel = 'Save product',
 		class: className,
 		onValidSubmit
@@ -40,6 +42,12 @@
 	const statusLabel = $derived(
 		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Select status'
 	);
+	const NONE_TAX = '__none__';
+	const taxLabel = $derived.by(() => {
+		const id = $formData.taxRateId;
+		if (!id) return 'No tax rate';
+		return taxRateOptions.find((o) => o.id === id)?.label ?? 'Tax rate';
+	});
 </script>
 
 <form
@@ -127,6 +135,27 @@
 				aria-invalid={!!$errors.unitPrice}
 			/>
 			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
+		</div>
+		<div class="space-y-2">
+			<Label for="product-tax">Tax rate</Label>
+			<Select.Root
+				type="single"
+				value={$formData.taxRateId || NONE_TAX}
+				onValueChange={(value) => {
+					$formData.taxRateId = !value || value === NONE_TAX ? '' : value;
+				}}
+				name="taxRateId"
+			>
+				<Select.Trigger id="product-tax" class="w-full" data-testid="product-tax-trigger">
+					{taxLabel}
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value={NONE_TAX} label="No tax rate">No tax rate</Select.Item>
+					{#each taxRateOptions as option (option.id)}
+						<Select.Item value={option.id} label={option.label}>{option.label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
 		</div>
 		<div class="space-y-2">
 			<Label for="product-stock">Opening stock</Label>

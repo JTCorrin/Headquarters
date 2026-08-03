@@ -8,6 +8,7 @@ export const productFormSchema = z.object({
 		.string()
 		.min(1, 'Unit price is required')
 		.regex(/^\d+(\.\d{1,2})?$/, 'Use a number like 12.50'),
+	taxRateId: z.string().optional().or(z.literal('')),
 	trackStock: z.boolean(),
 	stockQty: z
 		.string()
@@ -16,6 +17,11 @@ export const productFormSchema = z.object({
 		.refine((v) => v === undefined || v === '' || /^\d+$/.test(v), 'Stock must be a whole number'),
 	status: z.enum(['active', 'archived'])
 });
+
+export interface ProductTaxRateOption {
+	id: string;
+	label: string;
+}
 
 export type ProductFormSchema = typeof productFormSchema;
 export type ProductFormData = z.infer<typeof productFormSchema>;

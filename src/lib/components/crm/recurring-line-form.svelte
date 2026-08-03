@@ -52,6 +52,9 @@
 		if (!match) return;
 		$formData.descriptionTemplate = match.name;
 		$formData.unitPrice = match.unitPrice;
+		if (match.taxRatePercent != null && match.taxRatePercent !== '') {
+			$formData.taxRatePercent = match.taxRatePercent;
+		}
 		if (!$formData.qty) $formData.qty = '1';
 	}
 </script>
