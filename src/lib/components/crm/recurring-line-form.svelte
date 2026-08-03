@@ -131,7 +131,16 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="rline-tax">Tax % (optional)</Label>
-			<Input id="rline-tax" name="taxRatePercent" bind:value={$formData.taxRatePercent} placeholder="20" />
+			<Input
+				id="rline-tax"
+				name="taxRatePercent"
+				bind:value={$formData.taxRatePercent}
+				placeholder="20"
+				aria-invalid={!!$errors.taxRatePercent}
+			/>
+			{#if $errors.taxRatePercent}
+				<p class="text-destructive text-xs">{$errors.taxRatePercent}</p>
+			{/if}
 		</div>
 	</div>
 
