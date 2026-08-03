@@ -1548,6 +1548,39 @@ export interface ApiPaymentListParams {
 	bill_id?: string;
 }
 
+/** Row from `GET /api/v1/audit-events` (dictionary §9.2). */
+export type ApiAuditActorType = 'user' | 'agent' | 'api_key' | 'system' | string;
+
+export interface ApiAuditEvent {
+	id: string;
+	org_id: string | null;
+	actor_type: ApiAuditActorType;
+	actor_id: string | null;
+	action: string;
+	resource_type: string;
+	resource_id: string | null;
+	request_id: string | null;
+	ip_address: string | null;
+	user_agent: string | null;
+	before_data: Record<string, unknown> | null;
+	after_data: Record<string, unknown> | null;
+	metadata: Record<string, unknown>;
+	created_at: string;
+}
+
+/** List filters for org audit log (Owner/Admin). Dates are `YYYY-MM-DD`. */
+export interface ApiAuditEventListParams {
+	limit?: number;
+	cursor?: string;
+	/** Inclusive start date (`YYYY-MM-DD`). */
+	from?: string;
+	/** Inclusive end date (`YYYY-MM-DD`). */
+	to?: string;
+	/** Exact action code (e.g. `org.config_updated`) or prefix when BE supports it. */
+	action?: string;
+	actor_id?: string;
+}
+
 /** Entity types that host a profile timeline feed. */
 export type ApiTimelineEntityType =
 	| 'contact'
