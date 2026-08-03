@@ -116,6 +116,14 @@ fi
 PUBLIC_SUPABASE_URL="http://${APP_HOST}:54321"
 log "Supabase API ${PUBLIC_SUPABASE_URL}"
 
+# Edge signed upload/download URLs are minted from internal SUPABASE_URL (kong:8000).
+# Expose the LAN Kong origin so api-v1 can rewrite signed_url for the browser.
+cat > supabase/.env <<EOF
+API_CORS_ORIGIN=${STAGING_ORIGIN}
+PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
+EOF
+log "wrote PUBLIC_SUPABASE_URL into supabase/.env for Edge storage URL rewrite"
+
 # Edge runtime mounts supabase/functions but keeps a stale module graph across
 # git resets when the stack was already up. Bounce it so api-v1 matches this SHA
 # (Wave A mailbox/AI routes otherwise stay Route not found after migration up).
