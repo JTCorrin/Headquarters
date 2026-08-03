@@ -544,6 +544,7 @@ async function listQuotes(
   const url = new URL(req.url)
   const limit = parseLimit(url.searchParams.get('limit'))
   const status = parseQuoteListStatus(url.searchParams.get('status'))
+  const clientId = url.searchParams.get('client_id')
   const cursorValue = url.searchParams.get('cursor')
   const cursor = cursorValue ? decodeQuoteCursor(cursorValue) : null
 
@@ -557,6 +558,7 @@ async function listQuotes(
     .limit(limit + 1)
 
   if (status) query = query.eq('status', status)
+  if (clientId) query = query.eq('client_id', parseUuid(clientId, 'client_id'))
   if (cursor) {
     query = query.or(
       `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,

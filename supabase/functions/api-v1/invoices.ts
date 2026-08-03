@@ -530,6 +530,7 @@ async function listInvoices(
       status: 'Must be one of draft, sent, partial, paid, void',
     })
   }
+  const clientId = url.searchParams.get('client_id')
   const cursorValue = url.searchParams.get('cursor')
   const cursor = cursorValue ? decodeInvoiceCursor(cursorValue) : null
 
@@ -543,6 +544,7 @@ async function listInvoices(
     .limit(limit + 1)
 
   if (status) query = query.eq('status', status as InvoiceStatus)
+  if (clientId) query = query.eq('client_id', parseUuid(clientId, 'client_id'))
   if (cursor) {
     query = query.or(
       `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
