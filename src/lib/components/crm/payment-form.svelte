@@ -12,6 +12,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface PaymentFormProps {
@@ -264,12 +265,7 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="payment-occurred">{$formData.direction === 'inbound' ? 'Received on' : 'Paid on'}</Label>
-			<Input
-				id="payment-occurred"
-				name="occurredOn"
-				type="date"
-				bind:value={$formData.occurredOn}
-			/>
+			<DateField id="payment-occurred" name="occurredOn" bind:value={$formData.occurredOn} />
 			{#if $errors.occurredOn}<p class="text-destructive text-xs">{$errors.occurredOn}</p>{/if}
 		</div>
 	</div>

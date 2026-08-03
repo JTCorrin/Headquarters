@@ -9,6 +9,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface BillFormProps {
@@ -195,33 +196,33 @@
 	<div class="grid gap-4 sm:grid-cols-3">
 		<div class="space-y-2">
 			<Label for="bill-issue">Issue on</Label>
-			<Input
+			<DateField
 				id="bill-issue"
 				name="issueOn"
-				type="date"
 				bind:value={$formData.issueOn}
 				disabled={readonly}
+				readonly={readonly}
 			/>
 		</div>
 		<div class="space-y-2">
 			<Label for="bill-received">Received on</Label>
-			<Input
+			<DateField
 				id="bill-received"
 				name="receivedOn"
-				type="date"
 				bind:value={$formData.receivedOn}
 				disabled={readonly}
+				readonly={readonly}
 			/>
 			{#if $errors.receivedOn}<p class="text-destructive text-xs">{$errors.receivedOn}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="bill-due">Due on</Label>
-			<Input
+			<DateField
 				id="bill-due"
 				name="dueOn"
-				type="date"
 				bind:value={$formData.dueOn}
 				disabled={readonly}
+				readonly={readonly}
 			/>
 			{#if $errors.dueOn}<p class="text-destructive text-xs">{$errors.dueOn}</p>{/if}
 		</div>
