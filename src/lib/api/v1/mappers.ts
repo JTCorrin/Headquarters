@@ -1491,13 +1491,21 @@ export function toRecurringLineInput(
 ): ApiRecurringInvoiceLineInput {
 	const unitCents = amountStringToCents(data.unitPrice);
 	if (unitCents == null) throw new Error('Invalid unit price');
-	const tax = data.taxRatePercent?.trim();
+	const quantity = Number(data.qty);
+	if (!Number.isFinite(quantity) || quantity <= 0) {
+		throw new Error('Invalid quantity');
+	}
+	const taxRaw = data.taxRatePercent?.trim();
+	const taxRate = taxRaw ? Number(taxRaw) : 0;
+	if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) {
+		throw new Error('Invalid tax rate');
+	}
 	const input: ApiRecurringInvoiceLineInput = {
 		description_template: data.descriptionTemplate.trim(),
-		quantity: data.qty,
+		quantity,
 		unit_price_cents: unitCents,
-		discount_percent: '0',
-		tax_rate_percent: tax ? tax : '0',
+		discount_percent: 0,
+		tax_rate_percent: taxRate,
 		position
 	};
 	const productId = data.productId?.trim();

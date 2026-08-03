@@ -17,20 +17,22 @@ export interface PersonalEmailInboxState {
 	mailboxConnected: boolean;
 	aiProviderConnected: boolean;
 	smtpReady: boolean;
+	/** Set when `listMine` failed — page should surface instead of a fake empty inbox. */
+	listError?: string;
 }
 
 function resolveEmptyState(
 	mailboxConnected: boolean,
 	messageCount: number
 ): EntityEmailEmptyState {
-	if (messageCount > 0) return 'no_matches';
+	if (messageCount > 0) return 'empty_inbox';
 	if (!mailboxConnected) return 'no_mailbox';
-	return 'no_matches';
+	return 'empty_inbox';
 }
 
 /**
  * Load personal working inbox: mailbox + AI + `GET /api/v1/me/email-messages`.
- * Soft-fails each source so the page still renders.
+ * Soft-fails mailbox/integrations; surfaces listMine failures via `listError`.
  */
 export async function loadPersonalEmailInbox(
 	api: ApiV1Client,
@@ -66,8 +68,27 @@ export async function loadPersonalEmailInbox(
 	}
 
 	let messages: EmailMessage[] = [];
+	let listError: string | undefined;
 	if (messagesResult.status === 'fulfilled') {
-		messages = messagesResult.value.map(toEntityEmailMessage);
+		const payload = messagesResult.value as unknown;
+		// Client normally unwraps `{ data }`; tolerate a nested envelope if present.
+		const rows = Array.isArray(payload)
+			? payload
+			: payload &&
+				  typeof payload === 'object' &&
+				  Array.isArray((payload as { data?: unknown }).data)
+				? (payload as { data: Parameters<typeof toEntityEmailMessage>[0][] }).data
+				: null;
+		if (rows) {
+			messages = rows.map(toEntityEmailMessage);
+		} else {
+			listError = 'Personal inbox response was not a message list.';
+		}
+	} else if (messagesResult.reason) {
+		const reason = messagesResult.reason;
+		listError = isApiClientError(reason)
+			? reason.message || 'Could not load personal inbox messages.'
+			: 'Could not load personal inbox messages.';
 	}
 
 	return {
@@ -75,7 +96,8 @@ export async function loadPersonalEmailInbox(
 		emptyState: resolveEmptyState(mailboxConnected, messages.length),
 		mailboxConnected,
 		aiProviderConnected,
-		smtpReady
+		smtpReady,
+		listError
 	};
 }
 

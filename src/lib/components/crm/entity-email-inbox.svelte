@@ -19,8 +19,12 @@
 		unread?: boolean;
 	}
 
-	/** Wave A empty states — three different stories, not one generic message. */
-	export type EntityEmailEmptyState = 'no_mailbox' | 'no_matches' | 'teammate_nothing_shared';
+	/** Wave A empty states — personal inbox uses `empty_inbox`; entity tabs use `no_matches`. */
+	export type EntityEmailEmptyState =
+		| 'no_mailbox'
+		| 'no_matches'
+		| 'empty_inbox'
+		| 'teammate_nothing_shared';
 
 	export type DraftTone = 'warm' | 'neutral' | 'firm';
 
@@ -120,6 +124,15 @@
 						'Teammates only see mail that was added to the timeline — private inbox matches stay private.',
 					ctaHref: null,
 					ctaLabel: null
+				};
+			case 'empty_inbox':
+				return {
+					title: 'Your inbox is empty',
+					detail: mailboxConnected
+						? 'Messages owned by your connected mailbox appear here after sync. Contact and client Email tabs show address matches separately.'
+						: 'Connect a mailbox under My settings → Mail to start syncing.',
+					ctaHref: mailboxConnected ? null : mailSettingsHref,
+					ctaLabel: mailboxConnected ? null : 'Open Mail settings'
 				};
 			case 'no_matches':
 			default:

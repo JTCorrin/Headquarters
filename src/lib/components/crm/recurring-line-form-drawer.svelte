@@ -14,6 +14,8 @@
 		products?: CatalogProductOption[];
 		submitLabel?: string;
 		triggerLabel?: string;
+		title?: string;
+		description?: string;
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -25,6 +27,8 @@
 		products = [],
 		submitLabel = 'Add line',
 		triggerLabel = 'Add line',
+		title = 'Add schedule line',
+		description = 'Lines copy into each generated invoice snapshot.',
 		class: className,
 		trigger,
 		onValidSubmit
@@ -46,8 +50,8 @@
 
 	<Drawer.Content class={cn('mx-auto w-full max-w-lg', className)}>
 		<Drawer.Header class="text-left">
-			<Drawer.Title>Add schedule line</Drawer.Title>
-			<Drawer.Description>Lines copy into each generated invoice snapshot.</Drawer.Description>
+			<Drawer.Title>{title}</Drawer.Title>
+			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
 			<RecurringLineForm {form} {products} {submitLabel} {onValidSubmit} class="max-w-none" />
