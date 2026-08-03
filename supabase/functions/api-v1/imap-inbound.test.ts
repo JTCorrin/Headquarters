@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects } from '@std/assert'
 import {
   chunkUids,
+  decodeMimeBodyText,
   extractBodyLiteral,
   formatImapSinceDate,
   IMAP_CONNECT_TIMEOUT_MS,
@@ -205,4 +206,69 @@ Deno.test('withImapTimeout FETCH label sets step fetch', async () => {
   )
   assertEquals(error.code, 'timeout')
   assertEquals(error.step, 'fetch')
+})
+
+Deno.test('decodeMimeBodyText prefers Outlook multipart QP text/plain', () => {
+  const raw = [
+    '--_000_CWLP123MB49142F33173CECF9FBCD2CA7CED52CWLP123MB4914GBRP_',
+    'Content-Type: text/plain; charset="iso-8859-1"',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    'Hello',
+    '',
+    '--_000_CWLP123MB49142F33173CECF9FBCD2CA7CED52CWLP123MB4914GBRP_',
+    'Content-Type: text/html; charset="iso-8859-1"',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    '<html>',
+    '<head>',
+    '<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=',
+    '1">',
+    '</head>',
+    '<body dir=3D"ltr">',
+    '<div>Hello</div>',
+    '</body>',
+    '</html>',
+    '',
+    '--_000_CWLP123MB49142F33173CECF9FBCD2CA7CED52CWLP123MB4914GBRP_--',
+    '',
+  ].join('\r\n')
+
+  assertEquals(decodeMimeBodyText(raw), 'Hello')
+})
+
+Deno.test('decodeMimeBodyText leaves non-multipart body unchanged', () => {
+  assertEquals(
+    decodeMimeBodyText('Just a plain note\nwith two lines'),
+    'Just a plain note\nwith two lines',
+  )
+})
+
+Deno.test('decodeMimeBodyText falls back to HTML when no plain part', () => {
+  const raw = [
+    '--bound123',
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    '<p>Hi=3Dthere</p>',
+    '--bound123--',
+    '',
+  ].join('\r\n')
+
+  assertEquals(decodeMimeBodyText(raw), 'Hi=there')
+})
+
+Deno.test('decodeMimeBodyText decodes base64 text/plain part', () => {
+  const payload = btoa('Secret base64 hello')
+  const raw = [
+    '--b64bound',
+    'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    payload,
+    '--b64bound--',
+    '',
+  ].join('\r\n')
+
+  assertEquals(decodeMimeBodyText(raw), 'Secret base64 hello')
 })
