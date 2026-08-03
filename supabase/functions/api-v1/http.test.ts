@@ -55,6 +55,11 @@ import {
   validateQuoteBody,
 } from './quotes.ts'
 import { validateTaxRateBody } from './tax-rates.ts'
+import {
+  decodeTimelineCursor,
+  parseEntityType,
+  validateTimelineNoteBody,
+} from './timeline-events.ts'
 
 Deno.test('apiPath normalises product and native function URLs', () => {
   assertEquals(apiPath('/api/v1/contacts'), '/api/v1/contacts')
@@ -1241,6 +1246,46 @@ Deno.test('payment allocate/reverse idempotency payload omits expected_version',
     paymentMutationIdempotencyPayload(paymentId, { reason: 'oops' }),
   )
   assertEquals(hashV1, hashV2)
+})
+
+Deno.test('timeline entity type and note body validation', () => {
+  assertEquals(parseEntityType('quote'), 'quote')
+  assertThrows(() => parseEntityType('organisation'), ApiError)
+  assertEquals(
+    validateTimelineNoteBody({
+      title: '  Follow up  ',
+      body: 'Called the client',
+      payload: { accent: 'slate', icon: 'note' },
+    }),
+    {
+      kind: 'note',
+      title: 'Follow up',
+      body: 'Called the client',
+      payload: { accent: 'slate', icon: 'note' },
+    },
+  )
+  assertEquals(
+    validateTimelineNoteBody({ kind: 'call', title: 'Dialed' }),
+    { kind: 'call', title: 'Dialed', body: null, payload: {} },
+  )
+  assertThrows(
+    () => validateTimelineNoteBody({ kind: 'conversion', title: 'Nope' }),
+    ApiError,
+  )
+  assertThrows(() => validateTimelineNoteBody({ title: '' }), ApiError)
+  assertThrows(
+    () => validateTimelineNoteBody({ title: 'X', payload: [] }),
+    ApiError,
+  )
+})
+
+Deno.test('timeline cursor decode accepts occurred_at keyset', () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  const occurredAt = '2026-08-03T12:00:00.000Z'
+  const encoded = btoa(JSON.stringify({ occurred_at: occurredAt, id }))
+  assertEquals(decodeTimelineCursor(encoded), { occurred_at: occurredAt, id })
+  assertEquals(decodeTimelineCursor(null), null)
+  assertThrows(() => decodeTimelineCursor('%%%'), ApiError)
 })
 
 Deno.test('email template create validation defaults status and merge_schema', () => {
