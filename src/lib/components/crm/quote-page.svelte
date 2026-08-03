@@ -468,6 +468,12 @@
 						{canConvert}
 						{canEditLines}
 						{actionPending}
+						moneyTotals={{
+							subtotalCents: quote.subtotal_cents,
+							discountCents: quote.discount_cents,
+							taxCents: quote.tax_cents,
+							totalCents: quote.total_cents
+						}}
 						bind:lines
 						bind:lineDrawerOpen
 						onSaveQuote={onSaveQuote}

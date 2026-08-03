@@ -32,6 +32,13 @@
 		canEditLines?: boolean;
 		canAccept?: boolean;
 		canConvert?: boolean;
+		/** Server-authoritative money totals for table/PDF (minor units). */
+		moneyTotals?: {
+			subtotalCents: number;
+			discountCents: number;
+			taxCents: number;
+			totalCents: number;
+		} | null;
 		actionPending?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
@@ -58,6 +65,7 @@
 		canEditLines = true,
 		canAccept = false,
 		canConvert = false,
+		moneyTotals = null,
 		actionPending = false,
 		onRemoveLine,
 		onAddLine,
@@ -82,7 +90,15 @@
 			currency: formData.current.currency,
 			status: status || formData.current.status,
 			lines,
-			issueDate: new Date().toISOString().slice(0, 10)
+			issueDate: new Date().toISOString().slice(0, 10),
+			totals: moneyTotals
+				? {
+						subtotalCents: moneyTotals.subtotalCents,
+						discountCents: moneyTotals.discountCents,
+						taxCents: moneyTotals.taxCents,
+						totalCents: moneyTotals.totalCents
+					}
+				: undefined
 		})
 	);
 
@@ -172,6 +188,7 @@
 
 					<LineItemsTable
 						rows={lines}
+						totals={moneyTotals}
 						onRemove={canEditLines ? onRemoveLine : undefined}
 						class="self-start"
 					>
