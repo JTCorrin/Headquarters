@@ -1,5 +1,10 @@
 import type { ApiRequestFn } from '../request.js';
-import type { ApiMailboxAccount, ApiMailboxPutBody, ApiMailboxTestResult } from '../types.js';
+import type {
+	ApiMailboxAccount,
+	ApiMailboxPutBody,
+	ApiMailboxSyncResult,
+	ApiMailboxTestResult
+} from '../types.js';
 import type { MailboxEndpoints } from './types.js';
 
 export function createMailboxEndpoints(request: ApiRequestFn): MailboxEndpoints {
@@ -22,6 +27,14 @@ export function createMailboxEndpoints(request: ApiRequestFn): MailboxEndpoints 
 		},
 		test: async (signal) => {
 			const { data } = await request<ApiMailboxTestResult>('/api/v1/me/mailbox/test', {
+				method: 'POST',
+				orgScoped: true,
+				signal
+			});
+			return data;
+		},
+		sync: async (signal) => {
+			const { data } = await request<ApiMailboxSyncResult>('/api/v1/me/mailbox/sync', {
 				method: 'POST',
 				orgScoped: true,
 				signal

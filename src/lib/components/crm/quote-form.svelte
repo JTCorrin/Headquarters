@@ -147,13 +147,15 @@
 				name="status"
 				value={statusLabel}
 				readonly
+				disabled
 				tabindex={-1}
 				class="bg-muted/40"
 				data-testid="quote-status-readonly"
+				aria-describedby="quote-status-help"
 			/>
-			<p class="text-muted-foreground text-xs">
-				Status is server-managed. Use <span class="font-medium">Accept</span>, then
-				<span class="font-medium">Convert to invoice</span>.
+			<p id="quote-status-help" class="text-muted-foreground text-xs">
+				Status is locked — use <span class="font-medium">Accept</span>, then
+				<span class="font-medium">Convert to invoice</span>. Saving details does not change status.
 			</p>
 		</div>
 	</div>

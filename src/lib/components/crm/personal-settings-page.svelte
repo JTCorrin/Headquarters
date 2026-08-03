@@ -3,7 +3,11 @@
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { MembershipRole, ProfilePreferencesData } from '$lib/schemas/organisation.js';
 	import { roleLabel } from '$lib/schemas/organisation.js';
-	import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
+	import type {
+		MailboxAccountResource,
+		MailboxFormData,
+		MailboxTestFeedback
+	} from '$lib/schemas/mailbox.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
@@ -27,7 +31,16 @@
 		onReload?: () => void;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
-		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
+		onTestMailbox?: () =>
+			| MailboxTestFeedback
+			| false
+			| void
+			| Promise<MailboxTestFeedback | false | void>;
+		onSyncMailbox?: () =>
+			| MailboxTestFeedback
+			| false
+			| void
+			| Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 	}
 
@@ -45,6 +58,7 @@
 		onSavePreferences,
 		onSaveMailbox,
 		onTestMailbox,
+		onSyncMailbox,
 		onDisconnectMailbox
 	}: PersonalSettingsPageProps = $props();
 
@@ -121,6 +135,7 @@
 									account={mailboxAccount}
 									onValidSubmit={onSaveMailbox}
 									onTest={onTestMailbox}
+									onSync={onSyncMailbox}
 									onDisconnect={onDisconnectMailbox}
 								/>
 							</section>

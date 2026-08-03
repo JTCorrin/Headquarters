@@ -149,9 +149,34 @@ export function humanizeMailboxSyncError(code: string | null | undefined): strin
 			return 'Sync paused after repeated failures — fix credentials, then use Test connection.';
 		case 'quota_exceeded':
 			return 'The mail provider rejected the request (quota or rate limit). Try again later.';
+		case 'imap_not_configured_for_host':
+			return 'Real IMAP fetch is not enabled for this host yet — sync marked the mailbox checked. Use a *.example.test host for synthetic staging ingest.';
+		case 'credentials_missing':
+			return 'Mailbox credentials are missing — save a password, then try Sync again.';
+		case 'lease_error':
+		case 'not_claimed':
+			return 'Another sync is already running — wait a moment and try again.';
 		default:
-			return `Sync issue (${code}). Try Test connection, or reconnect the mailbox.`;
+			return `Sync issue (${code}). Try Sync now, or Test connection.`;
 	}
+}
+
+export function describeMailboxSyncResult(result: {
+	ok: boolean;
+	ingested: number;
+	error_code: string | null;
+}): string {
+	const hint = humanizeMailboxSyncError(result.error_code);
+	if (result.ingested > 0) {
+		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${hint ? ` ${hint}` : ''}`;
+	}
+	if (result.error_code === 'imap_not_configured_for_host') {
+		return hint ?? 'Sync completed — real IMAP for this host is not available yet.';
+	}
+	if (result.ok) {
+		return hint ?? 'Sync completed — no new messages.';
+	}
+	return hint ?? 'Sync failed — try again or check mailbox settings.';
 }
 
 export function formatMailboxLastChecked(iso: string | null | undefined): string | null {
