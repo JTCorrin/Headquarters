@@ -9,6 +9,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import ClientPicker from './client-picker.svelte';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface LeadFormProps {
@@ -211,12 +212,12 @@
 
 	<div class="space-y-2">
 		<Label for="lead-close">Expected close</Label>
-		<Input
+		<DateField
 			id="lead-close"
 			name="expectedCloseOn"
-			type="date"
 			bind:value={$formData.expectedCloseOn}
 			aria-invalid={!!$errors.expectedCloseOn}
+			presets={['today', 'plus7', 'endOfMonth']}
 		/>
 		{#if $errors.expectedCloseOn}
 			<p class="text-destructive text-xs">{$errors.expectedCloseOn}</p>
