@@ -581,6 +581,7 @@ interface ApiBillWritableFields {
 	received_on?: string | null;
 	due_on?: string;
 	notes?: string | null;
+	attachment_document_id?: string | null;
 }
 
 export type ApiBillCreateBody = ApiBillWritableFields & {
@@ -844,7 +845,8 @@ export type ApiDocumentEntityType =
 	| 'contact'
 	| 'lead'
 	| 'organisation'
-	| 'meeting';
+	| 'meeting'
+	| 'bill';
 
 export type ApiDocumentCategory =
 	| 'contract'
