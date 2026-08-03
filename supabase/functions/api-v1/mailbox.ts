@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '../_shared/database.ts'
-import { ApiError, jsonBody, jsonResponse } from './http.ts'
+import { ApiError, jsonBody, jsonResponse, parseLimit } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
@@ -292,6 +292,40 @@ async function testMailbox(
   }
 
   return jsonResponse({ data: { ok: true, error_code: null } }, 200, requestId)
+}
+
+export async function listMyEmailMessages(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  role: MembershipRole,
+  requestId: string,
+): Promise<Response> {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access personal email inbox')
+  }
+  if (req.method !== 'GET') {
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for personal email inbox')
+  }
+
+  const url = new URL(req.url)
+  const limit = parseLimit(url.searchParams.get('limit'))
+  const { data, error } = await db.rpc('list_my_email_messages', {
+    p_org_id: orgId,
+    p_limit: limit,
+  })
+  if (error) {
+    const message = error.message?.toLowerCase() ?? ''
+    if (error.code === '42501' || message.includes('forbidden')) {
+      throw new ApiError(403, 'FORBIDDEN', 'Personal email inbox is forbidden')
+    }
+    console.error('Personal email inbox list failed', {
+      request_id: requestId,
+      code: error.code ?? 'unknown',
+    })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Personal email inbox list failed')
+  }
+  return jsonResponse({ data: (data ?? []) as Json[] }, 200, requestId)
 }
 
 export async function listEntityEmailMessages(
