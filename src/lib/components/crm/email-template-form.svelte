@@ -13,14 +13,22 @@
 		form: SuperForm<EmailTemplateFormData>;
 		submitLabel?: string;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
-	let { form, submitLabel = 'Save template', class: className }: EmailTemplateFormProps = $props();
+	let {
+		form,
+		submitLabel = 'Save template',
+		class: className,
+		onValidSubmit
+	}: EmailTemplateFormProps = $props();
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+	let submitLock = false;
+	let pendingSubmit = $state(false);
 
 	const categoryOptions = [
 		{ value: 'transactional', label: 'Transactional' },
@@ -43,7 +51,28 @@
 	);
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)}>
+<form
+	method="POST"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (!onValidSubmit) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+	class={cn('space-y-4', className)}
+	data-testid="email-template-form"
+>
 	<div class="space-y-2">
 		<Label for="tpl-name">Name</Label>
 		<Input
@@ -110,5 +139,5 @@
 		{#if $errors.body}<p class="text-destructive text-xs">{$errors.body}</p>{/if}
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={$submitting || pendingSubmit}>{submitLabel}</Button>
 </form>

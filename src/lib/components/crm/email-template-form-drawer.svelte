@@ -16,6 +16,7 @@
 		triggerLabel?: string;
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -26,7 +27,8 @@
 		submitLabel = 'Save template',
 		triggerLabel = 'New template',
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: EmailTemplateFormDrawerProps = $props();
 </script>
 
@@ -47,7 +49,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<EmailTemplateForm {form} {submitLabel} />
+			<EmailTemplateForm {form} {submitLabel} {onValidSubmit} />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

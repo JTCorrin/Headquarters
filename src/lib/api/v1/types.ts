@@ -1056,7 +1056,7 @@ export interface ApiEmailMessage {
 	direction: 'inbound' | 'outbound';
 	from_address: string;
 	from_name?: string | null;
-	to_addresses: string[] | unknown;
+	to_addresses?: string[] | unknown;
 	subject: string;
 	preview_text?: string | null;
 	body_text?: string | null;
@@ -1064,6 +1064,59 @@ export interface ApiEmailMessage {
 	sent_at?: string | null;
 	link_reason?: 'address_match' | 'timeline_share' | null;
 	unread?: boolean;
+	/** Present on personal inbox rows from `list_my_email_messages`. */
+	status?: string | null;
+	is_owner?: boolean;
+	mailbox_account_id?: string | null;
+}
+
+export type ApiEmailTemplateCategory =
+	| 'transactional'
+	| 'campaign'
+	| 'chase'
+	| 'onboarding'
+	| 'other';
+
+export type ApiEmailTemplateStatus = 'draft' | 'active' | 'archived';
+
+export interface ApiEmailTemplate {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	subject: string;
+	body_text: string | null;
+	body_html: string | null;
+	category: ApiEmailTemplateCategory;
+	status: ApiEmailTemplateStatus;
+	merge_schema: unknown[];
+}
+
+export interface ApiEmailTemplateCreateBody {
+	name: string;
+	subject: string;
+	body_text?: string | null;
+	body_html?: string | null;
+	category: ApiEmailTemplateCategory;
+	status?: ApiEmailTemplateStatus;
+	merge_schema?: unknown[];
+}
+
+export type ApiEmailTemplateUpdateBody = Partial<ApiEmailTemplateCreateBody>;
+
+export interface ApiEmailTemplateListParams {
+	limit?: number;
+	status?: ApiEmailTemplateStatus;
+	category?: ApiEmailTemplateCategory;
+}
+
+export interface ApiMyEmailMessageListParams {
+	limit?: number;
 }
 
 /** Body for `POST /api/v1/email-messages/{id}/share` (Wave B BE contract). */
