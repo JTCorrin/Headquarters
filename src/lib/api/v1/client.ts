@@ -18,6 +18,7 @@ import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
 import { createTasksEndpoints } from './endpoints/tasks.js';
+import { createTimelineEventsEndpoints } from './endpoints/timeline-events.js';
 import { createVendorsEndpoints } from './endpoints/vendors.js';
 import type {
 	BillsEndpoints,
@@ -39,6 +40,7 @@ import type {
 	RecurringInvoiceSchedulesEndpoints,
 	TaxRatesEndpoints,
 	TasksEndpoints,
+	TimelineEventsEndpoints,
 	VendorsEndpoints
 } from './endpoints/types.js';
 import type { ApiRequestFn, ApiRequestOptions, ApiResult } from './request.js';
@@ -82,6 +84,7 @@ export interface ApiV1Client {
 	documents: DocumentsEndpoints;
 	emailMessages: EmailMessagesEndpoints;
 	emailTemplates: EmailTemplatesEndpoints;
+	timelineEvents: TimelineEventsEndpoints;
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
@@ -264,6 +267,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		tasks: createTasksEndpoints(request),
 		documents: createDocumentsEndpoints(request),
 		emailMessages: createEmailMessagesEndpoints(request),
-		emailTemplates: createEmailTemplatesEndpoints(request)
+		emailTemplates: createEmailTemplatesEndpoints(request),
+		timelineEvents: createTimelineEventsEndpoints(request)
 	};
 }

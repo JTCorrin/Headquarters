@@ -13,8 +13,9 @@
 		type TimelineIconId
 	} from './timeline-accents.js';
 	import {
-		TIMELINE_EVENT_KINDS,
+		COMPOSABLE_TIMELINE_EVENT_KINDS,
 		TIMELINE_KIND_META,
+		isComposableTimelineEventKind,
 		type TimelineEventKind
 	} from './timeline-kinds.js';
 	import TimelineIcon from './timeline-icon.svelte';
@@ -62,12 +63,13 @@
 		document: 'amber',
 		status: 'orange',
 		meeting: 'indigo',
-		task: 'rose'
+		task: 'rose',
+		conversion: 'violet'
 	};
 
 	function onKindChange(next: string) {
-		if (!(TIMELINE_EVENT_KINDS as readonly string[]).includes(next)) return;
-		kind = next as TimelineEventKind;
+		if (!isComposableTimelineEventKind(next)) return;
+		kind = next;
 		accent = kindDefaultAccent[kind];
 		icon = kind as TimelineIconId;
 	}
@@ -184,7 +186,7 @@
 				>
 					<Select.Trigger id="timeline-kind" class="w-full">{kindLabel}</Select.Trigger>
 					<Select.Content>
-						{#each TIMELINE_EVENT_KINDS as option (option)}
+						{#each COMPOSABLE_TIMELINE_EVENT_KINDS as option (option)}
 							<Select.Item value={option} label={TIMELINE_KIND_META[option].label}>
 								{TIMELINE_KIND_META[option].label}
 							</Select.Item>

@@ -7,6 +7,7 @@
 	import ProfileTabs from './profile-tabs.svelte';
 	import InfoCard, { type InfoCardField } from './info-card.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
 	import EntityEmailInbox, {
 		type EmailMessage,
 		type EntityEmailEmptyState
@@ -28,6 +29,7 @@
 		companyFields: InfoCardField[];
 		contactFields: InfoCardField[];
 		timelineEvents?: TimelineEvent[];
+		composerActor?: string;
 		emailMessages?: EmailMessage[];
 		emailEmptyState?: EntityEmailEmptyState;
 		mailboxConnected?: boolean;
@@ -47,6 +49,7 @@
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
+		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
@@ -69,6 +72,7 @@
 		companyFields,
 		contactFields,
 		timelineEvents = $bindable<TimelineEvent[]>([]),
+		composerActor = 'You',
 		emailMessages = [],
 		emailEmptyState = 'no_mailbox',
 		mailboxConnected = false,
@@ -86,6 +90,7 @@
 		moneyItems = [],
 		showNav = true,
 		class: className,
+		onTimelineAdd,
 		onAddToTimeline,
 		onDraftResponse,
 		onUseSuggestion,
@@ -135,7 +140,8 @@
 								bind:events={timelineEvents}
 								title="Activity"
 								composable
-								composerActor="Joe"
+								{composerActor}
+								onAdd={onTimelineAdd}
 							/>
 						</div>
 					{:else if active === 'email'}

@@ -17,6 +17,7 @@ export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
 export { createTasksEndpoints } from './tasks.js';
 export { createTaxRatesEndpoints } from './tax-rates.js';
+export { createTimelineEventsEndpoints } from './timeline-events.js';
 export { createVendorsEndpoints } from './vendors.js';
 export type {
 	BillsEndpoints,
@@ -38,5 +39,6 @@ export type {
 	RecurringInvoiceSchedulesEndpoints,
 	TaxRatesEndpoints,
 	TasksEndpoints,
+	TimelineEventsEndpoints,
 	VendorsEndpoints
 } from './types.js';

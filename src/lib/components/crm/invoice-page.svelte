@@ -19,6 +19,10 @@
 		toPaymentListItem
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiInvoiceDocument, ApiTaxRate } from '$lib/api/v1/types.js';
+	import {
+		createEntityTimelineEvent,
+		loadEntityTimeline
+	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -40,6 +44,8 @@
 	} from '$lib/schemas/payment.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
+	import type { TimelineEvent } from './timeline.svelte';
 	import AppShell from './app-shell.svelte';
 	import InvoiceDetailPage from './invoice-detail-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
@@ -73,6 +79,7 @@
 	let products = $state<CatalogProductOption[]>([]);
 	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
+	let timelineEvents = $state<TimelineEvent[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
 	let switchError = $state<string | null>(null);
@@ -257,6 +264,7 @@
 	function resetOrgScopedState() {
 		invoice = null;
 		lines = [];
+		timelineEvents = [];
 		paymentRows = [];
 		clientOptions = [];
 		contactOptions = [];
@@ -383,9 +391,14 @@
 			}
 			contactOptions = options;
 			viewState = { kind: 'ready' };
+
+			const timeline = await loadEntityTimeline(api, 'invoice', invoiceId);
+			if (isStale(epoch)) return;
+			timelineEvents = timeline;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			invoice = null;
+			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Invoice not found.' };
 				return;
@@ -520,6 +533,8 @@
 			const updated = await action();
 			if (isStale(epoch)) return;
 			applyDocument(updated);
+			timelineEvents = await loadEntityTimeline(api, 'invoice', invoiceId);
+			if (isStale(epoch)) return;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -537,6 +552,11 @@
 		} finally {
 			actionPending = false;
 		}
+	}
+
+	async function onTimelineAdd(submit: TimelineComposerSubmit) {
+		const created = await createEntityTimelineEvent(api, 'invoice', invoiceId, submit);
+		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
 	async function onSend() {
@@ -759,6 +779,7 @@
 						balanceLabel={formatCents(invoice.balance_due_cents, invoice.currency)}
 						canRecordPayment={['sent', 'partial', 'paid'].includes(invoice.status)}
 						bind:lines
+						bind:timelineEvents
 						bind:lineDrawerOpen
 						onSaveInvoice={onSaveInvoice}
 						onAddLine={onAddLine}
@@ -768,6 +789,7 @@
 						onDelete={onDelete}
 						onRecordPayment={onRecordPayment}
 						onReversePayment={onReversePayment}
+						{onTimelineAdd}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>
