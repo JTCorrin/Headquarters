@@ -8,6 +8,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface TaskFormProps {
@@ -183,7 +184,7 @@
 
 		<div class="space-y-2">
 			<Label for="task-due">Due date</Label>
-			<Input id="task-due" name="dueOn" type="date" bind:value={$formData.dueOn} />
+			<DateField id="task-due" name="dueOn" bind:value={$formData.dueOn} />
 		</div>
 	</div>
 

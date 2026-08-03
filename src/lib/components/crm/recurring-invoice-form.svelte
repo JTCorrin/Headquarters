@@ -11,6 +11,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface RecurringInvoiceFormProps {
@@ -321,15 +322,33 @@
 	<div class="grid gap-4 sm:grid-cols-3">
 		<div class="space-y-2">
 			<Label for="ri-anchor">Anchor date</Label>
-			<Input id="ri-anchor" type="date" bind:value={$formData.anchorOn} disabled={readonly} />
+			<DateField
+				id="ri-anchor"
+				name="anchorOn"
+				bind:value={$formData.anchorOn}
+				disabled={readonly}
+				readonly={readonly}
+			/>
 		</div>
 		<div class="space-y-2">
 			<Label for="ri-start">Start on</Label>
-			<Input id="ri-start" type="date" bind:value={$formData.startOn} disabled={readonly} />
+			<DateField
+				id="ri-start"
+				name="startOn"
+				bind:value={$formData.startOn}
+				disabled={readonly}
+				readonly={readonly}
+			/>
 		</div>
 		<div class="space-y-2">
 			<Label for="ri-end">End on (optional)</Label>
-			<Input id="ri-end" type="date" bind:value={$formData.endOn} disabled={readonly} />
+			<DateField
+				id="ri-end"
+				name="endOn"
+				bind:value={$formData.endOn}
+				disabled={readonly}
+				readonly={readonly}
+			/>
 		</div>
 	</div>
 
