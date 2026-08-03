@@ -26,7 +26,3 @@ test-results
 
 *storybook.log
 storybook-static
-
-# Vitest browser failure artifacts
-src/lib/components/crm/__screenshots__/
-.vitest-attachments/
