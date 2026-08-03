@@ -2,6 +2,7 @@ import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
 import {
+  parseDocumentEntityType,
   resolveStoragePublicBase,
   rewriteStorageSignedUrl,
   validateFolderCreateBody,
@@ -985,6 +986,12 @@ Deno.test('document folder create validation trims name and allows null parent',
   assertEquals(ok.name, 'Contracts')
   assertEquals(ok.parent_id, null)
   assertThrows(() => validateFolderCreateBody({ name: '' }), ApiError)
+})
+
+Deno.test('document entity types accept bill and reject unknown values', () => {
+  assertEquals(parseDocumentEntityType('bill'), 'bill')
+  assertEquals(parseDocumentEntityType('client'), 'client')
+  assertThrows(() => parseDocumentEntityType('invoice'), ApiError)
 })
 
 Deno.test('mailbox validation normalises email and rejects empty password rotate', () => {
