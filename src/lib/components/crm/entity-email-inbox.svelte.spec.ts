@@ -36,6 +36,22 @@ describe('EntityEmailInbox', () => {
 			.toHaveTextContent(/added to the timeline/i);
 	});
 
+	it('shows personal inbox empty state (not entity match copy)', async () => {
+		render(EntityEmailInbox, {
+			messages: [],
+			emptyState: 'empty_inbox',
+			mailboxConnected: true,
+			role: 'owner'
+		});
+
+		await expect
+			.element(page.getByTestId('entity-email-empty-pane'))
+			.toHaveTextContent(/Your inbox is empty/i);
+		await expect
+			.element(page.getByTestId('entity-email-empty-pane'))
+			.not.toHaveTextContent(/matched this person/i);
+	});
+
 	it('gates Draft response for members when AI is disconnected', async () => {
 		render(EntityEmailInbox, {
 			messages: sampleEmailMessages,

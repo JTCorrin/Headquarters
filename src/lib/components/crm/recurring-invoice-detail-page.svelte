@@ -39,8 +39,11 @@
 		isDirty?: boolean;
 		actionPending?: boolean;
 		actionError?: string | null;
+		/** When true, line drawer is correcting an existing line (not appending). */
+		lineEditing?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
+		onPrepareAddLine?: () => void;
 		onSaveSchedule?: () => boolean | void | Promise<boolean | void>;
 		onActivate?: () => void | Promise<void>;
 		onPause?: () => void | Promise<void>;
@@ -71,8 +74,10 @@
 		isDirty = false,
 		actionPending = false,
 		actionError = null,
+		lineEditing = false,
 		onRemoveLine,
 		onAddLine,
+		onPrepareAddLine,
 		onSaveSchedule,
 		onActivate,
 		onPause,
@@ -212,10 +217,20 @@
 									form={lineForm}
 									{products}
 									onValidSubmit={onAddLine}
+									submitLabel={lineEditing ? 'Update line' : 'Add line'}
 									triggerLabel="Add line"
+									title={lineEditing ? 'Fix schedule line' : 'Add schedule line'}
+									description={lineEditing
+										? 'Correct the highlighted fields, then save the schedule again.'
+										: 'Lines copy into each generated invoice snapshot.'}
 								>
 									{#snippet trigger()}
-										<Button type="button" size="sm" variant="outline">
+										<Button
+											type="button"
+											size="sm"
+											variant="outline"
+											onclick={() => onPrepareAddLine?.()}
+										>
 											<PlusIcon class="mr-1 size-4" />
 											Add line
 										</Button>
