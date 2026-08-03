@@ -136,6 +136,12 @@
 				{lineForm}
 				products={catalog}
 				{timelineEvents}
+				moneyTotals={{
+					subtotalCents: 190000,
+					discountCents: 0,
+					taxCents: 38000,
+					totalCents: 228000
+				}}
 				bind:lines
 				bind:lineDrawerOpen
 				onRemoveLine={(id) => {
