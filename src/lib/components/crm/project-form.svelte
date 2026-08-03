@@ -19,19 +19,24 @@
 		clients?: ProjectClientOption[];
 		submitLabel?: string;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
 		form,
 		clients = [],
 		submitLabel = 'Save project',
-		class: className
+		class: className,
+		onValidSubmit
 	}: ProjectFormProps = $props();
 
 	const formData = untrack(() => form.form);
 	const errors = untrack(() => form.errors);
 	const enhance = untrack(() => form.enhance);
 	const submitting = untrack(() => form.submitting);
+
+	let submitLock = false;
+	let pendingSubmit = $state(false);
 
 	const statusOptions = [
 		{ value: 'planning', label: 'Planning' },
@@ -48,7 +53,27 @@
 	);
 </script>
 
-<form method="POST" use:enhance class={cn('space-y-4', className)}>
+<form
+	method="POST"
+	use:enhance={{
+		async onUpdate({ form: validated }) {
+			if (!validated.valid) return;
+			if (submitLock) return false;
+			submitLock = true;
+			pendingSubmit = true;
+			try {
+				return await onValidSubmit?.();
+			} catch {
+				return false;
+			} finally {
+				submitLock = false;
+				pendingSubmit = false;
+			}
+		}
+	}}
+	class={cn('space-y-4', className)}
+	data-testid="project-form"
+>
 	<div class="space-y-2">
 		<Label for="project-name">Name</Label>
 		<Input
@@ -76,22 +101,16 @@
 		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
 	</div>
 
-	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="space-y-2">
-			<Label for="project-owner">Owner</Label>
-			<Input id="project-owner" name="owner" bind:value={$formData.owner} placeholder="Joe" />
-		</div>
-		<div class="space-y-2">
-			<Label for="project-status">Status</Label>
-			<Select.Root type="single" bind:value={$formData.status} name="status">
-				<Select.Trigger id="project-status" class="w-full">{statusLabel}</Select.Trigger>
-				<Select.Content>
-					{#each statusOptions as option (option.value)}
-						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
+	<div class="space-y-2">
+		<Label for="project-status">Status</Label>
+		<Select.Root type="single" bind:value={$formData.status} name="status">
+			<Select.Trigger id="project-status" class="w-full">{statusLabel}</Select.Trigger>
+			<Select.Content>
+				{#each statusOptions as option (option.value)}
+					<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
 	</div>
 
 	<div class="space-y-2">
@@ -105,5 +124,5 @@
 		/>
 	</div>
 
-	<Button type="submit" disabled={$submitting}>{submitLabel}</Button>
+	<Button type="submit" disabled={$submitting || pendingSubmit}>{submitLabel}</Button>
 </form>

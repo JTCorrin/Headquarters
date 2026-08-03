@@ -1,25 +1,35 @@
 <script lang="ts">
-	import SvarKanbanShell from './svar-kanban-shell.svelte';
 	import type { KanbanCard, ColumnConfig } from '@svar-ui/svelte-kanban';
+	import SvarKanbanShell, { type MoveCardEvent } from './svar-kanban-shell.svelte';
 	import { cn } from '$lib/utils.js';
-
-	export type ProjectWorkColumn = 'backlog' | 'doing' | 'review' | 'done';
+	import { computeBoardPosition } from '$lib/money.js';
 
 	export interface ProjectWorkCard {
 		id: string;
 		title: string;
 		assignee?: string;
-		column: ProjectWorkColumn;
+		/** Target column id (project_columns.id). */
+		column: string;
 		dueOn?: string;
+		version?: number;
+		position?: number;
+	}
+
+	export interface ProjectCardBoardMove {
+		id: string;
+		columnId: string;
+		position: number;
+		beforeId: string | null;
 	}
 
 	export interface ProjectWorkspaceBoardProps {
 		cards: ProjectWorkCard[];
-		columns?: { id: ProjectWorkColumn; label: string }[];
+		columns?: { id: string; label: string }[];
 		class?: string;
+		onMoveCard?: (move: ProjectCardBoardMove) => void | Promise<void>;
 	}
 
-	const defaultColumns: { id: ProjectWorkColumn; label: string }[] = [
+	const defaultColumns: { id: string; label: string }[] = [
 		{ id: 'backlog', label: 'Backlog' },
 		{ id: 'doing', label: 'Doing' },
 		{ id: 'review', label: 'Review' },
@@ -29,7 +39,8 @@
 	let {
 		cards: workCards,
 		columns: stageColumns = defaultColumns,
-		class: className
+		class: className,
+		onMoveCard
 	}: ProjectWorkspaceBoardProps = $props();
 
 	const columns = $derived<ColumnConfig[]>(
@@ -41,15 +52,48 @@
 	);
 
 	const cards = $derived<KanbanCard[]>(
-		workCards.map((card) => ({
-			id: card.id,
-			label: card.title,
-			column: card.column,
-			description: [card.assignee ? `Owner: ${card.assignee}` : null, card.dueOn]
-				.filter(Boolean)
-				.join(' · ')
-		}))
+		workCards
+			.slice()
+			.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+			.map((card) => ({
+				id: card.id,
+				label: card.title,
+				column: card.column,
+				description: [card.assignee ? `Owner: ${card.assignee}` : null, card.dueOn]
+					.filter(Boolean)
+					.join(' · ')
+			}))
 	);
+
+	function resolveCardId(encoded: string | number | null | undefined): string | null {
+		if (encoded == null) return null;
+		const raw = String(encoded);
+		const match = workCards.find((c) => raw === `:${c.id}` || raw === String(c.id));
+		return match?.id ?? null;
+	}
+
+	function resolveColumnId(encoded: string | number | null | undefined): string | null {
+		if (encoded == null) return null;
+		const raw = String(encoded);
+		const match = stageColumns.find((c) => raw === `:${c.id}` || raw === String(c.id));
+		return match?.id ?? null;
+	}
+
+	function handleMoveCard(event: MoveCardEvent) {
+		const id = resolveCardId(event.id);
+		if (!id) return;
+		const columnId = resolveColumnId(event.column) ?? String(event.column ?? '');
+		if (!columnId || !stageColumns.some((c) => c.id === columnId)) return;
+		const beforeId = resolveCardId(event.before ?? null);
+		const columnCards = workCards.filter((c) => c.column === columnId || c.id === id);
+		const optimisticColumn = columnCards.map((c) =>
+			c.id === id ? { ...c, column: columnId } : c
+		);
+		const position = computeBoardPosition(optimisticColumn, beforeId, id);
+		void onMoveCard?.({ id, columnId, position, beforeId });
+	}
 </script>
 
-<SvarKanbanShell {cards} {columns} class={cn(className)} />
+<div class={cn(className)} data-testid="project-workspace-board">
+	<SvarKanbanShell {cards} {columns} onMoveCard={handleMoveCard} />
+</div>

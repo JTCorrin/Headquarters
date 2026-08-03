@@ -17,6 +17,7 @@
 		triggerLabel?: string;
 		class?: string;
 		trigger?: Snippet;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -28,18 +29,23 @@
 		submitLabel = 'Save project',
 		triggerLabel = 'New project',
 		class: className,
-		trigger
+		trigger,
+		onValidSubmit
 	}: ProjectFormDrawerProps = $props();
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
 	{#if trigger}
 		<Drawer.Trigger>
-			{@render trigger()}
+			{#snippet child({ props })}
+				<span class="inline-flex" {...props}>{@render trigger()}</span>
+			{/snippet}
 		</Drawer.Trigger>
 	{:else}
 		<Drawer.Trigger>
-			<Button type="button">{triggerLabel}</Button>
+			{#snippet child({ props })}
+				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+			{/snippet}
 		</Drawer.Trigger>
 	{/if}
 
@@ -49,7 +55,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ProjectForm {form} {clients} {submitLabel} />
+			<ProjectForm {form} {clients} {submitLabel} {onValidSubmit} class="max-w-none" />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

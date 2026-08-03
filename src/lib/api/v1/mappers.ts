@@ -120,6 +120,11 @@ import type {
 	ApiMeetingRelatedEntityType,
 	ApiMeetingStatus,
 	ApiMeetingUpdateBody,
+	ApiProject,
+	ApiProjectCard,
+	ApiProjectCreateBody,
+	ApiProjectDocument,
+	ApiProjectStatus,
 	ApiAuditEvent,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody
@@ -129,8 +134,16 @@ import type {
 	MeetingFormData,
 	MeetingListItem
 } from '$lib/schemas/meeting.js';
+import type {
+	ProjectFormData,
+	ProjectListItem
+} from '$lib/schemas/project.js';
+import { projectBoardStatuses } from '$lib/schemas/project.js';
 import type { InfoCardField } from '$lib/components/crm/info-card.svelte';
 import type { DashboardMeeting } from '$lib/components/crm/dashboard-page.svelte';
+import type { EntityProject } from '$lib/components/crm/entity-projects.svelte';
+import type { ProjectWorkCard } from '$lib/components/crm/project-workspace-board.svelte';
+import type { ProjectCard } from '$lib/components/crm/projects-board.svelte';
 
 export function toOrgMembershipSummary(
 	row: ApiOrganisationMembership
@@ -2075,4 +2088,111 @@ export function toMeetingCreateBody(data: MeetingFormData): ApiMeetingCreateBody
 
 export function toMeetingUpdateBody(data: MeetingFormData): ApiMeetingUpdateBody {
 	return toMeetingCreateBody(data);
+}
+
+export function projectStatusLabel(status: ApiProjectStatus): string {
+	switch (status) {
+		case 'planning':
+			return 'Planning';
+		case 'active':
+			return 'Active';
+		case 'blocked':
+			return 'Blocked';
+		case 'done':
+			return 'Done';
+		case 'archived':
+			return 'Archived';
+		default:
+			return status;
+	}
+}
+
+export function emptyProjectFormData(): ProjectFormData {
+	return {
+		name: '',
+		clientId: '',
+		description: '',
+		status: 'planning'
+	};
+}
+
+export function toProjectCreateBody(data: ProjectFormData): ApiProjectCreateBody {
+	return {
+		client_id: data.clientId.trim(),
+		name: data.name.trim(),
+		description: data.description?.trim() ? data.description.trim() : null,
+		status: data.status
+	};
+}
+
+export function toProjectListItem(project: ApiProject): ProjectListItem {
+	const status = projectBoardStatuses.includes(project.status as (typeof projectBoardStatuses)[number])
+		? (project.status as (typeof projectBoardStatuses)[number])
+		: 'planning';
+	const cardCount = project.columns?.reduce((sum, col) => sum + (col.cards?.length ?? 0), 0);
+	return {
+		id: project.id,
+		name: project.name,
+		clientId: project.client_id,
+		clientName: project.client_label?.trim() || 'Client',
+		cardCount,
+		stage: status,
+		version: project.version,
+		position: project.position,
+		rawStatus: project.status
+	};
+}
+
+export function toProjectBoardCard(item: ProjectListItem): ProjectCard {
+	return {
+		id: item.id,
+		name: item.name,
+		clientId: item.clientId,
+		clientName: item.clientName,
+		owner: item.owner,
+		cardCount: item.cardCount,
+		stage: item.stage,
+		version: item.version,
+		position: item.position
+	};
+}
+
+export function toEntityProject(project: ApiProject): EntityProject {
+	const cardCount = project.columns?.reduce((sum, col) => sum + (col.cards?.length ?? 0), 0);
+	return {
+		id: project.id,
+		name: project.name,
+		status: projectStatusLabel(project.status),
+		cardCount,
+		updatedAt: project.updated_at
+	};
+}
+
+export function toWorkspaceCards(project: ApiProjectDocument): ProjectWorkCard[] {
+	const cards: ProjectWorkCard[] = [];
+	for (const column of project.columns ?? []) {
+		for (const card of column.cards ?? []) {
+			cards.push(toWorkspaceCard(card, column.id));
+		}
+	}
+	return cards.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
+export function toWorkspaceCard(card: ApiProjectCard, columnId = card.column_id): ProjectWorkCard {
+	return {
+		id: card.id,
+		title: card.title,
+		column: columnId,
+		dueOn: card.due_at ? card.due_at.slice(0, 10) : undefined,
+		version: card.version,
+		position: card.position
+	};
+}
+
+export function workspaceColumnsFromProject(
+	project: ApiProjectDocument
+): { id: string; label: string }[] {
+	return [...(project.columns ?? [])]
+		.sort((a, b) => a.position - b.position)
+		.map((col) => ({ id: col.id, label: col.name }));
 }
