@@ -117,7 +117,7 @@
 				breadcrumb="Accounting / Quotes"
 				{title}
 				{status}
-				description="Edit on the left — the PDF preview updates live on the right."
+				description="Edit on the left — the PDF preview updates live on the right. Lifecycle: Accept, then Convert to invoice."
 			>
 				{#snippet actions()}
 					{#if canAccept}
@@ -138,6 +138,17 @@
 							disabled={actionPending}
 							data-testid="quote-convert"
 							onclick={() => void onConvert?.()}
+						>
+							Convert to invoice
+						</Button>
+					{:else if canAccept}
+						<Button
+							size="sm"
+							type="button"
+							variant="outline"
+							disabled
+							title="Accept the quote first, then convert."
+							data-testid="quote-convert-disabled"
 						>
 							Convert to invoice
 						</Button>
