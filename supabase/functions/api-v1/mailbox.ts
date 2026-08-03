@@ -1,11 +1,47 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import type { Database, Json } from '../_shared/database.ts'
+import {
+  type ImapProbeOptions,
+  type ImapSecurity,
+  ImapSyncError,
+  isSyntheticImapHost,
+  probeImap,
+} from '../_shared/imap-inbound.ts'
 import { ApiError, jsonBody, jsonResponse, parseLimit } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
 const SECURITY = new Set(['tls', 'starttls', 'none'])
+
+type ImapProbeFn = (options: ImapProbeOptions) => Promise<void>
+
+let imapProbeFn: ImapProbeFn = probeImap
+
+/** Test seam — pass null to restore the real IMAP probe. */
+export function setImapProbeForTests(fn: ImapProbeFn | null): void {
+  imapProbeFn = fn ?? probeImap
+}
+
+function serviceRoleClient(): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Service credentials are unavailable')
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function mailboxTestFailure(errorCode: string, message: string): {
+  ok: false
+  error_code: string
+  message: string
+} {
+  return { ok: false, error_code: errorCode, message }
+}
 
 export type MailboxUpsertBody = {
   email_address: string
@@ -244,7 +280,7 @@ async function testMailbox(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  // Wave A: no live IMAP — validate credentials presence only. Never log body.
+  // Live IMAP probe (connect + LOGIN + LOGOUT). Never log body / password.
   let password: string | null = null
   if (req.headers.get('content-type')?.includes('application/json')) {
     const raw = await req.text()
@@ -262,36 +298,143 @@ async function testMailbox(
     }
   }
 
-  const { data, error } = await db.rpc('mailbox_credentials_present', {
+  const { data: present, error } = await db.rpc('mailbox_credentials_present', {
     p_org_id: orgId,
     p_password: password,
   })
   if (error) throw databaseError(error, requestId)
 
-  if (!data) {
+  if (!present) {
     return jsonResponse(
-      { data: { ok: false, error_code: 'credentials_missing' } },
+      {
+        data: mailboxTestFailure(
+          'credentials_missing',
+          'Mailbox credentials are missing — save a password, then try Test again.',
+        ),
+      },
       200,
       requestId,
     )
   }
 
-  // Confirm mailbox row exists when using stored credentials.
-  if (!password) {
-    const { data: mailbox, error: mailboxError } = await db.rpc('get_mailbox_account', {
-      p_org_id: orgId,
+  const { data: mailbox, error: mailboxError } = await db.rpc('get_mailbox_account', {
+    p_org_id: orgId,
+  })
+  if (mailboxError) throw databaseError(mailboxError, requestId)
+  if (!mailbox || typeof mailbox !== 'object') {
+    return jsonResponse(
+      {
+        data: mailboxTestFailure(
+          'credentials_missing',
+          'Mailbox credentials are missing — save mailbox settings, then try Test again.',
+        ),
+      },
+      200,
+      requestId,
+    )
+  }
+
+  const row = mailbox as Record<string, unknown>
+  const imapHost = String(row.imap_host ?? '')
+  const username = String(row.username ?? '')
+  const imapPort = Number(row.imap_port ?? 993)
+  const securityRaw = String(row.imap_security ?? 'tls')
+  const security: ImapSecurity = securityRaw === 'starttls' || securityRaw === 'none'
+    ? securityRaw
+    : 'tls'
+
+  // Staging / unit synthetic hosts: credentials-present is enough (no network).
+  if (isSyntheticImapHost(imapHost)) {
+    return jsonResponse(
+      {
+        data: {
+          ok: true,
+          error_code: null,
+          message: 'Synthetic mailbox host — credentials present (no network probe).',
+        },
+      },
+      200,
+      requestId,
+    )
+  }
+
+  let probePassword = password
+  if (!probePassword) {
+    const service = serviceRoleClient()
+    const { data: creds, error: credError } = await service.rpc('read_mailbox_sync_credentials', {
+      p_mailbox_id: String(row.id),
     })
-    if (mailboxError) throw databaseError(mailboxError, requestId)
-    if (!mailbox) {
+    if (credError) throw databaseError(credError, requestId)
+    const credRow = creds as Record<string, unknown> | null
+    probePassword = typeof credRow?.password === 'string' ? credRow.password : null
+  }
+
+  if (!probePassword) {
+    return jsonResponse(
+      {
+        data: mailboxTestFailure(
+          'credentials_missing',
+          'Mailbox credentials are missing — save a password, then try Test again.',
+        ),
+      },
+      200,
+      requestId,
+    )
+  }
+
+  try {
+    await imapProbeFn({
+      host: imapHost,
+      port: imapPort,
+      security,
+      username,
+      password: probePassword,
+    })
+    return jsonResponse(
+      {
+        data: {
+          ok: true,
+          error_code: null,
+          message: 'IMAP login succeeded.',
+        },
+      },
+      200,
+      requestId,
+    )
+  } catch (probeError) {
+    if (probeError instanceof ImapSyncError) {
+      const messages: Record<string, string> = {
+        timeout: 'Mail server timed out — check host, port, security, and network path.',
+        imap_auth_failed:
+          'Sign-in failed — check the email address and password (or app password).',
+        imap_tls_failed:
+          'Secure connection failed — try a different security setting (SSL / STARTTLS).',
+        imap_connection_failed:
+          'Could not reach the mail server — check host, port, and security settings.',
+      }
       return jsonResponse(
-        { data: { ok: false, error_code: 'credentials_missing' } },
+        {
+          data: mailboxTestFailure(
+            probeError.code,
+            messages[probeError.code] ?? `IMAP test failed (${probeError.code}).`,
+          ),
+        },
         200,
         requestId,
       )
     }
+    console.error('Mailbox IMAP probe failed', { request_id: requestId })
+    return jsonResponse(
+      {
+        data: mailboxTestFailure(
+          'imap_connection_failed',
+          'Could not reach the mail server — check host, port, and security settings.',
+        ),
+      },
+      200,
+      requestId,
+    )
   }
-
-  return jsonResponse({ data: { ok: true, error_code: null } }, 200, requestId)
 }
 
 export async function listMyEmailMessages(
