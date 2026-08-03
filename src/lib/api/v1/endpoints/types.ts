@@ -80,6 +80,14 @@ import type {
 	ApiMeetingDocument,
 	ApiMeetingListParams,
 	ApiMeetingUpdateBody,
+	ApiProject,
+	ApiProjectCard,
+	ApiProjectCardCreateBody,
+	ApiProjectCardUpdateBody,
+	ApiProjectCreateBody,
+	ApiProjectDocument,
+	ApiProjectListParams,
+	ApiProjectUpdateBody,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
@@ -326,6 +334,37 @@ export interface MeetingsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiMeetingDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface ProjectsEndpoints {
+	list(params?: ApiProjectListParams, signal?: AbortSignal): Promise<ApiResult<ApiProject[]>>;
+	create(body: ApiProjectCreateBody, signal?: AbortSignal): Promise<ApiProjectDocument>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiProjectDocument>>;
+	update(
+		id: string,
+		body: ApiProjectUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiProjectDocument>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	createCard(
+		projectId: string,
+		body: ApiProjectCardCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiProjectCard>;
+	updateCard(
+		projectId: string,
+		cardId: string,
+		body: ApiProjectCardUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiProjectCard>;
+	deleteCard(
+		projectId: string,
+		cardId: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<void>;
 }
 
 export interface RecurringInvoiceSchedulesEndpoints {

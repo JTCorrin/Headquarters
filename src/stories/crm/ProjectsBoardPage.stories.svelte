@@ -10,56 +10,66 @@
 	});
 
 	const clients = [
-		{ id: 'c-northwind', name: 'Northwind' },
-		{ id: 'c-contoso', name: 'Contoso' },
-		{ id: 'c-fabrikam', name: 'Fabrikam' }
+		{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Northwind' },
+		{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Contoso' },
+		{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', name: 'Fabrikam' }
 	];
 
 	const projects = [
 		{
 			id: 'p1',
 			name: 'Q2 retainer delivery',
-			clientId: 'c-northwind',
+			clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
 			clientName: 'Northwind',
 			owner: 'Joe',
 			cardCount: 8,
-			stage: 'active'
+			stage: 'active',
+			version: 1,
+			position: 0
 		},
 		{
 			id: 'p2',
 			name: 'Warehouse rollout',
-			clientId: 'c-northwind',
+			clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
 			clientName: 'Northwind',
 			owner: 'Maya',
 			cardCount: 12,
-			stage: 'planning'
+			stage: 'planning',
+			version: 1,
+			position: 0
 		},
 		{
 			id: 'p3',
-			name: 'Pilot integration',
-			clientId: 'c-fabrikam',
+			name: 'Portal integration',
+			clientId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
 			clientName: 'Fabrikam',
 			owner: 'Joe',
 			cardCount: 5,
-			stage: 'active'
+			stage: 'active',
+			version: 1,
+			position: 1
 		},
 		{
 			id: 'p4',
 			name: 'Expansion discovery',
-			clientId: 'c-contoso',
+			clientId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
 			clientName: 'Contoso',
 			owner: 'Maya',
 			cardCount: 3,
-			stage: 'blocked'
+			stage: 'blocked',
+			version: 1,
+			position: 0
 		},
 		{
 			id: 'p5',
 			name: 'Kickoff pack',
-			clientId: 'c-contoso',
+			clientId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
 			clientName: 'Contoso',
 			owner: 'Joe',
 			cardCount: 6,
-			stage: 'done'
+			stage: 'done',
+			version: 1,
+			position: 0
 		}
 	];
 </script>
@@ -73,9 +83,8 @@
 	const data = defaults(
 		{
 			name: '',
-			clientId: 'c-northwind',
+			clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
 			description: '',
-			owner: '',
 			status: 'planning'
 		},
 		zod4(projectFormSchema)

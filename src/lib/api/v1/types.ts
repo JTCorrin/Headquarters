@@ -759,6 +759,117 @@ export type ApiMeetingUpdateBody = Partial<Omit<ApiMeetingCreateBody, 'attendees
 	attendees?: ApiMeetingAttendeeInput[];
 };
 
+export type ApiProjectStatus = 'planning' | 'active' | 'blocked' | 'done' | 'archived';
+
+export interface ApiProjectCard {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	project_id: string;
+	column_id: string;
+	title: string;
+	description: string | null;
+	assignee_membership_id: string | null;
+	task_id: string | null;
+	due_at: string | null;
+	position: number;
+	completed_at: string | null;
+}
+
+export interface ApiProjectColumn {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	project_id: string;
+	name: string;
+	key: string;
+	position: number;
+	wip_limit: number | null;
+	/** Nested on GET project document. */
+	cards?: ApiProjectCard[];
+}
+
+export interface ApiProject {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	client_id: string;
+	name: string;
+	description: string | null;
+	status: ApiProjectStatus;
+	owner_membership_id: string | null;
+	starts_on: string | null;
+	due_on: string | null;
+	completed_at: string | null;
+	position: number;
+	/** Optional resolved client name from the API host. */
+	client_label?: string | null;
+	/** Nested on GET/POST project document. */
+	columns?: ApiProjectColumn[];
+}
+
+export type ApiProjectDocument = ApiProject & {
+	columns: Array<ApiProjectColumn & { cards: ApiProjectCard[] }>;
+};
+
+export interface ApiProjectListParams {
+	limit?: number;
+	cursor?: string;
+	client_id?: string;
+	/** Single status or comma-separated list. */
+	status?: ApiProjectStatus | string;
+}
+
+export interface ApiProjectCreateBody {
+	client_id: string;
+	name: string;
+	description?: string | null;
+	status?: ApiProjectStatus;
+	owner_membership_id?: string | null;
+	starts_on?: string | null;
+	due_on?: string | null;
+	position?: number;
+}
+
+export type ApiProjectUpdateBody = Partial<Omit<ApiProjectCreateBody, 'client_id'>> & {
+	client_id?: string;
+	status?: ApiProjectStatus;
+	position?: number;
+};
+
+export interface ApiProjectCardCreateBody {
+	title: string;
+	column_id?: string;
+	description?: string | null;
+	assignee_membership_id?: string | null;
+	due_at?: string | null;
+}
+
+export interface ApiProjectCardUpdateBody {
+	title?: string;
+	description?: string | null;
+	assignee_membership_id?: string | null;
+	due_at?: string | null;
+	column_id?: string;
+	position?: number;
+	completed_at?: string | null;
+}
+
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
 export interface ApiClient {

@@ -41,7 +41,12 @@
 			{#each projects as project (project.id)}
 				<li class="flex items-center justify-between gap-3 px-4 py-3">
 					<div class="min-w-0">
-						<p class="truncate text-sm font-medium">{project.name}</p>
+						<a
+							href={`/projects/${project.id}`}
+							class="hover:text-foreground truncate text-sm font-medium underline-offset-4 hover:underline"
+						>
+							{project.name}
+						</a>
 						<p class="text-muted-foreground truncate text-xs">
 							{[
 								project.owner ? `Owner ${project.owner}` : null,
