@@ -1,10 +1,27 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
+import {
+  fetchInboundFromImap,
+  type ImapFetchOptions,
+  type ImapSecurity,
+  ImapSyncError,
+  type InboundImapMessage,
+  isSyntheticImapHost,
+} from '../_shared/imap-inbound.ts'
 import { ApiError, jsonBody, jsonResponse, parseUuid } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
+
+type ImapInboundFetcher = (options: ImapFetchOptions) => Promise<InboundImapMessage[]>
+
+let imapInboundFetcher: ImapInboundFetcher = fetchInboundFromImap
+
+/** Test seam — pass null to restore the real IMAP fetcher. */
+export function setImapInboundFetcherForTests(fetcher: ImapInboundFetcher | null): void {
+  imapInboundFetcher = fetcher ?? fetchInboundFromImap
+}
 
 function serviceRoleClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL')
@@ -80,7 +97,35 @@ async function shareEmailMessage(
   return jsonResponse({ data }, 200, requestId)
 }
 
-/** Wave B sync skeleton: synthetic IMAP for *.example.test hosts; respects lease + bounds. */
+async function ingestInboundMessages(
+  service: SupabaseClient,
+  orgId: string,
+  mailboxId: string,
+  messages: InboundImapMessage[],
+): Promise<number> {
+  let ingested = 0
+  for (const message of messages) {
+    const { error } = await service.rpc('upsert_inbound_email_message', {
+      p_org_id: orgId,
+      p_mailbox_id: mailboxId,
+      p_provider_message_id: message.provider_message_id,
+      p_provider_thread_id: message.provider_thread_id,
+      p_from_address: message.from_address,
+      p_from_name: message.from_name,
+      p_to_addresses: message.to_addresses,
+      p_subject: message.subject,
+      p_body_text: message.body_text,
+      p_preview_text: message.preview_text,
+      p_received_at: message.received_at,
+      p_body_truncated: message.body_truncated,
+    })
+    if (error) throw error
+    ingested += 1
+  }
+  return ingested
+}
+
+/** Sync cycle: synthetic for *.example.test; real IMAP for all other hosts. */
 export async function runMailboxSyncCycle(
   mailboxId: string,
   holder: string,
@@ -109,65 +154,100 @@ export async function runMailboxSyncCycle(
   const imapHost = String(claimed.imap_host ?? '')
   const maxMessages = Number(claimed.sync_max_messages ?? 100)
   const maxBody = Number(claimed.sync_max_body_bytes ?? 262144)
+  const lookbackDays = Number(claimed.sync_lookback_days ?? 14)
   let ingested = 0
-  const authFailed = false
+  let authFailed = false
   let errorCode: string | null = null
 
   try {
     if (!claimed.credentials_configured) {
       errorCode = 'credentials_missing'
-    } else if (imapHost.endsWith('.example.test') || imapHost === 'imap.example.test') {
-      // Skeleton ingest for staging proofs — exact-address match to seeded contact email.
+    } else if (isSyntheticImapHost(imapHost)) {
       const peer = contactEmailForSeed ?? 'peer@example.test'
       const body =
         `Hello from Wave B sync skeleton.\n\nThis is a synthetic inbound message for staging proofs.`
       const truncated = body.length > maxBody
       const bodyText = truncated ? body.slice(0, maxBody) : body
       const count = Math.min(1, maxMessages)
+      const synthetic: InboundImapMessage[] = []
       for (let i = 0; i < count; i++) {
         const providerId = `synth-${mailboxId}-${Date.now()}-${i}`
-        const { error } = await service.rpc('upsert_inbound_email_message', {
-          p_org_id: orgId,
-          p_mailbox_id: mailboxId,
-          p_provider_message_id: providerId,
-          p_provider_thread_id: `thread-${providerId}`,
-          p_from_address: peer,
-          p_from_name: 'Wave B Peer',
-          p_to_addresses: [{ email: String(claimed.email_address), name: null }],
-          p_subject: 'Wave B sync skeleton message',
-          p_body_text: bodyText,
-          p_preview_text: bodyText.slice(0, 160),
-          p_received_at: new Date().toISOString(),
-          p_body_truncated: truncated,
+        synthetic.push({
+          provider_message_id: providerId,
+          provider_thread_id: `thread-${providerId}`,
+          from_address: peer,
+          from_name: 'Wave B Peer',
+          to_addresses: [{ email: String(claimed.email_address), name: null }],
+          subject: 'Wave B sync skeleton message',
+          body_text: bodyText,
+          preview_text: bodyText.slice(0, 160),
+          received_at: new Date().toISOString(),
+          body_truncated: truncated,
         })
-        if (error) throw error
-        ingested += 1
       }
+      ingested = await ingestInboundMessages(service, orgId, mailboxId, synthetic)
     } else {
-      // Real IMAP deferred — mark skipped without opening circuit.
-      errorCode = 'imap_not_configured_for_host'
+      const { data: creds, error: credError } = await service.rpc(
+        'read_mailbox_sync_credentials',
+        { p_mailbox_id: mailboxId },
+      )
+      if (credError) throw credError
+      const row = creds as Record<string, unknown> | null
+      const password = typeof row?.password === 'string' ? row.password : null
+      if (!password) {
+        errorCode = 'credentials_missing'
+      } else {
+        const securityRaw = String(row?.imap_security ?? 'tls')
+        const security: ImapSecurity = securityRaw === 'starttls' || securityRaw === 'none'
+          ? securityRaw
+          : 'tls'
+        const fetched = await imapInboundFetcher({
+          host: imapHost,
+          port: Number(claimed.imap_port ?? 993),
+          security,
+          username: String(row?.username ?? claimed.username ?? ''),
+          password,
+          lookbackDays,
+          maxMessages,
+          maxBodyBytes: maxBody,
+        })
+        ingested = await ingestInboundMessages(service, orgId, mailboxId, fetched)
+      }
     }
 
     await service.rpc('release_mailbox_sync_lease', {
       p_mailbox_id: mailboxId,
       p_holder: holder,
-      p_ok: errorCode === null || errorCode === 'imap_not_configured_for_host',
+      p_ok: errorCode === null,
       p_error_code: errorCode,
       p_auth_failed: authFailed,
     })
     return {
-      ok: errorCode === null || errorCode === 'imap_not_configured_for_host',
+      ok: errorCode === null,
       ingested,
       error_code: errorCode,
     }
   } catch (error) {
+    if (error instanceof ImapSyncError) {
+      authFailed = error.authFailed
+      errorCode = error.code
+      await service.rpc('release_mailbox_sync_lease', {
+        p_mailbox_id: mailboxId,
+        p_holder: holder,
+        p_ok: false,
+        p_error_code: error.code,
+        p_auth_failed: authFailed,
+      })
+      return { ok: false, ingested, error_code: error.code }
+    }
     const message = error instanceof Error ? error.message : 'sync_failed'
+    authFailed = /auth/i.test(message)
     await service.rpc('release_mailbox_sync_lease', {
       p_mailbox_id: mailboxId,
       p_holder: holder,
       p_ok: false,
       p_error_code: 'sync_failed',
-      p_auth_failed: /auth/i.test(message),
+      p_auth_failed: authFailed,
     })
     return { ok: false, ingested, error_code: 'sync_failed' }
   }
