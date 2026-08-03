@@ -5,6 +5,7 @@
 		type DocumentWorkspaceController
 	} from '$lib/api/v1/document-workspace-controller.svelte.js';
 	import type { ApiDocumentCategory, ApiDocumentEntityType } from '$lib/api/v1/types.js';
+	import DocumentFilePreview from './document-file-preview.svelte';
 	import EntityDocuments from './entity-documents.svelte';
 
 	interface Props {
@@ -86,6 +87,14 @@
 		}}
 		onRetryView={() => {
 			void controller?.refresh();
+		}}
+	/>
+	<DocumentFilePreview
+		preview={controller.previewState}
+		onClose={() => controller?.closePreview()}
+		onDownload={() => {
+			const id = controller?.previewState?.documentId;
+			if (id) void controller?.download(id);
 		}}
 	/>
 {/if}
