@@ -127,7 +127,7 @@
 
 		if (!membershipsReady) return;
 
-		if (isAuthPublicPath(path) || path === '/') {
+		if (isAuthPublicPath(path)) {
 			void goto(
 				postAuthDestination({
 					membershipCount: orgSession.memberships.length,

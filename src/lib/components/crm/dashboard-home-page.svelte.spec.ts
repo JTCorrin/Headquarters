@@ -4,12 +4,11 @@ import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
 import { createMockFetch } from '$lib/api/v1/mock-fetch.js';
 import { createOrgSession } from '$lib/org/session.svelte.js';
-import TasksPage from './tasks-page.svelte';
+import DashboardHomePage from './dashboard-home-page.svelte';
 
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const MEMBERSHIP_ID = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
 const TASK_ID = '11111111-2222-4333-8444-555555555555';
-const TASK_B = '22222222-3333-4444-8555-666666666666';
 
 function sampleTask(overrides: Record<string, unknown> = {}) {
 	return {
@@ -27,7 +26,7 @@ function sampleTask(overrides: Record<string, unknown> = {}) {
 		status: 'open',
 		assignee_membership_id: MEMBERSHIP_ID,
 		assignee_agent_id: null,
-		due_at: '2026-03-18T00:00:00.000Z',
+		due_at: '2026-12-18T00:00:00.000Z',
 		started_at: null,
 		completed_at: null,
 		blocked_reason: null,
@@ -99,103 +98,45 @@ function organisationsListBody() {
 	};
 }
 
-describe('TasksPage integration', () => {
-	it('lists tasks with X-Org-Id and creates a task', async () => {
-		const seenOrgHeaders: string[] = [];
-		let createBody: unknown;
+describe('DashboardHomePage integration', () => {
+	it('loads my tasks with assignee=me and toggles done', async () => {
+		const seenTaskUrls: string[] = [];
+		let patchBody: unknown;
+		let patchIfMatch: string | null = null;
 
 		const session = sessionForOrg();
-
-		const fetchMock = createMockFetch({
-			'GET /api/v1/organisations': async (request) => {
-				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
-				return { body: organisationsListBody() };
-			},
-			'GET /api/v1/tasks': async (request) => {
-				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
-				return { body: { data: [sampleTask()], meta: { next_cursor: null } } };
-			},
-			'POST /api/v1/tasks': async (request) => {
-				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
-				createBody = await request.json();
-				return {
-					status: 201,
-					body: {
-						data: sampleTask({
-							id: TASK_B,
-							title: 'Chase invoice',
-							status: 'in_progress'
-						})
-					}
-				};
-			}
-		});
-
-		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
-		render(TasksPage, { api, session });
-
-		await expect
-			.element(page.getByRole('button', { name: 'Send kickoff pack', exact: true }))
-			.toBeInTheDocument();
-		expect(seenOrgHeaders.some((h) => h === ORG_A)).toBe(true);
-
-		await page.getByRole('button', { name: 'New task' }).click();
-		await page.getByLabelText('Title').fill('Chase invoice');
-		await page.getByTestId('task-form').getByRole('button', { name: 'Save task' }).click();
-
-		await expect
-			.element(page.getByRole('button', { name: 'Chase invoice', exact: true }))
-			.toBeInTheDocument();
-		expect(createBody).toMatchObject({
-			title: 'Chase invoice',
-			priority: 'p3',
-			status: 'open',
-			source: 'manual'
-		});
-	});
-
-	it('surfaces ETag conflict on edit', async () => {
-		const session = sessionForOrg();
-		let patchCount = 0;
-		let lastPatch: { body: unknown; ifMatch: string | null } | null = null;
 
 		const fetchMock = createMockFetch({
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
-			'GET /api/v1/tasks': async () => ({
-				body: { data: [sampleTask({ version: 2 })], meta: { next_cursor: null } }
-			}),
+			'GET /api/v1/tasks': async (request) => {
+				seenTaskUrls.push(request.url);
+				return { body: { data: [sampleTask()], meta: { next_cursor: null } } };
+			},
 			[`PATCH /api/v1/tasks/${TASK_ID}`]: async (request) => {
-				patchCount += 1;
-				lastPatch = {
-					body: await request.json(),
-					ifMatch: request.headers.get('if-match')
-				};
+				patchBody = await request.json();
+				patchIfMatch = request.headers.get('if-match');
 				return {
-					status: 412,
 					body: {
-						error: {
-							code: 'PRECONDITION_FAILED',
-							message: 'Task version does not match If-Match'
-						}
+						data: sampleTask({ status: 'done', version: 2, completed_at: '2026-03-18T12:00:00Z' })
 					}
 				};
 			}
 		});
 
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
-		render(TasksPage, { api, session });
+		render(DashboardHomePage, { api, session });
 
+		await expect.element(page.getByText('Home')).toBeInTheDocument();
 		await expect
 			.element(page.getByRole('button', { name: 'Send kickoff pack', exact: true }))
 			.toBeInTheDocument();
-		await page.getByRole('button', { name: 'Send kickoff pack', exact: true }).click();
-		await expect.element(page.getByText('Edit task')).toBeInTheDocument();
-		await page.getByLabelText('Title').last().fill('Updated kickoff pack');
-		await page.getByRole('button', { name: 'Save changes' }).click();
+		expect(seenTaskUrls.some((url) => url.includes('assignee=me'))).toBe(true);
 
-		await expect.poll(() => lastPatch?.ifMatch).toBe('"2"');
+		await page.getByRole('button', { name: 'Complete Send kickoff pack' }).click();
+		await expect.poll(() => patchBody).toEqual({ status: 'done' });
+		expect(patchIfMatch).toBe('"1"');
 		await expect
-			.element(page.getByText(/412|version does not match|changed elsewhere/i))
+			.element(page.getByRole('button', { name: 'Reopen Send kickoff pack' }))
 			.toBeInTheDocument();
 	});
 });

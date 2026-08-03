@@ -15,6 +15,7 @@ describe('auth paths', () => {
 	});
 
 	it('requires selected org for org-scoped app routes', () => {
+		expect(requiresSelectedOrg('/')).toBe(true);
 		expect(requiresSelectedOrg('/org/config')).toBe(true);
 		expect(requiresSelectedOrg('/contacts')).toBe(true);
 		expect(requiresSelectedOrg('/contacts/abc')).toBe(true);
@@ -58,9 +59,15 @@ describe('auth paths', () => {
 				membershipCount: 1,
 				selectedOrgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 			})
-		).toBe('/settings');
+		).toBe('/');
 		expect(postAuthDestination({ membershipCount: 2, selectedOrgId: null })).toBe(
 			'/select-org'
 		);
+		expect(
+			postAuthDestination({
+				membershipCount: 2,
+				selectedOrgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+			})
+		).toBe('/');
 	});
 });
