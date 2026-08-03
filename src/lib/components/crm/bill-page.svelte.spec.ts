@@ -264,4 +264,200 @@ describe('BillPage detail flows', () => {
 			.toBeInTheDocument();
 		prompt.mockRestore();
 	});
+
+	it('uploads a source attachment and patches attachment_document_id', async () => {
+		const DOC_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+		let patchBody: unknown;
+		const putCalls: string[] = [];
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
+				body: { data: sampleBill() }
+			}),
+			'GET /api/v1/vendors': async () => ({
+				body: { data: [sampleVendor()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/payments': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			[`POST /api/v1/entities/bill/${BILL_ID}/documents/upload-intent`]: async () => ({
+				body: {
+					data: {
+						document: {
+							id: DOC_ID,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							name: 'vendor.pdf',
+							category: 'receipt',
+							notes: null,
+							bucket: 'docs',
+							storage_path: 'p',
+							storage_version: null,
+							mime_type: 'application/pdf',
+							size_bytes: 5,
+							sha256: 'abc',
+							uploaded_by: null,
+							uploaded_at: null,
+							scan_status: 'pending',
+							metadata: {},
+							status: 'pending_upload',
+							upload_expires_at: null
+						},
+						link: {
+							id: 'link-1',
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							document_id: DOC_ID,
+							entity_type: 'bill',
+							entity_id: BILL_ID,
+							folder_id: null
+						},
+						upload: {
+							signed_url: 'https://upload.test/put',
+							token: 't',
+							path: 'p',
+							expires_in: 60
+						}
+					}
+				}
+			}),
+			[`POST /api/v1/documents/${DOC_ID}/finalize`]: async () => ({
+				body: {
+					data: {
+						document: {
+							id: DOC_ID,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 2,
+							name: 'vendor.pdf',
+							category: 'receipt',
+							notes: null,
+							bucket: 'docs',
+							storage_path: 'p',
+							storage_version: null,
+							mime_type: 'application/pdf',
+							size_bytes: 5,
+							sha256: 'abc',
+							uploaded_by: null,
+							uploaded_at: '2026-01-01T00:00:00Z',
+							scan_status: 'clean',
+							metadata: {},
+							status: 'ready',
+							upload_expires_at: null
+						}
+					}
+				}
+			}),
+			[`PATCH /api/v1/bills/${BILL_ID}`]: async (request) => {
+				patchBody = await request.json();
+				return {
+					body: {
+						data: sampleBill({
+							version: 2,
+							attachment_document_id: DOC_ID
+						})
+					}
+				};
+			},
+			[`GET /api/v1/entities/bill/${BILL_ID}/documents`]: async () => ({
+				body: {
+					data: {
+						folders: [],
+						documents: [
+							{
+								document: {
+									id: DOC_ID,
+									org_id: ORG_A,
+									created_at: '2026-01-01T00:00:00Z',
+									updated_at: '2026-01-01T00:00:00Z',
+									created_by: null,
+									updated_by: null,
+									deleted_at: null,
+									version: 2,
+									name: 'vendor.pdf',
+									category: 'receipt',
+									notes: null,
+									bucket: 'docs',
+									storage_path: 'p',
+									storage_version: null,
+									mime_type: 'application/pdf',
+									size_bytes: 5,
+									sha256: 'abc',
+									uploaded_by: null,
+									uploaded_at: '2026-01-01T00:00:00Z',
+									scan_status: 'clean',
+									metadata: {},
+									status: 'ready',
+									upload_expires_at: null
+								},
+								link: {
+									id: 'link-1',
+									org_id: ORG_A,
+									created_at: '2026-01-01T00:00:00Z',
+									updated_at: '2026-01-01T00:00:00Z',
+									created_by: null,
+									updated_by: null,
+									deleted_at: null,
+									version: 1,
+									document_id: DOC_ID,
+									entity_type: 'bill',
+									entity_id: BILL_ID,
+									folder_id: null
+								}
+							}
+						]
+					}
+				}
+			})
+		});
+
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+			if (url.startsWith('https://upload.test/')) {
+				putCalls.push(url);
+				return new Response(null, { status: 200 });
+			}
+			return fetchMock(input as RequestInfo, init);
+		}) as typeof fetch;
+
+		try {
+			const session = sessionForOrg();
+			const api = createApiV1Client({
+				fetch: fetchMock,
+				getOrgId: () => session.selectedOrgId
+			});
+			render(BillPage, { api, session, billId: BILL_ID });
+
+			await expect.element(page.getByTestId('bill-source-attachment')).toBeInTheDocument();
+			const input = page.getByTestId('bill-source-file-input');
+			const file = new File(['hello'], 'vendor.pdf', { type: 'application/pdf' });
+			await input.upload(file);
+
+			await expect.poll(() => patchBody).toMatchObject({
+				attachment_document_id: DOC_ID
+			});
+			expect(putCalls).toEqual(['https://upload.test/put']);
+			await expect.element(page.getByTestId('bill-source-name')).toHaveTextContent('vendor.pdf');
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
 });

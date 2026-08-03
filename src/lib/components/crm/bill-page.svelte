@@ -24,6 +24,14 @@
 		createEntityTimelineEvent,
 		loadEntityTimeline
 	} from '$lib/crm/entity-timeline.js';
+	import {
+		isBillSourceAttachmentFile,
+		loadBillSourceAttachmentMeta,
+		uploadBillSourceDocument,
+		type BillSourceAttachmentMeta
+	} from '$lib/crm/bill-source-attachment.js';
+	import type { DocumentPreviewState } from '$lib/api/v1/document-workspace-controller.svelte.js';
+	import { isInlineDocumentPreview } from '$lib/api/v1/document-workspace-controller.svelte.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -87,6 +95,10 @@
 	let lineDrawerOpen = $state(false);
 	let vendorDrawerOpen = $state(false);
 	let paymentDrawerOpen = $state(false);
+	let sourceAttachment = $state<BillSourceAttachmentMeta | null>(null);
+	let sourceAttachmentPending = $state(false);
+	let sourceAttachmentError = $state<string | null>(null);
+	let sourcePreview = $state<DocumentPreviewState | null>(null);
 
 	function formatCents(cents: number, currency: string): string {
 		try {
@@ -276,7 +288,24 @@
 		products = [];
 		savedFingerprint = '';
 		paymentDrawerOpen = false;
+		sourceAttachment = null;
+		sourceAttachmentPending = false;
+		sourceAttachmentError = null;
+		sourcePreview = null;
 		viewState = { kind: 'loading' };
+	}
+
+	async function refreshSourceAttachment(
+		document: ApiBillDocument,
+		epoch: RequestEpoch
+	): Promise<void> {
+		const meta = await loadBillSourceAttachmentMeta(
+			api,
+			document.id,
+			document.attachment_document_id
+		);
+		if (isStale(epoch)) return;
+		sourceAttachment = meta;
 	}
 
 	function syncPaymentForm(document: ApiBillDocument) {
@@ -390,6 +419,8 @@
 
 			syncPaymentForm(result.data);
 			viewState = { kind: 'ready' };
+			await refreshSourceAttachment(result.data, epoch);
+			if (isStale(epoch)) return;
 
 			const timeline = await loadEntityTimeline(api, 'bill', billId);
 			if (isStale(epoch)) return;
@@ -709,6 +740,142 @@
 		}
 	}
 
+	async function onSourceUpload(file: File): Promise<void> {
+		if (!bill || bill.status !== 'draft') return;
+		if (!isBillSourceAttachmentFile(file)) {
+			sourceAttachmentError = 'Source attachment must be a PDF or image.';
+			return;
+		}
+		const epoch = captureEpoch();
+		const previous = sourceAttachment;
+		sourceAttachmentPending = true;
+		sourceAttachmentError = null;
+		try {
+			const uploaded = await uploadBillSourceDocument(api, bill.id, file);
+			if (isStale(epoch)) return;
+			const updated = await api.bills.update(
+				bill.id,
+				{ attachment_document_id: uploaded.id },
+				bill.version
+			);
+			if (isStale(epoch)) return;
+			applyDocument(updated);
+			sourceAttachment = {
+				id: uploaded.id,
+				name: uploaded.name,
+				mimeType: uploaded.mime_type,
+				version: uploaded.version,
+				sizeBytes: uploaded.size_bytes
+			};
+			if (previous && previous.id !== uploaded.id) {
+				try {
+					await api.documents.delete(previous.id, previous.version);
+				} catch {
+					// Link already moved; orphan cleanup is best-effort.
+				}
+			}
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			sourceAttachmentError = userMessage(error, 'Could not upload source document.');
+		} finally {
+			if (!isStale(epoch)) sourceAttachmentPending = false;
+		}
+	}
+
+	async function onSourceClear(): Promise<void> {
+		if (!bill || bill.status !== 'draft' || !bill.attachment_document_id) return;
+		const epoch = captureEpoch();
+		const previous = sourceAttachment;
+		sourceAttachmentPending = true;
+		sourceAttachmentError = null;
+		try {
+			const updated = await api.bills.update(
+				bill.id,
+				{ attachment_document_id: null },
+				bill.version
+			);
+			if (isStale(epoch)) return;
+			applyDocument(updated);
+			sourceAttachment = null;
+			sourcePreview = null;
+			if (previous) {
+				try {
+					await api.documents.delete(previous.id, previous.version);
+				} catch {
+					// Clearing the FK is the product requirement; delete is best-effort.
+				}
+			}
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Bill changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			sourceAttachmentError = userMessage(error, 'Could not clear source document.');
+		} finally {
+			if (!isStale(epoch)) sourceAttachmentPending = false;
+		}
+	}
+
+	async function onSourcePreview(): Promise<void> {
+		if (!sourceAttachment) return;
+		sourceAttachmentError = null;
+		try {
+			const result = await api.documents.download(sourceAttachment.id);
+			if (!isInlineDocumentPreview(result.mime_type)) {
+				if (typeof document !== 'undefined') {
+					const anchor = document.createElement('a');
+					anchor.href = result.signed_url;
+					anchor.download = result.name;
+					anchor.rel = 'noopener';
+					anchor.target = '_blank';
+					anchor.click();
+				}
+				return;
+			}
+			sourcePreview = {
+				documentId: result.document_id,
+				url: result.signed_url,
+				name: result.name,
+				mimeType: result.mime_type
+			};
+		} catch (error) {
+			sourceAttachmentError = userMessage(error, 'Could not open source preview.');
+		}
+	}
+
+	function onCloseSourcePreview() {
+		sourcePreview = null;
+	}
+
+	async function onDownloadSourcePreview(): Promise<void> {
+		if (!sourceAttachment) return;
+		try {
+			const result = await api.documents.download(sourceAttachment.id);
+			if (typeof document !== 'undefined') {
+				const anchor = document.createElement('a');
+				anchor.href = result.signed_url;
+				anchor.download = result.name;
+				anchor.rel = 'noopener';
+				anchor.click();
+			}
+		} catch (error) {
+			sourceAttachmentError = userMessage(error, 'Could not download source document.');
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -812,6 +979,15 @@
 						onRecordPayment={onRecordPayment}
 						onReversePayment={onReversePayment}
 						{onTimelineAdd}
+						{sourceAttachment}
+						{sourceAttachmentPending}
+						{sourceAttachmentError}
+						{sourcePreview}
+						{onSourceUpload}
+						{onSourceClear}
+						{onSourcePreview}
+						{onCloseSourcePreview}
+						{onDownloadSourcePreview}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>
