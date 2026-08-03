@@ -1791,6 +1791,10 @@ export type Database = {
         Args: { p_mailbox_id: string; p_holder: string; p_lease_seconds?: number }
         Returns: Json
       }
+      read_mailbox_sync_credentials: {
+        Args: { p_mailbox_id: string }
+        Returns: Json
+      }
       release_mailbox_sync_lease: {
         Args: {
           p_mailbox_id: string

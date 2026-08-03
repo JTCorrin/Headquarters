@@ -194,6 +194,14 @@ sync_json="$(api POST /api/v1/me/mailbox/sync --data '{}')"
 printf '%s' "$sync_json" | jq -e '.data.ok == true and .data.ingested >= 1' >/dev/null \
 	|| die "mailbox sync failed: ${sync_json}"
 
+log "GET me/email-messages after sync (personal mailbox inbox)"
+mine_json="$(api GET /api/v1/me/email-messages)"
+printf '%s' "$mine_json" | jq -e '
+	(.data | type == "array" and length >= 1)
+	and (.data[0].body_text != null)
+	and (.data[0].body_text | contains("Wave B sync skeleton"))
+' >/dev/null || die "personal inbox empty after sync: ${mine_json}"
+
 log "GET contact email-messages after sync (address_match, owner body)"
 owner_emails="$(api GET "/api/v1/contacts/${CONTACT_ID}/email-messages")"
 printf '%s' "$owner_emails" | jq -e '
