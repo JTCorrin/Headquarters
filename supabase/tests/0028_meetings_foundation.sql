@@ -180,6 +180,10 @@ set project_id = (created_project.doc ->> 'id')::uuid
 from created_project;
 
 reset role;
+-- Clear JWT so stamp_business_row does not overwrite created_by on fixture inserts.
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claim.role', '', true);
+select set_config('request.jwt.claims', '', true);
 
 with owner_meeting as (
   insert into public.meetings (
