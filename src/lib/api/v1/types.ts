@@ -1144,6 +1144,57 @@ export interface ApiEmailMessageShareResult {
 	subject?: string | null;
 }
 
+/** Entity types supported by `GET/POST …/timeline-events`. */
+export type ApiTimelineEntityType =
+	| 'contact'
+	| 'lead'
+	| 'client'
+	| 'quote'
+	| 'invoice'
+	| 'bill';
+
+export type ApiTimelineEventKind =
+	| 'note'
+	| 'email'
+	| 'call'
+	| 'payment'
+	| 'document'
+	| 'status'
+	| 'meeting'
+	| 'task'
+	| 'conversion';
+
+export interface ApiTimelineEvent {
+	id: string;
+	org_id: string;
+	entity_type: ApiTimelineEntityType;
+	entity_id: string;
+	kind: ApiTimelineEventKind | string;
+	title: string;
+	body: string | null;
+	actor_type: 'user' | 'agent' | 'system' | 'integration' | string;
+	actor_id: string | null;
+	source_type: string | null;
+	source_id: string | null;
+	payload: Record<string, unknown>;
+	occurred_at: string;
+	created_at: string;
+}
+
+/** Body for `POST /api/v1/entities/{type}/{id}/timeline-events`. */
+export interface ApiTimelineEventCreateBody {
+	title: string;
+	body?: string | null;
+	kind?: Exclude<ApiTimelineEventKind, 'conversion'>;
+	/** Render metadata (e.g. accent, icon) for TimelineComposer. */
+	payload?: Record<string, unknown>;
+}
+
+export interface ApiTimelineEventListParams {
+	limit?: number;
+	cursor?: string;
+}
+
 export interface ApiAiSuggestionGenerateBody {
 	email_message_id: string;
 	/** BE field name — warm | neutral | firm. */
