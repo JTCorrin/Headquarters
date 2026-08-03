@@ -661,6 +661,104 @@ export interface ApiTaskCreateBody {
 
 export type ApiTaskUpdateBody = Partial<ApiTaskCreateBody>;
 
+export type ApiMeetingStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+export type ApiMeetingTranscriptStatus = 'none' | 'uploaded' | 'processing' | 'ready' | 'failed';
+export type ApiMeetingSummaryStatus = 'none' | 'generating' | 'ready' | 'failed';
+/** M1 resolvable related types. Dictionary also allows `project` (422 until P1). */
+export type ApiMeetingRelatedEntityType = 'client' | 'contact' | 'lead' | 'project';
+export type ApiMeetingAttendeeResponseStatus =
+	| 'needs_action'
+	| 'accepted'
+	| 'declined'
+	| 'tentative';
+
+export interface ApiMeetingAttendee {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	meeting_id: string;
+	contact_id: string | null;
+	membership_id: string | null;
+	name: string | null;
+	email: string;
+	response_status: ApiMeetingAttendeeResponseStatus | null;
+	attended: boolean | null;
+	organiser: boolean;
+}
+
+export interface ApiMeeting {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	title: string;
+	status: ApiMeetingStatus;
+	starts_at: string;
+	ends_at: string;
+	timezone: string;
+	location: string | null;
+	meeting_url: string | null;
+	organiser_membership_id: string | null;
+	related_entity_type: ApiMeetingRelatedEntityType | null;
+	related_entity_id: string | null;
+	calendar_provider: string | null;
+	external_event_id: string | null;
+	transcript_status: ApiMeetingTranscriptStatus;
+	summary_status: ApiMeetingSummaryStatus;
+	summary: string | null;
+	metadata: Record<string, unknown>;
+	/** Present when the list/get payload nests attendees. */
+	attendees?: ApiMeetingAttendee[];
+	/** Optional resolved label from the API host. */
+	related_entity_label?: string | null;
+}
+
+export type ApiMeetingDocument = ApiMeeting & {
+	attendees: ApiMeetingAttendee[];
+};
+
+export interface ApiMeetingAttendeeInput {
+	email: string;
+	name?: string | null;
+	contact_id?: string | null;
+	membership_id?: string | null;
+	organiser?: boolean;
+}
+
+export interface ApiMeetingListParams {
+	limit?: number;
+	cursor?: string;
+	status?: ApiMeetingStatus;
+	upcoming?: boolean;
+}
+
+export interface ApiMeetingCreateBody {
+	title: string;
+	status?: ApiMeetingStatus;
+	starts_at: string;
+	ends_at: string;
+	timezone?: string;
+	location?: string | null;
+	meeting_url?: string | null;
+	related_entity_type?: ApiMeetingRelatedEntityType | null;
+	related_entity_id?: string | null;
+	attendees?: ApiMeetingAttendeeInput[];
+}
+
+export type ApiMeetingUpdateBody = Partial<Omit<ApiMeetingCreateBody, 'attendees'>> & {
+	/** Replace-all when present (M1 lock). */
+	attendees?: ApiMeetingAttendeeInput[];
+};
+
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
 export interface ApiClient {

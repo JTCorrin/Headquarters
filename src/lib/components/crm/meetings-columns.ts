@@ -1,18 +1,13 @@
 import type { ColumnDef } from '@tanstack/table-core';
+import type { MeetingListItem } from '$lib/schemas/meeting.js';
 import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import StatusBadge from './status-badge.svelte';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
+import MeetingTitleLink from './meeting-title-link.svelte';
 
-export interface MeetingRow {
-	id: string;
-	title: string;
-	when: string;
-	withWhom: string;
-	relatedTo: string;
-	status: string;
-}
+export type MeetingRow = MeetingListItem;
 
 export const meetingColumns: ColumnDef<MeetingRow>[] = [
 	{
@@ -39,6 +34,11 @@ export const meetingColumns: ColumnDef<MeetingRow>[] = [
 			renderComponent(DataTableSortHeader, {
 				label: 'Meeting',
 				onclick: column.getToggleSortingHandler()
+			}),
+		cell: ({ row }) =>
+			renderComponent(MeetingTitleLink, {
+				id: row.original.id,
+				title: row.original.title
 			})
 	},
 	{

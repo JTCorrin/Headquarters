@@ -75,6 +75,11 @@ import type {
 	ApiTaskCreateBody,
 	ApiTaskListParams,
 	ApiTaskUpdateBody,
+	ApiMeeting,
+	ApiMeetingCreateBody,
+	ApiMeetingDocument,
+	ApiMeetingListParams,
+	ApiMeetingUpdateBody,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
@@ -307,6 +312,19 @@ export interface TasksEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiTask>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface MeetingsEndpoints {
+	list(params?: ApiMeetingListParams, signal?: AbortSignal): Promise<ApiResult<ApiMeeting[]>>;
+	create(body: ApiMeetingCreateBody, signal?: AbortSignal): Promise<ApiMeetingDocument>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiMeetingDocument>>;
+	update(
+		id: string,
+		body: ApiMeetingUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiMeetingDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 }
 
