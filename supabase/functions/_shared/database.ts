@@ -57,6 +57,36 @@ export type TaxRateRow = {
   active: boolean
 }
 
+export type EmailTemplateRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  subject: string
+  body_text: string | null
+  body_html: string | null
+  category: 'transactional' | 'campaign' | 'chase' | 'onboarding' | 'other'
+  status: 'draft' | 'active' | 'archived'
+  merge_schema: Json
+}
+
+export type EmailTemplateInsert = {
+  org_id: string
+  name: string
+  subject: string
+  body_text?: string | null
+  body_html?: string | null
+  category: EmailTemplateRow['category']
+  status?: EmailTemplateRow['status']
+  merge_schema?: Json
+  deleted_at?: string | null
+}
+
 export type MembershipRow = {
   id: string
   org_id: string
@@ -992,6 +1022,12 @@ export type Database = {
         Update: Partial<TaxRateInsert>
         Relationships: []
       }
+      email_templates: {
+        Row: EmailTemplateRow
+        Insert: EmailTemplateInsert
+        Update: Partial<EmailTemplateInsert>
+        Relationships: []
+      }
       memberships: {
         Row: MembershipRow
         Insert: MembershipInsert
@@ -1813,6 +1849,15 @@ export type Database = {
           p_entity_type: string
           p_entity_id: string
           p_limit?: number
+        }
+        Returns: Json
+      }
+      list_my_email_messages: {
+        Args: {
+          p_org_id: string
+          p_limit?: number
+          p_cursor_received_at?: string | null
+          p_cursor_id?: string | null
         }
         Returns: Json
       }

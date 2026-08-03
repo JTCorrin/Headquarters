@@ -35,6 +35,7 @@ import {
   validateCreateBody,
   validateReverseBody,
 } from './payments.ts'
+import { validateEmailTemplateBody } from './email-templates.ts'
 import {
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -1204,4 +1205,35 @@ Deno.test('payment allocate/reverse idempotency payload omits expected_version',
     paymentMutationIdempotencyPayload(paymentId, { reason: 'oops' }),
   )
   assertEquals(hashV1, hashV2)
+})
+
+Deno.test('email template create validation defaults status and merge_schema', () => {
+  assertEquals(
+    validateEmailTemplateBody(
+      {
+        name: '  Chase overdue  ',
+        subject: 'Invoice {{number}}',
+        body_text: 'Please pay',
+        category: 'chase',
+      },
+      false,
+    ),
+    {
+      name: 'Chase overdue',
+      subject: 'Invoice {{number}}',
+      body_text: 'Please pay',
+      category: 'chase',
+      status: 'draft',
+      merge_schema: [],
+    },
+  )
+  assertThrows(
+    () => validateEmailTemplateBody({ name: 'X', subject: 'Y', category: 'nope' }, false),
+    ApiError,
+  )
+  assertThrows(() => validateEmailTemplateBody({ name: 'X' }, false), ApiError)
+  assertEquals(
+    validateEmailTemplateBody({ status: 'archived' }, true),
+    { status: 'archived' },
+  )
 })
