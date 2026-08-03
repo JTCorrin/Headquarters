@@ -9,13 +9,13 @@
 		emptyTaskFormData,
 		membershipFromCreateResult,
 		roleFromMemberships,
+		toDashboardTask,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toTaskBoardCard,
 		toTaskCreateBody,
 		toTaskFormData,
 		toTaskListItem,
-		toTaskRow,
 		toTaskUpdateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiOrganisationMembership } from '$lib/api/v1/types.js';
@@ -35,6 +35,8 @@
 	export interface TasksPageProps {
 		api: ApiV1Client;
 		session: OrgSession;
+		/** When set, open the edit drawer for this task after load. */
+		initialEditTaskId?: string | null;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
@@ -44,6 +46,7 @@
 	let {
 		api,
 		session,
+		initialEditTaskId = null,
 		onMissingOrg,
 		onSwitchNavigate,
 		onLogout,
@@ -88,8 +91,13 @@
 	);
 	const navGroups = $derived(appNavGroups('Tasks', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-	const tableRows = $derived(tasks.map(toTaskRow));
+	const listTasks = $derived(tasks.map(toDashboardTask));
 	const boardTasks = $derived(tasks.map(toTaskBoardCard));
+	let pendingEditTaskId = $state<string | null>(null);
+
+	$effect(() => {
+		pendingEditTaskId = initialEditTaskId;
+	});
 
 	function listItemOptions() {
 		return {
@@ -198,6 +206,12 @@
 				tasks.length === 0
 					? { kind: 'empty', message: 'No tasks yet — create your first task.' }
 					: { kind: 'ready' };
+
+			const editId = pendingEditTaskId;
+			if (editId && tasks.some((row) => row.id === editId)) {
+				pendingEditTaskId = null;
+				openEdit(editId);
+			}
 		} catch (error) {
 			if (isStale(epoch)) return;
 			if (isApiClientError(error) && error.isForbidden) {
@@ -271,6 +285,35 @@
 		}
 	}
 
+	async function onToggleDone(taskId: string) {
+		const existing = tasks.find((row) => row.id === taskId);
+		if (!existing) return;
+
+		const nextStatus = existing.rawStatus === 'done' ? 'open' : 'done';
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.tasks.update(taskId, { status: nextStatus }, existing.version);
+			if (isStale(epoch)) return;
+			tasks = tasks.map((row) =>
+				row.id === taskId ? toTaskListItem(updated, listItemOptions()) : row
+			);
+			viewState = tasks.length === 0 ? { kind: 'empty', message: 'No tasks yet.' } : { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Task version does not match If-Match.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not update task — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -326,7 +369,7 @@
 				<TasksListPage
 					{orgName}
 					{navGroups}
-					rows={tableRows}
+					{listTasks}
 					{boardTasks}
 					{viewMode}
 					form={taskForm}
@@ -337,6 +380,7 @@
 					onValidSubmit={onCreateTask}
 					onValidEdit={onEditTask}
 					onEditTask={openEdit}
+					{onToggleDone}
 					onViewModeChange={(mode) => {
 						viewMode = mode;
 					}}

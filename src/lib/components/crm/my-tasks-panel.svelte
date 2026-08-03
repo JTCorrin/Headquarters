@@ -19,7 +19,11 @@
 		title?: string;
 		emptyMessage?: string;
 		onToggleDone?: (id: string) => void;
+		/** Opens edit / detail when the task title is activated. */
+		onSelectTask?: (id: string) => void;
 		onViewAll?: () => void;
+		/** When false, hide the View all control (e.g. already on /tasks). */
+		showViewAll?: boolean;
 		class?: string;
 	}
 
@@ -28,7 +32,9 @@
 		title = 'My tasks',
 		emptyMessage = 'Nothing on your plate — nice.',
 		onToggleDone,
+		onSelectTask,
 		onViewAll,
+		showViewAll = true,
 		class: className
 	}: MyTasksPanelProps = $props();
 
@@ -63,10 +69,12 @@
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
 			<p class="text-muted-foreground text-xs">{openCount} open</p>
 		</div>
-		{#if onViewAll}
-			<Button type="button" variant="ghost" size="sm" onclick={onViewAll}>View all</Button>
-		{:else}
-			<Button type="button" variant="ghost" size="sm" href="/tasks">View all</Button>
+		{#if showViewAll}
+			{#if onViewAll}
+				<Button type="button" variant="ghost" size="sm" onclick={onViewAll}>View all</Button>
+			{:else}
+				<Button type="button" variant="ghost" size="sm" href="/tasks">View all</Button>
+			{/if}
 		{/if}
 	</div>
 
@@ -99,14 +107,27 @@
 								class={cn('mt-1.5 size-1.5 shrink-0 rounded-full', priorityDot(task.priority))}
 								aria-hidden="true"
 							></span>
-							<p
-								class={cn(
-									'text-sm font-medium leading-snug',
-									isDone(task.status) && 'text-muted-foreground line-through'
-								)}
-							>
-								{task.title}
-							</p>
+							{#if onSelectTask}
+								<button
+									type="button"
+									class={cn(
+										'text-left text-sm font-medium leading-snug hover:underline',
+										isDone(task.status) && 'text-muted-foreground line-through'
+									)}
+									onclick={() => onSelectTask(task.id)}
+								>
+									{task.title}
+								</button>
+							{:else}
+								<p
+									class={cn(
+										'text-sm font-medium leading-snug',
+										isDone(task.status) && 'text-muted-foreground line-through'
+									)}
+								>
+									{task.title}
+								</p>
+							{/if}
 						</div>
 						<p class="text-muted-foreground mt-1 truncate text-xs">
 							{#if task.relatedTo}{task.relatedTo} · {/if}Due {task.dueOn}

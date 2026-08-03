@@ -41,7 +41,8 @@ import type {
 	TaskAssigneeOption,
 	TaskBoardStatus,
 	TaskFormData,
-	TaskListItem
+	TaskListItem,
+	TaskPriority
 } from '$lib/schemas/task.js';
 import type { TaskRow } from '$lib/components/crm/tasks-columns.js';
 import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
@@ -1166,6 +1167,34 @@ export function toTaskRow(item: TaskListItem): TaskRow {
 		priority: item.priority,
 		dueOn: item.dueOn
 	};
+}
+
+/** Map a list item into the Storyboard My tasks / dashboard panel shape. */
+export function toDashboardTask(item: TaskListItem): {
+	id: string;
+	title: string;
+	relatedTo?: string;
+	dueOn: string;
+	status: string;
+	priority?: TaskPriority;
+} {
+	return {
+		id: item.id,
+		title: item.title,
+		relatedTo: item.relatedTo === '—' ? undefined : item.relatedTo,
+		dueOn: item.dueOn === '—' ? '—' : item.dueOn,
+		status: item.status,
+		priority: item.rawPriority
+	};
+}
+
+/** Open tasks whose due date is before today (UTC date). */
+export function isTaskDueBeforeToday(dueAt: string | null, now = new Date()): boolean {
+	if (!dueAt) return false;
+	const dueDay = dueAt.slice(0, 10);
+	if (!dueDay) return false;
+	const today = now.toISOString().slice(0, 10);
+	return dueDay < today;
 }
 
 export function toTaskBoardCard(item: TaskListItem): {
