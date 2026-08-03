@@ -73,9 +73,13 @@ if [[ -f supabase/config.toml ]]; then
 		supabase/config.toml
 fi
 
-# Edge Function CORS for browser → Kong (Auth uses its own allow-list via site_url).
+# Edge secrets load from supabase/functions/.env (CLI default), not supabase/.env.
 # api-v1 defaults to `*` when unset; pin staging origin explicitly.
-mkdir -p supabase
+mkdir -p supabase/functions
+cat > supabase/functions/.env <<EOF
+API_CORS_ORIGIN=${STAGING_ORIGIN}
+EOF
+# Mirror for any tooling that still reads the repo-root supabase/.env.
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 EOF
@@ -118,11 +122,17 @@ log "Supabase API ${PUBLIC_SUPABASE_URL}"
 
 # Edge signed upload/download URLs are minted from internal SUPABASE_URL (kong:8000).
 # Expose the LAN Kong origin so api-v1 can rewrite signed_url for the browser.
+# Must land in supabase/functions/.env before edge-runtime restart (Edge secret load path).
+mkdir -p supabase/functions
+cat > supabase/functions/.env <<EOF
+API_CORS_ORIGIN=${STAGING_ORIGIN}
+PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
+EOF
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 EOF
-log "wrote PUBLIC_SUPABASE_URL into supabase/.env for Edge storage URL rewrite"
+log "wrote PUBLIC_SUPABASE_URL into supabase/functions/.env for Edge storage URL rewrite"
 
 # Edge runtime mounts supabase/functions but keeps a stale module graph across
 # git resets when the stack was already up. Bounce it so api-v1 matches this SHA
