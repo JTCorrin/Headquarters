@@ -113,6 +113,7 @@ export { default as DocumentFormDrawer } from './document-form-drawer.svelte';
 export { default as EntityDocuments } from './entity-documents.svelte';
 export { default as DocumentWorkspaceApiHost } from './document-workspace-api-host.svelte';
 export { default as DocumentsPage } from './documents-page.svelte';
+export { default as DocumentFilePreview } from './document-file-preview.svelte';
 export { default as DocumentPdfPreview } from './document-pdf-preview.svelte';
 export { default as EmailTemplateForm } from './email-template-form.svelte';
 export { default as EmailTemplateFormDrawer } from './email-template-form-drawer.svelte';
