@@ -140,7 +140,9 @@
 							<ul class="m-0 list-none space-y-3 p-0">
 								{#each upcomingMeetings as meeting (meeting.id)}
 									<li>
-										<p class="text-sm font-medium">{meeting.title}</p>
+										<a href="/meetings/{meeting.id}" class="text-sm font-medium hover:underline">
+											{meeting.title}
+										</a>
 										<p class="text-muted-foreground text-xs">
 											{meeting.when} · {meeting.withWhom}
 										</p>
