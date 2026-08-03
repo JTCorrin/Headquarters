@@ -1,13 +1,16 @@
 import { assertEquals, assertRejects } from '@std/assert'
 import {
+  chunkUids,
   extractBodyLiteral,
   formatImapSinceDate,
   IMAP_CONNECT_TIMEOUT_MS,
+  IMAP_FETCH_BATCH_SIZE,
   ImapSyncError,
   isSyntheticImapHost,
   parseAddressList,
   parseHeaderBlock,
   probeImap,
+  safeMailboxSyncFailureMessage,
   setOpenImapConnectionForTests,
   withImapTimeout,
 } from '../_shared/imap-inbound.ts'
@@ -126,4 +129,36 @@ Deno.test('probeImap maps LOGIN NO to imap_auth_failed', async () => {
   } finally {
     setOpenImapConnectionForTests(null)
   }
+})
+
+Deno.test('chunkUids batches into groups of 1–5 (default 5)', () => {
+  assertEquals(IMAP_FETCH_BATCH_SIZE, 5)
+  assertEquals(chunkUids([1, 2, 3, 4, 5, 6, 7], 5), [[1, 2, 3, 4, 5], [6, 7]])
+  assertEquals(chunkUids([10, 11, 12], 1), [[10], [11], [12]])
+  assertEquals(chunkUids([1, 2, 3, 4, 5, 6], 99), [[1, 2, 3, 4, 5], [6]])
+  assertEquals(chunkUids([], 5), [])
+})
+
+Deno.test('safeMailboxSyncFailureMessage keeps select/search/fetch distinct', () => {
+  assertEquals(safeMailboxSyncFailureMessage('imap_select_failed').step, 'select')
+  assertEquals(safeMailboxSyncFailureMessage('imap_search_failed').step, 'search')
+  assertEquals(safeMailboxSyncFailureMessage('imap_fetch_failed').step, 'fetch')
+  assertEquals(safeMailboxSyncFailureMessage('timeout', 'fetch').step, 'fetch')
+  assertEquals(
+    safeMailboxSyncFailureMessage('timeout', 'fetch').message.includes('fetch'),
+    true,
+  )
+  assertEquals(
+    safeMailboxSyncFailureMessage('imap_connection_failed').message.includes('reach'),
+    true,
+  )
+})
+
+Deno.test('withImapTimeout FETCH label sets step fetch', async () => {
+  const error = await assertRejects(
+    () => withImapTimeout(new Promise(() => {}), 15, 'IMAP FETCH'),
+    ImapSyncError,
+  )
+  assertEquals(error.code, 'timeout')
+  assertEquals(error.step, 'fetch')
 })

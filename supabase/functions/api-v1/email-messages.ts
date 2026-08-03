@@ -8,6 +8,7 @@ import {
   ImapSyncError,
   type InboundImapMessage,
   isSyntheticImapHost,
+  safeMailboxSyncFailureMessage,
 } from '../_shared/imap-inbound.ts'
 import { ApiError, jsonBody, jsonResponse, parseUuid } from './http.ts'
 
@@ -125,12 +126,37 @@ async function ingestInboundMessages(
   return ingested
 }
 
+export type MailboxSyncCycleResult = {
+  ok: boolean
+  ingested: number
+  error_code: string | null
+  /** Present on failure — short safe copy for clients (no secrets). */
+  message: string | null
+  /** Present on failure — pipeline step hint (connect/login/select/search/fetch/…). */
+  step: string | null
+}
+
+function syncFailureResult(
+  ingested: number,
+  errorCode: string,
+  step: string | null = null,
+): MailboxSyncCycleResult {
+  const meta = safeMailboxSyncFailureMessage(errorCode, step)
+  return {
+    ok: false,
+    ingested,
+    error_code: errorCode,
+    message: meta.message,
+    step: meta.step,
+  }
+}
+
 /** Sync cycle: synthetic for *.example.test; real IMAP for all other hosts. */
 export async function runMailboxSyncCycle(
   mailboxId: string,
   holder: string,
   contactEmailForSeed?: string,
-): Promise<{ ok: boolean; ingested: number; error_code: string | null }> {
+): Promise<MailboxSyncCycleResult> {
   const service = serviceRoleClient()
   const { data: claim, error: claimError } = await service.rpc('claim_mailbox_sync_lease', {
     p_mailbox_id: mailboxId,
@@ -139,15 +165,11 @@ export async function runMailboxSyncCycle(
   })
   if (claimError) {
     console.error('claim lease failed', { code: claimError.code })
-    return { ok: false, ingested: 0, error_code: 'lease_error' }
+    return syncFailureResult(0, 'lease_error')
   }
   const claimed = claim as Record<string, unknown>
   if (!claimed?.claimed) {
-    return {
-      ok: false,
-      ingested: 0,
-      error_code: String(claimed?.reason ?? 'not_claimed'),
-    }
+    return syncFailureResult(0, String(claimed?.reason ?? 'not_claimed'))
   }
 
   const orgId = String(claimed.org_id)
@@ -158,6 +180,7 @@ export async function runMailboxSyncCycle(
   let ingested = 0
   let authFailed = false
   let errorCode: string | null = null
+  let failureStep: string | null = null
 
   try {
     if (!claimed.credentials_configured) {
@@ -222,15 +245,21 @@ export async function runMailboxSyncCycle(
       p_error_code: errorCode,
       p_auth_failed: authFailed,
     })
+    if (errorCode !== null) {
+      return syncFailureResult(ingested, errorCode, failureStep)
+    }
     return {
-      ok: errorCode === null,
+      ok: true,
       ingested,
-      error_code: errorCode,
+      error_code: null,
+      message: null,
+      step: null,
     }
   } catch (error) {
     if (error instanceof ImapSyncError) {
       authFailed = error.authFailed
       errorCode = error.code
+      failureStep = error.step
       await service.rpc('release_mailbox_sync_lease', {
         p_mailbox_id: mailboxId,
         p_holder: holder,
@@ -238,7 +267,7 @@ export async function runMailboxSyncCycle(
         p_error_code: error.code,
         p_auth_failed: authFailed,
       })
-      return { ok: false, ingested, error_code: error.code }
+      return syncFailureResult(ingested, error.code, error.step)
     }
     const message = error instanceof Error ? error.message : 'sync_failed'
     authFailed = /auth/i.test(message)
@@ -249,7 +278,7 @@ export async function runMailboxSyncCycle(
       p_error_code: 'sync_failed',
       p_auth_failed: authFailed,
     })
-    return { ok: false, ingested, error_code: 'sync_failed' }
+    return syncFailureResult(ingested, 'sync_failed')
   }
 }
 
