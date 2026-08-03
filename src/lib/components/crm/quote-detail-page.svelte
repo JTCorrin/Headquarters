@@ -9,6 +9,7 @@
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
 	import LineItemsTable, { type LineItemRow } from './line-items-table.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
@@ -28,6 +29,7 @@
 		products?: CatalogProductOption[];
 		lines?: LineItemRow[];
 		timelineEvents?: TimelineEvent[];
+		composerActor?: string;
 		lineDrawerOpen?: boolean;
 		canEditLines?: boolean;
 		canAccept?: boolean;
@@ -45,6 +47,7 @@
 		onAccept?: () => void | Promise<void>;
 		onConvert?: () => void | Promise<void>;
 		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
+		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		clientOptions?: import('$lib/schemas/quote.js').QuoteClientOption[];
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
@@ -61,6 +64,7 @@
 		products = [],
 		lines = $bindable<LineItemRow[]>([]),
 		timelineEvents = $bindable<TimelineEvent[]>([]),
+		composerActor = 'You',
 		lineDrawerOpen = $bindable(false),
 		canEditLines = true,
 		canAccept = false,
@@ -72,6 +76,7 @@
 		onAccept,
 		onConvert,
 		onSaveQuote,
+		onTimelineAdd,
 		clientOptions = [],
 		showNav = true,
 		class: className
@@ -215,7 +220,8 @@
 						bind:events={timelineEvents}
 						title="Activity"
 						composable
-						composerActor="Joe"
+						{composerActor}
+						onAdd={onTimelineAdd}
 						emptyMessage="No quote activity yet."
 						class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					/>

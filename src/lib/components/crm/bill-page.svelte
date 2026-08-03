@@ -20,6 +20,10 @@
 		toVendorCreateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiBillDocument } from '$lib/api/v1/types.js';
+	import {
+		createEntityTimelineEvent,
+		loadEntityTimeline
+	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -40,6 +44,8 @@
 	import { vendorFormSchema } from '$lib/schemas/vendor.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
+	import type { TimelineEvent } from './timeline.svelte';
 	import AppShell from './app-shell.svelte';
 	import BillDetailPage from './bill-detail-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
@@ -71,6 +77,7 @@
 	let vendorOptions = $state<BillVendorOption[]>([]);
 	let products = $state<CatalogProductOption[]>([]);
 	let lines = $state<LineItemRow[]>([]);
+	let timelineEvents = $state<TimelineEvent[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
 	let switchError = $state<string | null>(null);
@@ -263,6 +270,7 @@
 	function resetOrgScopedState() {
 		bill = null;
 		lines = [];
+		timelineEvents = [];
 		paymentRows = [];
 		vendorOptions = [];
 		products = [];
@@ -382,9 +390,14 @@
 
 			syncPaymentForm(result.data);
 			viewState = { kind: 'ready' };
+
+			const timeline = await loadEntityTimeline(api, 'bill', billId);
+			if (isStale(epoch)) return;
+			timelineEvents = timeline;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			bill = null;
+			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Bill not found.' };
 				return;
@@ -518,6 +531,8 @@
 			const updated = await action();
 			if (isStale(epoch)) return;
 			applyDocument(updated);
+			timelineEvents = await loadEntityTimeline(api, 'bill', billId);
+			if (isStale(epoch)) return;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -535,6 +550,11 @@
 		} finally {
 			actionPending = false;
 		}
+	}
+
+	async function onTimelineAdd(submit: TimelineComposerSubmit) {
+		const created = await createEntityTimelineEvent(api, 'bill', billId, submit);
+		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
 	async function onReceive() {
@@ -779,6 +799,7 @@
 						balanceLabel={formatCents(bill.balance_due_cents, bill.currency)}
 						canRecordPayment={['received', 'partial', 'paid'].includes(bill.status)}
 						bind:lines
+						bind:timelineEvents
 						bind:lineDrawerOpen
 						bind:vendorDrawerOpen
 						onSaveBill={onSaveBill}
@@ -790,6 +811,7 @@
 						onValidVendorCreate={onCreateVendor}
 						onRecordPayment={onRecordPayment}
 						onReversePayment={onReversePayment}
+						{onTimelineAdd}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>

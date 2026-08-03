@@ -20,12 +20,18 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
+	import {
+		createEntityTimelineEvent,
+		loadEntityTimeline
+	} from '$lib/crm/entity-timeline.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
+	import type { TimelineEvent } from './timeline.svelte';
 	import AppShell from './app-shell.svelte';
 	import ClientProfilePage from './client-profile-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
@@ -53,6 +59,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let client = $state<ApiClient | null>(null);
 	let emailTab = $state<EntityEmailTabState>(emptyEntityEmailTabState());
+	let timelineEvents = $state<TimelineEvent[]>([]);
 	let sharingId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
@@ -172,6 +179,7 @@
 	function resetOrgScopedState() {
 		client = null;
 		emailTab = emptyEntityEmailTabState();
+		timelineEvents = [];
 		sharingId = null;
 		editDrawerOpen = false;
 		viewState = { kind: 'loading' };
@@ -203,13 +211,18 @@
 			clientForm.form.set(toClientFormData(result.data));
 			viewState = { kind: 'ready' };
 
-			const tab = await loadEntityEmailTab(api, 'client', clientId);
+			const [tab, timeline] = await Promise.all([
+				loadEntityEmailTab(api, 'client', clientId),
+				loadEntityTimeline(api, 'client', clientId)
+			]);
 			if (isStale(epoch)) return;
 			emailTab = tab;
+			timelineEvents = timeline;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			client = null;
 			emailTab = emptyEntityEmailTabState();
+			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Client not found.' };
 				return;
@@ -232,10 +245,20 @@
 				entity_type: 'client',
 				entity_id: clientId
 			});
-			emailTab = await loadEntityEmailTab(api, 'client', clientId);
+			const [tab, timeline] = await Promise.all([
+				loadEntityEmailTab(api, 'client', clientId),
+				loadEntityTimeline(api, 'client', clientId)
+			]);
+			emailTab = tab;
+			timelineEvents = timeline;
 		} finally {
 			sharingId = null;
 		}
+	}
+
+	async function onTimelineAdd(submit: TimelineComposerSubmit) {
+		const created = await createEntityTimelineEvent(api, 'client', clientId, submit);
+		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
 	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
@@ -345,6 +368,7 @@
 						{clientForm}
 						bind:editDrawerOpen
 						{viewState}
+						bind:timelineEvents
 						emailMessages={emailTab.messages}
 						emailEmptyState={emailTab.emptyState}
 						mailboxConnected={emailTab.mailboxConnected}
@@ -355,6 +379,7 @@
 						documentsApi={api}
 						documentsEntityId={client.id}
 						documentsReloadKey={session.cacheGeneration}
+						{onTimelineAdd}
 						{onAddToTimeline}
 						{onDraftResponse}
 						{onUseSuggestion}

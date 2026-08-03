@@ -1547,3 +1547,52 @@ export interface ApiPaymentListParams {
 	/** Via payment_allocations join — mutually exclusive with invoice_id. */
 	bill_id?: string;
 }
+
+/** Entity types that host a profile timeline feed. */
+export type ApiTimelineEntityType =
+	| 'contact'
+	| 'lead'
+	| 'client'
+	| 'quote'
+	| 'invoice'
+	| 'bill';
+
+export type ApiTimelineEventKind =
+	| 'note'
+	| 'email'
+	| 'call'
+	| 'payment'
+	| 'document'
+	| 'status'
+	| 'meeting'
+	| 'task'
+	| 'conversion'
+	| string;
+
+export type ApiTimelineActorType = 'user' | 'agent' | 'system' | 'integration' | string;
+
+/** Row from `GET/POST …/timeline-events` (dictionary §9.1). */
+export interface ApiTimelineEvent {
+	id: string;
+	org_id: string;
+	entity_type: ApiTimelineEntityType | string;
+	entity_id: string;
+	kind: ApiTimelineEventKind;
+	title: string;
+	body: string | null;
+	actor_type: ApiTimelineActorType;
+	actor_id: string | null;
+	source_type: string | null;
+	source_id: string | null;
+	payload: Record<string, unknown>;
+	occurred_at: string;
+	created_at: string;
+}
+
+/** Body for composer note create (`POST …/timeline-events`). Default `kind=note`; rejects `conversion`. */
+export interface ApiTimelineEventCreateBody {
+	title: string;
+	body?: string | null;
+	kind?: ApiTimelineEventKind;
+	payload?: Record<string, unknown>;
+}

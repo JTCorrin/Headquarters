@@ -15,11 +15,17 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
+	import {
+		createEntityTimelineEvent,
+		loadEntityTimeline
+	} from '$lib/crm/entity-timeline.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
+	import type { TimelineEvent } from './timeline.svelte';
 	import AppShell from './app-shell.svelte';
 	import ContactProfilePage from './contact-profile-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
@@ -47,6 +53,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let contact = $state<ApiContact | null>(null);
 	let emailTab = $state<EntityEmailTabState>(emptyEntityEmailTabState());
+	let timelineEvents = $state<TimelineEvent[]>([]);
 	let sharingId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
@@ -129,6 +136,7 @@
 	function resetOrgScopedState() {
 		contact = null;
 		emailTab = emptyEntityEmailTabState();
+		timelineEvents = [];
 		sharingId = null;
 		viewState = { kind: 'loading' };
 	}
@@ -158,13 +166,18 @@
 			contact = result.data;
 			viewState = { kind: 'ready' };
 
-			const tab = await loadEntityEmailTab(api, 'contact', contactId);
+			const [tab, timeline] = await Promise.all([
+				loadEntityEmailTab(api, 'contact', contactId),
+				loadEntityTimeline(api, 'contact', contactId)
+			]);
 			if (isStale(epoch)) return;
 			emailTab = tab;
+			timelineEvents = timeline;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			contact = null;
 			emailTab = emptyEntityEmailTabState();
+			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Contact not found.' };
 				return;
@@ -187,10 +200,20 @@
 				entity_type: 'contact',
 				entity_id: contactId
 			});
-			emailTab = await loadEntityEmailTab(api, 'contact', contactId);
+			const [tab, timeline] = await Promise.all([
+				loadEntityEmailTab(api, 'contact', contactId),
+				loadEntityTimeline(api, 'contact', contactId)
+			]);
+			emailTab = tab;
+			timelineEvents = timeline;
 		} finally {
 			sharingId = null;
 		}
+	}
+
+	async function onTimelineAdd(submit: TimelineComposerSubmit) {
+		const created = await createEntityTimelineEvent(api, 'contact', contactId, submit);
+		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
 	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
@@ -273,6 +296,7 @@
 							: (contact.job_title ?? undefined)}
 						{contactFields}
 						{companyFields}
+						bind:timelineEvents
 						emailMessages={emailTab.messages}
 						emailEmptyState={emailTab.emptyState}
 						mailboxConnected={emailTab.mailboxConnected}
@@ -283,6 +307,7 @@
 						documentsApi={api}
 						documentsEntityId={contact.id}
 						documentsReloadKey={session.cacheGeneration}
+						{onTimelineAdd}
 						{onAddToTimeline}
 						{onDraftResponse}
 						{onUseSuggestion}

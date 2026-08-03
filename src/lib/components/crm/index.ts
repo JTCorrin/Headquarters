@@ -188,8 +188,10 @@ export type { TimelineEvent } from './timeline.svelte';
 export type { TimelineComposerSubmit } from './timeline-composer.svelte';
 export type { TimelineAccentId, TimelineIconId } from './timeline-accents.js';
 export {
+	COMPOSABLE_TIMELINE_EVENT_KINDS,
 	TIMELINE_EVENT_KINDS,
 	TIMELINE_KIND_META,
+	isComposableTimelineEventKind,
 	isTimelineEventKind,
 	timelineKindLabel,
 	timelineKindMarkerClass,

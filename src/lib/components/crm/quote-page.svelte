@@ -17,6 +17,10 @@
 		toQuoteUpdateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiQuoteDocument, ApiTaxRate } from '$lib/api/v1/types.js';
+	import {
+		createEntityTimelineEvent,
+		loadEntityTimeline
+	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -29,6 +33,8 @@
 	import { quoteFormSchema, type QuoteClientOption } from '$lib/schemas/quote.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
+	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
+	import type { TimelineEvent } from './timeline.svelte';
 	import AppShell from './app-shell.svelte';
 	import QuoteDetailPage from './quote-detail-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
@@ -61,6 +67,7 @@
 	let products = $state<CatalogProductOption[]>([]);
 	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
+	let timelineEvents = $state<TimelineEvent[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -173,6 +180,7 @@
 	function resetOrgScopedState() {
 		quote = null;
 		lines = [];
+		timelineEvents = [];
 		clientOptions = [];
 		products = [];
 		viewState = { kind: 'loading' };
@@ -231,9 +239,14 @@
 			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
 			lineForm.form.set(emptyLineForm());
 			viewState = { kind: 'ready' };
+
+			const timeline = await loadEntityTimeline(api, 'quote', quoteId);
+			if (isStale(epoch)) return;
+			timelineEvents = timeline;
 		} catch (error) {
 			if (isStale(epoch)) return;
 			quote = null;
+			timelineEvents = [];
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'not_found', message: 'Quote not found.' };
 				return;
@@ -364,6 +377,8 @@
 			const updated = await api.quotes.accept(quote.id, quote.version);
 			if (isStale(epoch)) return;
 			applyDocument(updated);
+			timelineEvents = await loadEntityTimeline(api, 'quote', quoteId);
+			if (isStale(epoch)) return;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -381,6 +396,11 @@
 		} finally {
 			actionPending = false;
 		}
+	}
+
+	async function onTimelineAdd(submit: TimelineComposerSubmit) {
+		const created = await createEntityTimelineEvent(api, 'quote', quoteId, submit);
+		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
 	async function onConvert() {
@@ -475,12 +495,14 @@
 							totalCents: quote.total_cents
 						}}
 						bind:lines
+						bind:timelineEvents
 						bind:lineDrawerOpen
 						onSaveQuote={onSaveQuote}
 						onAddLine={onAddLine}
 						onRemoveLine={onRemoveLine}
 						onAccept={onAccept}
 						onConvert={onConvert}
+						{onTimelineAdd}
 						showNav={false}
 						class="min-h-0 flex-1"
 					/>

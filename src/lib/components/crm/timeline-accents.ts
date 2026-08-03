@@ -40,6 +40,7 @@ export type TimelineIconId =
 	| 'status'
 	| 'meeting'
 	| 'task'
+	| 'conversion'
 	| 'flag'
 	| 'star'
 	| 'alert';
@@ -53,6 +54,7 @@ export const TIMELINE_ICONS: readonly { id: TimelineIconId; label: string }[] = 
 	{ id: 'document', label: 'Document' },
 	{ id: 'payment', label: 'Payment' },
 	{ id: 'status', label: 'Status' },
+	{ id: 'conversion', label: 'Conversion' },
 	{ id: 'flag', label: 'Flag' },
 	{ id: 'star', label: 'Star' },
 	{ id: 'alert', label: 'Alert' }
