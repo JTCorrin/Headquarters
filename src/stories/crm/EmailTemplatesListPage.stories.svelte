@@ -10,7 +10,8 @@
 			subject: 'Quick nudge on {{invoice.number}}',
 			category: 'chase',
 			status: 'Active',
-			updatedAt: 'Mar 12'
+			updatedAt: 'Mar 12',
+			version: 1
 		},
 		{
 			id: '2',
@@ -18,7 +19,8 @@
 			subject: 'Welcome aboard, {{contact.name}}',
 			category: 'onboarding',
 			status: 'Active',
-			updatedAt: 'Feb 28'
+			updatedAt: 'Feb 28',
+			version: 1
 		},
 		{
 			id: '3',
@@ -26,7 +28,8 @@
 			subject: 'Still thinking about {{quote.number}}?',
 			category: 'chase',
 			status: 'Draft',
-			updatedAt: 'Mar 18'
+			updatedAt: 'Mar 18',
+			version: 1
 		},
 		{
 			id: '4',
@@ -34,7 +37,8 @@
 			subject: 'Thanks — payment received',
 			category: 'transactional',
 			status: 'Active',
-			updatedAt: 'Jan 9'
+			updatedAt: 'Jan 9',
+			version: 1
 		}
 	];
 

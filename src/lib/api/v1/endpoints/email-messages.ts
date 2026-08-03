@@ -5,12 +5,21 @@ import type {
 	ApiEmailMessage,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
-	ApiEntityEmailType
+	ApiEntityEmailType,
+	ApiMyEmailMessageListParams
 } from '../types.js';
 import type { EmailMessagesEndpoints } from './types.js';
 
 export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessagesEndpoints {
 	return {
+		listMine: async (params: ApiMyEmailMessageListParams = {}, signal) => {
+			const { data } = await request<ApiEmailMessage[]>('/api/v1/me/email-messages', {
+				orgScoped: true,
+				query: { limit: params.limit },
+				signal
+			});
+			return data;
+		},
 		listForEntity: async (entityType: ApiEntityEmailType, entityId: string, signal) => {
 			const plural =
 				entityType === 'contact'

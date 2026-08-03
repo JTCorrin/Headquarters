@@ -46,11 +46,16 @@ import type {
 import type { TaskRow } from '$lib/components/crm/tasks-columns.js';
 import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
 import type { ClientRow } from '$lib/components/crm/clients-columns.js';
+import type { EmailTemplateRow } from '$lib/components/crm/email-templates-columns.js';
 import type { LeadCard } from '$lib/components/crm/leads-board.svelte';
 import type { ProductRow } from '$lib/components/crm/products-columns.js';
+import type { EmailTemplateFormData } from '$lib/schemas/email-template.js';
 import type {
 	ApiAiIntegration,
 	ApiEmailMessage,
+	ApiEmailTemplate,
+	ApiEmailTemplateCreateBody,
+	ApiEmailTemplateUpdateBody,
 	ApiClient,
 	ApiClientCreateBody,
 	ApiClientUpdateBody,
@@ -1204,7 +1209,7 @@ export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
 	return {
 		id: row.id,
 		direction: row.direction === 'outbound' ? 'out' : 'in',
-		from: row.from_address,
+		from: row.from_name?.trim() || row.from_address,
 		to: firstAddress(row.to_addresses),
 		subject: row.subject || '(no subject)',
 		preview: row.preview_text || row.body_text?.slice(0, 160) || '',
@@ -1212,6 +1217,53 @@ export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
 		occurredAt: occurred ? new Date(occurred).toLocaleString() : '',
 		unread: row.unread
 	};
+}
+
+function formatEmailTemplateUpdatedAt(iso: string): string {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return iso;
+	return date.toLocaleDateString(undefined, {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric'
+	});
+}
+
+export function toEmailTemplateRow(template: ApiEmailTemplate): EmailTemplateRow {
+	return {
+		id: template.id,
+		name: template.name,
+		subject: template.subject,
+		category: template.category,
+		status: template.status,
+		updatedAt: formatEmailTemplateUpdatedAt(template.updated_at),
+		version: template.version
+	};
+}
+
+export function toEmailTemplateFormData(template: ApiEmailTemplate): EmailTemplateFormData {
+	return {
+		name: template.name,
+		subject: template.subject,
+		body: template.body_text || template.body_html || '',
+		category: template.category,
+		status: template.status
+	};
+}
+
+export function toEmailTemplateCreateBody(data: EmailTemplateFormData): ApiEmailTemplateCreateBody {
+	return {
+		name: data.name.trim(),
+		subject: data.subject.trim(),
+		body_text: data.body,
+		body_html: null,
+		category: data.category,
+		status: data.status
+	};
+}
+
+export function toEmailTemplateUpdateBody(data: EmailTemplateFormData): ApiEmailTemplateUpdateBody {
+	return toEmailTemplateCreateBody(data);
 }
 
 export function recurringInvoiceStatusLabel(

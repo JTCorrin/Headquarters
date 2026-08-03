@@ -33,6 +33,7 @@ export function requiresSelectedOrg(pathname: string): boolean {
 	if (pathname === '/payments' || pathname.startsWith('/payments/')) return true;
 	if (pathname === '/products' || pathname.startsWith('/products/')) return true;
 	if (pathname === '/documents' || pathname.startsWith('/documents/')) return true;
+	if (pathname === '/email' || pathname.startsWith('/email/')) return true;
 	if (pathname === '/leads' || pathname.startsWith('/leads/')) return true;
 	if (pathname === '/clients' || pathname.startsWith('/clients/')) return true;
 	if (pathname === '/tasks' || pathname.startsWith('/tasks/')) return true;
