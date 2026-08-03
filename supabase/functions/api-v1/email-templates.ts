@@ -151,6 +151,13 @@ export function validateEmailTemplateBody(
 }
 
 function databaseError(error: { code?: string; message?: string }, requestId: string): ApiError {
+  if (error.message?.toLowerCase().includes('version conflict')) {
+    return new ApiError(
+      412,
+      'PRECONDITION_FAILED',
+      'Email template version does not match If-Match',
+    )
+  }
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'An email template with this name already exists')
   }
@@ -160,6 +167,12 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
       'VALIDATION_ERROR',
       error.message || 'Email template failed a database constraint',
     )
+  }
+  if (error.code === '42501') {
+    return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
+  }
+  if (error.code === 'P0002' || error.message?.toLowerCase().includes('not found')) {
+    return new ApiError(404, 'NOT_FOUND', 'Email template not found')
   }
   console.error('Email template operation failed', {
     request_id: requestId,
@@ -311,34 +324,14 @@ export function handleEmailTemplates(
     }
     return (async () => {
       const version = parseVersion(req)
-      const current = await findTemplate(db, orgId, templateId, requestId)
-      if (current.version !== version) {
-        throw new ApiError(
-          412,
-          'PRECONDITION_FAILED',
-          'Email template version does not match If-Match',
-        )
-      }
-      const { data, error } = await db
-        .from('email_templates')
-        .update({
-          deleted_at: new Date().toISOString(),
-          status: 'archived',
-        })
-        .eq('org_id', orgId)
-        .eq('id', templateId)
-        .eq('version', version)
-        .is('deleted_at', null)
-        .select('id')
-        .maybeSingle()
+      // Direct UPDATE ... deleted_at fails under RLS on staging (500);
+      // mutate through the security-definer RPC (same pattern as products).
+      const { error } = await db.rpc('soft_delete_email_template', {
+        p_template_id: templateId,
+        p_org_id: orgId,
+        p_expected_version: version,
+      })
       if (error) throw databaseError(error, requestId)
-      if (!data) {
-        throw new ApiError(
-          412,
-          'PRECONDITION_FAILED',
-          'Email template version does not match If-Match',
-        )
-      }
       return new Response(null, {
         status: 204,
         headers: { 'x-request-id': requestId },
