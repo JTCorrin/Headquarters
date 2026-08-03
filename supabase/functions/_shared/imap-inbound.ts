@@ -249,6 +249,153 @@ export function parseHeaderBlock(raw: string): Record<string, string> {
   return headers
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeCharset(charset: string): string {
+  const c = charset.trim().toLowerCase().replace(/_/g, '-')
+  if (c === 'utf8') return 'utf-8'
+  if (c === 'us-ascii' || c === 'ascii') return 'utf-8'
+  if (c === 'latin1' || c === 'latin-1' || c === 'iso-8859-1') return 'iso-8859-1'
+  return c || 'utf-8'
+}
+
+function bytesToText(bytes: Uint8Array, charset: string): string {
+  const label = normalizeCharset(charset)
+  try {
+    return new TextDecoder(label).decode(bytes)
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes)
+  }
+}
+
+/** Decode quoted-printable body octets (soft line breaks + =XX). */
+export function decodeQuotedPrintable(raw: string): Uint8Array {
+  const stripped = raw.replace(/=\r?\n/g, '')
+  const out: number[] = []
+  for (let i = 0; i < stripped.length; i++) {
+    const ch = stripped[i]
+    if (ch === '=' && i + 2 < stripped.length) {
+      const hex = stripped.slice(i + 1, i + 3)
+      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
+        out.push(Number.parseInt(hex, 16))
+        i += 2
+        continue
+      }
+    }
+    out.push(stripped.charCodeAt(i) & 0xff)
+  }
+  return Uint8Array.from(out)
+}
+
+/** Decode base64 body (whitespace ignored). */
+export function decodeBase64Body(raw: string): Uint8Array {
+  const cleaned = raw.replace(/\s+/g, '')
+  if (!cleaned) return new Uint8Array()
+  const binary = atob(cleaned)
+  const out = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+  return out
+}
+
+function decodeTransferEncoding(
+  raw: string,
+  cte: string | undefined,
+  charset: string,
+): string {
+  const enc = (cte ?? '7bit').trim().toLowerCase()
+  if (enc === 'quoted-printable') {
+    return bytesToText(decodeQuotedPrintable(raw), charset)
+  }
+  if (enc === 'base64') {
+    return bytesToText(decodeBase64Body(raw), charset)
+  }
+  return raw
+}
+
+function charsetFromContentType(contentType: string | undefined): string {
+  const m = contentType?.match(/charset\s*=\s*"?([^";\s]+)"?/i)
+  return m?.[1] ?? 'utf-8'
+}
+
+function stripHtmlToText(html: string): string {
+  return html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
+function looksLikeMultipartBody(body: string): boolean {
+  const trimmed = body.replace(/^\uFEFF/, '').replace(/^\r?\n+/, '')
+  if (!trimmed.startsWith('--')) return false
+  return /^--\S[\s\S]*?\nContent-Type\s*:/i.test(trimmed)
+}
+
+function decodeMultipartAlternative(body: string): string | null {
+  const trimmed = body.replace(/^\uFEFF/, '').replace(/^\r?\n+/, '')
+  const first = trimmed.match(/^--([^\r\n]+)/)
+  if (!first) return null
+  let boundary = first[1]
+  if (boundary.endsWith('--')) boundary = boundary.slice(0, -2)
+  if (!boundary) return null
+
+  const delim = new RegExp(`(?:^|\r?\n)--${escapeRegExp(boundary)}(?:--)?(?=\r?\n|$)`)
+  const segments = trimmed.split(delim)
+  let plain: string | null = null
+  let html: string | null = null
+
+  for (const segment of segments) {
+    if (!segment || !/\S/.test(segment)) continue
+    const headerEnd = segment.search(/\r?\n\r?\n/)
+    if (headerEnd < 0) continue
+    const headers = parseHeaderBlock(segment.slice(0, headerEnd))
+    const contentType = headers['content-type'] ?? ''
+    const ctLower = contentType.toLowerCase()
+    if (!ctLower.includes('text/plain') && !ctLower.includes('text/html')) continue
+
+    const partRaw = segment.slice(headerEnd).replace(/^\r?\n\r?\n/, '')
+    const decoded = decodeTransferEncoding(
+      partRaw,
+      headers['content-transfer-encoding'],
+      charsetFromContentType(contentType),
+    ).replace(/\s+$/u, '')
+
+    if (ctLower.includes('text/plain') && plain === null) plain = decoded
+    else if (ctLower.includes('text/html') && html === null) html = decoded
+  }
+
+  if (plain !== null && plain.length > 0) return plain
+  if (html !== null) return stripHtmlToText(html)
+  return null
+}
+
+/**
+ * Turn IMAP BODY[TEXT] into displayable plain text.
+ * Prefers multipart text/plain; decodes quoted-printable / base64; HTML→text fallback.
+ */
+export function decodeMimeBodyText(raw: string): string {
+  if (!raw) return ''
+  if (looksLikeMultipartBody(raw)) {
+    const decoded = decodeMultipartAlternative(raw)
+    if (decoded !== null) return decoded
+  }
+  return raw
+}
+
 function quoteImapString(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
@@ -587,7 +734,7 @@ function parseFetchBlockToMessage(
     .slice(0, 500)
   const providerThreadId = (inReplyTo || references[0] || providerMessageId).slice(0, 500)
   const truncated = bodyRaw.length >= maxBodyBytes
-  const bodyText = bodyRaw.slice(0, maxBodyBytes)
+  const bodyText = decodeMimeBodyText(bodyRaw).slice(0, maxBodyBytes)
   return {
     provider_message_id: providerMessageId,
     provider_thread_id: providerThreadId,
