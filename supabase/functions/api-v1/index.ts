@@ -18,6 +18,7 @@ import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleEmailTemplates } from './email-templates.ts'
 import { handleMailbox, listEntityEmailMessages, listMyEmailMessages } from './mailbox.ts'
+import { handleAuditEvents } from './audit-events.ts'
 import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
@@ -427,6 +428,17 @@ export default {
             orgId,
             membership.role,
             userId,
+            requestId,
+          )
+        }
+
+        if (path === '/api/v1/audit-events') {
+          return await handleAuditEvents(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
             requestId,
           )
         }
