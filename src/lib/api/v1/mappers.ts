@@ -119,6 +119,9 @@ import type {
 	ApiMeetingDocument,
 	ApiMeetingRelatedEntityType,
 	ApiMeetingStatus,
+	ApiMeetingSummaryStatus,
+	ApiMeetingTaskProposal,
+	ApiMeetingTranscriptStatus,
 	ApiMeetingUpdateBody,
 	ApiProject,
 	ApiProjectCard,
@@ -1888,6 +1891,52 @@ export function toAuditLogListItem(row: ApiAuditEvent): AuditLogListItem {
 export function meetingStatusLabel(status: ApiMeetingStatus): string {
 	if (status === 'in_progress') return 'In progress';
 	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function meetingTranscriptStatusLabel(status: ApiMeetingTranscriptStatus): string {
+	if (status === 'none') return 'Missing';
+	if (status === 'uploaded') return 'Uploaded';
+	if (status === 'processing') return 'Processing';
+	if (status === 'ready') return 'Ready';
+	if (status === 'failed') return 'Failed';
+	return status;
+}
+
+export function meetingSummaryStatusLabel(status: ApiMeetingSummaryStatus): string {
+	if (status === 'none') return 'Missing';
+	if (status === 'generating') return 'Generating';
+	if (status === 'ready') return 'Ready';
+	if (status === 'failed') return 'Failed';
+	return status;
+}
+
+export function meetingTranscriptPlainText(meeting: ApiMeetingDocument): string {
+	return meeting.transcript?.plain_text?.trim() || '';
+}
+
+export function toProposedMeetingTasks(
+	proposals: ApiMeetingTaskProposal[] | null | undefined
+): Array<{
+	id: string;
+	title: string;
+	assignee?: string;
+	status: 'proposed' | 'accepted' | 'dismissed';
+	accepted: boolean;
+}> {
+	if (!proposals?.length) return [];
+	return proposals.map((proposal) => ({
+		id: proposal.id,
+		title: proposal.title,
+		assignee: proposal.suggested_assignee_label?.trim() || undefined,
+		status: proposal.status,
+		accepted: proposal.status === 'accepted'
+	}));
+}
+
+export function canGenerateMeetingSummary(meeting: ApiMeetingDocument): boolean {
+	if (meeting.summary_status === 'generating') return false;
+	if (meeting.transcript?.plain_text?.trim()) return true;
+	return meeting.transcript_status === 'ready';
 }
 
 export function formatMeetingWhen(

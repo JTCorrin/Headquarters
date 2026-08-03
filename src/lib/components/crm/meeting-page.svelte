@@ -2,15 +2,21 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		canGenerateMeetingSummary,
 		formatMeetingWhen,
 		meetingStatusLabel,
+		meetingSummaryStatusLabel,
+		meetingTranscriptPlainText,
+		meetingTranscriptStatusLabel,
 		membershipFromCreateResult,
 		roleFromMemberships,
 		toAttendeeFields,
 		toOrganisationCreateBody,
-		toOrgMembershipSummary
+		toOrgMembershipSummary,
+		toProposedMeetingTasks
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiMeetingDocument } from '$lib/api/v1/types.js';
+	import { attachMeetingTranscriptFile } from '$lib/crm/meeting-transcript-attachment.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
@@ -44,7 +50,10 @@
 	let meeting = $state<ApiMeetingDocument | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
+	let actionError = $state<string | null>(null);
 	let busy = $state(false);
+	let actionBusy = $state(false);
+	let fileInput: HTMLInputElement | null = $state(null);
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -85,6 +94,20 @@
 	const attendeeFields = $derived.by((): InfoCardField[] =>
 		toAttendeeFields(meeting?.attendees ?? [])
 	);
+	const transcript = $derived(meeting ? meetingTranscriptPlainText(meeting) : '');
+	const summary = $derived(meeting?.summary?.trim() || '');
+	const proposedTasks = $derived(toProposedMeetingTasks(meeting?.task_proposals));
+	const transcriptStatusLabel = $derived(
+		meeting ? meetingTranscriptStatusLabel(meeting.transcript_status) : 'Missing'
+	);
+	const summaryStatusLabel = $derived(
+		meeting && meeting.summary_status !== 'none'
+			? meetingSummaryStatusLabel(meeting.summary_status)
+			: summary
+				? 'Ready'
+				: undefined
+	);
+	const generateEnabled = $derived(meeting ? canGenerateMeetingSummary(meeting) : false);
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
@@ -95,6 +118,7 @@
 			}
 			return error.message || fallback;
 		}
+		if (error instanceof Error && error.message) return error.message;
 		return fallback;
 	}
 
@@ -134,6 +158,7 @@
 
 	function resetOrgScopedState() {
 		meeting = null;
+		actionError = null;
 		viewState = { kind: 'loading' };
 	}
 
@@ -210,6 +235,121 @@
 		}
 	}
 
+	function onUploadTranscript() {
+		actionError = null;
+		fileInput?.click();
+	}
+
+	async function onTranscriptFileSelected(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file || !meeting) return;
+
+		const epoch = captureEpoch();
+		actionBusy = true;
+		actionError = null;
+		try {
+			const next = await attachMeetingTranscriptFile(api, meeting, file);
+			if (isStale(epoch)) return;
+			meeting = next;
+		} catch (error) {
+			if (isStale(epoch)) return;
+			actionError = userMessage(error, 'Could not attach transcript — try again.');
+		} finally {
+			if (!isStale(epoch)) actionBusy = false;
+		}
+	}
+
+	async function onGenerateSummary() {
+		if (!meeting || !canGenerateMeetingSummary(meeting)) return;
+		const epoch = captureEpoch();
+		actionBusy = true;
+		actionError = null;
+		try {
+			const next = await api.meetings.generateSummary(meeting.id, meeting.version);
+			if (isStale(epoch)) return;
+			meeting = next;
+			if (next.summary_status === 'failed') {
+				actionError = 'Summary generation failed — check the transcript and retry.';
+			}
+		} catch (error) {
+			if (isStale(epoch)) return;
+			actionError = userMessage(error, 'Could not generate summary — try again.');
+		} finally {
+			if (!isStale(epoch)) actionBusy = false;
+		}
+	}
+
+	async function onAcceptTask(proposalId: string) {
+		if (!meeting) return;
+		const epoch = captureEpoch();
+		actionBusy = true;
+		actionError = null;
+		try {
+			const next = await api.meetings.acceptTaskProposal(
+				meeting.id,
+				proposalId,
+				meeting.version
+			);
+			if (isStale(epoch)) return;
+			meeting = next;
+		} catch (error) {
+			if (isStale(epoch)) return;
+			actionError = userMessage(error, 'Could not accept proposal — try again.');
+		} finally {
+			if (!isStale(epoch)) actionBusy = false;
+		}
+	}
+
+	async function onDismissTask(proposalId: string) {
+		if (!meeting) return;
+		const epoch = captureEpoch();
+		actionBusy = true;
+		actionError = null;
+		try {
+			const next = await api.meetings.dismissTaskProposal(
+				meeting.id,
+				proposalId,
+				meeting.version
+			);
+			if (isStale(epoch)) return;
+			meeting = next;
+		} catch (error) {
+			if (isStale(epoch)) return;
+			actionError = userMessage(error, 'Could not dismiss proposal — try again.');
+		} finally {
+			if (!isStale(epoch)) actionBusy = false;
+		}
+	}
+
+	async function onAcceptAllTasks() {
+		if (!meeting) return;
+		const open = (meeting.task_proposals ?? []).filter((p) => p.status === 'proposed');
+		if (open.length === 0) return;
+
+		const epoch = captureEpoch();
+		actionBusy = true;
+		actionError = null;
+		try {
+			let current = meeting;
+			for (const proposal of open) {
+				current = await api.meetings.acceptTaskProposal(
+					current.id,
+					proposal.id,
+					current.version
+				);
+				if (isStale(epoch)) return;
+			}
+			meeting = current;
+		} catch (error) {
+			if (isStale(epoch)) return;
+			actionError = userMessage(error, 'Could not accept all proposals — try again.');
+		} finally {
+			if (!isStale(epoch)) actionBusy = false;
+		}
+	}
+
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
@@ -220,6 +360,14 @@
 
 {#if currentOrgId}
 	<div class={className} data-testid="meeting-page">
+		<input
+			bind:this={fileInput}
+			type="file"
+			class="sr-only"
+			accept=".txt,.md,.markdown,.vtt,.pdf,text/plain,text/markdown,text/vtt,application/pdf"
+			data-testid="meeting-transcript-file"
+			onchange={onTranscriptFileSelected}
+		/>
 		<AppShell
 			{currentOrgId}
 			memberships={session.memberships}
@@ -248,10 +396,20 @@
 						{relatedTo}
 						{scheduleFields}
 						{attendeeFields}
-						transcript=""
-						summary=""
-						proposedTasks={[]}
+						{transcript}
+						{transcriptStatusLabel}
+						{summary}
+						{summaryStatusLabel}
+						{proposedTasks}
+						{actionError}
+						{actionBusy}
+						{generateEnabled}
 						showNav={false}
+						{onUploadTranscript}
+						{onGenerateSummary}
+						{onAcceptTask}
+						{onDismissTask}
+						{onAcceptAllTasks}
 						class="min-h-0 flex-1"
 					/>
 				{/if}

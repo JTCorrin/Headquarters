@@ -79,6 +79,7 @@ import type {
 	ApiMeetingCreateBody,
 	ApiMeetingDocument,
 	ApiMeetingListParams,
+	ApiMeetingTranscriptAttachBody,
 	ApiMeetingUpdateBody,
 	ApiProject,
 	ApiProjectCard,
@@ -334,6 +335,31 @@ export interface MeetingsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiMeetingDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	/** Attach a finalized document as the meeting transcript (M2). */
+	attachTranscript(
+		id: string,
+		body: ApiMeetingTranscriptAttachBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiMeetingDocument>;
+	/** Stub-capable summary generation; returns meeting + proposals when ready (M2). */
+	generateSummary(
+		id: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiMeetingDocument>;
+	acceptTaskProposal(
+		meetingId: string,
+		proposalId: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiMeetingDocument>;
+	dismissTaskProposal(
+		meetingId: string,
+		proposalId: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiMeetingDocument>;
 }
 
 export interface ProjectsEndpoints {
