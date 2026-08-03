@@ -585,31 +585,7 @@ async function replaceAttendees(
   attendees: AttendeeInput[],
   requestId: string,
 ): Promise<MeetingAttendeeRow[]> {
-  const { data: existing, error: listError } = await db
-    .from('meeting_attendees')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('meeting_id', meetingId)
-    .is('deleted_at', null)
-
-  if (listError) throw databaseError(listError, requestId)
-
-  if (existing && existing.length > 0) {
-    const now = new Date().toISOString()
-    const { error: softError } = await db
-      .from('meeting_attendees')
-      .update({ deleted_at: now })
-      .eq('org_id', orgId)
-      .eq('meeting_id', meetingId)
-      .is('deleted_at', null)
-    if (softError) throw databaseError(softError, requestId)
-  }
-
-  if (attendees.length === 0) return []
-
-  const rows = attendees.map((attendee) => ({
-    org_id: orgId,
-    meeting_id: meetingId,
+  const payload = attendees.map((attendee) => ({
     email: attendee.email,
     name: attendee.name ?? null,
     contact_id: attendee.contact_id ?? null,
@@ -619,13 +595,15 @@ async function replaceAttendees(
     attended: attendee.attended ?? null,
   }))
 
-  const { data, error } = await db
-    .from('meeting_attendees')
-    .insert(rows)
-    .select(ATTENDEE_SELECT)
+  const { data, error } = await db.rpc('replace_meeting_attendees', {
+    p_meeting_id: meetingId,
+    p_org_id: orgId,
+    p_attendees: payload,
+  })
 
   if (error) throw databaseError(error, requestId)
-  return data ?? []
+  if (!Array.isArray(data)) return []
+  return data as MeetingAttendeeRow[]
 }
 
 async function hostMeeting(
