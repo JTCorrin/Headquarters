@@ -142,8 +142,8 @@ LIST_COUNT="$(printf '%s' "$list_up" | jq -r --arg id "$MEETING_ID" '[.data[]? |
 [[ "$LIST_COUNT" == "1" ]] || die "upcoming list missing meeting: ${list_up}"
 
 log "PATCH meetings attendees replace-all with If-Match"
-patch_meeting="$(
-	curl -fsS --max-time 30 \
+patch_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/patch.json" -w '%{http_code}' \
 		-X PATCH "${API_BASE}/api/v1/meetings/${MEETING_ID}" \
 		-H "apikey: ${SUPABASE_ANON_KEY}" \
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
@@ -152,6 +152,8 @@ patch_meeting="$(
 		-H 'content-type: application/json' \
 		-d '{"status":"in_progress","attendees":[{"email":"only@meetings-proof.test","organiser":true}]}'
 )"
+patch_meeting="$(cat "${TMPDIR_PROOF}/patch.json")"
+[[ "$patch_code" == "200" ]] || die "meeting patch HTTP ${patch_code}: ${patch_meeting}"
 MEETING_VER2="$(printf '%s' "$patch_meeting" | jq -r '.data.version // empty')"
 PATCH_STATUS="$(printf '%s' "$patch_meeting" | jq -r '.data.status // empty')"
 PATCH_ATTENDEES="$(printf '%s' "$patch_meeting" | jq -r '.data.attendees | length')"
