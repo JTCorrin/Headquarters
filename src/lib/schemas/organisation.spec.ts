@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	canAccessAuditLog,
 	canAccessOrgConfigRoutes,
 	canAccessPersonalConfig,
 	canMutateOrgConfig,
@@ -141,6 +142,11 @@ describe('organisation schemas', () => {
 		for (const role of ['admin', 'member', 'billing', 'readonly'] as const) {
 			expect(canAccessOrgConfigRoutes(role)).toBe(false);
 			expect(canMutateOrgConfig(role)).toBe(false);
+		}
+		expect(canAccessAuditLog('owner')).toBe(true);
+		expect(canAccessAuditLog('admin')).toBe(true);
+		for (const role of ['member', 'billing', 'readonly'] as const) {
+			expect(canAccessAuditLog(role)).toBe(false);
 		}
 		expect(canAccessPersonalConfig('owner')).toBe(true);
 		expect(canAccessPersonalConfig('admin')).toBe(true);

@@ -18,6 +18,8 @@ import type {
 	ApiDocumentBrowseResult,
 	ApiDocumentDownloadResult,
 	ApiDocumentEntityType,
+	ApiAuditEvent,
+	ApiAuditEventListParams,
 	ApiTimelineEntityType,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody,
@@ -518,4 +520,11 @@ export interface TimelineEventsEndpoints {
 		body: ApiTimelineEventCreateBody,
 		signal?: AbortSignal
 	): Promise<ApiTimelineEvent>;
+}
+
+export interface AuditEventsEndpoints {
+	list(
+		params?: ApiAuditEventListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiAuditEvent[]>>;
 }

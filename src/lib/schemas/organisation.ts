@@ -188,6 +188,11 @@ export function canMutateOrgConfig(role: MembershipRole): boolean {
 	return role === 'owner';
 }
 
+/** Audit log view — Owner + Admin (nav matrix §8.5). */
+export function canAccessAuditLog(role: MembershipRole): boolean {
+	return role === 'owner' || role === 'admin';
+}
+
 /**
  * Personal settings (theme + Mail) — every membership except billing.
  * Owners also use this for personal Mail; org defaults stay under `/org/config`.
