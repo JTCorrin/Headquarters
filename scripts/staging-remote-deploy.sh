@@ -135,10 +135,12 @@ EOF
 log "wrote PUBLIC_SUPABASE_URL into supabase/functions/.env for Edge storage URL rewrite"
 
 # Edge loads supabase/functions/.env on container create (supabase start), not on a
-# plain restart. CLI names use underscores (supabase_edge_runtime_*) or hyphens —
-# match like PostgREST discovery, then recreate so PUBLIC_SUPABASE_URL is injected.
+# plain restart. CLI names use underscores (supabase_edge_runtime_*) or hyphens.
+# Do NOT docker rm Edge alone: Kong then returns 503 {"message":"name resolution failed"}
+# because the edge-runtime upstream hostname disappears from the Docker network.
+# Bounce the whole local stack via the CLI so Kong + Edge share aliases again.
 if ! command -v docker >/dev/null 2>&1; then
-	log "docker not available — cannot recreate edge-runtime after functions/.env write"
+	log "docker not available — cannot bounce edge-runtime after functions/.env write"
 	exit 1
 fi
 edge_lines="$(
@@ -146,35 +148,56 @@ edge_lines="$(
 		| awk 'tolower($0) ~ /edge[_-]runtime/ { print }' \
 		| sort -u
 )"
-edge_ids="$(printf '%s\n' "$edge_lines" | awk '{ print $1 }' | tr '\n' ' ')"
-edge_ids="${edge_ids%"${edge_ids##*[![:space:]]}"}"
 edge_names="$(printf '%s\n' "$edge_lines" | awk '{ print $2 }' | paste -sd',' -)"
-if [[ -z "$edge_ids" ]]; then
-	log "no edge-runtime container matched edge[_-]runtime — refusing silent skip"
+if [[ -z "$edge_names" ]]; then
+	# Broken prior recreate can leave Kong with no edge upstream ("name resolution failed").
+	# Still bounce so CLI recreates Edge; fail only if it is missing after start.
+	log "no edge-runtime container before bounce — recovering via supabase stop/start"
+	docker ps --format '{{.ID}} {{.Names}}' >&2 || true
+else
+	log "bouncing Supabase stack so Edge loads functions/.env + api-v1 @ ${SHA} (names=${edge_names})"
+fi
+# Preserve DB/storage volumes (default). --no-backup would wipe staging data.
+supabase stop
+supabase start
+
+edge_after="$(
+	docker ps --format '{{.Names}}' \
+		| awk 'tolower($0) ~ /edge[_-]runtime/ { print }' \
+		| sort -u \
+		| paste -sd',' -
+)"
+if [[ -z "$edge_after" ]]; then
+	log "edge-runtime missing after supabase start — refusing to continue"
 	docker ps --format '{{.ID}} {{.Names}}' >&2 || true
 	exit 1
 fi
-log "recreating edge-runtime to load functions/.env + api-v1 @ ${SHA} (names=${edge_names})"
-# shellcheck disable=SC2086
-docker rm -f $edge_ids >/dev/null
-# Stack is already up — recreate the missing Edge service only.
-supabase start
+log "edge-runtime up after bounce (names=${edge_after})"
+
+# Unauth organisations: healthy Edge serves 401 (verify_jwt) or 200 — never 5xx/000.
+# Staging smoke historically expects 401 via proxy for GET /api/v1/organisations.
 ready=0
-for _ in $(seq 1 90); do
+last_code="000"
+for i in $(seq 1 90); do
 	code="$(
 		curl -sS -o /dev/null -w '%{http_code}' --max-time 2 \
 			-H "apikey: ${PUBLIC_SUPABASE_ANON_KEY}" \
 			"${PUBLIC_SUPABASE_URL}/functions/v1/api-v1/api/v1/organisations" || true
 	)"
-	if [[ "$code" =~ ^[0-9]{3}$ ]]; then
-		log "edge-runtime ready (HTTP ${code})"
+	last_code="${code:-000}"
+	if [[ "$last_code" == "401" || "$last_code" == "200" ]]; then
+		log "edge-runtime ready (HTTP ${last_code})"
 		ready=1
 		break
+	fi
+	# Log non-healthy codes occasionally so deploy logs show 503/000 progress.
+	if (( i % 15 == 0 )); then
+		log "edge-runtime not ready yet (HTTP ${last_code}); waiting…"
 	fi
 	sleep 1
 done
 if [[ "$ready" -ne 1 ]]; then
-	log "edge-runtime did not become ready after recreate"
+	log "edge-runtime did not become healthy after bounce (last HTTP ${last_code}; want 401 or 200)"
 	exit 1
 fi
 
