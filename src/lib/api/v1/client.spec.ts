@@ -170,12 +170,19 @@ describe('createApiV1Client', () => {
 				expect(url.searchParams.get('limit')).toBe('10');
 				expect(url.searchParams.get('cursor')).toBe('opaque-cursor');
 				expect(url.searchParams.get('status')).toBe('draft');
+				expect(url.searchParams.get('client_id')).toBe(CLIENT_ID);
 				return {
 					body: {
 						data: [sampleQuoteDocument],
 						meta: { next_cursor: 'next-opaque' }
 					}
 				};
+			},
+			'GET /api/v1/invoices': async (request) => {
+				const url = new URL(request.url);
+				expect(url.searchParams.get('client_id')).toBe(CLIENT_ID);
+				expect(url.searchParams.get('limit')).toBe('20');
+				return { body: { data: [] } };
 			}
 		});
 
@@ -184,10 +191,12 @@ describe('createApiV1Client', () => {
 		const listed = await client.quotes.list({
 			limit: 10,
 			cursor: 'opaque-cursor',
-			status: 'draft'
+			status: 'draft',
+			client_id: CLIENT_ID
 		});
 		expect(listed.data).toHaveLength(1);
 		expect(listed.meta?.next_cursor).toBe('next-opaque');
+		await client.invoices.list({ client_id: CLIENT_ID, limit: 20 });
 	});
 
 	it('omits Content-Type when there is no body', async () => {
