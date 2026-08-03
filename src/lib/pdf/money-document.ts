@@ -24,7 +24,7 @@ export interface MoneyDocumentInput {
 	issueDate?: string;
 	lines: LineItemRow[];
 	notes?: string;
-	/** When set (invoices), summary uses these instead of recomputing from lines. */
+	/** When set, summary uses these instead of recomputing from lines (quote/invoice/bill). */
 	totals?: MoneyDocumentTotals;
 }
 
