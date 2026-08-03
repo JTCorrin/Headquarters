@@ -1623,6 +1623,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      soft_delete_email_template: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_template_id: string
+        }
+        Returns: undefined
+      }
       browse_entity_documents: {
         Args: {
           p_org_id: string
