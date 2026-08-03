@@ -17,6 +17,7 @@ export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
 export { createTasksEndpoints } from './tasks.js';
+export { createMeetingsEndpoints } from './meetings.js';
 export { createTaxRatesEndpoints } from './tax-rates.js';
 export { createTimelineEventsEndpoints } from './timeline-events.js';
 export { createVendorsEndpoints } from './vendors.js';
@@ -32,6 +33,7 @@ export type {
 	InvoicesEndpoints,
 	LeadsEndpoints,
 	MailboxEndpoints,
+	MeetingsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
 	PaymentsEndpoints,

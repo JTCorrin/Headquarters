@@ -6,7 +6,9 @@
 		isTaskDueBeforeToday,
 		membershipFromCreateResult,
 		roleFromMemberships,
+		toDashboardMeeting,
 		toDashboardTask,
+		toMeetingListItem,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toTaskListItem
@@ -16,10 +18,12 @@
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { TaskListItem } from '$lib/schemas/task.js';
+	import type { MeetingListItem } from '$lib/schemas/meeting.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import DashboardPage, {
 		type DashboardAttentionItem,
+		type DashboardMeeting,
 		type DashboardStat
 	} from './dashboard-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
@@ -45,6 +49,7 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let tasks = $state<TaskListItem[]>([]);
+	let upcomingMeetingItems = $state<MeetingListItem[]>([]);
 	let currentMembershipId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
@@ -62,6 +67,9 @@
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	const myTasks = $derived(tasks.map(toDashboardTask));
+	const upcomingMeetings = $derived.by((): DashboardMeeting[] =>
+		upcomingMeetingItems.map(toDashboardMeeting)
+	);
 	const openTasks = $derived(
 		tasks.filter((t) => t.rawStatus !== 'done' && t.rawStatus !== 'cancelled')
 	);
@@ -139,6 +147,7 @@
 
 	function resetOrgScopedState() {
 		tasks = [];
+		upcomingMeetingItems = [];
 		currentMembershipId = null;
 		viewState = { kind: 'loading' };
 	}
@@ -174,6 +183,16 @@
 			tasks = listed.data.map((task) =>
 				toTaskListItem(task, { currentMembershipId })
 			);
+
+			try {
+				const upcoming = await api.meetings.list({ limit: 5, upcoming: true });
+				if (isStale(epoch)) return;
+				upcomingMeetingItems = upcoming.data.map(toMeetingListItem);
+			} catch {
+				if (isStale(epoch)) return;
+				// Meetings API may land after this FE cut — keep Home usable.
+				upcomingMeetingItems = [];
+			}
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -280,7 +299,7 @@
 						{stats}
 						{myTasks}
 						{attentionItems}
-						upcomingMeetings={[]}
+						{upcomingMeetings}
 						{recentActivity}
 						{onToggleTask}
 						{onSelectTask}

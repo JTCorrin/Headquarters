@@ -112,10 +112,25 @@ import type {
 	ApiTask,
 	ApiTaskCreateBody,
 	ApiTaskUpdateBody,
+	ApiMeeting,
+	ApiMeetingAttendee,
+	ApiMeetingAttendeeInput,
+	ApiMeetingCreateBody,
+	ApiMeetingDocument,
+	ApiMeetingRelatedEntityType,
+	ApiMeetingStatus,
+	ApiMeetingUpdateBody,
 	ApiAuditEvent,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody
 } from './types.js';
+import type {
+	MeetingAttendeeFormData,
+	MeetingFormData,
+	MeetingListItem
+} from '$lib/schemas/meeting.js';
+import type { InfoCardField } from '$lib/components/crm/info-card.svelte';
+import type { DashboardMeeting } from '$lib/components/crm/dashboard-page.svelte';
 
 export function toOrgMembershipSummary(
 	row: ApiOrganisationMembership
@@ -1855,4 +1870,209 @@ export function toAuditLogListItem(row: ApiAuditEvent): AuditLogListItem {
 		target: auditTargetLabel(row),
 		ip: row.ip_address?.trim() ? row.ip_address : '—'
 	};
+}
+
+export function meetingStatusLabel(status: ApiMeetingStatus): string {
+	if (status === 'in_progress') return 'In progress';
+	return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function formatMeetingWhen(
+	startsAt: string,
+	endsAt: string,
+	timezone?: string | null
+): string {
+	const start = new Date(startsAt);
+	const end = new Date(endsAt);
+	if (Number.isNaN(start.getTime())) return startsAt || '—';
+	const tz = timezone?.trim() || undefined;
+	const dateOpts: Intl.DateTimeFormatOptions = {
+		dateStyle: 'medium',
+		timeStyle: 'short',
+		...(tz ? { timeZone: tz } : {})
+	};
+	try {
+		const startLabel = start.toLocaleString(undefined, dateOpts);
+		if (Number.isNaN(end.getTime())) return startLabel;
+		const endLabel = end.toLocaleTimeString(undefined, {
+			timeStyle: 'short',
+			...(tz ? { timeZone: tz } : {})
+		});
+		return `${startLabel}–${endLabel}`;
+	} catch {
+		return startsAt;
+	}
+}
+
+function meetingWithWhom(meeting: ApiMeeting): string {
+	const attendees = meeting.attendees;
+	if (attendees?.length) {
+		const organiser = attendees.find((a) => a.organiser);
+		const primary = organiser ?? attendees[0];
+		const name = primary.name?.trim();
+		if (name) return name;
+		if (primary.email) return primary.email;
+	}
+	// List payloads omit nested attendees — fall back to location when present.
+	const location = meeting.location?.trim();
+	return location || '—';
+}
+
+function meetingRelatedLabel(meeting: ApiMeeting): string {
+	const label = meeting.related_entity_label?.trim();
+	if (label) return label;
+	if (meeting.related_entity_type) {
+		const type = meeting.related_entity_type;
+		return type.charAt(0).toUpperCase() + type.slice(1);
+	}
+	return '—';
+}
+
+export function toMeetingListItem(meeting: ApiMeeting): MeetingListItem {
+	return {
+		id: meeting.id,
+		title: meeting.title,
+		when: formatMeetingWhen(meeting.starts_at, meeting.ends_at, meeting.timezone),
+		withWhom: meetingWithWhom(meeting),
+		relatedTo: meetingRelatedLabel(meeting),
+		status: meetingStatusLabel(meeting.status),
+		version: meeting.version,
+		rawStatus: meeting.status,
+		startsAt: meeting.starts_at,
+		endsAt: meeting.ends_at,
+		timezone: meeting.timezone
+	};
+}
+
+export function toDashboardMeeting(item: MeetingListItem): DashboardMeeting {
+	return {
+		id: item.id,
+		title: item.title,
+		when: item.when,
+		withWhom: item.withWhom
+	};
+}
+
+export function toAttendeeFields(attendees: ApiMeetingAttendee[]): InfoCardField[] {
+	if (attendees.length === 0) {
+		return [{ label: 'Attendees', value: 'None yet' }];
+	}
+	return attendees.map((attendee, index) => {
+		const name = attendee.name?.trim();
+		const value = name ? `${name} · ${attendee.email}` : attendee.email;
+		const label = attendee.organiser ? 'Organiser' : `Guest ${index + 1}`;
+		return { label, value };
+	});
+}
+
+function defaultMeetingTimezone(): string {
+	try {
+		return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+	} catch {
+		return 'UTC';
+	}
+}
+
+/** datetime-local ← ISO timestamptz (browser local wall clock). */
+export function isoToLocalDatetime(iso: string | null | undefined): string {
+	if (!iso) return '';
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return '';
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** ISO timestamptz ← datetime-local (browser local interpretation). */
+export function localDatetimeToIso(local: string): string {
+	const trimmed = local.trim();
+	if (!trimmed) return '';
+	const date = new Date(trimmed);
+	if (Number.isNaN(date.getTime())) return trimmed;
+	return date.toISOString();
+}
+
+export function emptyMeetingFormData(): MeetingFormData {
+	return {
+		title: '',
+		startsAt: '',
+		endsAt: '',
+		timezone: defaultMeetingTimezone(),
+		location: '',
+		meetingUrl: '',
+		relatedEntityType: 'none',
+		relatedEntityId: '',
+		attendees: [],
+		status: 'scheduled'
+	};
+}
+
+export function toMeetingFormData(meeting: ApiMeetingDocument): MeetingFormData {
+	const relatedType =
+		meeting.related_entity_type === 'client' ||
+		meeting.related_entity_type === 'contact' ||
+		meeting.related_entity_type === 'lead'
+			? meeting.related_entity_type
+			: 'none';
+	return {
+		title: meeting.title,
+		startsAt: isoToLocalDatetime(meeting.starts_at),
+		endsAt: isoToLocalDatetime(meeting.ends_at),
+		timezone: meeting.timezone || defaultMeetingTimezone(),
+		location: meeting.location ?? '',
+		meetingUrl: meeting.meeting_url ?? '',
+		relatedEntityType: relatedType,
+		relatedEntityId: relatedType !== 'none' ? (meeting.related_entity_id ?? '') : '',
+		attendees: (meeting.attendees ?? []).map((a) => ({
+			email: a.email,
+			name: a.name ?? '',
+			contactId: a.contact_id ?? '',
+			membershipId: a.membership_id ?? '',
+			organiser: a.organiser
+		})),
+		status: meeting.status
+	};
+}
+
+function toAttendeeInputs(attendees: MeetingAttendeeFormData[]): ApiMeetingAttendeeInput[] {
+	return attendees
+		.map((a) => ({
+			email: a.email.trim(),
+			name: a.name?.trim() ? a.name.trim() : null,
+			contact_id: a.contactId?.trim() ? a.contactId.trim() : null,
+			membership_id: a.membershipId?.trim() ? a.membershipId.trim() : null,
+			organiser: Boolean(a.organiser)
+		}))
+		.filter((a) => a.email);
+}
+
+function relatedEntityFromForm(data: MeetingFormData): {
+	related_entity_type: ApiMeetingRelatedEntityType | null;
+	related_entity_id: string | null;
+} {
+	const type = data.relatedEntityType;
+	const id = data.relatedEntityId?.trim() || '';
+	if (type === 'none' || !id) {
+		return { related_entity_type: null, related_entity_id: null };
+	}
+	return { related_entity_type: type, related_entity_id: id };
+}
+
+export function toMeetingCreateBody(data: MeetingFormData): ApiMeetingCreateBody {
+	const related = relatedEntityFromForm(data);
+	return {
+		title: data.title.trim(),
+		status: data.status,
+		starts_at: localDatetimeToIso(data.startsAt),
+		ends_at: localDatetimeToIso(data.endsAt),
+		timezone: data.timezone.trim() || defaultMeetingTimezone(),
+		location: data.location?.trim() ? data.location.trim() : null,
+		meeting_url: data.meetingUrl?.trim() ? data.meetingUrl.trim() : null,
+		related_entity_type: related.related_entity_type,
+		related_entity_id: related.related_entity_id,
+		attendees: toAttendeeInputs(data.attendees ?? [])
+	};
+}
+
+export function toMeetingUpdateBody(data: MeetingFormData): ApiMeetingUpdateBody {
+	return toMeetingCreateBody(data);
 }

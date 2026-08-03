@@ -9,6 +9,7 @@ import DashboardHomePage from './dashboard-home-page.svelte';
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const MEMBERSHIP_ID = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
 const TASK_ID = '11111111-2222-4333-8444-555555555555';
+const MEETING_ID = '33333333-4444-4555-8666-777777777777';
 
 function sampleTask(overrides: Record<string, unknown> = {}) {
 	return {
@@ -98,6 +99,36 @@ function organisationsListBody() {
 	};
 }
 
+function sampleMeeting(overrides: Record<string, unknown> = {}) {
+	return {
+		id: MEETING_ID,
+		org_id: ORG_A,
+		created_at: '2026-01-01T00:00:00Z',
+		updated_at: '2026-01-01T00:00:00Z',
+		created_by: null,
+		updated_by: null,
+		deleted_at: null,
+		version: 1,
+		title: 'Q2 planning',
+		status: 'scheduled',
+		starts_at: '2026-08-10T14:00:00.000Z',
+		ends_at: '2026-08-10T14:45:00.000Z',
+		timezone: 'UTC',
+		location: 'Boardroom',
+		meeting_url: null,
+		organiser_membership_id: MEMBERSHIP_ID,
+		related_entity_type: null,
+		related_entity_id: null,
+		calendar_provider: null,
+		external_event_id: null,
+		transcript_status: 'none',
+		summary_status: 'none',
+		summary: null,
+		metadata: {},
+		...overrides
+	};
+}
+
 describe('DashboardHomePage integration', () => {
 	it('loads my tasks with assignee=me and toggles done', async () => {
 		const seenTaskUrls: string[] = [];
@@ -112,6 +143,9 @@ describe('DashboardHomePage integration', () => {
 				seenTaskUrls.push(request.url);
 				return { body: { data: [sampleTask()], meta: { next_cursor: null } } };
 			},
+			'GET /api/v1/meetings': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			[`PATCH /api/v1/tasks/${TASK_ID}`]: async (request) => {
 				patchBody = await request.json();
 				patchIfMatch = request.headers.get('if-match');
@@ -138,5 +172,29 @@ describe('DashboardHomePage integration', () => {
 		await expect
 			.element(page.getByRole('button', { name: 'Reopen Send kickoff pack' }))
 			.toBeInTheDocument();
+	});
+
+	it('loads upcoming meetings with upcoming=true', async () => {
+		const seenMeetingUrls: string[] = [];
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/tasks': async () => ({
+				body: { data: [sampleTask()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/meetings': async (request) => {
+				seenMeetingUrls.push(request.url);
+				return { body: { data: [sampleMeeting()], meta: { next_cursor: null } } };
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(DashboardHomePage, { api, session });
+
+		await expect.element(page.getByText('Q2 planning')).toBeInTheDocument();
+		await expect.poll(() => seenMeetingUrls.length).toBeGreaterThan(0);
+		expect(seenMeetingUrls.some((url) => url.includes('upcoming=true'))).toBe(true);
+		expect(seenMeetingUrls.some((url) => url.includes('limit=5'))).toBe(true);
 	});
 });
