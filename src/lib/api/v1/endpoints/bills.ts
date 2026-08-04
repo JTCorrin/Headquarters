@@ -1,4 +1,5 @@
 import type { ApiRequestFn } from '../request.js';
+import { newIdempotencyKey } from '../idempotency.js';
 import type {
 	ApiBill,
 	ApiBillCreateBody,
@@ -62,6 +63,7 @@ export function createBillsEndpoints(request: ApiRequestFn): BillsEndpoints {
 				body: {},
 				orgScoped: true,
 				ifMatchVersion: version,
+				headers: { 'Idempotency-Key': newIdempotencyKey('bill-receive') },
 				signal
 			});
 			return data;
@@ -72,6 +74,7 @@ export function createBillsEndpoints(request: ApiRequestFn): BillsEndpoints {
 				body,
 				orgScoped: true,
 				ifMatchVersion: version,
+				headers: { 'Idempotency-Key': newIdempotencyKey('bill-void') },
 				signal
 			});
 			return data;
