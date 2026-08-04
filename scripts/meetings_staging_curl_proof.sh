@@ -158,6 +158,18 @@ LABEL="$(printf '%s' "$create_meeting" | jq -r '.data.related_entity_label // em
 	|| die "meeting create: ${create_meeting}"
 log "meeting ${MEETING_ID} v${MEETING_VER}"
 
+log "GET contact timeline for meeting.scheduled"
+timeline_sched="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/entities/contact/${CONTACT_ID}/timeline-events?limit=20" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+SCHED_COUNT="$(printf '%s' "$timeline_sched" | jq -r --arg mid "$MEETING_ID" \
+	'[.data[]? | select(.kind == "meeting" and (.payload.action // "") == "meeting.scheduled" and (.payload.meeting_id // "") == $mid)] | length')"
+[[ "$SCHED_COUNT" == "1" ]] || die "expected meeting.scheduled on contact timeline: ${timeline_sched}"
+
 log "GET meetings?upcoming=true"
 list_up="$(
 	curl -fsS --max-time 30 \
@@ -189,6 +201,31 @@ PATCH_EMAIL="$(printf '%s' "$patch_meeting" | jq -r '.data.attendees[0].email //
 [[ "$PATCH_STATUS" == "in_progress" && -n "$MEETING_VER2" && "$MEETING_VER2" != "$MEETING_VER" && "$PATCH_ATTENDEES" == "1" && "$PATCH_EMAIL" == "only@meetings-proof.test" ]] \
 	|| die "meeting patch: ${patch_meeting}"
 log "patched v${MEETING_VER2}"
+
+log "PATCH meeting status=completed → timeline meeting.completed"
+complete_code="$(
+	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/complete.json" -w '%{http_code}' \
+		-X PATCH "${API_BASE}/api/v1/meetings/${MEETING_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H "If-Match: \"${MEETING_VER2}\"" \
+		-H 'content-type: application/json' \
+		-d '{"status":"completed"}'
+)"
+complete_body="$(cat "${TMPDIR_PROOF}/complete.json")"
+[[ "$complete_code" == "200" ]] || die "meeting complete HTTP ${complete_code}: ${complete_body}"
+MEETING_VER2="$(printf '%s' "$complete_body" | jq -r '.data.version // empty')"
+timeline_done="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/entities/contact/${CONTACT_ID}/timeline-events?limit=20" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+DONE_COUNT="$(printf '%s' "$timeline_done" | jq -r --arg mid "$MEETING_ID" \
+	'[.data[]? | select(.kind == "meeting" and (.payload.action // "") == "meeting.completed" and (.payload.meeting_id // "") == $mid)] | length')"
+[[ "$DONE_COUNT" == "1" ]] || die "expected meeting.completed on contact timeline: ${timeline_done}"
 
 log "POST related_entity_type=project with valid project → expect 201"
 project_ok_code="$(
