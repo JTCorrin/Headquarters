@@ -36,6 +36,7 @@ import { handleProducts } from './products.ts'
 import { handleProfilePreferences } from './profile-preferences.ts'
 import { handleQuotes } from './quotes.ts'
 import { handleTaxRates } from './tax-rates.ts'
+import { handleMcp } from './mcp.ts'
 import { handleTimelineEvents } from './timeline-events.ts'
 
 const configuredCorsOrigin = Deno.env.get('API_CORS_ORIGIN')
@@ -49,7 +50,7 @@ const corsOrigin = configuredCorsOrigin ?? '*'
 const corsHeaders = {
   'Access-Control-Allow-Origin': corsOrigin,
   'Access-Control-Allow-Headers':
-    'authorization, apikey, content-type, if-match, idempotency-key, x-client-info, x-org-id, x-request-id',
+    'authorization, apikey, content-type, if-match, idempotency-key, x-client-info, x-org-id, x-request-id, mcp-protocol-version, mcp-method, mcp-name',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Access-Control-Expose-Headers': 'etag, location, x-request-id',
 }
@@ -62,6 +63,7 @@ type RequestAuth = {
   membership: { id: string; role: MembershipRole }
   orgId: string
   actorType: 'user' | 'api_key'
+  apiKeyId: string | null
 }
 
 function assertCanAccessPipeline(
@@ -190,7 +192,29 @@ async function routeOrgScoped(
   auth: RequestAuth,
   requestId: string,
 ): Promise<Response> {
-  const { db, userId, membership, orgId, actorType } = auth
+  const { db, userId, membership, orgId, actorType, apiKeyId } = auth
+
+  if (path === '/api/v1/mcp') {
+    if (actorType !== 'api_key' || !apiKeyId) {
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'MCP requires an organisation API key (Bearer crm_key_…)',
+      )
+    }
+    return await handleMcp(
+      req,
+      {
+        db,
+        userId,
+        membership,
+        orgId,
+        actorType: 'api_key',
+        apiKeyId,
+      },
+      requestId,
+    )
+  }
 
   if (path === '/api/v1/api-keys' || path.startsWith('/api/v1/api-keys/')) {
     if (actorType === 'api_key') {
@@ -430,6 +454,9 @@ async function routeOrgScoped(
       membership.role,
       membership.id,
       requestId,
+      actorType === 'api_key' && apiKeyId
+        ? { actorType: 'api_key', apiKeyId }
+        : { actorType: 'user' },
     )
   }
 
@@ -473,14 +500,21 @@ async function routeOrgScoped(
   }
 
   if (/^\/api\/v1\/entities\/[^/]+\/[^/]+\/timeline-events$/.test(path)) {
+    const timelineActor = actorType === 'api_key' && apiKeyId
+      ? { actorType: 'api_key' as const, apiKeyId }
+      : { actorType: 'user' as const }
+    if (timelineActor.actorType === 'user') {
+      requireUserId(userId)
+    }
     return await handleTimelineEvents(
       req,
       db,
       path,
       orgId,
       membership.role,
-      requireUserId(userId),
+      userId,
       requestId,
+      timelineActor,
     )
   }
 
@@ -581,6 +615,7 @@ async function handleUserRequest(
       membership: { id: membership.id, role: membership.role },
       orgId,
       actorType: 'user',
+      apiKeyId: null,
     },
     requestId,
   )
@@ -655,6 +690,7 @@ async function handleApiKeyRequest(req: Request, requestId: string): Promise<Res
       membership: membershipForRoutes,
       orgId,
       actorType: 'api_key',
+      apiKeyId: resolved.id,
     },
     requestId,
   )
