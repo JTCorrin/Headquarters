@@ -10,6 +10,14 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
+import {
+  hashIdempotencyRequest,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyConflictError,
+  type IdempotencyEnvelope,
+  parseIdempotencyKey,
+  sha256Hex,
+} from './idempotency.ts'
 
 const QUOTE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,title,client_id,lead_id,contact_id,owner_membership_id,status,currency,issue_on,valid_until,subtotal_cents,discount_cents,tax_cents,total_cents,party_snapshot,terms,notes,internal_notes,sent_at,viewed_at,accepted_at,rejected_at,converted_invoice_id'
@@ -716,6 +724,8 @@ function quoteLifecycleError(
   if (error.message?.toLowerCase().includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
   }
+  const idempotencyError = idempotencyConflictError(error)
+  if (idempotencyError) return idempotencyError
   if (error.code === 'P0002') {
     return new ApiError(404, 'NOT_FOUND', error.message || 'Quote not found')
   }
@@ -738,6 +748,11 @@ function quoteLifecycleError(
   return new ApiError(500, 'INTERNAL_ERROR', `Quote ${action} failed`)
 }
 
+/** Idempotency request payload — omits expected_version (If-Match is first-exec only). */
+export function quoteAcceptIdempotencyPayload(quoteId: string): Record<string, unknown> {
+  return { quote_id: quoteId }
+}
+
 async function acceptQuoteRoute(
   req: Request,
   db: DatabaseClient,
@@ -746,19 +761,37 @@ async function acceptQuoteRoute(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
+  const rawKey = parseIdempotencyKey(req)
+  const route = `/api/v1/quotes/${quoteId}/accept`
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    quoteAcceptIdempotencyPayload(quoteId),
+  )
+  const keyHash = await sha256Hex(rawKey)
 
-  const { data, error } = await db.rpc('accept_quote', {
+  const { data, error } = await db.rpc('accept_quote_idempotent', {
     p_quote_id: quoteId,
     p_org_id: orgId,
     p_expected_version: version,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
   })
 
   if (error) throw quoteLifecycleError(error, requestId, 'accept')
-
-  const document = asQuoteDocument(data as Json)
-  return jsonResponse({ data: document }, 200, requestId, {
-    etag: etag(document.version),
-  })
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote accept returned an unexpected payload')
+  }
+  const envelope = data as IdempotencyEnvelope
+  return jsonResponse(
+    envelope.response_body ?? { data: null },
+    envelope.response_status ?? 200,
+    requestId,
+    {
+      ...(envelope.response_headers ?? {}),
+      [IDEMPOTENCY_KEY_HEADER]: rawKey,
+    },
+  )
 }
 
 async function sendQuoteRoute(
