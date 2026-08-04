@@ -194,6 +194,14 @@ export function canAccessAuditLog(role: MembershipRole): boolean {
 }
 
 /**
+ * Org API keys list/create/revoke — Owner + Admin (matches MCP-Keys-BE RLS).
+ * Nav matrix §8.6 create/revoke Owner-only is a known product nit; BE allows Admin.
+ */
+export function canAccessApiKeys(role: MembershipRole): boolean {
+	return role === 'owner' || role === 'admin';
+}
+
+/**
  * Personal settings (theme + Mail + Calendar) — every membership except billing.
  * Owners also use this for personal Mail/Calendar; org defaults stay under `/org/config`.
  */
