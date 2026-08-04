@@ -248,6 +248,19 @@ export type AuditEventRow = {
   created_at: string
 }
 
+export type UserNotificationRow = {
+  id: string
+  org_id: string
+  recipient_membership_id: string
+  kind: 'email.received'
+  title: string
+  body: string | null
+  source_type: 'email_message'
+  source_id: string
+  read_at: string | null
+  created_at: string
+}
+
 export type ProductCategoryRow = {
   id: string
   org_id: string
@@ -1263,6 +1276,16 @@ export type Database = {
           & Partial<AuditEventRow>
           & Pick<AuditEventRow, 'actor_type' | 'action' | 'resource_type'>
         Update: Partial<AuditEventRow>
+        Relationships: []
+      }
+      user_notifications: {
+        Row: UserNotificationRow
+        Insert: Partial<UserNotificationRow> &
+          Pick<
+            UserNotificationRow,
+            'org_id' | 'recipient_membership_id' | 'kind' | 'title' | 'source_type' | 'source_id'
+          >
+        Update: Partial<UserNotificationRow>
         Relationships: []
       }
       email_messages: {
@@ -2353,6 +2376,26 @@ export type Database = {
           p_cursor_id?: string | null
         }
         Returns: Json
+      }
+      list_my_notifications: {
+        Args: {
+          p_org_id: string
+          p_limit?: number
+          p_cursor_created_at?: string | null
+          p_cursor_id?: string | null
+        }
+        Returns: Json
+      }
+      mark_notification_read: {
+        Args: {
+          p_org_id: string
+          p_notification_id: string
+        }
+        Returns: Json
+      }
+      count_my_unread_notifications: {
+        Args: { p_org_id: string }
+        Returns: number
       }
     }
     Enums: Record<string, never>
