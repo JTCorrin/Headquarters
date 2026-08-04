@@ -9,7 +9,9 @@
 		membershipFromCreateResult,
 		roleFromMemberships,
 		toMeetingCreateBody,
+		toMeetingFormData,
 		toMeetingListItem,
+		toMeetingUpdateBody,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
@@ -55,8 +57,19 @@
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let drawerOpen = $state(false);
+	let editDrawerOpen = $state(false);
+	let editingMeetingId = $state<string | null>(null);
+	let editingMeetingVersion = $state<number | null>(null);
 
 	const meetingForm = superForm(defaults(emptyMeetingFormData(), zod4(meetingFormSchema)), {
+		validators: zod4(meetingFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
+
+	const editMeetingForm = superForm(defaults(emptyMeetingFormData(), zod4(meetingFormSchema)), {
 		validators: zod4(meetingFormSchema),
 		SPA: true,
 		warnings: { duplicateId: false },
@@ -136,6 +149,9 @@
 	function resetOrgScopedState() {
 		rows = [];
 		drawerOpen = false;
+		editDrawerOpen = false;
+		editingMeetingId = null;
+		editingMeetingVersion = null;
 		viewState = { kind: 'loading' };
 	}
 
@@ -215,6 +231,91 @@
 		}
 	}
 
+	async function openEditMeeting(id: string) {
+		const epoch = captureEpoch();
+		try {
+			const result = await api.meetings.get(id);
+			if (isStale(epoch)) return;
+			editingMeetingId = id;
+			editingMeetingVersion = result.data.version;
+			editMeetingForm.form.set(toMeetingFormData(result.data));
+			editDrawerOpen = true;
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not load meeting — try again.')
+			};
+		}
+	}
+
+	async function onEditMeeting(): Promise<boolean> {
+		const meetingId = editingMeetingId;
+		const version = editingMeetingVersion;
+		if (!meetingId || version == null) return false;
+
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.meetings.update(
+				meetingId,
+				toMeetingUpdateBody(get(editMeetingForm.form)),
+				version
+			);
+			if (isStale(epoch)) return false;
+			rows = rows.map((row) => (row.id === meetingId ? toMeetingListItem(updated) : row));
+			editDrawerOpen = false;
+			editingMeetingId = null;
+			editingMeetingVersion = null;
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Meeting changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not save meeting — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onDeleteMeeting(id: string) {
+		const existing = rows.find((row) => row.id === id);
+		if (!existing) return;
+		if (!window.confirm('Delete this meeting? This cannot be undone.')) return;
+
+		const epoch = captureEpoch();
+		try {
+			await api.meetings.delete(id, existing.version);
+			if (isStale(epoch)) return;
+			rows = rows.filter((row) => row.id !== id);
+			viewState =
+				rows.length === 0
+					? { kind: 'empty', message: 'No meetings yet — schedule your first meeting.' }
+					: { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Meeting changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete meeting — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -274,10 +375,15 @@
 					{navGroups}
 					{rows}
 					form={meetingForm}
+					editForm={editMeetingForm}
 					filterLabel={entityFilterLabel}
 					onClearFilter={entityFilter ? onClearEntityFilter : undefined}
 					bind:drawerOpen
+					bind:editDrawerOpen
 					onValidSubmit={onCreateMeeting}
+					onValidEdit={onEditMeeting}
+					onEditMeeting={openEditMeeting}
+					onDeleteMeeting={onDeleteMeeting}
 					showNav={false}
 					class="min-h-0 flex-1"
 				/>

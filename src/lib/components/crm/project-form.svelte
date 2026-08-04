@@ -18,6 +18,8 @@
 		form: SuperForm<ProjectFormData>;
 		clients?: ProjectClientOption[];
 		submitLabel?: string;
+		/** When true, status select includes Archive. */
+		allowArchived?: boolean;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
@@ -26,6 +28,7 @@
 		form,
 		clients = [],
 		submitLabel = 'Save project',
+		allowArchived = false,
 		class: className,
 		onValidSubmit
 	}: ProjectFormProps = $props();
@@ -38,12 +41,13 @@
 	let submitLock = false;
 	let pendingSubmit = $state(false);
 
-	const statusOptions = [
+	const statusOptions = $derived([
 		{ value: 'planning', label: 'Planning' },
 		{ value: 'active', label: 'Active' },
 		{ value: 'blocked', label: 'Blocked' },
-		{ value: 'done', label: 'Done' }
-	] as const;
+		{ value: 'done', label: 'Done' },
+		...(allowArchived ? [{ value: 'archived', label: 'Archived' }] : [])
+	]);
 
 	const statusLabel = $derived(
 		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Status'

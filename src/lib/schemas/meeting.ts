@@ -17,7 +17,7 @@ export const meetingFormSchema = z
 		timezone: z.string().min(1, 'Timezone is required').max(64),
 		location: z.string().max(500).optional().or(z.literal('')),
 		meetingUrl: z.string().max(2000).optional().or(z.literal('')),
-		relatedEntityType: z.enum(['none', 'client', 'contact', 'lead']),
+		relatedEntityType: z.enum(['none', 'client', 'contact', 'lead', 'project']),
 		relatedEntityId: z.string().optional().or(z.literal('')),
 		attendees: z.array(meetingAttendeeFormSchema).default([]),
 		status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled'])

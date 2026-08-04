@@ -1413,3 +1413,91 @@ describe('createApiV1Client', () => {
 		expect(reversed.status).toBe('reversed');
 	});
 });
+
+describe('projects column client methods', () => {
+	const projectId = '11111111-2222-4333-8444-555555555555';
+	const columnId = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb';
+
+	it('createColumn / updateColumn / deleteColumn hit Edge paths with If-Match', async () => {
+		const seen: string[] = [];
+		const fetchMock = createMockFetch({
+			[`POST /api/v1/projects/${projectId}/columns`]: async (request) => {
+				seen.push(`${request.method} ${new URL(request.url).pathname}`);
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				expect(await request.json()).toMatchObject({ name: 'Review', key: 'review' });
+				return {
+					status: 201,
+					body: {
+						data: {
+							id: columnId,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							project_id: projectId,
+							name: 'Review',
+							key: 'review',
+							position: 2,
+							wip_limit: null,
+							cards: []
+						}
+					}
+				};
+			},
+			[`PATCH /api/v1/projects/${projectId}/columns/${columnId}`]: async (request) => {
+				seen.push(`${request.method} ${new URL(request.url).pathname}`);
+				expect(request.headers.get('if-match')).toBe('"1"');
+				expect(await request.json()).toMatchObject({ name: 'In review', wip_limit: 3 });
+				return {
+					body: {
+						data: {
+							id: columnId,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 2,
+							project_id: projectId,
+							name: 'In review',
+							key: 'review',
+							position: 2,
+							wip_limit: 3
+						}
+					}
+				};
+			},
+			[`DELETE /api/v1/projects/${projectId}/columns/${columnId}`]: async (request) => {
+				seen.push(`${request.method} ${new URL(request.url).pathname}`);
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return { status: 204, body: undefined };
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const created = await client.projects.createColumn(projectId, {
+			name: 'Review',
+			key: 'review'
+		});
+		expect(created.id).toBe(columnId);
+
+		const updated = await client.projects.updateColumn(
+			projectId,
+			columnId,
+			{ name: 'In review', wip_limit: 3 },
+			1
+		);
+		expect(updated.version).toBe(2);
+
+		await client.projects.deleteColumn(projectId, columnId, 2);
+		expect(seen).toEqual([
+			`POST /api/v1/projects/${projectId}/columns`,
+			`PATCH /api/v1/projects/${projectId}/columns/${columnId}`,
+			`DELETE /api/v1/projects/${projectId}/columns/${columnId}`
+		]);
+	});
+});
