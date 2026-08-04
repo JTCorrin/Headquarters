@@ -228,6 +228,7 @@ send_inv="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H "If-Match: \"${INV_VER}\"" \
+		-H "Idempotency-Key: inv-send-${INV_ID}" \
 		-H 'content-type: application/json' \
 		-d '{}'
 )"
@@ -262,6 +263,7 @@ void_inv="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H "If-Match: \"${INV_VER}\"" \
+		-H "Idempotency-Key: inv-void-${INV_ID}" \
 		-H 'content-type: application/json' \
 		-d "$(jq -n '{void_reason: "Duplicate / curl proof"}')"
 )"
@@ -354,6 +356,7 @@ accept_quote="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H "If-Match: \"${QUOTE_VER}\"" \
+		-H "Idempotency-Key: quote-accept-${QUOTE_ID}" \
 		-H 'content-type: application/json' \
 		-d '{}'
 )"
