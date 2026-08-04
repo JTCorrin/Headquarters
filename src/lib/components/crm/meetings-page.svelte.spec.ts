@@ -232,4 +232,58 @@ describe('MeetingsPage integration', () => {
 		await expect.element(page.getByTestId('list-filter-banner')).toBeInTheDocument();
 		expect(entityQueries).toContain(`project|${ENTITY_ID}`);
 	});
+
+	it('edits a meeting with If-Match and related project', async () => {
+		const PROJECT_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+		let patchBody: unknown;
+		let ifMatch: string | null = null;
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/meetings': async () => ({
+				body: { data: [sampleMeeting()], meta: { next_cursor: null } }
+			}),
+			[`GET /api/v1/meetings/${MEETING_ID}`]: async () => ({
+				body: { data: sampleMeeting() }
+			}),
+			[`PATCH /api/v1/meetings/${MEETING_ID}`]: async (request) => {
+				ifMatch = request.headers.get('if-match');
+				patchBody = await request.json();
+				return {
+					body: {
+						data: sampleMeeting({
+							version: 2,
+							title: 'Q2 planning (updated)',
+							related_entity_type: 'project',
+							related_entity_id: PROJECT_ID
+						})
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(MeetingsPage, { api, session });
+
+		await expect.element(page.getByRole('link', { name: 'Q2 planning' })).toBeInTheDocument();
+		await page.getByRole('button', { name: 'Open meeting actions' }).click();
+		await page.getByRole('menuitem', { name: 'Edit' }).click();
+		const editForm = page.getByTestId('meeting-form');
+		await editForm.getByLabelText('Title').fill('Q2 planning (updated)');
+		await editForm.getByLabelText('Related to').click();
+		await page.getByRole('option', { name: 'Project' }).click();
+		await editForm.getByLabelText('Related entity id').fill(PROJECT_ID);
+		await editForm.getByRole('button', { name: 'Save changes' }).click();
+
+		await expect
+			.element(page.getByRole('link', { name: 'Q2 planning (updated)' }))
+			.toBeInTheDocument();
+		expect(ifMatch).toBe('"1"');
+		expect(patchBody).toMatchObject({
+			title: 'Q2 planning (updated)',
+			related_entity_type: 'project',
+			related_entity_id: PROJECT_ID
+		});
+	});
 });

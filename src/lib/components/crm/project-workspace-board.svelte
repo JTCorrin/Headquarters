@@ -7,6 +7,7 @@
 	export interface ProjectWorkCard {
 		id: string;
 		title: string;
+		description?: string;
 		assignee?: string;
 		/** Target column id (project_columns.id). */
 		column: string;
@@ -27,6 +28,7 @@
 		columns?: { id: string; label: string }[];
 		class?: string;
 		onMoveCard?: (move: ProjectCardBoardMove) => void | Promise<void>;
+		onSelectCard?: (id: string) => void;
 	}
 
 	const defaultColumns: { id: string; label: string }[] = [
@@ -40,7 +42,8 @@
 		cards: workCards,
 		columns: stageColumns = defaultColumns,
 		class: className,
-		onMoveCard
+		onMoveCard,
+		onSelectCard
 	}: ProjectWorkspaceBoardProps = $props();
 
 	const columns = $derived<ColumnConfig[]>(
@@ -59,7 +62,11 @@
 				id: card.id,
 				label: card.title,
 				column: card.column,
-				description: [card.assignee ? `Owner: ${card.assignee}` : null, card.dueOn]
+				description: [
+					card.description,
+					card.assignee ? `Owner: ${card.assignee}` : null,
+					card.dueOn
+				]
 					.filter(Boolean)
 					.join(' · ')
 			}))
@@ -92,8 +99,32 @@
 		const position = computeBoardPosition(optimisticColumn, beforeId, id);
 		void onMoveCard?.({ id, columnId, position, beforeId });
 	}
+
+	function selectFromEvent(e: Event) {
+		const target = e.target as HTMLElement | null;
+		if (target?.closest?.('.wx-expand, .wx-toggle, .wx-add, button')) return;
+		const card = target?.closest?.('[data-id]') as HTMLElement | null;
+		if (!card) return;
+		const id = resolveCardId(card.getAttribute('data-id'));
+		if (id) onSelectCard?.(id);
+	}
+
+	function onKeydown(e: KeyboardEvent) {
+		if (e.key !== 'Enter' && e.key !== ' ') return;
+		const target = e.target as HTMLElement | null;
+		if (target?.closest?.('button, select, input, textarea, a, .wx-expand, .wx-toggle')) return;
+		if (!target?.closest?.('[data-id]')) return;
+		e.preventDefault();
+		selectFromEvent(e);
+	}
 </script>
 
-<div class={cn(className)} data-testid="project-workspace-board">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class={cn(className)}
+	data-testid="project-workspace-board"
+	onclick={selectFromEvent}
+	onkeydown={onKeydown}
+>
 	<SvarKanbanShell {cards} {columns} onMoveCard={handleMoveCard} />
 </div>
