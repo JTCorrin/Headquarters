@@ -33,7 +33,7 @@ const WRITABLE_FIELDS = new Set([
 const PRIORITIES = new Set(['p1', 'p2', 'p3', 'p4'])
 const STATUSES = new Set(['open', 'in_progress', 'blocked', 'done', 'cancelled'])
 const SOURCES = new Set(['manual', 'meeting', 'email', 'workflow', 'agent'])
-const ENTITY_TYPES = new Set(['contact', 'lead', 'client'])
+const ENTITY_TYPES = new Set(['contact', 'lead', 'client', 'project'])
 
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/
 
@@ -205,7 +205,7 @@ export function validateTaskBody(
     if (value === null) {
       output.entity_type = null
     } else if (typeof value !== 'string' || !ENTITY_TYPES.has(value)) {
-      fields.entity_type = 'Must be contact, lead, client, or null'
+      fields.entity_type = 'Must be contact, lead, client, project, or null'
     } else {
       output.entity_type = value as TaskEntityType
     }
@@ -400,9 +400,16 @@ async function listTasks(
   }
   if (entityType !== null && !ENTITY_TYPES.has(entityType)) {
     throw new ApiError(400, 'BAD_REQUEST', 'entity_type is invalid', {
-      entity_type: 'Must be contact, lead, or client',
+      entity_type: 'Must be contact, lead, client, or project',
     })
   }
+
+  const meetingIdRaw = url.searchParams.get('meeting_id')
+  const projectCardIdRaw = url.searchParams.get('project_card_id')
+  const meetingId = meetingIdRaw === null ? null : parseUuid(meetingIdRaw, 'meeting_id')
+  const projectCardId = projectCardIdRaw === null
+    ? null
+    : parseUuid(projectCardIdRaw, 'project_card_id')
 
   let query = db
     .from('tasks')
@@ -423,6 +430,12 @@ async function listTasks(
     query = query
       .eq('entity_type', entityType as TaskEntityType)
       .eq('entity_id', parseUuid(entityId, 'entity_id'))
+  }
+  if (meetingId !== null) {
+    query = query.eq('meeting_id', meetingId)
+  }
+  if (projectCardId !== null) {
+    query = query.eq('project_card_id', projectCardId)
   }
 
   const cursorValue = url.searchParams.get('cursor')

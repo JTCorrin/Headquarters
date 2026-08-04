@@ -18,7 +18,9 @@ export function createTasksEndpoints(request: ApiRequestFn): TasksEndpoints {
 					status: params.status,
 					assignee: params.assignee,
 					entity_type: params.entity_type,
-					entity_id: params.entity_id
+					entity_id: params.entity_id,
+					meeting_id: params.meeting_id,
+					project_card_id: params.project_card_id
 				},
 				signal
 			});

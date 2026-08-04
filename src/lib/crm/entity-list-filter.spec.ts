@@ -21,8 +21,16 @@ describe('parseTaskEntityFilter', () => {
 		expect(parseTaskEntityFilter(new URLSearchParams({ entity_id: ID }))).toBeNull();
 	});
 
-	it('rejects unknown task entity types', () => {
+	it('allows project entity type', () => {
 		const params = new URLSearchParams({ entity_type: 'project', entity_id: ID });
+		expect(parseTaskEntityFilter(params)).toEqual({
+			entity_type: 'project',
+			entity_id: ID
+		});
+	});
+
+	it('rejects unknown task entity types', () => {
+		const params = new URLSearchParams({ entity_type: 'invoice', entity_id: ID });
 		expect(parseTaskEntityFilter(params)).toBeNull();
 	});
 });
