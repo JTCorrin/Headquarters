@@ -43,6 +43,15 @@ function mailboxTestFailure(errorCode: string, message: string): {
   return { ok: false, error_code: errorCode, message }
 }
 
+/** Reject CR/LF and other controls that could break IMAP protocol lines. */
+function hasControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
+
 export type MailboxUpsertBody = {
   email_address: string
   from_name: string | null
@@ -152,7 +161,7 @@ export function validateMailboxBody(body: Record<string, unknown>): MailboxUpser
   const username = typeof body.username === 'string' ? body.username.trim() : ''
   if (!username || username.length > 320) {
     fields.username = 'Must be 1–320 characters'
-  } else if (/[\x00-\x1f\x7f]/.test(username)) {
+  } else if (hasControlChars(username)) {
     // Control characters (esp. CR/LF) could be injected into IMAP protocol lines.
     fields.username = 'Must not contain control characters'
   }
@@ -166,7 +175,7 @@ export function validateMailboxBody(body: Record<string, unknown>): MailboxUpser
         fields.password = 'Password cannot be empty; omit to keep existing'
       } else if (body.password.length > 512) {
         fields.password = 'Must be at most 512 characters'
-      } else if (/[\x00-\x1f\x7f]/.test(body.password)) {
+      } else if (hasControlChars(body.password)) {
         fields.password = 'Must not contain control characters'
       } else {
         password = body.password
@@ -207,7 +216,7 @@ export function validateMailboxTestBody(
       fields.password = 'Must be a non-empty string when provided'
     } else if (body.password.length > 512) {
       fields.password = 'Must be at most 512 characters'
-    } else if (/[\x00-\x1f\x7f]/.test(body.password)) {
+    } else if (hasControlChars(body.password)) {
       fields.password = 'Must not contain control characters'
     } else {
       password = body.password
@@ -420,6 +429,8 @@ async function testMailbox(
           'Secure connection failed — try a different security setting (SSL / STARTTLS).',
         imap_connection_failed:
           'Could not reach the mail server — check host, port, and security settings.',
+        imap_host_blocked:
+          'This mail host is not allowed — private, link-local, and metadata addresses are blocked.',
       }
       return jsonResponse(
         {
