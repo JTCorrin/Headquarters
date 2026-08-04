@@ -279,7 +279,11 @@ export function handleCalendar(
 
   if (path === '/api/v1/me/calendar/oauth/callback') {
     if (req.method !== 'GET' && req.method !== 'POST') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for calendar OAuth callback')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for calendar OAuth callback',
+      )
     }
     assertCanWriteCalendar(role)
     return oauthCallback(req, db, orgId, requestId)

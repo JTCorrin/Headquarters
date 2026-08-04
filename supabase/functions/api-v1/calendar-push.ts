@@ -3,10 +3,10 @@ import type { Database, MeetingRow } from '../_shared/database.ts'
 import {
   createLiveGoogleCalendarClient,
   createStubGoogleCalendarClient,
+  type GoogleEventInput,
   isCalendarSyncStubMode,
   parseTokenBlob,
   serializeTokenBlob,
-  type GoogleEventInput,
 } from '../_shared/google-calendar.ts'
 
 type DatabaseClient = SupabaseClient<Database>
@@ -15,11 +15,13 @@ async function loadActiveConnection(
   db: DatabaseClient,
   orgId: string,
   membershipId: string,
-): Promise<{
-  id: string
-  calendar_id: string
-  token_blob: string
-} | null> {
+): Promise<
+  {
+    id: string
+    calendar_id: string
+    token_blob: string
+  } | null
+> {
   const { data: row, error } = await db
     .from('calendar_connections')
     .select('id, calendar_id, status')
