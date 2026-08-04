@@ -5,6 +5,7 @@
 	import PageHeader from './page-header.svelte';
 	import MeetingsTable from './meetings-table.svelte';
 	import MeetingFormDrawer from './meeting-form-drawer.svelte';
+	import ListFilterBanner from './list-filter-banner.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface MeetingsListPageProps {
@@ -13,6 +14,8 @@
 		rows: MeetingListItem[];
 		form: SuperForm<MeetingFormData>;
 		drawerOpen?: boolean;
+		filterLabel?: string | null;
+		onClearFilter?: () => void;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -25,6 +28,8 @@
 		rows,
 		form,
 		drawerOpen = $bindable(false),
+		filterLabel = null,
+		onClearFilter,
 		showNav = true,
 		class: className,
 		onValidSubmit
@@ -53,6 +58,10 @@
 					<MeetingFormDrawer bind:open={drawerOpen} {form} {onValidSubmit} />
 				{/snippet}
 			</PageHeader>
+
+			{#if filterLabel}
+				<ListFilterBanner label={filterLabel} onClear={onClearFilter} />
+			{/if}
 
 			<MeetingsTable {rows} />
 		</div>

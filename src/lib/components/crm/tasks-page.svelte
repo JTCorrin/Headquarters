@@ -18,7 +18,8 @@
 		toTaskListItem,
 		toTaskUpdateBody
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiOrganisationMembership } from '$lib/api/v1/types.js';
+	import type { ApiOrganisationMembership, ApiTaskEntityType } from '$lib/api/v1/types.js';
+	import type { EntityListFilter } from '$lib/crm/entity-list-filter.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
@@ -37,8 +38,11 @@
 		session: OrgSession;
 		/** When set, open the edit drawer for this task after load. */
 		initialEditTaskId?: string | null;
+		/** Optional paired entity list filter (`entity_type` + `entity_id`). */
+		entityFilter?: EntityListFilter<ApiTaskEntityType> | null;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onClearEntityFilter?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -47,8 +51,10 @@
 		api,
 		session,
 		initialEditTaskId = null,
+		entityFilter = null,
 		onMissingOrg,
 		onSwitchNavigate,
+		onClearEntityFilter,
 		onLogout,
 		class: className
 	}: TasksPageProps = $props();
@@ -93,6 +99,11 @@
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const listTasks = $derived(tasks.map(toDashboardTask));
 	const boardTasks = $derived(tasks.map(toTaskBoardCard));
+	const entityFilterLabel = $derived(
+		entityFilter
+			? `Filtered by ${entityFilter.entity_type} · ${entityFilter.entity_id.slice(0, 8)}…`
+			: null
+	);
 	let pendingEditTaskId = $state<string | null>(null);
 
 	$effect(() => {
@@ -125,24 +136,39 @@
 	interface RequestEpoch {
 		orgId: string | null;
 		generation: number;
+		entityKey: string;
 	}
 
 	const liveEpoch: RequestEpoch = {
 		orgId: null,
-		generation: -1
+		generation: -1,
+		entityKey: ''
 	};
+
+	function entityKey(filter: EntityListFilter<ApiTaskEntityType> | null | undefined): string {
+		return filter ? `${filter.entity_type}:${filter.entity_id}` : '';
+	}
 
 	$effect(() => {
 		liveEpoch.orgId = session.selectedOrgId;
 		liveEpoch.generation = session.cacheGeneration;
+		liveEpoch.entityKey = entityKey(entityFilter);
 	});
 
 	function captureEpoch(): RequestEpoch {
-		return { orgId: liveEpoch.orgId, generation: liveEpoch.generation };
+		return {
+			orgId: liveEpoch.orgId,
+			generation: liveEpoch.generation,
+			entityKey: liveEpoch.entityKey
+		};
 	}
 
 	function isStale(epoch: RequestEpoch): boolean {
-		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
+		return (
+			epoch.orgId !== liveEpoch.orgId ||
+			epoch.generation !== liveEpoch.generation ||
+			epoch.entityKey !== liveEpoch.entityKey
+		);
 	}
 
 	function resetOrgScopedState() {
@@ -198,13 +224,23 @@
 
 			syncAssigneeContext(membershipRows);
 
-			const listed = await api.tasks.list({ limit: 100 });
+			const listed = await api.tasks.list({
+				limit: 100,
+				...(entityFilter
+					? { entity_type: entityFilter.entity_type, entity_id: entityFilter.entity_id }
+					: {})
+			});
 			if (isStale(epoch)) return;
 
 			tasks = listed.data.map((task) => toTaskListItem(task, listItemOptions()));
 			viewState =
 				tasks.length === 0
-					? { kind: 'empty', message: 'No tasks yet — create your first task.' }
+					? {
+							kind: 'empty',
+							message: entityFilter
+								? 'No tasks for this entity.'
+								: 'No tasks yet — create your first task.'
+						}
 					: { kind: 'ready' };
 
 			const editId = pendingEditTaskId;
@@ -342,6 +378,8 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
+		void entityFilter?.entity_type;
+		void entityFilter?.entity_id;
 		void loadAll();
 	});
 </script>
@@ -375,6 +413,8 @@
 					form={taskForm}
 					editForm={editTaskForm}
 					{assigneeOptions}
+					filterLabel={entityFilterLabel}
+					onClearFilter={entityFilter ? onClearEntityFilter : undefined}
 					bind:drawerOpen
 					bind:editDrawerOpen
 					onValidSubmit={onCreateTask}
