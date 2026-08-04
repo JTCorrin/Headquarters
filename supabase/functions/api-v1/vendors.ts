@@ -391,6 +391,87 @@ async function deleteVendor(
   })
 }
 
+export function validateVendorBankDetailsBody(
+  body: Record<string, unknown>,
+): { bank_details: string } {
+  const fields: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    if (key !== 'bank_details') fields[key] = 'Field is not writable'
+  }
+  const value = body.bank_details
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    fields.bank_details = 'Must be a non-empty string'
+  } else if (value.length > 8192) {
+    fields.bank_details = 'Must be at most 8192 characters'
+  }
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Vendor bank details validation failed', fields)
+  }
+  return { bank_details: (value as string).trim() }
+}
+
+async function getVendorBankDetails(
+  db: DatabaseVendor,
+  orgId: string,
+  vendorId: string,
+  requestId: string,
+): Promise<Response> {
+  const { data, error } = await db.rpc('read_vendor_bank_details', {
+    p_org_id: orgId,
+    p_vendor_id: vendorId,
+  })
+  if (error) throw databaseError(error, requestId)
+  return jsonResponse({ data }, 200, requestId)
+}
+
+async function putVendorBankDetails(
+  req: Request,
+  db: DatabaseVendor,
+  orgId: string,
+  vendorId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const payload = validateVendorBankDetailsBody(await jsonBody(req))
+  const { data, error } = await db.rpc('set_vendor_bank_details', {
+    p_org_id: orgId,
+    p_vendor_id: vendorId,
+    p_bank_details: payload.bank_details,
+    p_expected_version: version,
+  })
+  if (error) throw databaseError(error, requestId)
+  const row = data as { version?: number }
+  return jsonResponse(
+    { data },
+    200,
+    requestId,
+    typeof row?.version === 'number' ? { etag: etag(row.version) } : undefined,
+  )
+}
+
+async function deleteVendorBankDetails(
+  req: Request,
+  db: DatabaseVendor,
+  orgId: string,
+  vendorId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const { data, error } = await db.rpc('clear_vendor_bank_details', {
+    p_org_id: orgId,
+    p_vendor_id: vendorId,
+    p_expected_version: version,
+  })
+  if (error) throw databaseError(error, requestId)
+  const row = data as { version?: number }
+  return jsonResponse(
+    { data },
+    200,
+    requestId,
+    typeof row?.version === 'number' ? { etag: etag(row.version) } : undefined,
+  )
+}
+
 export function handleVendors(
   req: Request,
   db: DatabaseVendor,
@@ -402,6 +483,21 @@ export function handleVendors(
     if (req.method === 'GET') return listVendors(req, db, orgId, requestId)
     if (req.method === 'POST') return createVendor(req, db, orgId, requestId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for vendors')
+  }
+
+  const bankMatch = path.match(
+    /^\/api\/v1\/vendors\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/bank-details$/i,
+  )
+  if (bankMatch) {
+    const vendorId = bankMatch[1]
+    if (req.method === 'GET') return getVendorBankDetails(db, orgId, vendorId, requestId)
+    if (req.method === 'PUT') {
+      return putVendorBankDetails(req, db, orgId, vendorId, requestId)
+    }
+    if (req.method === 'DELETE') {
+      return deleteVendorBankDetails(req, db, orgId, vendorId, requestId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for vendor bank details')
   }
 
   const itemMatch = path.match(
