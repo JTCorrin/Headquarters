@@ -12,6 +12,7 @@ import { handleIntegrations } from './integrations.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
+import { handleCalendar } from './calendar.ts'
 import { handleMeetings } from './meetings.ts'
 import { handleProjects } from './projects.ts'
 import { handleRecurringInvoices } from './recurring-invoices.ts'
@@ -269,6 +270,17 @@ export default {
           )
         }
 
+        if (path === '/api/v1/me/calendar' || path.startsWith('/api/v1/me/calendar/')) {
+          return await handleCalendar(
+            req,
+            db,
+            path,
+            orgId,
+            membership.role,
+            requestId,
+          )
+        }
+
         if (
           path === '/api/v1/email-templates' ||
           path.startsWith('/api/v1/email-templates/')
@@ -444,6 +456,7 @@ export default {
             membership.role,
             requestId,
             userId,
+            membership.id,
           )
         }
 
