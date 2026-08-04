@@ -123,6 +123,7 @@ send_inv="$(
 		-X POST "${API_BASE}/api/v1/invoices/${INV_ID}/send" \
 		"${H[@]}" \
 		-H "If-Match: \"${INV_VER}\"" \
+		-H "Idempotency-Key: pay-proof-inv-send-${INV_ID}" \
 		-H 'content-type: application/json' \
 		-d '{}'
 )"
@@ -150,6 +151,7 @@ recv_bill="$(
 		-X POST "${API_BASE}/api/v1/bills/${BILL_ID}/receive" \
 		"${H[@]}" \
 		-H "If-Match: \"${BILL_VER}\"" \
+		-H "Idempotency-Key: pay-proof-bill-receive-${BILL_ID}" \
 		-H 'content-type: application/json' \
 		-d '{}'
 )"

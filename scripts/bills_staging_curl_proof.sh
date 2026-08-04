@@ -150,6 +150,7 @@ receive_bill="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H "If-Match: \"${BILL_VER}\"" \
+		-H "Idempotency-Key: bill-receive-${BILL_ID}" \
 		-H 'content-type: application/json' \
 		-d '{}'
 )"
@@ -182,6 +183,7 @@ void_bill="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H "If-Match: \"${BILL_VER}\"" \
+		-H "Idempotency-Key: bill-void-${BILL_ID}" \
 		-H 'content-type: application/json' \
 		-d '{"void_reason":"Curl proof void"}'
 )"

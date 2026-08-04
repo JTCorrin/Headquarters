@@ -233,6 +233,7 @@ accept_quote="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H "If-Match: \"${QUOTE_VER}\"" \
+		-H "Idempotency-Key: pqi-quote-accept-${QUOTE_ID}" \
 		-H 'content-type: application/json' \
 		-d '{}'
 )"
