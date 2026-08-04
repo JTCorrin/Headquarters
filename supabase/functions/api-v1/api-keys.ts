@@ -38,6 +38,8 @@ export type ResolvedApiKey = {
   scopes: string[]
   expires_at: string | null
   created_by: string | null
+  /** Active membership id for created_by in the key's org; from resolve RPC. */
+  creator_membership_id: string | null
 }
 
 function assertCanManageApiKeys(role: MembershipRole): void {
@@ -185,6 +187,9 @@ export async function resolveOrgApiKey(secret: string): Promise<ResolvedApiKey> 
       : [],
     expires_at: typeof row.expires_at === 'string' ? row.expires_at : null,
     created_by: typeof row.created_by === 'string' ? row.created_by : null,
+    creator_membership_id: typeof row.creator_membership_id === 'string'
+      ? row.creator_membership_id
+      : null,
   }
 }
 

@@ -655,8 +655,9 @@ async function handleApiKeyRequest(req: Request, requestId: string): Promise<Res
   const orgId = resolved.org_id
   const db = serviceRoleDb()
 
-  let membershipId: string | null = null
-  if (resolved.created_by) {
+  // Prefer membership id from resolve RPC (no second Data API round-trip).
+  let membershipId: string | null = resolved.creator_membership_id
+  if (!membershipId && resolved.created_by) {
     const { data: creatorMembership, error: creatorError } = await db
       .from('memberships')
       .select('id')
@@ -668,6 +669,7 @@ async function handleApiKeyRequest(req: Request, requestId: string): Promise<Res
       console.error('API key creator membership lookup failed', {
         request_id: requestId,
         code: creatorError.code,
+        message: creatorError.message,
       })
       throw new ApiError(500, 'INTERNAL_ERROR', 'Organisation context validation failed')
     }
