@@ -70,7 +70,7 @@ begin
       using errcode = 'P0002';
   end if;
 
-  -- Role check before FOR UPDATE.
+  -- Role check before row lock.
   if not private.has_org_role(
     product_org,
     array['owner', 'admin', 'member']
@@ -183,7 +183,8 @@ begin
       using errcode = '22023';
   end if;
 
-  -- Authz before any FOR UPDATE. Org is required from the API tenancy context.
+  -- Authz before locking the idempotency claim or nested stock adjust.
+  -- Org is required from the API tenancy context.
   if not private.has_org_role(p_org_id, array['owner', 'admin', 'member']) then
     -- Match adjust_product_stock: non-members / wrong-org → not-found when product
     -- is absent from this org; in-org wrong role → permission denied below.
