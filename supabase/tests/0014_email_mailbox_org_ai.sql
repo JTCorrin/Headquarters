@@ -3,7 +3,7 @@ begin;
 select plan(30);
 
 select has_table('private', 'integration_secrets', 'private.integration_secrets exists');
-select has_table('private', 'encryption_keys', 'private.encryption_keys exists');
+select has_table('private', 'encryption_key_meta', 'private.encryption_key_meta exists');
 select has_table('public', 'mailbox_accounts', 'mailbox_accounts table exists');
 select has_table('public', 'email_threads', 'email_threads table exists');
 select has_table('public', 'email_messages', 'email_messages table exists');
@@ -168,8 +168,8 @@ select ok(
 );
 
 select ok(
-  not has_table_privilege('authenticated', 'private.encryption_keys', 'select'),
-  'authenticated cannot select private.encryption_keys'
+  not has_table_privilege('authenticated', 'private.encryption_key_meta', 'select'),
+  'authenticated cannot select private.encryption_key_meta'
 );
 
 select ok(

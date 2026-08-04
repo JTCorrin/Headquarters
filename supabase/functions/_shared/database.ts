@@ -1644,6 +1644,36 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_vendor_bank_details: {
+        Args: {
+          p_bank_details: string
+          p_expected_version: number
+          p_org_id: string
+          p_vendor_id: string
+        }
+        Returns: Json
+      }
+      clear_vendor_bank_details: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_vendor_id: string
+        }
+        Returns: Json
+      }
+      read_vendor_bank_details: {
+        Args: {
+          p_org_id: string
+          p_vendor_id: string
+        }
+        Returns: Json
+      }
+      rotate_org_encryption_key: {
+        Args: {
+          p_org_id: string
+        }
+        Returns: Json
+      }
       create_recurring_schedule_draft: {
         Args: {
           p_lines?: Json
