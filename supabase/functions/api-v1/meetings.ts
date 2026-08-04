@@ -496,6 +496,9 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (lower.includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Meeting version does not match If-Match')
   }
+  if (lower.includes('not open for accept') || lower.includes('not open for dismiss')) {
+    return new ApiError(409, 'CONFLICT', message || 'Task proposal is not open for accept')
+  }
   if (
     lower.includes('organiser must be') ||
     lower.includes('related') ||
@@ -520,7 +523,13 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
   }
+  if (error.code === 'P0001') {
+    return new ApiError(409, 'CONFLICT', message || 'Task proposal conflict')
+  }
   if (error.code === 'P0002') {
+    if (lower.includes('proposal')) {
+      return new ApiError(404, 'NOT_FOUND', 'Task proposal not found')
+    }
     return new ApiError(404, 'NOT_FOUND', 'Meeting not found')
   }
   console.error('Meeting database operation failed', {
@@ -1009,54 +1018,27 @@ async function acceptProposal(
   meetingId: string,
   proposalId: string,
   requestId: string,
-  userId: string,
+  _userId: string,
 ): Promise<Response> {
   await findMeeting(db, orgId, meetingId, requestId)
-  const proposal = await findProposal(db, orgId, meetingId, proposalId, requestId)
-  if (proposal.status !== 'proposed') {
-    throw new ApiError(409, 'CONFLICT', 'Task proposal is not open for accept')
-  }
 
-  const { data: task, error: taskError } = await db
-    .from('tasks')
-    .insert({
-      org_id: orgId,
-      title: proposal.title,
-      description: proposal.description,
-      assignee_membership_id: proposal.suggested_assignee_membership_id,
-      due_at: proposal.suggested_due_at,
-      source: 'meeting',
-      meeting_id: meetingId,
-      status: 'open',
-      priority: 'p3',
-    })
-    .select('id')
-    .single()
-  if (taskError) throw databaseError(taskError, requestId)
-
-  const decidedAt = new Date().toISOString()
-  const { data: updated, error } = await db
-    .from('meeting_task_proposals')
-    .update({
-      status: 'accepted',
-      accepted_task_id: task.id,
-      decided_at: decidedAt,
-      decided_by: userId,
-    })
-    .eq('org_id', orgId)
-    .eq('id', proposalId)
-    .eq('status', 'proposed')
-    .is('deleted_at', null)
-    .select(PROPOSAL_SELECT)
-    .maybeSingle()
+  const { data, error } = await db.rpc('accept_meeting_task_proposal', {
+    p_org_id: orgId,
+    p_meeting_id: meetingId,
+    p_proposal_id: proposalId,
+  })
   if (error) throw databaseError(error, requestId)
-  if (!updated) {
-    throw new ApiError(409, 'CONFLICT', 'Task proposal changed during this request')
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Accept proposal returned an unexpected payload')
+  }
+  const acceptedTaskId = (data as { accepted_task_id?: string }).accepted_task_id
+  if (typeof acceptedTaskId !== 'string') {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Accept proposal returned an incomplete payload')
   }
 
   const meeting = await findMeeting(db, orgId, meetingId, requestId)
   const host = await hostMeeting(db, orgId, meeting, requestId)
-  return jsonResponse({ data: host, meta: { accepted_task_id: task.id } }, 200, requestId, {
+  return jsonResponse({ data: host, meta: { accepted_task_id: acceptedTaskId } }, 200, requestId, {
     etag: etag(meeting.version),
   })
 }
