@@ -26,8 +26,13 @@ import {
 import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
-import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
-import { validateBillBody } from './bills.ts'
+import {
+  decodeInvoiceCursor,
+  invoiceLifecycleIdempotencyPayload,
+  validateInvoiceBody,
+} from './invoices.ts'
+import { billLifecycleIdempotencyPayload, validateBillBody } from './bills.ts'
+import { quoteAcceptIdempotencyPayload } from './quotes.ts'
 import { validateVendorBankDetailsBody, validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
 import { decodeMeetingCursor, validateMeetingBody } from './meetings.ts'
@@ -1403,6 +1408,43 @@ Deno.test('payment allocate/reverse idempotency payload omits expected_version',
     paymentMutationIdempotencyPayload(paymentId, { reason: 'oops' }),
   )
   assertEquals(hashV1, hashV2)
+})
+
+Deno.test('A5 financial lifecycle idempotency payloads omit expected_version', async () => {
+  const invoiceId = '44444444-4444-4444-8444-444444444444'
+  const quoteId = '55555555-5555-4555-8555-555555555555'
+  const billId = '66666666-6666-4666-8666-666666666666'
+
+  assertEquals(invoiceLifecycleIdempotencyPayload(invoiceId), { invoice_id: invoiceId })
+  assertEquals(
+    invoiceLifecycleIdempotencyPayload(invoiceId, { void_reason: 'dup' }),
+    { invoice_id: invoiceId, void_reason: 'dup' },
+  )
+  assertEquals(quoteAcceptIdempotencyPayload(quoteId), { quote_id: quoteId })
+  assertEquals(billLifecycleIdempotencyPayload(billId), { bill_id: billId })
+
+  const sendRoute = `/api/v1/invoices/${invoiceId}/send`
+  const sendA = await hashIdempotencyRequest(
+    sendRoute,
+    invoiceLifecycleIdempotencyPayload(invoiceId),
+  )
+  const sendB = await hashIdempotencyRequest(
+    sendRoute,
+    invoiceLifecycleIdempotencyPayload(invoiceId),
+  )
+  assertEquals(sendA, sendB)
+
+  const acceptRoute = `/api/v1/quotes/${quoteId}/accept`
+  assertEquals(
+    await hashIdempotencyRequest(acceptRoute, quoteAcceptIdempotencyPayload(quoteId)),
+    await hashIdempotencyRequest(acceptRoute, quoteAcceptIdempotencyPayload(quoteId)),
+  )
+
+  const receiveRoute = `/api/v1/bills/${billId}/receive`
+  assertEquals(
+    await hashIdempotencyRequest(receiveRoute, billLifecycleIdempotencyPayload(billId)),
+    await hashIdempotencyRequest(receiveRoute, billLifecycleIdempotencyPayload(billId)),
+  )
 })
 
 Deno.test('timeline entity type and note body validation', () => {

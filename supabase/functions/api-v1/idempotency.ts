@@ -29,3 +29,31 @@ export async function hashIdempotencyRequest(
 ): Promise<string> {
   return await sha256Hex(JSON.stringify({ route, payload }))
 }
+
+export type IdempotencyEnvelope = {
+  replay?: boolean
+  response_status?: number
+  response_body?: unknown
+  response_headers?: Record<string, string>
+}
+
+/** Map Postgres idempotency claim errors to API conflicts (call before generic 23505). */
+export function idempotencyConflictError(
+  error: { code?: string; message?: string },
+): ApiError | null {
+  const message = error.message?.toLowerCase() ?? ''
+  if (
+    message.includes('idempotency-key was reused') ||
+    (error.code === '23505' && message.includes('idempotency'))
+  ) {
+    return new ApiError(
+      409,
+      'CONFLICT',
+      'Idempotency-Key was reused with a different request payload',
+    )
+  }
+  if (error.code === '55000') {
+    return new ApiError(409, 'CONFLICT', 'An identical request is already in progress')
+  }
+  return null
+}

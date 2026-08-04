@@ -10,6 +10,14 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
+import {
+  hashIdempotencyRequest,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyConflictError,
+  type IdempotencyEnvelope,
+  parseIdempotencyKey,
+  sha256Hex,
+} from './idempotency.ts'
 import { assertJsonSafeLineMoney } from './quotes.ts'
 
 const BILL_SELECT =
@@ -493,6 +501,8 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.message?.toLowerCase().includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Bill version does not match If-Match')
   }
+  const idempotencyError = idempotencyConflictError(error)
+  if (idempotencyError) return idempotencyError
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The bill conflicts with an existing record')
   }
@@ -723,6 +733,30 @@ async function deleteBill(
   })
 }
 
+/** Idempotency request payload — omits expected_version (If-Match is first-exec only). */
+export function billLifecycleIdempotencyPayload(
+  billId: string,
+  extras: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return { bill_id: billId, ...extras }
+}
+
+function billEnvelopeResponse(
+  envelope: IdempotencyEnvelope,
+  requestId: string,
+  rawKey: string,
+): Response {
+  return jsonResponse(
+    envelope.response_body ?? { data: null },
+    envelope.response_status ?? 200,
+    requestId,
+    {
+      ...(envelope.response_headers ?? {}),
+      [IDEMPOTENCY_KEY_HEADER]: rawKey,
+    },
+  )
+}
+
 async function receiveBillRoute(
   req: Request,
   db: DatabaseClient,
@@ -731,19 +765,28 @@ async function receiveBillRoute(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
+  const rawKey = parseIdempotencyKey(req)
+  const route = `/api/v1/bills/${billId}/receive`
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    billLifecycleIdempotencyPayload(billId),
+  )
+  const keyHash = await sha256Hex(rawKey)
 
-  const { data, error } = await db.rpc('receive_bill', {
+  const { data, error } = await db.rpc('receive_bill_idempotent', {
     p_bill_id: billId,
     p_org_id: orgId,
     p_expected_version: version,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
   })
 
   if (error) throw databaseError(error, requestId)
-  const document = asBillDocument(data)
-
-  return jsonResponse({ data: document }, 200, requestId, {
-    etag: etag(document.version),
-  })
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Bill receive returned an unexpected payload')
+  }
+  return billEnvelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
 
 async function voidBillRoute(
@@ -755,20 +798,29 @@ async function voidBillRoute(
 ): Promise<Response> {
   const version = parseVersion(req)
   const voidReason = validateVoidBody(await jsonBody(req))
+  const rawKey = parseIdempotencyKey(req)
+  const route = `/api/v1/bills/${billId}/void`
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    billLifecycleIdempotencyPayload(billId, { void_reason: voidReason }),
+  )
+  const keyHash = await sha256Hex(rawKey)
 
-  const { data, error } = await db.rpc('void_bill', {
+  const { data, error } = await db.rpc('void_bill_idempotent', {
     p_bill_id: billId,
     p_org_id: orgId,
     p_expected_version: version,
     p_void_reason: voidReason,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
   })
 
   if (error) throw databaseError(error, requestId)
-  const document = asBillDocument(data)
-
-  return jsonResponse({ data: document }, 200, requestId, {
-    etag: etag(document.version),
-  })
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Bill void returned an unexpected payload')
+  }
+  return billEnvelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
 
 export function handleBills(
