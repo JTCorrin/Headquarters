@@ -1,6 +1,6 @@
 begin;
 
-select plan(18);
+select plan(20);
 
 select ok(
   exists (
@@ -265,6 +265,27 @@ select ok(
     (select org_id::text from _api_keys_fixture)
   ),
   'resolved key is pinned to org'
+);
+
+select ok(
+  (
+    select public.resolve_api_key_by_hash((select key_hash from _api_keys_fixture))
+      ->> 'creator_membership_id'
+    =
+    (
+      select memberships.id::text
+      from public.memberships
+      where memberships.org_id = (select org_id from _api_keys_fixture)
+        and memberships.user_id = (select owner_id from _api_keys_fixture)
+        and memberships.status = 'active'
+    )
+  ),
+  'resolve_api_key_by_hash returns creator_membership_id'
+);
+
+select ok(
+  has_table_privilege('service_role', 'public.memberships', 'select'),
+  'service_role can select memberships via Data API grants'
 );
 
 set local role authenticated;
