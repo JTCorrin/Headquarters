@@ -1,54 +1,45 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { MeetingFormData } from '$lib/schemas/meeting.js';
+	import type { ProjectCardFormData } from '$lib/schemas/project.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import MeetingForm from './meeting-form.svelte';
+	import ProjectCardForm from './project-card-form.svelte';
 	import { cn } from '$lib/utils.js';
-	import type { Snippet } from 'svelte';
 
-	export interface MeetingFormDrawerProps {
-		form: SuperForm<MeetingFormData>;
+	export interface ProjectCardFormDrawerProps {
+		form: SuperForm<ProjectCardFormData>;
 		open?: boolean;
 		title?: string;
 		description?: string;
 		submitLabel?: string;
-		triggerLabel?: string;
 		showTrigger?: boolean;
+		triggerLabel?: string;
 		class?: string;
-		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void | Promise<void>;
 	}
 
 	let {
 		form,
 		open = $bindable(false),
-		title = 'Schedule meeting',
-		description = 'Link attendees and a client, contact, lead, or project when you know them.',
-		submitLabel = 'Save meeting',
-		triggerLabel = 'New meeting',
-		showTrigger = true,
+		title = 'Card',
+		description = 'Title, description, and due date for this project card.',
+		submitLabel = 'Save card',
+		showTrigger = false,
+		triggerLabel = 'Add card',
 		class: className,
-		trigger,
-		onValidSubmit
-	}: MeetingFormDrawerProps = $props();
+		onValidSubmit,
+		onDelete
+	}: ProjectCardFormDrawerProps = $props();
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
 	{#if showTrigger}
-		{#if trigger}
-			<Drawer.Trigger>
-				{#snippet child({ props })}
-					<span class="inline-flex" {...props}>{@render trigger()}</span>
-				{/snippet}
-			</Drawer.Trigger>
-		{:else}
-			<Drawer.Trigger>
-				{#snippet child({ props })}
-					<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
-				{/snippet}
-			</Drawer.Trigger>
-		{/if}
+		<Drawer.Trigger>
+			{#snippet child({ props })}
+				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+			{/snippet}
+		</Drawer.Trigger>
 	{/if}
 
 	<Drawer.Content class={cn('mx-auto w-full max-w-lg', className)}>
@@ -57,7 +48,13 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<MeetingForm {form} {submitLabel} {onValidSubmit} class="max-w-none" />
+			<ProjectCardForm
+				{form}
+				{submitLabel}
+				{onValidSubmit}
+				{onDelete}
+				class="max-w-none"
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

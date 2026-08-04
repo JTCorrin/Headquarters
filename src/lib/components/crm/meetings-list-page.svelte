@@ -14,12 +14,17 @@
 		rows: MeetingListItem[];
 		form: SuperForm<MeetingFormData>;
 		drawerOpen?: boolean;
+		editForm?: SuperForm<MeetingFormData>;
+		editDrawerOpen?: boolean;
 		filterLabel?: string | null;
 		onClearFilter?: () => void;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onValidEdit?: () => boolean | void | Promise<boolean | void>;
+		onEditMeeting?: (id: string) => void;
+		onDeleteMeeting?: (id: string) => void;
 	}
 
 	let {
@@ -28,11 +33,16 @@
 		rows,
 		form,
 		drawerOpen = $bindable(false),
+		editForm,
+		editDrawerOpen = $bindable(false),
 		filterLabel = null,
 		onClearFilter,
 		showNav = true,
 		class: className,
-		onValidSubmit
+		onValidSubmit,
+		onValidEdit,
+		onEditMeeting,
+		onDeleteMeeting
 	}: MeetingsListPageProps = $props();
 </script>
 
@@ -63,7 +73,19 @@
 				<ListFilterBanner label={filterLabel} onClear={onClearFilter} />
 			{/if}
 
-			<MeetingsTable {rows} />
+			<MeetingsTable {rows} {onEditMeeting} {onDeleteMeeting} />
 		</div>
 	</main>
 </div>
+
+{#if editForm}
+	<MeetingFormDrawer
+		bind:open={editDrawerOpen}
+		form={editForm}
+		showTrigger={false}
+		title="Edit meeting"
+		description="Update schedule, related record, or attendees. Changes use If-Match versioning."
+		submitLabel="Save changes"
+		onValidSubmit={onValidEdit}
+	/>
+{/if}
