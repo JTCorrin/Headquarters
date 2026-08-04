@@ -4,6 +4,11 @@ import type { ConvertLeadFormData, LeadFormData, LeadResource } from '$lib/schem
 import { leadWritableStages } from '$lib/schemas/lead.js';
 import type { AiIntegrationResource } from '$lib/schemas/integration.js';
 import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
+import {
+	emptyCalendarConnection,
+	mapCalendarConnectionStatus,
+	type CalendarConnectionResource
+} from '$lib/schemas/calendar-connection.js';
 import { amountStringToCents, centsToAmountString } from '$lib/money.js';
 import type {
 	MembershipRole,
@@ -82,6 +87,7 @@ import type {
 	ApiLeadConvertBody,
 	ApiLeadCreateBody,
 	ApiLeadUpdateBody,
+	ApiCalendarConnection,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
 	ApiOrganisationConfiguration,
@@ -1047,6 +1053,22 @@ export function toMailboxAccountResource(
 	};
 }
 
+export function toCalendarConnectionResource(
+	connection: ApiCalendarConnection | null | undefined
+): CalendarConnectionResource {
+	if (!connection) return emptyCalendarConnection();
+	const email = connection.config?.email?.trim() || null;
+	const label = connection.config?.account_label?.trim() || null;
+	return {
+		provider: connection.provider === 'google' ? 'google' : null,
+		credentials_configured: Boolean(connection.credentials_configured),
+		status: mapCalendarConnectionStatus(connection.status),
+		account_label: label || email,
+		last_error_code: connection.last_error_code ?? null,
+		last_checked_at: connection.last_checked_at ?? null
+	};
+}
+
 export function toMailboxPutBody(data: MailboxFormData): ApiMailboxPutBody {
 	const body: ApiMailboxPutBody = {
 		email_address: data.emailAddress.trim(),
@@ -2006,7 +2028,9 @@ export function toMeetingListItem(meeting: ApiMeeting): MeetingListItem {
 		rawStatus: meeting.status,
 		startsAt: meeting.starts_at,
 		endsAt: meeting.ends_at,
-		timezone: meeting.timezone
+		timezone: meeting.timezone,
+		calendarProvider: meeting.calendar_provider ?? null,
+		externalEventId: meeting.external_event_id ?? null
 	};
 }
 

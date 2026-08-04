@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -9,6 +10,7 @@
 		roleFromMemberships,
 		themePreferenceFromApi,
 		themePreferenceToApi,
+		toCalendarConnectionResource,
 		toMailboxAccountResource,
 		toMailboxPutBody,
 		toOrganisationCreateBody,
@@ -38,6 +40,10 @@
 		type MailboxAccountResource,
 		type MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
+	import {
+		emptyCalendarConnection,
+		type CalendarConnectionResource
+	} from '$lib/schemas/calendar-connection.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import PersonalSettingsPage from './personal-settings-page.svelte';
@@ -62,6 +68,8 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let mailboxAccount = $state<MailboxAccountResource | null>(null);
+	let calendarConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
+	let calendarConnectError = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -217,6 +225,24 @@
 				}
 			}
 
+			try {
+				const connection = await api.calendar.get();
+				if (isStale(epoch)) return;
+				calendarConnection = toCalendarConnectionResource(connection);
+				calendarConnectError = null;
+			} catch (error) {
+				if (isStale(epoch)) return;
+				calendarConnection = emptyCalendarConnection();
+				if (
+					!(
+						isApiClientError(error) &&
+						(error.status === 404 || error.code === 'NOT_FOUND')
+					)
+				) {
+					calendarConnectError = userMessage(error, 'Could not load calendar connection.');
+				}
+			}
+
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -362,6 +388,48 @@
 		}
 	}
 
+	async function onConnectCalendar() {
+		const epoch = captureEpoch();
+		calendarConnectError = null;
+		try {
+			const start = await api.calendar.startOAuth();
+			if (isStale(epoch)) return false;
+			if (!start?.authorize_url?.trim()) {
+				calendarConnectError = 'Calendar OAuth start did not return a redirect URL.';
+				return false;
+			}
+			if (browser) {
+				window.location.assign(start.authorize_url);
+			}
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			calendarConnectError = userMessage(error, 'Could not start Google Calendar connect.');
+			return false;
+		}
+	}
+
+	async function onDisconnectCalendar() {
+		const epoch = captureEpoch();
+		calendarConnectError = null;
+		try {
+			await api.calendar.disconnect();
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			calendarConnection = emptyCalendarConnection();
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			calendarConnectError = userMessage(error, 'Could not disconnect Google Calendar.');
+			return false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -423,6 +491,8 @@
 				{preferencesForm}
 				{mailboxForm}
 				{mailboxAccount}
+				{calendarConnection}
+				{calendarConnectError}
 				{viewState}
 				onReload={() => loadAll({ forceMailboxReload: true })}
 				{onSavePreferences}
@@ -430,6 +500,8 @@
 				{onTestMailbox}
 				{onSyncMailbox}
 				{onDisconnectMailbox}
+				{onConnectCalendar}
+				{onDisconnectCalendar}
 				showNav={false}
 			/>
 		</AppShell>

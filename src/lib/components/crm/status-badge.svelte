@@ -16,6 +16,8 @@
 				'paid',
 				'won',
 				'active',
+				'connected',
+				'linked',
 				'client',
 				'primary',
 				'ready',

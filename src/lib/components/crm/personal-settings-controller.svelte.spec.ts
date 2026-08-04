@@ -143,4 +143,91 @@ describe('PersonalSettingsController', () => {
 			/Missing saved credentials/i
 		);
 	});
+
+	it('renders Calendar tab disconnected and calls OAuth start on Connect', async () => {
+		let oauthStarts = 0;
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'GET /api/v1/organisations': async () => ({ body: memberships() }),
+				'GET /api/v1/profile/preferences': async () => ({
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				}),
+				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
+				'GET /api/v1/me/calendar': async () => ({
+					body: {
+						data: {
+							provider: null,
+							status: 'disconnected',
+							credentials_configured: false,
+							config: null,
+							last_error_code: null,
+							last_checked_at: null
+						}
+					}
+				}),
+				'GET /api/v1/me/calendar/oauth/start': async () => {
+					oauthStarts += 1;
+					// Empty URL surfaces a readable error without navigating the browser.
+					return { body: { data: { authorize_url: '', state: 'test' } } };
+				}
+			}),
+			getOrgId: () => session.selectedOrgId
+		});
+
+		render(PersonalSettingsController, { api, session });
+
+		await page.getByRole('tab', { name: 'Calendar' }).click();
+		await expect.element(page.getByTestId('personal-calendar-section')).toBeInTheDocument();
+		await expect.element(page.getByTestId('calendar-connection-label')).toHaveTextContent(
+			/Not connected/i
+		);
+		await expect.element(page.getByTestId('calendar-connect')).toBeInTheDocument();
+
+		await page.getByTestId('calendar-connect').click();
+		await expect.poll(() => oauthStarts).toBe(1);
+		await expect.element(page.getByTestId('calendar-connect-error')).toHaveTextContent(
+			/did not return a redirect URL/i
+		);
+	});
+
+	it('renders connected Calendar status from GET /me/calendar', async () => {
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'GET /api/v1/organisations': async () => ({ body: memberships() }),
+				'GET /api/v1/profile/preferences': async () => ({
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				}),
+				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
+				'GET /api/v1/me/calendar': async () => ({
+					body: {
+						data: {
+							provider: 'google',
+							status: 'active',
+							credentials_configured: true,
+							config: { email: 'joe@acme.test' },
+							last_error_code: null,
+							last_checked_at: null
+						}
+					}
+				})
+			}),
+			getOrgId: () => session.selectedOrgId
+		});
+
+		render(PersonalSettingsController, { api, session });
+
+		await page.getByRole('tab', { name: 'Calendar' }).click();
+		await expect.element(page.getByTestId('calendar-connection-label')).toHaveTextContent(
+			/joe@acme.test/i
+		);
+		await expect.element(page.getByTestId('calendar-disconnect')).toBeInTheDocument();
+	});
 });

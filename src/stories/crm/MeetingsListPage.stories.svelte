@@ -15,7 +15,9 @@
 			rawStatus: 'scheduled',
 			startsAt: '2026-08-03T15:00:00.000Z',
 			endsAt: '2026-08-03T15:45:00.000Z',
-			timezone: 'UTC'
+			timezone: 'UTC',
+			calendarProvider: 'google',
+			externalEventId: 'evt-1'
 		},
 		{
 			id: '2',
@@ -28,7 +30,9 @@
 			rawStatus: 'scheduled',
 			startsAt: '2026-08-06T11:30:00.000Z',
 			endsAt: '2026-08-06T12:00:00.000Z',
-			timezone: 'UTC'
+			timezone: 'UTC',
+			calendarProvider: null,
+			externalEventId: null
 		},
 		{
 			id: '3',
@@ -41,7 +45,9 @@
 			rawStatus: 'scheduled',
 			startsAt: '2026-08-07T09:00:00.000Z',
 			endsAt: '2026-08-07T09:30:00.000Z',
-			timezone: 'UTC'
+			timezone: 'UTC',
+			calendarProvider: null,
+			externalEventId: null
 		},
 		{
 			id: '4',
@@ -54,7 +60,9 @@
 			rawStatus: 'completed',
 			startsAt: '2026-03-12T10:00:00.000Z',
 			endsAt: '2026-03-12T10:45:00.000Z',
-			timezone: 'UTC'
+			timezone: 'UTC',
+			calendarProvider: null,
+			externalEventId: null
 		}
 	];
 
