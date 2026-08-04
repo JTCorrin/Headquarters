@@ -936,29 +936,37 @@ async function lifecycleCommand(
     )
   }
 
-  const rpcName = ({
-    activate: 'activate_recurring_schedule',
-    pause: 'pause_recurring_schedule',
-    resume: 'resume_recurring_schedule',
-    cancel: 'cancel_recurring_schedule',
-  } as const)[command as 'activate' | 'pause' | 'resume' | 'cancel']
-
-  // Store idempotency for non-run-now via a lightweight claim table insert is heavy;
-  // require Idempotency-Key but execute command directly (key validated present).
-  void keyHash
-  void requestHash
-
-  const { data, error } = await db.rpc(rpcName, {
+  const { data, error } = await db.rpc('recurring_schedule_lifecycle_idempotent', {
+    p_command: command,
     p_schedule_id: scheduleId,
     p_org_id: orgId,
     p_expected_version: version,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
   })
   if (error) throw databaseError(error, requestId)
-  const document = asScheduleDocument(data as Json)
-  return jsonResponse({ data: document }, 200, requestId, {
-    etag: etag(document.version),
-    [IDEMPOTENCY_KEY_HEADER]: rawKey,
-  })
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Recurring lifecycle returned an unexpected payload',
+    )
+  }
+  const envelope = data as {
+    response_status?: number
+    response_body?: unknown
+    response_headers?: Record<string, string>
+  }
+  return jsonResponse(
+    envelope.response_body ?? { data: null },
+    envelope.response_status ?? 200,
+    requestId,
+    {
+      ...(envelope.response_headers ?? {}),
+      [IDEMPOTENCY_KEY_HEADER]: rawKey,
+    },
+  )
 }
 
 async function listRuns(
