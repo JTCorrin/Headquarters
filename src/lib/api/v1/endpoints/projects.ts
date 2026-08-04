@@ -4,6 +4,9 @@ import type {
 	ApiProjectCard,
 	ApiProjectCardCreateBody,
 	ApiProjectCardUpdateBody,
+	ApiProjectColumn,
+	ApiProjectColumnCreateBody,
+	ApiProjectColumnUpdateBody,
 	ApiProjectCreateBody,
 	ApiProjectDocument,
 	ApiProjectListParams,
@@ -52,6 +55,45 @@ export function createProjectsEndpoints(request: ApiRequestFn): ProjectsEndpoint
 		},
 		delete: async (id, version, signal) => {
 			await request<undefined>(`/api/v1/projects/${id}`, {
+				method: 'DELETE',
+				orgScoped: true,
+				ifMatchVersion: version,
+				signal
+			});
+		},
+		createColumn: async (projectId, body: ApiProjectColumnCreateBody, signal) => {
+			const { data } = await request<ApiProjectColumn>(
+				`/api/v1/projects/${projectId}/columns`,
+				{
+					method: 'POST',
+					body,
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
+		},
+		updateColumn: async (
+			projectId,
+			columnId,
+			body: ApiProjectColumnUpdateBody,
+			version,
+			signal
+		) => {
+			const { data } = await request<ApiProjectColumn>(
+				`/api/v1/projects/${projectId}/columns/${columnId}`,
+				{
+					method: 'PATCH',
+					body,
+					orgScoped: true,
+					ifMatchVersion: version,
+					signal
+				}
+			);
+			return data;
+		},
+		deleteColumn: async (projectId, columnId, version, signal) => {
+			await request<undefined>(`/api/v1/projects/${projectId}/columns/${columnId}`, {
 				method: 'DELETE',
 				orgScoped: true,
 				ifMatchVersion: version,

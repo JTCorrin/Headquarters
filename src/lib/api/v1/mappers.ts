@@ -125,9 +125,12 @@ import type {
 	ApiMeetingUpdateBody,
 	ApiProject,
 	ApiProjectCard,
+	ApiProjectCardCreateBody,
+	ApiProjectCardUpdateBody,
 	ApiProjectCreateBody,
 	ApiProjectDocument,
 	ApiProjectStatus,
+	ApiProjectUpdateBody,
 	ApiAuditEvent,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody
@@ -138,10 +141,11 @@ import type {
 	MeetingListItem
 } from '$lib/schemas/meeting.js';
 import type {
+	ProjectCardFormData,
 	ProjectFormData,
 	ProjectListItem
 } from '$lib/schemas/project.js';
-import { projectBoardStatuses } from '$lib/schemas/project.js';
+import { projectBoardStatuses, projectFormStatuses } from '$lib/schemas/project.js';
 import type { InfoCardField } from '$lib/components/crm/info-card.svelte';
 import type { DashboardMeeting } from '$lib/components/crm/dashboard-page.svelte';
 import type { EntityProject } from '$lib/components/crm/entity-projects.svelte';
@@ -2072,7 +2076,8 @@ export function toMeetingFormData(meeting: ApiMeetingDocument): MeetingFormData 
 	const relatedType =
 		meeting.related_entity_type === 'client' ||
 		meeting.related_entity_type === 'contact' ||
-		meeting.related_entity_type === 'lead'
+		meeting.related_entity_type === 'lead' ||
+		meeting.related_entity_type === 'project'
 			? meeting.related_entity_type
 			: 'none';
 	return {
@@ -2165,12 +2170,67 @@ export function emptyProjectFormData(): ProjectFormData {
 	};
 }
 
+export function toProjectFormData(project: ApiProject): ProjectFormData {
+	const status = projectFormStatuses.includes(
+		project.status as (typeof projectFormStatuses)[number]
+	)
+		? (project.status as ProjectFormData['status'])
+		: 'planning';
+	return {
+		name: project.name,
+		clientId: project.client_id,
+		description: project.description ?? '',
+		status
+	};
+}
+
 export function toProjectCreateBody(data: ProjectFormData): ApiProjectCreateBody {
 	return {
 		client_id: data.clientId.trim(),
 		name: data.name.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
+		status: data.status === 'archived' ? 'planning' : data.status
+	};
+}
+
+export function toProjectUpdateBody(data: ProjectFormData): ApiProjectUpdateBody {
+	return {
+		client_id: data.clientId.trim(),
+		name: data.name.trim(),
+		description: data.description?.trim() ? data.description.trim() : null,
 		status: data.status
+	};
+}
+
+export function emptyProjectCardFormData(): ProjectCardFormData {
+	return {
+		title: '',
+		description: '',
+		dueAt: ''
+	};
+}
+
+export function toProjectCardFormData(card: ApiProjectCard): ProjectCardFormData {
+	return {
+		title: card.title,
+		description: card.description ?? '',
+		dueAt: isoToLocalDatetime(card.due_at)
+	};
+}
+
+export function toProjectCardCreateBody(data: ProjectCardFormData): ApiProjectCardCreateBody {
+	return {
+		title: data.title.trim(),
+		description: data.description?.trim() ? data.description.trim() : null,
+		due_at: data.dueAt?.trim() ? localDatetimeToIso(data.dueAt.trim()) : null
+	};
+}
+
+export function toProjectCardUpdateBody(data: ProjectCardFormData): ApiProjectCardUpdateBody {
+	return {
+		title: data.title.trim(),
+		description: data.description?.trim() ? data.description.trim() : null,
+		due_at: data.dueAt?.trim() ? localDatetimeToIso(data.dueAt.trim()) : null
 	};
 }
 
@@ -2231,6 +2291,7 @@ export function toWorkspaceCard(card: ApiProjectCard, columnId = card.column_id)
 	return {
 		id: card.id,
 		title: card.title,
+		description: card.description?.trim() || undefined,
 		column: columnId,
 		dueOn: card.due_at ? card.due_at.slice(0, 10) : undefined,
 		version: card.version,

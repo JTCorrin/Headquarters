@@ -9,6 +9,8 @@
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import XIcon from '@lucide/svelte/icons/x';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 
 	export interface ProposedMeetingTask {
 		id: string;
@@ -44,6 +46,8 @@
 		onAcceptTask?: (id: string) => void;
 		onDismissTask?: (id: string) => void;
 		onAcceptAllTasks?: () => void;
+		onEdit?: () => void;
+		onDelete?: () => void;
 		class?: string;
 	}
 
@@ -70,6 +74,8 @@
 		onAcceptTask,
 		onDismissTask,
 		onAcceptAllTasks,
+		onEdit,
+		onDelete,
 		class: className
 	}: MeetingWorkspacePageProps = $props();
 
@@ -107,6 +113,28 @@
 				description="{when} · {relatedTo}"
 			>
 				{#snippet actions()}
+					{#if onEdit}
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={actionBusy}
+							onclick={() => onEdit?.()}
+						>
+							<PencilIcon class="size-3.5" />
+							Edit
+						</Button>
+					{/if}
+					{#if onDelete}
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={actionBusy}
+							onclick={() => onDelete?.()}
+						>
+							<Trash2Icon class="size-3.5" />
+							Delete
+						</Button>
+					{/if}
 					<Button
 						variant="outline"
 						size="sm"

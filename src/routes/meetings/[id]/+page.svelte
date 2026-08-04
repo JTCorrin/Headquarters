@@ -30,6 +30,9 @@
 		onSwitchNavigate={() => {
 			void goto('/meetings');
 		}}
+		onDeleted={() => {
+			void goto('/meetings');
+		}}
 		onLogout={handleLogout}
 	/>
 {/if}
