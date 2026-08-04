@@ -29,7 +29,9 @@ async function proxy(event: Parameters<RequestHandler>[0]): Promise<Response> {
 	const pathSuffix = event.params.path ? `/${event.params.path}` : '';
 	const pathname = `/api/v1${pathSuffix}`;
 	const target = buildApiV1ProxyUrl(upstream, pathname, event.url.search);
-	const headers = forwardProxyHeaders(event.request.headers);
+	const headers = forwardProxyHeaders(event.request.headers, {
+		fallbackApikey: publicEnv.PUBLIC_SUPABASE_ANON_KEY
+	});
 
 	const init: RequestInit = {
 		method: event.request.method,

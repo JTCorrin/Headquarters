@@ -75,4 +75,38 @@ describe('forwardProxyHeaders', () => {
 		expect(forwarded.get('x-real-ip')).toBeNull();
 		expect(forwarded.get('x-custom')).toBeNull();
 	});
+
+	it('injects fallbackApikey when inbound apikey is missing', () => {
+		const source = new Headers({
+			authorization: 'Bearer crm_key_abc'
+		});
+		const forwarded = forwardProxyHeaders(source, {
+			fallbackApikey: '  anon-public-key  '
+		});
+		expect(forwarded.get('apikey')).toBe('anon-public-key');
+		expect(forwarded.get('authorization')).toBe('Bearer crm_key_abc');
+	});
+
+	it('does not overwrite an explicit inbound apikey', () => {
+		const source = new Headers({
+			authorization: 'Bearer crm_key_abc',
+			apikey: 'client-supplied'
+		});
+		const forwarded = forwardProxyHeaders(source, {
+			fallbackApikey: 'anon-public-key'
+		});
+		expect(forwarded.get('apikey')).toBe('client-supplied');
+	});
+
+	it('forwards mcp-* headers for Cursor / MCP sessions', () => {
+		const source = new Headers({
+			authorization: 'Bearer crm_key_abc',
+			'mcp-session-id': 'sess-1'
+		});
+		const forwarded = forwardProxyHeaders(source, {
+			fallbackApikey: 'anon-public-key'
+		});
+		expect(forwarded.get('mcp-session-id')).toBe('sess-1');
+		expect(forwarded.get('apikey')).toBe('anon-public-key');
+	});
 });
