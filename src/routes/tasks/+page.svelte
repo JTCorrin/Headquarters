@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
+	import { parseTaskEntityFilter } from '$lib/crm/entity-list-filter.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import TasksPage from '$lib/components/crm/tasks-page.svelte';
 
@@ -11,6 +12,7 @@
 	const auth = getAuthSession();
 
 	const initialEditTaskId = $derived(page.url.searchParams.get('edit'));
+	const entityFilter = $derived(parseTaskEntityFilter(page.url.searchParams));
 
 	async function handleLogout() {
 		await auth.signOut();
@@ -18,17 +20,26 @@
 		session.setMemberships([]);
 		void goto('/login');
 	}
+
+	function clearEntityFilter() {
+		const url = new URL(page.url);
+		url.searchParams.delete('entity_type');
+		url.searchParams.delete('entity_id');
+		void goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+	}
 </script>
 
 <TasksPage
 	{api}
 	{session}
 	{initialEditTaskId}
+	{entityFilter}
 	onMissingOrg={() => {
 		void goto('/select-org');
 	}}
 	onSwitchNavigate={() => {
 		// Stay on tasks; page reloads via cacheGeneration.
 	}}
+	onClearEntityFilter={clearEntityFilter}
 	onLogout={handleLogout}
 />

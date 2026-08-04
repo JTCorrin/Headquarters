@@ -590,6 +590,34 @@ describe('createApiV1Client', () => {
 						}
 					}
 				};
+			},
+			[`POST /api/v1/quotes/${QUOTE_ID}/send`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				return {
+					headers: { etag: '"2"' },
+					body: {
+						data: {
+							...sampleQuoteDocument,
+							version: 2,
+							status: 'sent',
+							sent_at: '2026-03-02T00:00:00Z'
+						}
+					}
+				};
+			},
+			[`POST /api/v1/quotes/${QUOTE_ID}/reject`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				return {
+					headers: { etag: '"3"' },
+					body: {
+						data: {
+							...sampleQuoteDocument,
+							version: 3,
+							status: 'rejected',
+							rejected_at: '2026-03-02T00:00:00Z'
+						}
+					}
+				};
 			}
 		});
 
@@ -609,6 +637,12 @@ describe('createApiV1Client', () => {
 			reason: 'opening'
 		});
 		expect(adjusted.stock_qty).toBe(5);
+
+		const sent = await client.quotes.send(QUOTE_ID, 1);
+		expect(sent.status).toBe('sent');
+
+		const rejected = await client.quotes.reject(QUOTE_ID, 2);
+		expect(rejected.status).toBe('rejected');
 
 		const accepted = await client.quotes.accept(QUOTE_ID, 2);
 		expect(accepted.status).toBe('accepted');
