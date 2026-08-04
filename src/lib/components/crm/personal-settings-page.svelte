@@ -8,7 +8,10 @@
 		MailboxFormData,
 		MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
-	import type { CalendarConnectionResource } from '$lib/schemas/calendar-connection.js';
+	import {
+		canMutateCalendarConnection,
+		type CalendarConnectionResource
+	} from '$lib/schemas/calendar-connection.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
@@ -90,6 +93,7 @@
 	] as const;
 
 	let activeTab = $state<(typeof tabs)[number]['id']>(initialTab());
+	const canEditCalendar = $derived(canMutateCalendarConnection(role));
 </script>
 
 <div
@@ -171,6 +175,7 @@
 								<ProfileCalendarForm
 									connection={calendarConnection}
 									connectError={calendarConnectError}
+									canEdit={canEditCalendar}
 									onConnect={onConnectCalendar}
 									onDisconnect={onDisconnectCalendar}
 								/>

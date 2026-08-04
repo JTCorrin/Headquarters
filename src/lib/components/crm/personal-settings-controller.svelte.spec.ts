@@ -160,19 +160,19 @@ describe('PersonalSettingsController', () => {
 				'GET /api/v1/me/calendar': async () => ({
 					body: {
 						data: {
-							provider: null,
+							provider: 'google',
 							status: 'disconnected',
 							credentials_configured: false,
-							config: null,
+							config: {},
 							last_error_code: null,
-							last_checked_at: null
+							last_sync_at: null
 						}
 					}
 				}),
 				'GET /api/v1/me/calendar/oauth/start': async () => {
 					oauthStarts += 1;
 					// Empty URL surfaces a readable error without navigating the browser.
-					return { body: { data: { authorize_url: '', state: 'test' } } };
+					return { body: { data: { url: '', state: 'test' } } };
 				}
 			}),
 			getOrgId: () => session.selectedOrgId
@@ -212,9 +212,11 @@ describe('PersonalSettingsController', () => {
 							provider: 'google',
 							status: 'active',
 							credentials_configured: true,
-							config: { email: 'joe@acme.test' },
+							config: { account_email: 'joe@acme.test', calendar_id: 'primary' },
+							account_email: 'joe@acme.test',
+							calendar_id: 'primary',
 							last_error_code: null,
-							last_checked_at: null
+							last_sync_at: null
 						}
 					}
 				})

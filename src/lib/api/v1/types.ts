@@ -1320,10 +1320,8 @@ export type ApiCalendarConnectionStatus =
 	| string;
 
 export interface ApiCalendarConnectionConfig {
-	/** Connected Google account email when known. */
-	email?: string | null;
-	/** Optional display label from provider. */
-	account_label?: string | null;
+	/** Connected Google account email when known (Cal-Sync-BE). */
+	account_email?: string | null;
 	/** Remote calendar id (default primary). */
 	calendar_id?: string | null;
 }
@@ -1332,14 +1330,17 @@ export interface ApiCalendarConnection {
 	provider: ApiCalendarProvider | null;
 	status: ApiCalendarConnectionStatus;
 	credentials_configured: boolean;
-	config: ApiCalendarConnectionConfig | null;
+	config: ApiCalendarConnectionConfig | Record<string, unknown> | null;
+	/** Top-level duplicate of config.account_email from Cal-Sync-BE. */
+	account_email?: string | null;
+	calendar_id?: string | null;
 	last_error_code?: string | null;
-	last_checked_at?: string | null;
+	last_sync_at?: string | null;
 }
 
-/** `GET /api/v1/me/calendar/oauth/start` — FE redirects to `authorize_url`. */
+/** `GET /api/v1/me/calendar/oauth/start` — FE redirects to `url` (Cal-Sync-BE). */
 export interface ApiCalendarOAuthStart {
-	authorize_url: string;
+	url: string;
 	state: string;
 }
 

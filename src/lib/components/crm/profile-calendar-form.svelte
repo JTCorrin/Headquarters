@@ -10,6 +10,8 @@
 	export interface ProfileCalendarFormProps {
 		connection?: CalendarConnectionResource | null;
 		connectError?: string | null;
+		/** False for readonly — status still visible. */
+		canEdit?: boolean;
 		class?: string;
 		onConnect?: () => boolean | void | Promise<boolean | void>;
 		onDisconnect?: () => boolean | void | Promise<boolean | void>;
@@ -18,6 +20,7 @@
 	let {
 		connection = null,
 		connectError = null,
+		canEdit = true,
 		class: className,
 		onConnect,
 		onDisconnect
@@ -90,26 +93,32 @@
 		</p>
 	{/if}
 
-	<div class="flex flex-wrap gap-2">
-		{#if connected}
-			<Button
-				type="button"
-				variant="outline"
-				disabled={busy}
-				data-testid="calendar-disconnect"
-				onclick={handleDisconnect}
-			>
-				{pendingDisconnect ? 'Disconnecting…' : 'Disconnect'}
-			</Button>
-		{:else}
-			<Button
-				type="button"
-				disabled={busy || !onConnect}
-				data-testid="calendar-connect"
-				onclick={handleConnect}
-			>
-				{pendingConnect ? 'Redirecting…' : 'Connect Google Calendar'}
-			</Button>
-		{/if}
-	</div>
+	{#if canEdit}
+		<div class="flex flex-wrap gap-2">
+			{#if connected}
+				<Button
+					type="button"
+					variant="outline"
+					disabled={busy}
+					data-testid="calendar-disconnect"
+					onclick={handleDisconnect}
+				>
+					{pendingDisconnect ? 'Disconnecting…' : 'Disconnect'}
+				</Button>
+			{:else}
+				<Button
+					type="button"
+					disabled={busy || !onConnect}
+					data-testid="calendar-connect"
+					onclick={handleConnect}
+				>
+					{pendingConnect ? 'Redirecting…' : 'Connect Google Calendar'}
+				</Button>
+			{/if}
+		</div>
+	{:else}
+		<p class="text-muted-foreground text-sm" data-testid="calendar-readonly-note">
+			Ask an owner, admin, or member to connect Google Calendar for push sync.
+		</p>
+	{/if}
 </div>
