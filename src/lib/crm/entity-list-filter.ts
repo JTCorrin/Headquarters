@@ -1,6 +1,6 @@
 import type { ApiMeetingRelatedEntityType, ApiTaskEntityType } from '$lib/api/v1/types.js';
 
-const TASK_ENTITY_TYPES = new Set<ApiTaskEntityType>(['contact', 'lead', 'client']);
+const TASK_ENTITY_TYPES = new Set<ApiTaskEntityType>(['contact', 'lead', 'client', 'project']);
 const MEETING_ENTITY_TYPES = new Set<ApiMeetingRelatedEntityType>([
 	'client',
 	'contact',

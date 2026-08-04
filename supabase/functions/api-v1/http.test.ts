@@ -891,6 +891,13 @@ Deno.test('task create validation defaults priority/status/source and rejects re
     () => validateTaskBody({ title: 'X', priority: 'urgent' }, false),
     ApiError,
   )
+  const withProject = validateTaskBody({
+    title: 'Project-linked task',
+    entity_type: 'project',
+    entity_id: '11111111-1111-4111-8111-111111111111',
+  }, false)
+  assertEquals(withProject.entity_type, 'project')
+  assertEquals(withProject.entity_id, '11111111-1111-4111-8111-111111111111')
   const patched = validateTaskBody({ status: 'blocked', blocked_reason: 'Waiting' }, true)
   assertEquals(patched.status, 'blocked')
   assertEquals(patched.blocked_reason, 'Waiting')
