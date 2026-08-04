@@ -68,6 +68,29 @@ describe('OrgApiKeysPage', () => {
 			.toHaveTextContent(/^crm_key_[0-9a-f]{32}$/);
 	});
 
+	it('shows a copy error when clipboard and fallback both fail', async () => {
+		vi.stubGlobal('isSecureContext', false);
+		vi.stubGlobal('navigator', {});
+		vi.spyOn(document, 'execCommand').mockReturnValue(false);
+
+		render(OrgApiKeysPage, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('API keys'),
+			role: 'owner',
+			keys,
+			revealedSecret: 'crm_key_' + 'cd'.repeat(16)
+		});
+
+		await page.getByTestId('org-api-keys-create').click();
+		await page.getByTestId('org-api-keys-copy-secret').click();
+		await expect
+			.element(page.getByTestId('org-api-keys-copy-error'))
+			.toHaveTextContent(/Could not copy/);
+
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	});
+
 	it('confirms before revoking a key', async () => {
 		const onRevoke = vi.fn(async () => true);
 		const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);

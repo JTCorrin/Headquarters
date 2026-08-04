@@ -14,6 +14,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { copyText, selectElementText } from '$lib/clipboard.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface OrgApiKeysCreateDrawerProps {
@@ -60,6 +61,7 @@
 	let pending = $state(false);
 	let localError = $state<string | null>(null);
 	let copied = $state(false);
+	let copyError = $state<string | null>(null);
 	const busy = $derived($submitting || pending);
 	const displayError = $derived(createError ?? localError);
 	const roleLabelText = $derived(apiKeyRoleLabel($formData.role));
@@ -71,6 +73,11 @@
 			formData.update((current) => ({ ...current, name: '', role: defaultRole }));
 			localError = null;
 			copied = false;
+			copyError = null;
+		}
+		if (open && revealedSecret) {
+			copied = false;
+			copyError = null;
 		}
 	});
 
@@ -100,18 +107,25 @@
 
 	async function copySecret() {
 		if (!revealedSecret) return;
-		try {
-			await navigator.clipboard.writeText(revealedSecret);
+		copyError = null;
+		const result = await copyText(revealedSecret);
+		if (result.ok) {
 			copied = true;
-		} catch {
-			copied = false;
+			return;
 		}
+		copied = false;
+		copyError = result.error;
+	}
+
+	function onSecretClick(event: MouseEvent & { currentTarget: EventTarget & HTMLElement }) {
+		selectElementText(event.currentTarget);
 	}
 
 	function closeAfterReveal() {
 		onDismissSecret?.();
 		open = false;
 		copied = false;
+		copyError = null;
 	}
 </script>
 
@@ -130,11 +144,21 @@
 			</Drawer.Header>
 			<div class="space-y-4 px-4 pb-6" data-testid="org-api-keys-secret-reveal">
 				<div class="bg-muted/60 rounded-3xl border px-3 py-3">
-					<code
-						class="text-foreground block break-all font-mono text-sm"
-						data-testid="org-api-keys-secret-value">{revealedSecret}</code
+					<button
+						type="button"
+						class="text-foreground block w-full cursor-text break-all text-left font-mono text-sm select-all"
+						data-testid="org-api-keys-secret-value"
+						title="Click to select"
+						onclick={onSecretClick}
 					>
+						{revealedSecret}
+					</button>
 				</div>
+				{#if copyError}
+					<p class="text-destructive text-sm" role="alert" data-testid="org-api-keys-copy-error">
+						{copyError}
+					</p>
+				{/if}
 				<div class="flex flex-wrap gap-2">
 					<Button type="button" data-testid="org-api-keys-copy-secret" onclick={copySecret}>
 						{copied ? 'Copied' : 'Copy secret'}
