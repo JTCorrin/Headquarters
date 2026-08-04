@@ -83,6 +83,19 @@ export function createMeetingColumns(handlers: MeetingColumnHandlers = {}): Colu
 			cell: ({ row }) => renderComponent(StatusBadge, { status: row.original.status })
 		},
 		{
+			id: 'calendarLink',
+			accessorFn: (row) => (row.calendarProvider ? 'Linked' : ''),
+			header: ({ column }) =>
+				renderComponent(DataTableSortHeader, {
+					label: 'Calendar',
+					onclick: column.getToggleSortingHandler()
+				}),
+			cell: ({ row }) =>
+				row.original.calendarProvider
+					? renderComponent(StatusBadge, { status: 'Linked' })
+					: '—'
+		},
+		{
 			id: 'actions',
 			enableHiding: false,
 			cell: ({ row }) =>

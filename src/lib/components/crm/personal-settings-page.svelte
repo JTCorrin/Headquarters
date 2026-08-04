@@ -8,6 +8,7 @@
 		MailboxFormData,
 		MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
+	import type { CalendarConnectionResource } from '$lib/schemas/calendar-connection.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
@@ -16,6 +17,7 @@
 	} from './resource-state-banner.svelte';
 	import ProfilePreferencesForm from './profile-preferences-form.svelte';
 	import ProfileMailboxForm from './profile-mailbox-form.svelte';
+	import ProfileCalendarForm from './profile-calendar-form.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface PersonalSettingsPageProps {
@@ -25,6 +27,8 @@
 		preferencesForm: SuperForm<ProfilePreferencesData>;
 		mailboxForm: SuperForm<MailboxFormData>;
 		mailboxAccount?: MailboxAccountResource | null;
+		calendarConnection?: CalendarConnectionResource | null;
+		calendarConnectError?: string | null;
 		viewState?: ResourceViewState;
 		class?: string;
 		showNav?: boolean;
@@ -42,6 +46,15 @@
 			| void
 			| Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
+		onConnectCalendar?: () => boolean | void | Promise<boolean | void>;
+		onDisconnectCalendar?: () => boolean | void | Promise<boolean | void>;
+	}
+
+	function initialTab(): 'theme' | 'mail' | 'calendar' {
+		if (!browser) return 'theme';
+		if (window.location.hash === '#mail') return 'mail';
+		if (window.location.hash === '#calendar') return 'calendar';
+		return 'theme';
 	}
 
 	let {
@@ -51,6 +64,8 @@
 		preferencesForm,
 		mailboxForm,
 		mailboxAccount = null,
+		calendarConnection = null,
+		calendarConnectError = null,
 		viewState = { kind: 'ready' },
 		class: className,
 		showNav = true,
@@ -59,7 +74,9 @@
 		onSaveMailbox,
 		onTestMailbox,
 		onSyncMailbox,
-		onDisconnectMailbox
+		onDisconnectMailbox,
+		onConnectCalendar,
+		onDisconnectCalendar
 	}: PersonalSettingsPageProps = $props();
 
 	const showContent = $derived(
@@ -68,12 +85,11 @@
 
 	const tabs = [
 		{ id: 'theme', label: 'Theme' },
-		{ id: 'mail', label: 'Mail' }
+		{ id: 'mail', label: 'Mail' },
+		{ id: 'calendar', label: 'Calendar' }
 	] as const;
 
-	let activeTab = $state<(typeof tabs)[number]['id']>(
-		browser && window.location.hash === '#mail' ? 'mail' : 'theme'
-	);
+	let activeTab = $state<(typeof tabs)[number]['id']>(initialTab());
 </script>
 
 <div
@@ -92,7 +108,7 @@
 			<PageHeader
 				breadcrumb="Organisation · Settings"
 				title="My settings"
-				description="Your personal theme and mailbox for this organisation. Organisation defaults and AI providers stay under Owner Config / Integrations."
+				description="Your personal theme, mailbox, and Google Calendar for this organisation. Organisation defaults and AI providers stay under Owner Config / Integrations."
 			>
 				{#snippet actions()}
 					<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
@@ -137,6 +153,26 @@
 									onTest={onTestMailbox}
 									onSync={onSyncMailbox}
 									onDisconnect={onDisconnectMailbox}
+								/>
+							</section>
+						{:else if active === 'calendar'}
+							<section
+								class="space-y-4 scroll-mt-6"
+								id="calendar"
+								data-testid="personal-calendar-section"
+							>
+								<div>
+									<h2 class="text-lg font-semibold tracking-tight">Calendar</h2>
+									<p class="text-muted-foreground text-sm">
+										Connect your personal Google Calendar for this organisation membership. Push
+										is one-way from Headquarters meetings.
+									</p>
+								</div>
+								<ProfileCalendarForm
+									connection={calendarConnection}
+									connectError={calendarConnectError}
+									onConnect={onConnectCalendar}
+									onDisconnect={onDisconnectCalendar}
 								/>
 							</section>
 						{/if}

@@ -107,6 +107,16 @@
 		if (meeting.meeting_url?.trim()) {
 			fields.push({ label: 'Meeting URL', value: meeting.meeting_url.trim() });
 		}
+		if (meeting.calendar_provider?.trim()) {
+			const provider = meeting.calendar_provider.trim();
+			const label =
+				provider.toLowerCase() === 'google'
+					? 'Google'
+					: provider.toLowerCase() === 'microsoft'
+						? 'Microsoft'
+						: provider;
+			fields.push({ label: 'Calendar', value: `Linked · ${label}` });
+		}
 		fields.push({ label: 'Related', value: relatedTo });
 		return fields;
 	});
