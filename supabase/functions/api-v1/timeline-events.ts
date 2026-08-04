@@ -298,17 +298,33 @@ async function listTimelineEvents(
   )
 }
 
+export type TimelineActorContext = {
+  actorType: 'user' | 'api_key'
+  apiKeyId?: string | null
+}
+
 async function createTimelineNote(
   req: Request,
   db: DatabaseClient,
   orgId: string,
   entityType: TimelineEntityType,
   entityId: string,
-  _userId: string,
+  userId: string | null,
   requestId: string,
+  actor?: TimelineActorContext,
 ): Promise<Response> {
   const draft = validateTimelineNoteBody(await jsonBody(req))
-  const { data, error } = await db.rpc('create_timeline_event', {
+  const rpcArgs: {
+    p_org_id: string
+    p_entity_type: string
+    p_entity_id: string
+    p_kind: string
+    p_title: string
+    p_body: string | null
+    p_payload: Json
+    p_actor_type?: string
+    p_actor_id?: string
+  } = {
     p_org_id: orgId,
     p_entity_type: entityType,
     p_entity_id: entityId,
@@ -316,7 +332,23 @@ async function createTimelineNote(
     p_title: draft.title,
     p_body: draft.body,
     p_payload: draft.payload,
-  })
+  }
+
+  if (actor?.actorType === 'api_key') {
+    if (!actor.apiKeyId) {
+      throw new ApiError(403, 'FORBIDDEN', 'API key identity is required for timeline writes')
+    }
+    rpcArgs.p_actor_type = 'api_key'
+    rpcArgs.p_actor_id = actor.apiKeyId
+  } else if (!userId) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'This route requires a user-backed actor (JWT or API key with created_by)',
+    )
+  }
+
+  const { data, error } = await db.rpc('create_timeline_event', rpcArgs)
 
   if (error) throw databaseError(error, requestId)
   if (!data) {
@@ -340,8 +372,9 @@ export async function handleTimelineEvents(
   path: string,
   orgId: string,
   role: MembershipRole,
-  userId: string,
+  userId: string | null,
   requestId: string,
+  actor?: TimelineActorContext,
 ): Promise<Response> {
   const match = path.match(
     /^\/api\/v1\/entities\/([a-z]+)\/([0-9a-f-]{36})\/timeline-events$/i,
@@ -375,6 +408,7 @@ export async function handleTimelineEvents(
       entityId,
       userId,
       requestId,
+      actor,
     )
   }
 
