@@ -6,9 +6,31 @@
 import { createClient } from '@supabase/supabase-js'
 import { runMailboxSyncCycle } from '../api-v1/email-messages.ts'
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder()
+  const bufA = encoder.encode(a)
+  const bufB = encoder.encode(b)
+  if (bufA.byteLength !== bufB.byteLength) return false
+  let diff = 0
+  for (let i = 0; i < bufA.byteLength; i++) diff |= bufA[i] ^ bufB[i]
+  return diff === 0
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'METHOD_NOT_ALLOWED' }), { status: 405 })
+  }
+
+  // verify_jwt=false for this function, so fail closed unless the internal
+  // cron secret is configured and supplied by the caller.
+  const expectedSecret = Deno.env.get('MAILBOX_SYNC_SECRET')
+  if (!expectedSecret) {
+    console.error('MAILBOX_SYNC_SECRET is not configured; refusing to run')
+    return new Response(JSON.stringify({ error: 'SERVICE_UNAVAILABLE' }), { status: 503 })
+  }
+  const suppliedSecret = req.headers.get('x-mailbox-sync-secret') ?? ''
+  if (!timingSafeEqual(suppliedSecret, expectedSecret)) {
+    return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), { status: 401 })
   }
 
   const url = Deno.env.get('SUPABASE_URL')

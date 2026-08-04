@@ -102,6 +102,11 @@ function validateAllocations(value: unknown): AllocationInput[] {
       allocations: 'Must be an array',
     })
   }
+  if (value.length > 200) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Payment validation failed', {
+      allocations: 'Must not exceed 200 items',
+    })
+  }
   return value.map((raw, index) => {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       throw new ApiError(422, 'VALIDATION_ERROR', 'Payment validation failed', {
@@ -291,6 +296,10 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
   if ('metadata' in body) {
     if (!body.metadata || typeof body.metadata !== 'object' || Array.isArray(body.metadata)) {
       fields.metadata = 'Must be an object'
+    } else if (
+      new TextEncoder().encode(JSON.stringify(body.metadata)).byteLength > 16_384
+    ) {
+      fields.metadata = 'Must not exceed 16 KiB'
     } else {
       metadata = body.metadata as Record<string, unknown>
     }
@@ -398,17 +407,13 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.code === '55000') {
     return new ApiError(409, 'CONFLICT', 'An identical request is already in progress')
   }
-  if (
-    error.code === '23503' ||
-    error.code === '23514' ||
-    error.code === '22023' ||
-    error.code === '22003'
-  ) {
-    return new ApiError(
-      422,
-      'VALIDATION_ERROR',
-      error.message || 'The payment failed a database constraint',
-    )
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Payment validation failed')
+  }
+  if (error.code === '23503' || error.code === '23514' || error.code === '22003') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
+    return new ApiError(422, 'VALIDATION_ERROR', 'The payment failed a database constraint')
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')

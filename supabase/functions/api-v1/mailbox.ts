@@ -150,7 +150,12 @@ export function validateMailboxBody(body: Record<string, unknown>): MailboxUpser
   if (!SECURITY.has(smtpSecurity)) fields.smtp_security = 'Must be tls, starttls, or none'
 
   const username = typeof body.username === 'string' ? body.username.trim() : ''
-  if (!username || username.length > 320) fields.username = 'Must be 1–320 characters'
+  if (!username || username.length > 320) {
+    fields.username = 'Must be 1–320 characters'
+  } else if (/[\x00-\x1f\x7f]/.test(username)) {
+    // Control characters (esp. CR/LF) could be injected into IMAP protocol lines.
+    fields.username = 'Must not contain control characters'
+  }
 
   let password: string | null = null
   if ('password' in body) {
@@ -161,6 +166,8 @@ export function validateMailboxBody(body: Record<string, unknown>): MailboxUpser
         fields.password = 'Password cannot be empty; omit to keep existing'
       } else if (body.password.length > 512) {
         fields.password = 'Must be at most 512 characters'
+      } else if (/[\x00-\x1f\x7f]/.test(body.password)) {
+        fields.password = 'Must not contain control characters'
       } else {
         password = body.password
       }
@@ -200,6 +207,8 @@ export function validateMailboxTestBody(
       fields.password = 'Must be a non-empty string when provided'
     } else if (body.password.length > 512) {
       fields.password = 'Must be at most 512 characters'
+    } else if (/[\x00-\x1f\x7f]/.test(body.password)) {
+      fields.password = 'Must not contain control characters'
     } else {
       password = body.password
     }
@@ -477,6 +486,7 @@ export async function listEntityEmailMessages(
   entityType: 'contact' | 'lead' | 'client',
   entityId: string,
   requestId: string,
+  limit = 50,
 ): Promise<Response> {
   // Wave B: entity existence check + ownership/share list RPC.
   let exists: { id: string } | null = null
@@ -519,7 +529,7 @@ export async function listEntityEmailMessages(
     p_org_id: orgId,
     p_entity_type: entityType,
     p_entity_id: entityId,
-    p_limit: 50,
+    p_limit: limit,
   })
   if (error) {
     console.error('Entity email list failed', {
