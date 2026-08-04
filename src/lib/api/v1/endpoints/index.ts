@@ -10,6 +10,7 @@ export { createInvoicesEndpoints } from './invoices.js';
 export { createIntegrationsEndpoints } from './integrations.js';
 export { createLeadsEndpoints } from './leads.js';
 export { createMailboxEndpoints } from './mailbox.js';
+export { createCalendarEndpoints } from './calendar.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
 export { createPaymentsEndpoints } from './payments.js';
@@ -34,6 +35,7 @@ export type {
 	InvoicesEndpoints,
 	LeadsEndpoints,
 	MailboxEndpoints,
+	CalendarEndpoints,
 	MeetingsEndpoints,
 	ProjectsEndpoints,
 	OrganisationConfigEndpoints,

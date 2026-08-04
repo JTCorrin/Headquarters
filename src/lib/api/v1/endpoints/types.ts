@@ -92,6 +92,8 @@ import type {
 	ApiProjectDocument,
 	ApiProjectListParams,
 	ApiProjectUpdateBody,
+	ApiCalendarConnection,
+	ApiCalendarOAuthStart,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
@@ -557,6 +559,13 @@ export interface MailboxEndpoints {
 	put(body: ApiMailboxPutBody, signal?: AbortSignal): Promise<ApiMailboxAccount>;
 	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
 	sync(signal?: AbortSignal): Promise<ApiMailboxSyncResult>;
+	disconnect(signal?: AbortSignal): Promise<void>;
+}
+
+/** Personal Google Calendar — mailbox-shaped; never echoes tokens. */
+export interface CalendarEndpoints {
+	get(signal?: AbortSignal): Promise<ApiCalendarConnection>;
+	startOAuth(signal?: AbortSignal): Promise<ApiCalendarOAuthStart>;
 	disconnect(signal?: AbortSignal): Promise<void>;
 }
 
