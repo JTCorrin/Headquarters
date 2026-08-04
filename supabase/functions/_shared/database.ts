@@ -938,6 +938,27 @@ export type MailboxAccountRow = {
   consecutive_auth_failures: number
 }
 
+/** Public SELECT shape — secret_ref intentionally omitted. */
+export type CalendarConnectionRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  membership_id: string
+  provider: 'google'
+  external_account_id: string | null
+  calendar_id: string
+  account_email: string | null
+  status: 'pending' | 'active' | 'error' | 'disabled'
+  last_sync_at: string | null
+  last_error_code: string | null
+  credentials_updated_at: string | null
+}
+
 export type IntegrationRow = {
   id: string
   org_id: string
@@ -1427,6 +1448,12 @@ export type Database = {
         Row: MailboxAccountRow
         Insert: Partial<MailboxAccountRow>
         Update: Partial<MailboxAccountRow>
+        Relationships: []
+      }
+      calendar_connections: {
+        Row: CalendarConnectionRow
+        Insert: Partial<CalendarConnectionRow>
+        Update: Partial<CalendarConnectionRow>
         Relationships: []
       }
       integrations: {
@@ -2166,6 +2193,40 @@ export type Database = {
       reap_expired_document_uploads: {
         Args: Record<string, never>
         Returns: Json
+      }
+      get_calendar_connection: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      create_calendar_oauth_state: {
+        Args: { p_org_id: string; p_state: string; p_ttl_seconds?: number }
+        Returns: undefined
+      }
+      consume_calendar_oauth_state: {
+        Args: { p_org_id: string; p_state: string }
+        Returns: Json
+      }
+      upsert_calendar_connection_tokens: {
+        Args: {
+          p_org_id: string
+          p_token_blob: string
+          p_account_email?: string | null
+          p_external_account_id?: string | null
+          p_calendar_id?: string | null
+        }
+        Returns: Json
+      }
+      disconnect_calendar_connection: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      read_calendar_connection_credentials: {
+        Args: { p_connection_id: string }
+        Returns: Json
+      }
+      set_calendar_connection_error: {
+        Args: { p_connection_id: string; p_error_code: string | null }
+        Returns: undefined
       }
       get_mailbox_account: {
         Args: { p_org_id: string }

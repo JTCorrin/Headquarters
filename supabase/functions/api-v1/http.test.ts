@@ -35,7 +35,14 @@ import { billLifecycleIdempotencyPayload, validateBillBody } from './bills.ts'
 import { quoteAcceptIdempotencyPayload } from './quotes.ts'
 import { validateVendorBankDetailsBody, validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
+import { calendarPayloadHasForbiddenSecretKey, validateOAuthCallbackParams } from './calendar.ts'
 import { decodeMeetingCursor, parseMeetingListRange, validateMeetingBody } from './meetings.ts'
+import {
+  buildGoogleAuthUrl,
+  createStubGoogleCalendarClient,
+  isCalendarSyncStubMode,
+  parseTokenBlob,
+} from '../_shared/google-calendar.ts'
 import {
   decodeProjectCursor,
   parseProjectStatusFilter,
@@ -1273,6 +1280,84 @@ Deno.test('secret-echo guard treats auth_mode api_key value as safe, keys as for
   assertEquals(payloadHasForbiddenSecretKey({ api_key: 'sk-leaked' }), true)
   assertEquals(payloadHasForbiddenSecretKey({ secret_ref: 'x' }), true)
   assertEquals(payloadHasForbiddenSecretKey({ password: 'x' }), true)
+})
+
+Deno.test('meeting PATCH rejects calendar_provider and external_event_id as not writable', () => {
+  assertThrows(
+    () => validateMeetingBody({ calendar_provider: 'google' }, true),
+    ApiError,
+  )
+  assertThrows(
+    () => validateMeetingBody({ external_event_id: 'evt-1' }, true),
+    ApiError,
+  )
+  try {
+    validateMeetingBody({ calendar_provider: 'google', external_event_id: 'evt-1' }, true)
+    throw new Error('expected validation error')
+  } catch (err) {
+    assertEquals(err instanceof ApiError, true)
+    const fields = (err as ApiError).fields ?? {}
+    assertEquals(fields.calendar_provider, 'Field is not writable')
+    assertEquals(fields.external_event_id, 'Field is not writable')
+  }
+})
+
+Deno.test('calendar OAuth callback params require code and state', () => {
+  assertEquals(
+    validateOAuthCallbackParams({ code: 'abc', state: '1234567890abcdef' }),
+    { code: 'abc', state: '1234567890abcdef' },
+  )
+  assertThrows(
+    () => validateOAuthCallbackParams({ code: null, state: '1234567890abcdef' }),
+    ApiError,
+  )
+  assertThrows(() => validateOAuthCallbackParams({ code: 'abc', state: 'short' }), ApiError)
+})
+
+Deno.test('calendar secret-echo guard forbids token keys', () => {
+  assertEquals(
+    calendarPayloadHasForbiddenSecretKey({
+      provider: 'google',
+      credentials_configured: true,
+      config: { account_email: 'a@example.test' },
+    }),
+    false,
+  )
+  assertEquals(calendarPayloadHasForbiddenSecretKey({ refresh_token: 'x' }), true)
+  assertEquals(calendarPayloadHasForbiddenSecretKey({ access_token: 'x' }), true)
+  assertEquals(calendarPayloadHasForbiddenSecretKey({ token_blob: 'x' }), true)
+  assertEquals(calendarPayloadHasForbiddenSecretKey({ secret_ref: 'x' }), true)
+})
+
+Deno.test('google calendar stub client and auth url helpers', async () => {
+  const client = createStubGoogleCalendarClient('meeting-1')
+  const created = await client.insertEvent('primary', {
+    title: 'Sync',
+    starts_at: '2026-08-10T10:00:00.000Z',
+    ends_at: '2026-08-10T11:00:00.000Z',
+    timezone: 'UTC',
+  })
+  assertEquals(created.id, 'stub-meeting-1')
+  const patched = await client.patchEvent('primary', created.id, {
+    title: 'Sync 2',
+    starts_at: '2026-08-10T10:00:00.000Z',
+    ends_at: '2026-08-10T11:00:00.000Z',
+    timezone: 'UTC',
+  })
+  assertEquals(patched.id, 'stub-meeting-1')
+  await client.deleteEvent('primary', created.id)
+
+  const url = buildGoogleAuthUrl({
+    clientId: 'cid',
+    redirectUri: 'https://example.test/callback',
+    state: 'state-token-abcdefgh',
+  })
+  assertEquals(url.includes('accounts.google.com'), true)
+  assertEquals(url.includes('state=state-token-abcdefgh'), true)
+  assertEquals(parseTokenBlob('{"stub":true,"refresh_token":"r"}').stub, true)
+  assertEquals(parseTokenBlob('raw-refresh').refresh_token, 'raw-refresh')
+  assertEquals(isCalendarSyncStubMode(() => '1'), true)
+  assertEquals(isCalendarSyncStubMode(() => undefined), false)
 })
 
 Deno.test('email share validation requires entity_type and entity_id UUID', () => {

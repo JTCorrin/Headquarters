@@ -16,6 +16,7 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
+import { cancelMeetingOnGoogle, pushMeetingToGoogle } from './calendar-push.ts'
 
 const MEETING_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,title,status,starts_at,ends_at,timezone,location,meeting_url,organiser_membership_id,related_entity_type,related_entity_id,calendar_provider,external_event_id,transcript_status,summary_status,summary,metadata'
@@ -1271,6 +1272,7 @@ async function createMeeting(
   db: DatabaseMeeting,
   orgId: string,
   requestId: string,
+  membershipId: string,
 ): Promise<Response> {
   const body = await jsonBody(req)
   const payload = validateMeetingBody(body, false)
@@ -1296,10 +1298,11 @@ async function createMeeting(
     nested = await replaceAttendees(db, orgId, data.id, attendees, requestId)
   }
 
-  const host = await hostMeeting(db, orgId, data, requestId, nested)
+  const synced = await pushMeetingToGoogle(db, orgId, membershipId, data, requestId)
+  const host = await hostMeeting(db, orgId, synced, requestId, nested)
   return jsonResponse({ data: host }, 201, requestId, {
-    etag: etag(data.version),
-    location: `/api/v1/meetings/${data.id}`,
+    etag: etag(synced.version),
+    location: `/api/v1/meetings/${synced.id}`,
   })
 }
 
@@ -1339,6 +1342,7 @@ async function updateMeeting(
   orgId: string,
   meetingId: string,
   requestId: string,
+  membershipId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
   const current = await findMeeting(db, orgId, meetingId, requestId)
@@ -1396,8 +1400,9 @@ async function updateMeeting(
     nested = await replaceAttendees(db, orgId, meetingId, attendees, requestId)
   }
 
-  const host = await hostMeeting(db, orgId, data, requestId, nested)
-  return jsonResponse({ data: host }, 200, requestId, { etag: etag(data.version) })
+  const synced = await pushMeetingToGoogle(db, orgId, membershipId, data, requestId)
+  const host = await hostMeeting(db, orgId, synced, requestId, nested)
+  return jsonResponse({ data: host }, 200, requestId, { etag: etag(synced.version) })
 }
 
 async function deleteMeeting(
@@ -1406,8 +1411,10 @@ async function deleteMeeting(
   orgId: string,
   meetingId: string,
   requestId: string,
+  membershipId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
+  const current = await findMeeting(db, orgId, meetingId, requestId)
   const { error } = await db.rpc('soft_delete_meeting', {
     p_meeting_id: meetingId,
     p_org_id: orgId,
@@ -1415,6 +1422,8 @@ async function deleteMeeting(
   })
 
   if (error) throw databaseError(error, requestId)
+
+  await cancelMeetingOnGoogle(db, orgId, membershipId, current, requestId)
 
   return new Response(null, {
     status: 204,
@@ -1430,10 +1439,11 @@ export function handleMeetings(
   _role: MembershipRole,
   requestId: string,
   userId: string,
+  membershipId: string,
 ): Promise<Response> {
   if (path === '/api/v1/meetings') {
     if (req.method === 'GET') return listMeetings(req, db, orgId, requestId)
-    if (req.method === 'POST') return createMeeting(req, db, orgId, requestId)
+    if (req.method === 'POST') return createMeeting(req, db, orgId, requestId, membershipId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for meetings')
   }
 
@@ -1488,7 +1498,11 @@ export function handleMeetings(
 
   const meetingId = itemMatch[1]
   if (req.method === 'GET') return getMeeting(db, orgId, meetingId, requestId)
-  if (req.method === 'PATCH') return updateMeeting(req, db, orgId, meetingId, requestId)
-  if (req.method === 'DELETE') return deleteMeeting(req, db, orgId, meetingId, requestId)
+  if (req.method === 'PATCH') {
+    return updateMeeting(req, db, orgId, meetingId, requestId, membershipId)
+  }
+  if (req.method === 'DELETE') {
+    return deleteMeeting(req, db, orgId, meetingId, requestId, membershipId)
+  }
   throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for meeting')
 }
