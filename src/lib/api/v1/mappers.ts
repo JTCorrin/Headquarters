@@ -1057,15 +1057,21 @@ export function toCalendarConnectionResource(
 	connection: ApiCalendarConnection | null | undefined
 ): CalendarConnectionResource {
 	if (!connection) return emptyCalendarConnection();
-	const email = connection.config?.email?.trim() || null;
-	const label = connection.config?.account_label?.trim() || null;
+	const config = (connection.config ?? {}) as {
+		account_email?: string | null;
+		calendar_id?: string | null;
+	};
+	const email =
+		connection.account_email?.trim() ||
+		config.account_email?.trim() ||
+		null;
 	return {
-		provider: connection.provider === 'google' ? 'google' : null,
+		provider: 'google',
 		credentials_configured: Boolean(connection.credentials_configured),
 		status: mapCalendarConnectionStatus(connection.status),
-		account_label: label || email,
+		account_label: email,
 		last_error_code: connection.last_error_code ?? null,
-		last_checked_at: connection.last_checked_at ?? null
+		last_checked_at: connection.last_sync_at ?? null
 	};
 }
 

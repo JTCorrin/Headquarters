@@ -41,6 +41,7 @@
 		type MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
 	import {
+		canMutateCalendarConnection,
 		emptyCalendarConnection,
 		type CalendarConnectionResource
 	} from '$lib/schemas/calendar-connection.js';
@@ -391,15 +392,20 @@
 	async function onConnectCalendar() {
 		const epoch = captureEpoch();
 		calendarConnectError = null;
+		if (!canMutateCalendarConnection(role)) {
+			calendarConnectError = 'Readonly members cannot connect Google Calendar.';
+			return false;
+		}
 		try {
 			const start = await api.calendar.startOAuth();
 			if (isStale(epoch)) return false;
-			if (!start?.authorize_url?.trim()) {
+			const redirectUrl = start?.url?.trim() ?? '';
+			if (!redirectUrl) {
 				calendarConnectError = 'Calendar OAuth start did not return a redirect URL.';
 				return false;
 			}
 			if (browser) {
-				window.location.assign(start.authorize_url);
+				window.location.assign(redirectUrl);
 			}
 			return true;
 		} catch (error) {

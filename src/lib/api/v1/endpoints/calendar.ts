@@ -4,12 +4,14 @@ import type { CalendarEndpoints } from './types.js';
 
 function disconnectedConnection(): ApiCalendarConnection {
 	return {
-		provider: null,
+		provider: 'google',
 		status: 'disconnected',
 		credentials_configured: false,
-		config: null,
+		config: {},
+		account_email: null,
+		calendar_id: 'primary',
 		last_error_code: null,
-		last_checked_at: null
+		last_sync_at: null
 	};
 }
 
