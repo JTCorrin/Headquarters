@@ -1535,6 +1535,22 @@ export type Database = {
         }
         Returns: Json
       }
+      send_quote: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_quote_id: string
+        }
+        Returns: Json
+      }
+      reject_quote: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_quote_id: string
+        }
+        Returns: Json
+      }
       create_invoice_draft: {
         Args: {
           p_lines?: Json

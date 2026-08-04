@@ -1115,6 +1115,20 @@ async function listMeetings(
     throw new ApiError(400, 'BAD_REQUEST', 'upcoming must be true or false')
   }
 
+  const entityType = url.searchParams.get('entity_type')
+  const entityId = url.searchParams.get('entity_id')
+  if ((entityType === null) !== (entityId === null)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'entity_type and entity_id must be provided together', {
+      entity_type: 'Required with entity_id',
+      entity_id: 'Required with entity_type',
+    })
+  }
+  if (entityType !== null && !RELATED_ENTITY_TYPES.has(entityType)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'entity_type is invalid', {
+      entity_type: 'Must be client, contact, lead, or project',
+    })
+  }
+
   let query = db
     .from('meetings')
     .select(MEETING_SELECT)
@@ -1124,6 +1138,11 @@ async function listMeetings(
 
   if (status) {
     query = query.eq('status', status as MeetingStatus)
+  }
+  if (entityType !== null && entityId !== null) {
+    query = query
+      .eq('related_entity_type', entityType as RelatedEntityType)
+      .eq('related_entity_id', parseUuid(entityId, 'entity_id'))
   }
 
   if (upcoming) {
