@@ -1,8 +1,13 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { goto } from '$app/navigation';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
+		assigneeOptionsFromMemberships,
+		emptyTaskFormData,
 		isTaskDueBeforeToday,
 		membershipFromCreateResult,
 		roleFromMemberships,
@@ -11,13 +16,18 @@
 		toMeetingListItem,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
+		toTaskCreateBody,
 		toTaskListItem
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiOrganisationMembership } from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import type { TaskListItem } from '$lib/schemas/task.js';
+	import {
+		taskFormSchema,
+		type TaskAssigneeOption,
+		type TaskListItem
+	} from '$lib/schemas/task.js';
 	import type { MeetingListItem } from '$lib/schemas/meeting.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -50,10 +60,20 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let tasks = $state<TaskListItem[]>([]);
 	let upcomingMeetingItems = $state<MeetingListItem[]>([]);
+	let assigneeOptions = $state<TaskAssigneeOption[]>([]);
 	let currentMembershipId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let drawerOpen = $state(false);
+
+	const taskForm = superForm(defaults(emptyTaskFormData(), zod4(taskFormSchema)), {
+		validators: zod4(taskFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -148,13 +168,27 @@
 	function resetOrgScopedState() {
 		tasks = [];
 		upcomingMeetingItems = [];
+		assigneeOptions = [];
 		currentMembershipId = null;
+		drawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
 
-	function syncMembershipId(rows: ApiOrganisationMembership[]) {
+	function syncAssigneeContext(rows: ApiOrganisationMembership[]) {
+		assigneeOptions = assigneeOptionsFromMemberships(rows, session.selectedOrgId);
 		const current = rows.find((row) => row.organisation.id === session.selectedOrgId);
 		currentMembershipId = current?.membership.id ?? null;
+	}
+
+	function listItemOptions() {
+		return {
+			currentMembershipId,
+			assigneeOptions
+		};
+	}
+
+	function resetCreateForm() {
+		taskForm.form.set(emptyTaskFormData());
 	}
 
 	async function loadAll() {
@@ -175,14 +209,12 @@
 			if (session.memberships.length === 0) {
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
-			syncMembershipId(membershipRows);
+			syncAssigneeContext(membershipRows);
 
 			const listed = await api.tasks.list({ limit: 50, assignee: 'me' });
 			if (isStale(epoch)) return;
 
-			tasks = listed.data.map((task) =>
-				toTaskListItem(task, { currentMembershipId })
-			);
+			tasks = listed.data.map((task) => toTaskListItem(task, listItemOptions()));
 
 			try {
 				const upcoming = await api.meetings.list({ limit: 5, upcoming: true });
@@ -217,7 +249,7 @@
 			const updated = await api.tasks.update(id, { status: nextStatus }, existing.version);
 			if (isStale(epoch)) return;
 			tasks = tasks.map((row) =>
-				row.id === id ? toTaskListItem(updated, { currentMembershipId }) : row
+				row.id === id ? toTaskListItem(updated, listItemOptions()) : row
 			);
 			if (viewState.kind !== 'ready') viewState = { kind: 'ready' };
 		} catch (error) {
@@ -233,6 +265,27 @@
 				kind: 'validation',
 				message: userMessage(error, 'Could not update task — try again.')
 			};
+		}
+	}
+
+	async function onCreateTask(): Promise<boolean> {
+		const epoch = captureEpoch();
+		try {
+			const created = await api.tasks.create(toTaskCreateBody(get(taskForm.form)));
+			if (isStale(epoch)) return false;
+			tasks = [toTaskListItem(created, listItemOptions()), ...tasks];
+			viewState = { kind: 'ready' };
+			resetCreateForm();
+			drawerOpen = false;
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not create task — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
 		}
 	}
 
@@ -301,6 +354,10 @@
 						{attentionItems}
 						{upcomingMeetings}
 						{recentActivity}
+						form={taskForm}
+						{assigneeOptions}
+						bind:drawerOpen
+						onValidSubmit={onCreateTask}
 						{onToggleTask}
 						{onSelectTask}
 						showNav={false}

@@ -1,10 +1,13 @@
 <script lang="ts">
+	import type { SuperForm } from 'sveltekit-superforms';
+	import type { TaskAssigneeOption, TaskFormData } from '$lib/schemas/task.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import StatCard from './stat-card.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import MyTasksPanel, { type DashboardTask } from './my-tasks-panel.svelte';
 	import StatusBadge from './status-badge.svelte';
+	import TaskFormDrawer from './task-form-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
@@ -38,8 +41,13 @@
 		attentionItems?: DashboardAttentionItem[];
 		upcomingMeetings?: DashboardMeeting[];
 		recentActivity: TimelineEvent[];
+		/** Same create form as `/tasks` — when set, New task opens TaskFormDrawer. */
+		form?: SuperForm<TaskFormData>;
+		assigneeOptions?: TaskAssigneeOption[];
+		drawerOpen?: boolean;
 		onToggleTask?: (id: string) => void;
 		onSelectTask?: (id: string) => void;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -53,8 +61,12 @@
 		attentionItems = [],
 		upcomingMeetings = [],
 		recentActivity,
+		form,
+		assigneeOptions = [],
+		drawerOpen = $bindable(false),
 		onToggleTask,
 		onSelectTask,
+		onValidSubmit,
 		showNav = true,
 		class: className
 	}: DashboardPageProps = $props();
@@ -79,7 +91,16 @@
 				description="Your pulse for the day — tasks, money that needs a nudge, and what’s coming up."
 			>
 				{#snippet actions()}
-					<Button size="sm" href="/tasks">New task</Button>
+					{#if form}
+						<TaskFormDrawer
+							bind:open={drawerOpen}
+							{form}
+							{assigneeOptions}
+							{onValidSubmit}
+						/>
+					{:else}
+						<Button size="sm" href="/tasks">New task</Button>
+					{/if}
 				{/snippet}
 			</PageHeader>
 
