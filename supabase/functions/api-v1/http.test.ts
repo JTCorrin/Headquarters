@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { isOrgApiKeySecret, sha256Hex, validateApiKeyCreateBody } from './api-keys.ts'
+import { listMcpTools, parseJsonRpcRequest } from './mcp.ts'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
 import {
@@ -1711,4 +1712,30 @@ Deno.test('API key secret shape and create body validation', async () => {
     () => validateApiKeyCreateBody({ name: 'X', expires_at: '2000-01-01T00:00:00.000Z' }),
     ApiError,
   )
+})
+
+Deno.test('MCP tools/list catalog covers MVP surface', () => {
+  const names = listMcpTools().map((tool) => tool.name).sort()
+  assertEquals(names, [
+    'add_timeline_note',
+    'create_task',
+    'get_client',
+    'get_contact',
+    'get_lead',
+    'get_task',
+    'list_clients',
+    'list_contacts',
+    'list_leads',
+    'list_tasks',
+    'update_task',
+  ])
+})
+
+Deno.test('MCP JSON-RPC parse rejects non-objects and bad jsonrpc', () => {
+  assertEquals(
+    parseJsonRpcRequest({ jsonrpc: '2.0', method: 'tools/list', id: 1 }).method,
+    'tools/list',
+  )
+  assertThrows(() => parseJsonRpcRequest([]), ApiError)
+  assertThrows(() => parseJsonRpcRequest({ jsonrpc: '1.0', method: 'ping' }), ApiError)
 })
