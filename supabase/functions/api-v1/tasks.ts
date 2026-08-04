@@ -466,11 +466,49 @@ async function listTasks(
   )
 }
 
+export type TaskActorContext = {
+  actorType: 'user' | 'api_key'
+  apiKeyId?: string | null
+}
+
+async function maybeAuditApiKeyTask(
+  db: DatabaseTask,
+  orgId: string,
+  action: string,
+  taskId: string,
+  afterData: unknown,
+  requestId: string,
+  actor?: TaskActorContext,
+): Promise<void> {
+  if (!actor || actor.actorType !== 'api_key' || !actor.apiKeyId) return
+  const requestUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      .test(requestId)
+    ? requestId
+    : null
+  const { error } = await db.rpc('append_audit_event_for_api_key', {
+    p_org_id: orgId,
+    p_api_key_id: actor.apiKeyId,
+    p_action: action,
+    p_resource_type: 'task',
+    p_resource_id: taskId,
+    p_request_id: requestUuid,
+    p_after_data: afterData as never,
+    p_metadata: { source: 'api_v1' },
+  })
+  if (error) {
+    console.error('Task API-key audit failed', {
+      request_id: requestId,
+      code: error.code,
+    })
+  }
+}
+
 async function createTask(
   req: Request,
   db: DatabaseTask,
   orgId: string,
   requestId: string,
+  actor?: TaskActorContext,
 ): Promise<Response> {
   const payload = applyStatusTimestamps(
     validateTaskBody(await jsonBody(req), false),
@@ -482,6 +520,16 @@ async function createTask(
     .single()
 
   if (error) throw databaseError(error, requestId)
+
+  await maybeAuditApiKeyTask(
+    db,
+    orgId,
+    'task.created',
+    data.id,
+    data,
+    requestId,
+    actor,
+  )
 
   return jsonResponse({ data }, 201, requestId, {
     etag: etag(data.version),
@@ -524,6 +572,7 @@ async function updateTask(
   orgId: string,
   taskId: string,
   requestId: string,
+  actor?: TaskActorContext,
 ): Promise<Response> {
   const version = parseVersion(req)
   const current = await findTask(db, orgId, taskId, requestId)
@@ -549,6 +598,16 @@ async function updateTask(
   if (!data) {
     throw new ApiError(412, 'PRECONDITION_FAILED', 'Task changed during this request')
   }
+
+  await maybeAuditApiKeyTask(
+    db,
+    orgId,
+    'task.updated',
+    data.id,
+    data,
+    requestId,
+    actor,
+  )
 
   return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
 }
@@ -583,12 +642,13 @@ export function handleTasks(
   _role: MembershipRole,
   membershipId: string,
   requestId: string,
+  actor?: TaskActorContext,
 ): Promise<Response> {
   if (path === '/api/v1/tasks') {
     if (req.method === 'GET') {
       return listTasks(req, db, orgId, membershipId, requestId)
     }
-    if (req.method === 'POST') return createTask(req, db, orgId, requestId)
+    if (req.method === 'POST') return createTask(req, db, orgId, requestId, actor)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for tasks')
   }
 
@@ -599,7 +659,9 @@ export function handleTasks(
 
   const taskId = itemMatch[1]
   if (req.method === 'GET') return getTask(db, orgId, taskId, requestId)
-  if (req.method === 'PATCH') return updateTask(req, db, orgId, taskId, requestId)
+  if (req.method === 'PATCH') {
+    return updateTask(req, db, orgId, taskId, requestId, actor)
+  }
   if (req.method === 'DELETE') return deleteTask(req, db, orgId, taskId, requestId)
   throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for task')
 }

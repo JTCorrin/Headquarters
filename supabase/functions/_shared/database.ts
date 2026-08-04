@@ -222,7 +222,7 @@ export type TimelineEventRow = {
     | 'conversion'
   title: string
   body: string | null
-  actor_type: 'user' | 'agent' | 'system' | 'integration'
+  actor_type: 'user' | 'agent' | 'system' | 'integration' | 'api_key'
   actor_id: string | null
   source_type: string | null
   source_id: string | null
@@ -1539,6 +1539,8 @@ export type Database = {
       }
       create_timeline_event: {
         Args: {
+          p_actor_id?: string | null
+          p_actor_type?: string | null
           p_body?: string | null
           p_entity_id: string
           p_entity_type: string
@@ -1548,6 +1550,19 @@ export type Database = {
           p_title: string
         }
         Returns: TimelineEventRow
+      }
+      append_audit_event_for_api_key: {
+        Args: {
+          p_action: string
+          p_after_data?: Json | null
+          p_api_key_id: string
+          p_metadata?: Json
+          p_org_id: string
+          p_request_id?: string | null
+          p_resource_id: string
+          p_resource_type: string
+        }
+        Returns: string
       }
       adjust_product_stock: {
         Args: {
