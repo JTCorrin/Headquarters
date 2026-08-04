@@ -29,5 +29,8 @@
 	onSwitchNavigate={() => {
 		void goto('/projects');
 	}}
+	onDeleted={() => {
+		void goto('/projects');
+	}}
 	onLogout={handleLogout}
 />

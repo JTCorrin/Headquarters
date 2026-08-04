@@ -1,8 +1,12 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
 		canGenerateMeetingSummary,
+		emptyMeetingFormData,
 		formatMeetingWhen,
 		meetingStatusLabel,
 		meetingSummaryStatusLabel,
@@ -11,6 +15,8 @@
 		membershipFromCreateResult,
 		roleFromMemberships,
 		toAttendeeFields,
+		toMeetingFormData,
+		toMeetingUpdateBody,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toProposedMeetingTasks
@@ -19,10 +25,12 @@
 	import { attachMeetingTranscriptFile } from '$lib/crm/meeting-transcript-attachment.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import { meetingFormSchema } from '$lib/schemas/meeting.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
+	import MeetingFormDrawer from './meeting-form-drawer.svelte';
 	import MeetingWorkspacePage from './meeting-workspace-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
@@ -32,6 +40,7 @@
 		meetingId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -42,6 +51,7 @@
 		meetingId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onDeleted,
 		onLogout,
 		class: className
 	}: MeetingPageProps = $props();
@@ -53,7 +63,16 @@
 	let actionError = $state<string | null>(null);
 	let busy = $state(false);
 	let actionBusy = $state(false);
+	let editDrawerOpen = $state(false);
 	let fileInput: HTMLInputElement | null = $state(null);
+
+	const editMeetingForm = superForm(defaults(emptyMeetingFormData(), zod4(meetingFormSchema)), {
+		validators: zod4(meetingFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -159,6 +178,7 @@
 	function resetOrgScopedState() {
 		meeting = null;
 		actionError = null;
+		editDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
 
@@ -323,6 +343,65 @@
 		}
 	}
 
+	function onEdit() {
+		if (!meeting) return;
+		editMeetingForm.form.set(toMeetingFormData(meeting));
+		actionError = null;
+		editDrawerOpen = true;
+	}
+
+	async function onValidEdit(): Promise<boolean> {
+		if (!meeting) return false;
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.meetings.update(
+				meeting.id,
+				toMeetingUpdateBody(get(editMeetingForm.form)),
+				meeting.version
+			);
+			if (isStale(epoch)) return false;
+			meeting = updated;
+			editDrawerOpen = false;
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Meeting changed elsewhere — reload and try again.')
+				};
+				return false;
+			}
+			actionError = userMessage(error, 'Could not save meeting — try again.');
+			return false;
+		}
+	}
+
+	async function onDelete() {
+		if (!meeting) return;
+		if (!window.confirm('Delete this meeting? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		actionBusy = true;
+		actionError = null;
+		try {
+			await api.meetings.delete(meeting.id, meeting.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Meeting changed elsewhere — reload and try again.')
+				};
+				return;
+			}
+			actionError = userMessage(error, 'Could not delete meeting — try again.');
+		} finally {
+			if (!isStale(epoch)) actionBusy = false;
+		}
+	}
+
 	async function onAcceptAllTasks() {
 		if (!meeting) return;
 		const open = (meeting.task_proposals ?? []).filter((p) => p.status === 'proposed');
@@ -410,7 +489,18 @@
 						{onAcceptTask}
 						{onDismissTask}
 						{onAcceptAllTasks}
+						{onEdit}
+						{onDelete}
 						class="min-h-0 flex-1"
+					/>
+					<MeetingFormDrawer
+						bind:open={editDrawerOpen}
+						form={editMeetingForm}
+						showTrigger={false}
+						title="Edit meeting"
+						description="Update schedule, related record, or attendees. Changes use If-Match versioning."
+						submitLabel="Save changes"
+						onValidSubmit={onValidEdit}
 					/>
 				{/if}
 			</div>

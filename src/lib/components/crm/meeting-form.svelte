@@ -44,7 +44,8 @@
 		{ value: 'none', label: 'None' },
 		{ value: 'client', label: 'Client' },
 		{ value: 'contact', label: 'Contact' },
-		{ value: 'lead', label: 'Lead' }
+		{ value: 'lead', label: 'Lead' },
+		{ value: 'project', label: 'Project' }
 	] as const;
 
 	const statusLabel = $derived(
