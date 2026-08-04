@@ -390,6 +390,20 @@ async function listTasks(
     throw new ApiError(400, 'BAD_REQUEST', 'assignee filter must be me when provided')
   }
 
+  const entityType = url.searchParams.get('entity_type')
+  const entityId = url.searchParams.get('entity_id')
+  if ((entityType === null) !== (entityId === null)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'entity_type and entity_id must be provided together', {
+      entity_type: 'Required with entity_id',
+      entity_id: 'Required with entity_type',
+    })
+  }
+  if (entityType !== null && !ENTITY_TYPES.has(entityType)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'entity_type is invalid', {
+      entity_type: 'Must be contact, lead, or client',
+    })
+  }
+
   let query = db
     .from('tasks')
     .select(TASK_SELECT)
@@ -404,6 +418,11 @@ async function listTasks(
   }
   if (assignee === 'me') {
     query = query.eq('assignee_membership_id', membershipId)
+  }
+  if (entityType !== null && entityId !== null) {
+    query = query
+      .eq('entity_type', entityType as TaskEntityType)
+      .eq('entity_id', parseUuid(entityId, 'entity_id'))
   }
 
   const cursorValue = url.searchParams.get('cursor')

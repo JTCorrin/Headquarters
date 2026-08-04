@@ -708,6 +708,36 @@ async function deleteQuote(
   })
 }
 
+function quoteLifecycleError(
+  error: { code?: string; message?: string },
+  requestId: string,
+  action: 'accept' | 'send' | 'reject',
+): ApiError {
+  if (error.message?.toLowerCase().includes('version conflict')) {
+    return new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
+  }
+  if (error.code === 'P0002') {
+    return new ApiError(404, 'NOT_FOUND', error.message || 'Quote not found')
+  }
+  if (error.code === '42501') {
+    return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
+  }
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Quote validation failed')
+  }
+  if (error.code === '23503' || error.code === '23514') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
+    return new ApiError(422, 'VALIDATION_ERROR', 'The quote failed a database constraint')
+  }
+  console.error(`Quote ${action} failed`, {
+    request_id: requestId,
+    code: error.code,
+    message: error.message,
+  })
+  return new ApiError(500, 'INTERNAL_ERROR', `Quote ${action} failed`)
+}
+
 async function acceptQuoteRoute(
   req: Request,
   db: DatabaseClient,
@@ -723,44 +753,55 @@ async function acceptQuoteRoute(
     p_expected_version: version,
   })
 
-  if (error) {
-    if (error.message?.toLowerCase().includes('version conflict')) {
-      throw new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
-    }
-    if (error.code === 'P0002') {
-      throw new ApiError(404, 'NOT_FOUND', error.message || 'Quote not found')
-    }
-    if (error.code === '42501') {
-      throw new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
-    }
-    if (error.code === '22023') {
-      // Deliberate RAISE from our own RPCs; the message is user-facing.
-      throw new ApiError(422, 'VALIDATION_ERROR', error.message || 'Quote validation failed')
-    }
-    if (error.code === '23503' || error.code === '23514') {
-      // Postgres-generated constraint messages leak schema details; keep generic.
-      throw new ApiError(422, 'VALIDATION_ERROR', 'The quote failed a database constraint')
-    }
-    console.error('Quote accept failed', {
-      request_id: requestId,
-      code: error.code,
-      message: error.message,
-    })
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote accept failed')
-  }
+  if (error) throw quoteLifecycleError(error, requestId, 'accept')
 
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an unexpected payload')
-  }
-  const payload = data as { quote?: QuoteRow; lines?: QuoteLineRow[] }
-  if (!payload.quote) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an incomplete payload')
-  }
-  const document = {
-    ...payload.quote,
-    lines: Array.isArray(payload.lines) ? payload.lines : [],
-  }
+  const document = asQuoteDocument(data as Json)
+  return jsonResponse({ data: document }, 200, requestId, {
+    etag: etag(document.version),
+  })
+}
 
+async function sendQuoteRoute(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  quoteId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+
+  const { data, error } = await db.rpc('send_quote', {
+    p_quote_id: quoteId,
+    p_org_id: orgId,
+    p_expected_version: version,
+  })
+
+  if (error) throw quoteLifecycleError(error, requestId, 'send')
+
+  const document = asQuoteDocument(data as Json)
+  return jsonResponse({ data: document }, 200, requestId, {
+    etag: etag(document.version),
+  })
+}
+
+async function rejectQuoteRoute(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  quoteId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+
+  const { data, error } = await db.rpc('reject_quote', {
+    p_quote_id: quoteId,
+    p_org_id: orgId,
+    p_expected_version: version,
+  })
+
+  if (error) throw quoteLifecycleError(error, requestId, 'reject')
+
+  const document = asQuoteDocument(data as Json)
   return jsonResponse({ data: document }, 200, requestId, {
     etag: etag(document.version),
   })
@@ -780,7 +821,7 @@ export function handleQuotes(
   }
 
   const itemMatch = path.match(
-    /^\/api\/v1\/quotes\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/(accept))?$/i,
+    /^\/api\/v1\/quotes\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/(accept|send|reject))?$/i,
   )
   if (!itemMatch) throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 
@@ -790,6 +831,14 @@ export function handleQuotes(
   if (action === 'accept') {
     if (req.method === 'POST') return acceptQuoteRoute(req, db, orgId, quoteId, requestId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote accept')
+  }
+  if (action === 'send') {
+    if (req.method === 'POST') return sendQuoteRoute(req, db, orgId, quoteId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote send')
+  }
+  if (action === 'reject') {
+    if (req.method === 'POST') return rejectQuoteRoute(req, db, orgId, quoteId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote reject')
   }
 
   if (req.method === 'GET') return getQuote(db, orgId, quoteId, requestId)
