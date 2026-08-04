@@ -11,6 +11,7 @@ import { createIntegrationsEndpoints } from './endpoints/integrations.js';
 import { createInvoicesEndpoints } from './endpoints/invoices.js';
 import { createLeadsEndpoints } from './endpoints/leads.js';
 import { createMailboxEndpoints } from './endpoints/mailbox.js';
+import { createCalendarEndpoints } from './endpoints/calendar.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createPaymentsEndpoints } from './endpoints/payments.js';
@@ -35,6 +36,7 @@ import type {
 	InvoicesEndpoints,
 	LeadsEndpoints,
 	MailboxEndpoints,
+	CalendarEndpoints,
 	MeetingsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
@@ -75,6 +77,7 @@ export interface ApiV1Client {
 	taxRates: TaxRatesEndpoints;
 	profilePreferences: ProfilePreferencesEndpoints;
 	mailbox: MailboxEndpoints;
+	calendar: CalendarEndpoints;
 	integrations: IntegrationsEndpoints;
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
@@ -245,6 +248,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		taxRates: createTaxRatesEndpoints(request),
 		profilePreferences: createProfilePreferencesEndpoints(request),
 		mailbox: createMailboxEndpoints(request),
+		calendar: createCalendarEndpoints(request),
 		integrations: createIntegrationsEndpoints(request),
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),

@@ -194,8 +194,8 @@ export function canAccessAuditLog(role: MembershipRole): boolean {
 }
 
 /**
- * Personal settings (theme + Mail) — every membership except billing.
- * Owners also use this for personal Mail; org defaults stay under `/org/config`.
+ * Personal settings (theme + Mail + Calendar) — every membership except billing.
+ * Owners also use this for personal Mail/Calendar; org defaults stay under `/org/config`.
  */
 export function canAccessPersonalConfig(role: MembershipRole): boolean {
 	return role !== 'billing';

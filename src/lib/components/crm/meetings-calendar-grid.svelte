@@ -2,6 +2,7 @@
 	import type { CalendarDate } from '@internationalized/date';
 	import { isSameMonth } from '@internationalized/date';
 	import type { MeetingListItem } from '$lib/schemas/meeting.js';
+	import { meetingCalendarLinkLabel } from '$lib/schemas/calendar-connection.js';
 	import {
 		calendarDateKey,
 		localDayKeyFromIso
@@ -90,6 +91,7 @@
 				</button>
 				<div class="flex min-h-0 flex-1 flex-col gap-0.5">
 					{#each dayMeetings.slice(0, 3) as meeting (meeting.id)}
+						{@const linkedLabel = meetingCalendarLinkLabel(meeting.calendarProvider)}
 						<button
 							type="button"
 							class="bg-primary/10 text-primary hover:bg-primary/15 truncate rounded-md px-1.5 py-0.5 text-left text-[11px] leading-tight"
@@ -98,6 +100,15 @@
 						>
 							<span class="font-medium">{timeLabel(meeting.startsAt)}</span>
 							<span class="text-primary/80"> {meeting.title}</span>
+							{#if linkedLabel}
+								<span
+									class="text-primary/70 ml-0.5"
+									data-testid="calendar-meeting-linked-{meeting.id}"
+									title="Linked to {linkedLabel} Calendar"
+								>
+									· {linkedLabel}
+								</span>
+							{/if}
 						</button>
 					{/each}
 					{#if dayMeetings.length > 3}
