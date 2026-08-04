@@ -1441,6 +1441,33 @@ export interface ApiAiIntegrationConnectBody {
 	api_key: string;
 }
 
+/**
+ * Org API key row from `GET /api/v1/api-keys` (MCP-Keys-BE).
+ * Secret is never listed — only returned once on create.
+ */
+export interface ApiOrgApiKey {
+	id: string;
+	org_id: string;
+	name: string;
+	prefix: string;
+	role: MembershipRole;
+	scopes: string[];
+	expires_at: string | null;
+	last_used_at: string | null;
+	revoked_at: string | null;
+	created_at: string;
+	created_by: string | null;
+}
+
+export interface ApiOrgApiKeyCreateBody {
+	name: string;
+	role?: MembershipRole;
+	expires_at?: string | null;
+}
+
+/** Create response includes reveal-once `secret` (`crm_key_` + 32 hex). */
+export type ApiOrgApiKeyCreateResult = ApiOrgApiKey & { secret: string };
+
 export type ApiEntityEmailType = 'contact' | 'lead' | 'client';
 
 export interface ApiEmailMessage {

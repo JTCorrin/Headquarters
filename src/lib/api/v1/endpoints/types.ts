@@ -104,6 +104,9 @@ import type {
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
 	ApiAiProvider,
+	ApiOrgApiKey,
+	ApiOrgApiKeyCreateBody,
+	ApiOrgApiKeyCreateResult,
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
@@ -590,6 +593,13 @@ export interface IntegrationsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiAiIntegration>;
 	disconnectAi(provider: ApiAiProvider, signal?: AbortSignal): Promise<void>;
+}
+
+/** Org API keys — `/api/v1/api-keys` (Owner/Admin; secret reveal-once on create). */
+export interface ApiKeysEndpoints {
+	list(signal?: AbortSignal): Promise<ApiOrgApiKey[]>;
+	create(body: ApiOrgApiKeyCreateBody, signal?: AbortSignal): Promise<ApiOrgApiKeyCreateResult>;
+	revoke(id: string, signal?: AbortSignal): Promise<ApiOrgApiKey>;
 }
 
 

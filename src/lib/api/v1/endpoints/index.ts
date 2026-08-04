@@ -8,6 +8,7 @@ export { createEmailMessagesEndpoints } from './email-messages.js';
 export { createEmailTemplatesEndpoints } from './email-templates.js';
 export { createInvoicesEndpoints } from './invoices.js';
 export { createIntegrationsEndpoints } from './integrations.js';
+export { createApiKeysEndpoints } from './api-keys.js';
 export { createLeadsEndpoints } from './leads.js';
 export { createMailboxEndpoints } from './mailbox.js';
 export { createCalendarEndpoints } from './calendar.js';
@@ -25,6 +26,7 @@ export { createTaxRatesEndpoints } from './tax-rates.js';
 export { createTimelineEventsEndpoints } from './timeline-events.js';
 export { createVendorsEndpoints } from './vendors.js';
 export type {
+	ApiKeysEndpoints,
 	AuditEventsEndpoints,
 	BillsEndpoints,
 	ClientsEndpoints,
