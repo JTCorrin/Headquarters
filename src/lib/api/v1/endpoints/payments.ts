@@ -1,4 +1,5 @@
 import type { ApiRequestFn } from '../request.js';
+import { newIdempotencyKey } from '../idempotency.js';
 import type {
 	ApiPayment,
 	ApiPaymentAllocateBody,
@@ -8,12 +9,6 @@ import type {
 	ApiPaymentReverseBody
 } from '../types.js';
 import type { PaymentsEndpoints } from './types.js';
-
-function newIdempotencyKey(): string {
-	return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-		? crypto.randomUUID()
-		: `pay-${Date.now()}`;
-}
 
 export function createPaymentsEndpoints(request: ApiRequestFn): PaymentsEndpoints {
 	return {

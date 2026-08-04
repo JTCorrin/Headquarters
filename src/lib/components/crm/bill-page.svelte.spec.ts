@@ -240,6 +240,7 @@ describe('BillPage detail flows', () => {
 			}),
 			[`POST /api/v1/bills/${BILL_ID}/void`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"3"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
 				return {
 					status: 412,
 					body: {
