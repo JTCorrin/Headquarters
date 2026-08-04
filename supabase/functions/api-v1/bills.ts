@@ -555,6 +555,7 @@ async function listBills(
       status: 'Must be one of draft, received, scheduled, partial, paid, void',
     })
   }
+  const vendorId = url.searchParams.get('vendor_id')
   const cursorValue = url.searchParams.get('cursor')
   const cursor = cursorValue ? decodeBillCursor(cursorValue) : null
 
@@ -568,6 +569,7 @@ async function listBills(
     .limit(limit + 1)
 
   if (status) query = query.eq('status', status as BillStatus)
+  if (vendorId) query = query.eq('vendor_id', parseUuid(vendorId, 'vendor_id'))
   if (cursor) {
     query = query.or(
       `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
