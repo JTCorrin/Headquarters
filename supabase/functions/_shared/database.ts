@@ -1759,6 +1759,19 @@ export type Database = {
         }
         Returns: Json
       }
+      recurring_schedule_lifecycle_idempotent: {
+        Args: {
+          p_command: string
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_request_hash: string
+          p_route: string
+          p_schedule_id: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
       get_payment: {
         Args: {
           p_org_id: string
@@ -1845,6 +1858,14 @@ export type Database = {
           p_org_id: string
         }
         Returns: undefined
+      }
+      accept_meeting_task_proposal: {
+        Args: {
+          p_meeting_id: string
+          p_org_id: string
+          p_proposal_id: string
+        }
+        Returns: Json
       }
       replace_meeting_attendees: {
         Args: {
