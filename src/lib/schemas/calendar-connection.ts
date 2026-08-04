@@ -29,7 +29,14 @@ export function mapCalendarConnectionStatus(
 	if (key === 'active' || key === 'connected' || key === 'ok') return 'connected';
 	if (key === 'pending') return 'pending';
 	if (key === 'error' || key === 'auth_failed') return 'error';
+	// Cal-Sync-BE uses `disabled` after disconnect until row is gone; treat as disconnected.
+	if (key === 'disabled' || key === 'disconnected') return 'disconnected';
 	return 'disconnected';
+}
+
+/** Connect/disconnect — billing blocked by personal settings; readonly can view only. */
+export function canMutateCalendarConnection(role: string): boolean {
+	return role === 'owner' || role === 'admin' || role === 'member';
 }
 
 export function emptyCalendarConnection(): CalendarConnectionResource {
