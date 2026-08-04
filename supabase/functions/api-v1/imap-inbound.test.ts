@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from '@std/assert'
 import {
+  assertSafeOutboundHost,
   chunkUids,
   decodeMimeBodyText,
   extractBodyLiteral,
@@ -8,6 +9,8 @@ import {
   IMAP_FETCH_BATCH_SIZE,
   type ImapByteConn,
   ImapSyncError,
+  isBlockedOutboundHostname,
+  isBlockedOutboundIp,
   isSyntheticImapHost,
   parseAddressList,
   parseHeaderBlock,
@@ -271,4 +274,60 @@ Deno.test('decodeMimeBodyText decodes base64 text/plain part', () => {
   ].join('\r\n')
 
   assertEquals(decodeMimeBodyText(raw), 'Secret base64 hello')
+})
+
+Deno.test('isBlockedOutboundIp rejects private/link-local/metadata ranges', () => {
+  assertEquals(isBlockedOutboundIp('127.0.0.1'), true)
+  assertEquals(isBlockedOutboundIp('10.0.0.5'), true)
+  assertEquals(isBlockedOutboundIp('172.16.1.1'), true)
+  assertEquals(isBlockedOutboundIp('192.168.1.10'), true)
+  assertEquals(isBlockedOutboundIp('169.254.169.254'), true)
+  assertEquals(isBlockedOutboundIp('100.64.1.1'), true)
+  assertEquals(isBlockedOutboundIp('::1'), true)
+  assertEquals(isBlockedOutboundIp('fc00::1'), true)
+  assertEquals(isBlockedOutboundIp('fe80::1'), true)
+  assertEquals(isBlockedOutboundIp('::ffff:127.0.0.1'), true)
+  assertEquals(isBlockedOutboundIp('8.8.8.8'), false)
+  assertEquals(isBlockedOutboundIp('1.1.1.1'), false)
+})
+
+Deno.test('isBlockedOutboundHostname rejects internal names', () => {
+  assertEquals(isBlockedOutboundHostname('localhost'), true)
+  assertEquals(isBlockedOutboundHostname('mail.internal'), true)
+  assertEquals(isBlockedOutboundHostname('host.docker.internal'), true)
+  assertEquals(isBlockedOutboundHostname('metadata.google.internal'), true)
+  assertEquals(isBlockedOutboundHostname('192.168.0.1'), true)
+  assertEquals(isBlockedOutboundHostname('imap.gmail.com'), false)
+  assertEquals(isBlockedOutboundHostname('outlook.office365.com'), false)
+})
+
+Deno.test('assertSafeOutboundHost blocks literal private IPs', async () => {
+  const error = await assertRejects(
+    () => assertSafeOutboundHost('169.254.169.254'),
+    ImapSyncError,
+  )
+  assertEquals(error.code, 'imap_host_blocked')
+})
+
+Deno.test('assertSafeOutboundHost blocks DNS that resolves to private IPs', async () => {
+  const error = await assertRejects(
+    () =>
+      assertSafeOutboundHost('evil.example.com', (_host, type) => {
+        if (type === 'A') return Promise.resolve(['10.1.2.3'])
+        return Promise.resolve([])
+      }),
+    ImapSyncError,
+  )
+  assertEquals(error.code, 'imap_host_blocked')
+})
+
+Deno.test('assertSafeOutboundHost allows public A records', async () => {
+  await assertSafeOutboundHost('imap.gmail.com', (_host, type) => {
+    if (type === 'A') return Promise.resolve(['142.250.1.108'])
+    return Promise.resolve([])
+  })
+})
+
+Deno.test('assertSafeOutboundHost allows synthetic example.test hosts', async () => {
+  await assertSafeOutboundHost('imap.example.test')
 })

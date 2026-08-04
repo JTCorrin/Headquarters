@@ -1,6 +1,6 @@
 begin;
 
-select plan(42);
+select plan(44);
 
 select has_table('public', 'product_categories', 'product_categories table exists');
 select has_table('public', 'products', 'products table exists');
@@ -309,9 +309,31 @@ select throws_ok(
   $$
     select public.adjust_product_stock((select other_product_id from _catalog_fixture), 1)
   $$,
-  '42501',
+  'P0002',
   null,
-  'adjust_product_stock denies cross-tenant products'
+  'adjust_product_stock cross-tenant UUID is not-found (no oracle)'
+);
+
+select ok(
+  (
+    select
+      position('has_org_role' in prosrc)
+        < position(E'\n  for update' in lower(prosrc))
+    from pg_proc
+    where oid = 'public.adjust_product_stock(uuid, numeric, text, text, timestamptz)'::regprocedure
+  ),
+  'adjust_product_stock checks org role before FOR UPDATE'
+);
+
+select ok(
+  (
+    select
+      position('has_org_role' in prosrc)
+        < position(E'\n    for update' in lower(prosrc))
+    from pg_proc
+    where oid = 'public.adjust_product_stock_idempotent(uuid, uuid, numeric, text, text, text, text, text, timestamptz, integer)'::regprocedure
+  ),
+  'adjust_product_stock_idempotent checks org role before FOR UPDATE'
 );
 
 select throws_ok(
