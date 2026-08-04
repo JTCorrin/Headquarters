@@ -19,7 +19,10 @@ export function navGroupsWithActive(
 				]
 			: []),
 		...(role === 'owner' || role === 'admin'
-			? [{ label: 'Audit log', href: '/org/audit-log', active: mark('Audit log') }]
+			? [
+					{ label: 'API keys', href: '/org/api-keys', active: mark('API keys') },
+					{ label: 'Audit log', href: '/org/audit-log', active: mark('Audit log') }
+				]
 			: []),
 		...(role !== 'billing'
 			? [{ label: 'My settings', href: '/settings', active: mark('My settings') }]
