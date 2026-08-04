@@ -80,6 +80,7 @@ import {
   parseAuditActionFilter,
   parseAuditCategoryFilter,
 } from './audit-events.ts'
+import { decodeNotificationCursor } from './notifications.ts'
 import {
   decodeTimelineCursor,
   parseEntityType,
@@ -1634,6 +1635,19 @@ Deno.test('audit cursor decode accepts created_at keyset', () => {
   assertThrows(() => decodeAuditCursor('%%%'), ApiError)
   assertThrows(
     () => decodeAuditCursor(btoa(JSON.stringify({ created_at: 'nope', id }))),
+    ApiError,
+  )
+})
+
+Deno.test('notification cursor decode accepts created_at keyset', () => {
+  const id = '33333333-3333-4333-8333-333333333333'
+  const createdAt = '2026-08-04T13:00:00.000Z'
+  const encoded = btoa(JSON.stringify({ created_at: createdAt, id }))
+  assertEquals(decodeNotificationCursor(encoded), { created_at: createdAt, id })
+  assertEquals(decodeNotificationCursor(null), null)
+  assertThrows(() => decodeNotificationCursor('%%%'), ApiError)
+  assertThrows(
+    () => decodeNotificationCursor(btoa(JSON.stringify({ created_at: 'nope', id }))),
     ApiError,
   )
 })
