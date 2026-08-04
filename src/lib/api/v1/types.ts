@@ -1306,6 +1306,44 @@ export interface ApiDocumentMoveBody {
 	folder_id?: string | null;
 }
 
+/**
+ * Personal Google Calendar connection for the current membership — secrets never returned.
+ * Locked C2 contract: `GET/DELETE /api/v1/me/calendar` + OAuth start/callback.
+ */
+export type ApiCalendarProvider = 'google';
+
+export type ApiCalendarConnectionStatus =
+	| 'disconnected'
+	| 'pending'
+	| 'active'
+	| 'error'
+	| string;
+
+export interface ApiCalendarConnectionConfig {
+	/** Connected Google account email when known (Cal-Sync-BE). */
+	account_email?: string | null;
+	/** Remote calendar id (default primary). */
+	calendar_id?: string | null;
+}
+
+export interface ApiCalendarConnection {
+	provider: ApiCalendarProvider | null;
+	status: ApiCalendarConnectionStatus;
+	credentials_configured: boolean;
+	config: ApiCalendarConnectionConfig | Record<string, unknown> | null;
+	/** Top-level duplicate of config.account_email from Cal-Sync-BE. */
+	account_email?: string | null;
+	calendar_id?: string | null;
+	last_error_code?: string | null;
+	last_sync_at?: string | null;
+}
+
+/** `GET /api/v1/me/calendar/oauth/start` — FE redirects to `url` (Cal-Sync-BE). */
+export interface ApiCalendarOAuthStart {
+	url: string;
+	state: string;
+}
+
 /** Personal IMAP/SMTP mailbox for the current membership — secrets never returned. */
 export interface ApiMailboxAccount {
 	id: string;

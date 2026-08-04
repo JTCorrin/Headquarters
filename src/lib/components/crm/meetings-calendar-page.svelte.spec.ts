@@ -143,6 +143,31 @@ describe('MeetingsCalendarPage integration', () => {
 		expect(onOpenMeeting).toHaveBeenCalledWith(MEETING_ID);
 	});
 
+	it('shows a Linked chip when calendar_provider is set', async () => {
+		const session = sessionForOrg();
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/meetings': async () => ({
+				body: {
+					data: [
+						sampleMeeting({
+							calendar_provider: 'google',
+							external_event_id: 'gcal-evt-1'
+						})
+					],
+					meta: { next_cursor: null }
+				}
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(MeetingsCalendarPage, { api, session });
+
+		await expect
+			.element(page.getByTestId(`calendar-meeting-linked-${MEETING_ID}`))
+			.toHaveTextContent(/Google/i);
+	});
+
 	it('prefills Schedule drawer when an empty day is clicked', async () => {
 		const session = sessionForOrg();
 		const fetchMock = createMockFetch({
