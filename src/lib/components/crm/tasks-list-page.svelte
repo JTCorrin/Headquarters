@@ -7,6 +7,7 @@
 	import type { TaskBoardCard } from './tasks-board.svelte';
 	import TaskFormDrawer from './task-form-drawer.svelte';
 	import MyTasksPanel, { type DashboardTask } from './my-tasks-panel.svelte';
+	import ListFilterBanner from './list-filter-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -24,6 +25,8 @@
 		assigneeOptions?: TaskAssigneeOption[];
 		drawerOpen?: boolean;
 		editDrawerOpen?: boolean;
+		filterLabel?: string | null;
+		onClearFilter?: () => void;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -45,6 +48,8 @@
 		assigneeOptions = [],
 		drawerOpen = $bindable(false),
 		editDrawerOpen = $bindable(false),
+		filterLabel = null,
+		onClearFilter,
 		showNav = true,
 		class: className,
 		onValidSubmit,
@@ -112,6 +117,10 @@
 					{/snippet}
 				</PageHeader>
 			</div>
+
+			{#if filterLabel}
+				<ListFilterBanner label={filterLabel} onClear={onClearFilter} />
+			{/if}
 
 			{#if viewMode === 'board'}
 				<TasksBoard tasks={boardTasks} class="min-h-0 flex-1" />

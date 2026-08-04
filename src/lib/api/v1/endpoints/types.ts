@@ -193,6 +193,8 @@ export interface QuotesEndpoints {
 	): Promise<ApiQuoteDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 	accept(id: string, version: number, signal?: AbortSignal): Promise<ApiQuoteDocument>;
+	send(id: string, version: number, signal?: AbortSignal): Promise<ApiQuoteDocument>;
+	reject(id: string, version: number, signal?: AbortSignal): Promise<ApiQuoteDocument>;
 }
 
 export interface InvoicesEndpoints {

@@ -17,7 +17,8 @@ export function createBillsEndpoints(request: ApiRequestFn): BillsEndpoints {
 				query: {
 					limit: params.limit,
 					cursor: params.cursor,
-					status: params.status
+					status: params.status,
+					vendor_id: params.vendor_id
 				},
 				signal
 			});
