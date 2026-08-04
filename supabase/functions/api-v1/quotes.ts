@@ -486,17 +486,13 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The quote conflicts with an existing record')
   }
-  if (
-    error.code === '23503' ||
-    error.code === '23514' ||
-    error.code === '22023' ||
-    error.code === '22003'
-  ) {
-    return new ApiError(
-      422,
-      'VALIDATION_ERROR',
-      error.message || 'The quote failed a database constraint',
-    )
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Quote validation failed')
+  }
+  if (error.code === '23503' || error.code === '23514' || error.code === '22003') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
+    return new ApiError(422, 'VALIDATION_ERROR', 'The quote failed a database constraint')
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
@@ -737,16 +733,13 @@ async function acceptQuoteRoute(
     if (error.code === '42501') {
       throw new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
     }
-    if (
-      error.code === '22023' ||
-      error.code === '23503' ||
-      error.code === '23514'
-    ) {
-      throw new ApiError(
-        422,
-        'VALIDATION_ERROR',
-        error.message || 'The quote failed a database constraint',
-      )
+    if (error.code === '22023') {
+      // Deliberate RAISE from our own RPCs; the message is user-facing.
+      throw new ApiError(422, 'VALIDATION_ERROR', error.message || 'Quote validation failed')
+    }
+    if (error.code === '23503' || error.code === '23514') {
+      // Postgres-generated constraint messages leak schema details; keep generic.
+      throw new ApiError(422, 'VALIDATION_ERROR', 'The quote failed a database constraint')
     }
     console.error('Quote accept failed', {
       request_id: requestId,

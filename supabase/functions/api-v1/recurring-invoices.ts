@@ -639,12 +639,13 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
       'Recurring schedule version does not match If-Match',
     )
   }
-  if (error.code === '23505' || message.includes('idempotency-key was reused')) {
-    return new ApiError(
-      409,
-      'CONFLICT',
-      error.message || 'The schedule conflicts with an existing record',
-    )
+  if (message.includes('idempotency-key was reused')) {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(409, 'CONFLICT', error.message || 'Idempotency-Key was reused')
+  }
+  if (error.code === '23505') {
+    // Postgres-generated unique-violation messages leak constraint names; keep generic.
+    return new ApiError(409, 'CONFLICT', 'The schedule conflicts with an existing record')
   }
   if (error.code === '55000') {
     return new ApiError(
@@ -653,16 +654,16 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
       error.message || 'An identical request is already in progress',
     )
   }
-  if (
-    error.code === '23503' ||
-    error.code === '23514' ||
-    error.code === '22023' ||
-    error.code === '22003'
-  ) {
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Schedule validation failed')
+  }
+  if (error.code === '23503' || error.code === '23514' || error.code === '22003') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
     return new ApiError(
       422,
       'VALIDATION_ERROR',
-      error.message || 'The recurring schedule failed a database constraint',
+      'The recurring schedule failed a database constraint',
     )
   }
   if (error.code === '42501') {
@@ -853,7 +854,7 @@ async function deleteSchedule(
     p_expected_version: version,
   })
   if (error) throw databaseError(error, requestId)
-  return jsonResponse({ data: { id: scheduleId, deleted: true } }, 200, requestId)
+  return new Response(null, { status: 204, headers: { 'x-request-id': requestId } })
 }
 
 async function previewSchedule(

@@ -65,14 +65,21 @@ export function renderTimelineMarkdown(source: string): string {
 	const escaped = source
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;');
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
 
 	const withCode = escaped.replace(/`([^`]+)`/g, '<code class="rounded bg-muted px-1 text-[0.85em]">$1</code>');
 	const withBold = withCode.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 	const withItalic = withBold.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
 	const withLinks = withItalic.replace(
 		/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-		'<a class="text-primary underline underline-offset-2" href="$2" target="_blank" rel="noreferrer">$1</a>'
+		(match, label: string, url: string) => {
+			// URL is already entity-escaped above; reject anything that could
+			// still break out of the href attribute as plain text.
+			if (/["'&]/.test(url.replace(/&(amp|quot|#39|lt|gt);/g, ''))) return match;
+			return `<a class="text-primary underline underline-offset-2" href="${url}" target="_blank" rel="noreferrer">${label}</a>`;
+		}
 	);
 
 	const lines = withLinks.split('\n');

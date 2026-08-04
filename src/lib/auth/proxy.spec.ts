@@ -58,4 +58,21 @@ describe('forwardProxyHeaders', () => {
 		expect(forwarded.get('host')).toBeNull();
 		expect(forwarded.get('cookie')).toBeNull();
 	});
+
+	it('drops headers outside the allow-list (spoofable / unexpected)', () => {
+		const source = new Headers({
+			authorization: 'Bearer tok',
+			'if-match': '"3"',
+			'idempotency-key': 'abc',
+			'x-forwarded-for': '1.2.3.4',
+			'x-real-ip': '1.2.3.4',
+			'x-custom': 'nope'
+		});
+		const forwarded = forwardProxyHeaders(source);
+		expect(forwarded.get('if-match')).toBe('"3"');
+		expect(forwarded.get('idempotency-key')).toBe('abc');
+		expect(forwarded.get('x-forwarded-for')).toBeNull();
+		expect(forwarded.get('x-real-ip')).toBeNull();
+		expect(forwarded.get('x-custom')).toBeNull();
+	});
 });

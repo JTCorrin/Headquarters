@@ -93,7 +93,9 @@ export function parseAuditCategoryFilter(value: string | null): string | null {
 export function decodeAuditCursor(value: string | null): AuditCursor | null {
   if (value === null || value === '') return null
   try {
-    const parsed = JSON.parse(atob(value)) as Partial<AuditCursor>
+    const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+    const parsed = JSON.parse(atob(`${base64}${padding}`)) as Partial<AuditCursor>
     if (
       typeof parsed.created_at !== 'string' ||
       typeof parsed.id !== 'string' ||
@@ -102,9 +104,14 @@ export function decodeAuditCursor(value: string | null): AuditCursor | null {
     ) {
       throw new Error('invalid')
     }
-    // Validate shapes early so bad cursors fail closed.
+    // Validate shapes early so bad cursors fail closed. The timestamp must be
+    // strict ISO because it is interpolated into a PostgREST `.or()` filter.
     parseUuid(parsed.id, 'cursor.id')
-    parseIsoTimestamp(parsed.created_at, 'cursor.created_at')
+    if (
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(\+00:00|Z)$/.test(parsed.created_at)
+    ) {
+      throw new Error('invalid')
+    }
     return { created_at: parsed.created_at, id: parsed.id }
   } catch (error) {
     if (error instanceof ApiError) throw error
@@ -116,6 +123,9 @@ export function decodeAuditCursor(value: string | null): AuditCursor | null {
 
 function encodeCursor(row: AuditCursor): string {
   return btoa(JSON.stringify({ created_at: row.created_at, id: row.id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
 }
 
 async function listAuditEvents(

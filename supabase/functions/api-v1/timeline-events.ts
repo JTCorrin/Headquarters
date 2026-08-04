@@ -184,13 +184,16 @@ export function decodeTimelineCursor(
 ): TimelineCursor | null {
   if (value === null || value === '') return null
   try {
-    const parsed = JSON.parse(atob(value)) as {
+    const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+    const parsed = JSON.parse(atob(`${base64}${padding}`)) as {
       occurred_at?: unknown
       id?: unknown
     }
+    // Strict ISO only: the timestamp is interpolated into a PostgREST `.or()` filter.
     if (
       typeof parsed.occurred_at !== 'string' ||
-      Number.isNaN(Date.parse(parsed.occurred_at)) ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(\+00:00|Z)$/.test(parsed.occurred_at) ||
       typeof parsed.id !== 'string' ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
         .test(
@@ -209,6 +212,9 @@ export function decodeTimelineCursor(
 
 function encodeCursor(row: TimelineCursor): string {
   return btoa(JSON.stringify({ occurred_at: row.occurred_at, id: row.id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
 }
 
 async function assertEntityExists(

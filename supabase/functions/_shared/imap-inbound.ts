@@ -733,7 +733,7 @@ function parseFetchBlockToMessage(
   const providerMessageId = (messageId && messageId.length > 0 ? messageId : `imap-uid-${uid}`)
     .slice(0, 500)
   const providerThreadId = (inReplyTo || references[0] || providerMessageId).slice(0, 500)
-  const truncated = bodyRaw.length >= maxBodyBytes
+  const truncated = new TextEncoder().encode(bodyRaw).byteLength >= maxBodyBytes
   const bodyText = decodeMimeBodyText(bodyRaw).slice(0, maxBodyBytes)
   return {
     provider_message_id: providerMessageId,

@@ -37,25 +37,28 @@ export function buildApiV1ProxyUrl(
 	return `${base}${path}${search}`;
 }
 
-/** Hop-by-hop / browser-only headers that must not be forwarded upstream. */
-const STRIP_REQUEST_HEADERS = new Set([
-	'connection',
-	'content-length',
-	'host',
-	'keep-alive',
-	'proxy-authenticate',
-	'proxy-authorization',
-	'te',
-	'trailer',
-	'transfer-encoding',
-	'upgrade',
-	'cookie'
+/**
+ * Explicit allow-list of headers forwarded upstream. Everything else (cookies,
+ * hop-by-hop headers, spoofable x-forwarded-* / x-real-ip, etc.) is dropped.
+ * Mirrors the headers the edge function accepts via CORS.
+ */
+const FORWARD_REQUEST_HEADERS = new Set([
+	'accept',
+	'accept-language',
+	'apikey',
+	'authorization',
+	'content-type',
+	'idempotency-key',
+	'if-match',
+	'x-client-info',
+	'x-org-id',
+	'x-request-id'
 ]);
 
 export function forwardProxyHeaders(source: Headers): Headers {
 	const headers = new Headers();
 	for (const [key, value] of source.entries()) {
-		if (STRIP_REQUEST_HEADERS.has(key.toLowerCase())) continue;
+		if (!FORWARD_REQUEST_HEADERS.has(key.toLowerCase())) continue;
 		headers.set(key, value);
 	}
 	return headers;

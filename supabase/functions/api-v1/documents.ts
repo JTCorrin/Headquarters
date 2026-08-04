@@ -44,15 +44,16 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
     return new ApiError(404, 'NOT_FOUND', error.message ?? 'Resource not found')
   }
   if (error.code === '23505') {
-    return new ApiError(409, 'CONFLICT', error.message ?? 'Resource conflict')
+    // Postgres-generated unique-violation messages leak constraint names; keep generic.
+    return new ApiError(409, 'CONFLICT', 'Resource conflict')
   }
-  if (
-    error.code === '22023' ||
-    error.code === '23514' ||
-    error.code === '23503' ||
-    error.code === '22003'
-  ) {
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
     return new ApiError(422, 'VALIDATION_ERROR', error.message ?? 'Validation failed')
+  }
+  if (error.code === '23514' || error.code === '23503' || error.code === '22003') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
+    return new ApiError(422, 'VALIDATION_ERROR', 'Validation failed')
   }
   console.error('Document RPC failed', { request_id: requestId, code: error.code })
   return new ApiError(500, 'INTERNAL_ERROR', 'Document operation failed')

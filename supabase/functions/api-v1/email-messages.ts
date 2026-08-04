@@ -309,7 +309,10 @@ export function handleEmailMessages(
   role: MembershipRole,
   requestId: string,
 ): Promise<Response> {
-  if (path === '/api/v1/me/mailbox/sync' && req.method === 'POST') {
+  if (path === '/api/v1/me/mailbox/sync') {
+    if (req.method !== 'POST') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for mailbox sync')
+    }
     return postMailboxSync(db, orgId, role, requestId)
   }
 
