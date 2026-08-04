@@ -8,6 +8,7 @@ import { createDocumentsEndpoints } from './endpoints/documents.js';
 import { createEmailMessagesEndpoints } from './endpoints/email-messages.js';
 import { createEmailTemplatesEndpoints } from './endpoints/email-templates.js';
 import { createIntegrationsEndpoints } from './endpoints/integrations.js';
+import { createApiKeysEndpoints } from './endpoints/api-keys.js';
 import { createInvoicesEndpoints } from './endpoints/invoices.js';
 import { createLeadsEndpoints } from './endpoints/leads.js';
 import { createMailboxEndpoints } from './endpoints/mailbox.js';
@@ -26,6 +27,7 @@ import { createProjectsEndpoints } from './endpoints/projects.js';
 import { createTimelineEventsEndpoints } from './endpoints/timeline-events.js';
 import { createVendorsEndpoints } from './endpoints/vendors.js';
 import type {
+	ApiKeysEndpoints,
 	AuditEventsEndpoints,
 	BillsEndpoints,
 	ClientsEndpoints,
@@ -82,6 +84,7 @@ export interface ApiV1Client {
 	calendar: CalendarEndpoints;
 	notifications: NotificationsEndpoints;
 	integrations: IntegrationsEndpoints;
+	apiKeys: ApiKeysEndpoints;
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
 	invoices: InvoicesEndpoints;
@@ -254,6 +257,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		calendar: createCalendarEndpoints(request),
 		notifications: createNotificationsEndpoints(request),
 		integrations: createIntegrationsEndpoints(request),
+		apiKeys: createApiKeysEndpoints(request),
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		invoices: createInvoicesEndpoints(request),
