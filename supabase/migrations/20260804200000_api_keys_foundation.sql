@@ -378,13 +378,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  found public.api_keys;
+  key_row public.api_keys;
 begin
   if p_key_hash is null or p_key_hash !~ '^[0-9a-f]{64}$' then
     return null;
   end if;
 
-  select * into found
+  select * into key_row
   from public.api_keys
   where api_keys.key_hash = p_key_hash
     and api_keys.revoked_at is null
@@ -398,21 +398,21 @@ begin
   if not exists (
     select 1
     from public.organisations
-    where organisations.id = found.org_id
+    where organisations.id = key_row.org_id
       and organisations.deleted_at is null
   ) then
     return null;
   end if;
 
   return jsonb_build_object(
-    'id', found.id,
-    'org_id', found.org_id,
-    'name', found.name,
-    'prefix', found.prefix,
-    'role', found.role,
-    'scopes', found.scopes,
-    'expires_at', found.expires_at,
-    'created_by', found.created_by
+    'id', key_row.id,
+    'org_id', key_row.org_id,
+    'name', key_row.name,
+    'prefix', key_row.prefix,
+    'role', key_row.role,
+    'scopes', key_row.scopes,
+    'expires_at', key_row.expires_at,
+    'created_by', key_row.created_by
   );
 end;
 $$;
