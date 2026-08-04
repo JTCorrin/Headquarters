@@ -1,4 +1,5 @@
 import type { ApiRequestFn } from '../request.js';
+import { newIdempotencyKey } from '../idempotency.js';
 import type {
 	ApiInvoice,
 	ApiInvoiceCreateBody,
@@ -72,6 +73,7 @@ export function createInvoicesEndpoints(request: ApiRequestFn): InvoicesEndpoint
 				body: {},
 				orgScoped: true,
 				ifMatchVersion: version,
+				headers: { 'Idempotency-Key': newIdempotencyKey('inv-send') },
 				signal
 			});
 			return data;
@@ -82,6 +84,7 @@ export function createInvoicesEndpoints(request: ApiRequestFn): InvoicesEndpoint
 				body,
 				orgScoped: true,
 				ifMatchVersion: version,
+				headers: { 'Idempotency-Key': newIdempotencyKey('inv-void') },
 				signal
 			});
 			return data;

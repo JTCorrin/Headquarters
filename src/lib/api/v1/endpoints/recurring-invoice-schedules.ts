@@ -1,4 +1,5 @@
 import type { ApiRequestFn } from '../request.js';
+import { newIdempotencyKey } from '../idempotency.js';
 import type {
 	ApiRecurringInvoiceCreateBody,
 	ApiRecurringInvoiceDocument,
@@ -12,12 +13,6 @@ import type {
 	ApiRecurringInvoiceUpdateBody
 } from '../types.js';
 import type { RecurringInvoiceSchedulesEndpoints } from './types.js';
-
-function newIdempotencyKey(): string {
-	return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-		? crypto.randomUUID()
-		: `cmd-${Date.now()}`;
-}
 
 export function createRecurringInvoiceSchedulesEndpoints(
 	request: ApiRequestFn
