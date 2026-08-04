@@ -94,6 +94,9 @@ import type {
 	ApiProjectUpdateBody,
 	ApiCalendarConnection,
 	ApiCalendarOAuthStart,
+	ApiNotificationListParams,
+	ApiNotificationUnreadCount,
+	ApiUserNotification,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
@@ -567,6 +570,16 @@ export interface CalendarEndpoints {
 	get(signal?: AbortSignal): Promise<ApiCalendarConnection>;
 	startOAuth(signal?: AbortSignal): Promise<ApiCalendarOAuthStart>;
 	disconnect(signal?: AbortSignal): Promise<void>;
+}
+
+/** Personal notifications bell — `/api/v1/me/notifications*`. */
+export interface NotificationsEndpoints {
+	list(
+		params?: ApiNotificationListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiUserNotification[]>>;
+	unreadCount(signal?: AbortSignal): Promise<ApiNotificationUnreadCount>;
+	markRead(id: string, signal?: AbortSignal): Promise<ApiUserNotification>;
 }
 
 export interface IntegrationsEndpoints {

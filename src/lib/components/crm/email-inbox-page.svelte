@@ -34,6 +34,8 @@
 	export interface EmailInboxPageProps {
 		api: ApiV1Client;
 		session: OrgSession;
+		/** Deep-link from notifications: `/email?message=<uuid>`. */
+		initialMessageId?: string | null;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
@@ -43,6 +45,7 @@
 	let {
 		api,
 		session,
+		initialMessageId = null,
 		onMissingOrg,
 		onSwitchNavigate,
 		onLogout,
@@ -52,11 +55,16 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let inbox = $state<PersonalEmailInboxState>(emptyPersonalEmailInboxState());
 	let selectedId = $state<string | undefined>(undefined);
+	let pendingMessageId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let syncPending = $state(false);
 	let syncFeedback = $state<string | null>(null);
+
+	$effect(() => {
+		pendingMessageId = initialMessageId ?? null;
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -136,10 +144,14 @@
 			const next = await loadPersonalEmailInbox(api);
 			if (isStale(epoch)) return;
 			inbox = next;
-			selectedId = preserveSelectedMessageId(
-				selectedId,
-				next.messages.map((m) => m.id)
-			);
+			const ids = next.messages.map((m) => m.id);
+			const deepLinkId = pendingMessageId;
+			if (deepLinkId && ids.includes(deepLinkId)) {
+				selectedId = deepLinkId;
+				pendingMessageId = null;
+			} else {
+				selectedId = preserveSelectedMessageId(selectedId, ids);
+			}
 			if (next.listError) {
 				viewState = {
 					kind: 'validation',
