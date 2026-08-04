@@ -28,7 +28,7 @@ import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
 import { decodeInvoiceCursor, validateInvoiceBody } from './invoices.ts'
 import { validateBillBody } from './bills.ts'
-import { validateVendorBody } from './vendors.ts'
+import { validateVendorBankDetailsBody, validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
 import { decodeMeetingCursor, validateMeetingBody } from './meetings.ts'
 import {
@@ -851,6 +851,18 @@ Deno.test('vendor create validation defaults status and rejects unknown fields',
   )
   assertThrows(
     () => validateVendorBody({ name: 'X', primary_email: 'not-an-email' }, false),
+    ApiError,
+  )
+})
+
+Deno.test('vendor bank details body accepts trimmed plaintext only', () => {
+  assertEquals(
+    validateVendorBankDetailsBody({ bank_details: '  IBAN GB00  ' }),
+    { bank_details: 'IBAN GB00' },
+  )
+  assertThrows(() => validateVendorBankDetailsBody({ bank_details: '' }), ApiError)
+  assertThrows(
+    () => validateVendorBankDetailsBody({ bank_details: 'x', extra: true }),
     ApiError,
   )
 })
