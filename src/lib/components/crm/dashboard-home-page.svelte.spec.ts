@@ -9,6 +9,7 @@ import DashboardHomePage from './dashboard-home-page.svelte';
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const MEMBERSHIP_ID = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
 const TASK_ID = '11111111-2222-4333-8444-555555555555';
+const TASK_B = '22222222-3333-4444-8555-666666666666';
 const MEETING_ID = '33333333-4444-4555-8666-777777777777';
 
 function sampleTask(overrides: Record<string, unknown> = {}) {
@@ -196,5 +197,62 @@ describe('DashboardHomePage integration', () => {
 		await expect.poll(() => seenMeetingUrls.length).toBeGreaterThan(0);
 		expect(seenMeetingUrls.some((url) => url.includes('upcoming=true'))).toBe(true);
 		expect(seenMeetingUrls.some((url) => url.includes('limit=5'))).toBe(true);
+	});
+
+	it('opens create drawer from New task and prepends My tasks on success', async () => {
+		let createBody: unknown;
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/tasks': async () => ({
+				body: { data: [sampleTask()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/meetings': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'POST /api/v1/tasks': async (request) => {
+				createBody = await request.json();
+				return {
+					status: 201,
+					body: {
+						data: sampleTask({
+							id: TASK_B,
+							title: 'Chase invoice',
+							status: 'in_progress',
+							assignee_membership_id: MEMBERSHIP_ID
+						})
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(DashboardHomePage, { api, session });
+
+		await expect.element(page.getByText('Home')).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: 'Send kickoff pack', exact: true }))
+			.toBeInTheDocument();
+
+		const newTask = page.getByRole('button', { name: 'New task' });
+		await expect.element(newTask).toBeInTheDocument();
+		expect(newTask.element().getAttribute('href')).toBeNull();
+
+		await newTask.click();
+		await expect.element(page.getByText('Create a follow-up for your team.')).toBeInTheDocument();
+		await page.getByLabelText('Title').fill('Chase invoice');
+		await page.getByTestId('task-form').getByRole('button', { name: 'Save task' }).click();
+
+		await expect
+			.element(page.getByRole('button', { name: 'Chase invoice', exact: true }))
+			.toBeInTheDocument();
+		await expect.element(page.getByText('Home')).toBeInTheDocument();
+		expect(createBody).toMatchObject({
+			title: 'Chase invoice',
+			priority: 'p3',
+			status: 'open',
+			source: 'manual'
+		});
 	});
 });
