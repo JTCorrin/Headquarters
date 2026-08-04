@@ -318,7 +318,7 @@ select ok(
   (
     select
       position('has_org_role' in prosrc)
-        < position('for update' in lower(prosrc))
+        < position(E'\n  for update' in lower(prosrc))
     from pg_proc
     where oid = 'public.adjust_product_stock(uuid, numeric, text, text, timestamptz)'::regprocedure
   ),
@@ -329,7 +329,7 @@ select ok(
   (
     select
       position('has_org_role' in prosrc)
-        < position('for update' in lower(prosrc))
+        < position(E'\n    for update' in lower(prosrc))
     from pg_proc
     where oid = 'public.adjust_product_stock_idempotent(uuid, uuid, numeric, text, text, text, text, text, timestamptz, integer)'::regprocedure
   ),
