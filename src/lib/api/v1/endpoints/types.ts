@@ -85,6 +85,9 @@ import type {
 	ApiProjectCard,
 	ApiProjectCardCreateBody,
 	ApiProjectCardUpdateBody,
+	ApiProjectColumn,
+	ApiProjectColumnCreateBody,
+	ApiProjectColumnUpdateBody,
 	ApiProjectCreateBody,
 	ApiProjectDocument,
 	ApiProjectListParams,
@@ -375,6 +378,24 @@ export interface ProjectsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiProjectDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	createColumn(
+		projectId: string,
+		body: ApiProjectColumnCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiProjectColumn>;
+	updateColumn(
+		projectId: string,
+		columnId: string,
+		body: ApiProjectColumnUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiProjectColumn>;
+	deleteColumn(
+		projectId: string,
+		columnId: string,
+		version: number,
+		signal?: AbortSignal
+	): Promise<void>;
 	createCard(
 		projectId: string,
 		body: ApiProjectCardCreateBody,

@@ -946,6 +946,19 @@ export interface ApiProjectCardUpdateBody {
 	completed_at?: string | null;
 }
 
+export interface ApiProjectColumnCreateBody {
+	name: string;
+	key?: string;
+	position?: number;
+	wip_limit?: number | null;
+}
+
+export type ApiProjectColumnUpdateBody = Partial<{
+	name: string;
+	position: number;
+	wip_limit: number | null;
+}>;
+
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
 export interface ApiClient {

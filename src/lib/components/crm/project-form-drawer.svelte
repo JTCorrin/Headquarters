@@ -15,6 +15,8 @@
 		description?: string;
 		submitLabel?: string;
 		triggerLabel?: string;
+		showTrigger?: boolean;
+		allowArchived?: boolean;
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -28,6 +30,8 @@
 		description = 'Projects attach to a client and open as their own kanban workspace.',
 		submitLabel = 'Save project',
 		triggerLabel = 'New project',
+		showTrigger = true,
+		allowArchived = false,
 		class: className,
 		trigger,
 		onValidSubmit
@@ -35,18 +39,20 @@
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
-	{#if trigger}
-		<Drawer.Trigger>
-			{#snippet child({ props })}
-				<span class="inline-flex" {...props}>{@render trigger()}</span>
-			{/snippet}
-		</Drawer.Trigger>
-	{:else}
-		<Drawer.Trigger>
-			{#snippet child({ props })}
-				<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
-			{/snippet}
-		</Drawer.Trigger>
+	{#if showTrigger}
+		{#if trigger}
+			<Drawer.Trigger>
+				{#snippet child({ props })}
+					<span class="inline-flex" {...props}>{@render trigger()}</span>
+				{/snippet}
+			</Drawer.Trigger>
+		{:else}
+			<Drawer.Trigger>
+				{#snippet child({ props })}
+					<Button type="button" size="sm" {...props}>{triggerLabel}</Button>
+				{/snippet}
+			</Drawer.Trigger>
+		{/if}
 	{/if}
 
 	<Drawer.Content class={cn('mx-auto w-full max-w-lg', className)}>
@@ -55,7 +61,14 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ProjectForm {form} {clients} {submitLabel} {onValidSubmit} class="max-w-none" />
+			<ProjectForm
+				{form}
+				{clients}
+				{submitLabel}
+				{allowArchived}
+				{onValidSubmit}
+				class="max-w-none"
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>
