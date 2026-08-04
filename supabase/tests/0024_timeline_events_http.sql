@@ -18,7 +18,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_timeline_event(uuid, text, uuid, text, text, text, jsonb)',
+    'public.create_timeline_event(uuid, text, uuid, text, text, text, jsonb, text, uuid)',
     'execute'
   ),
   'authenticated users can execute create_timeline_event'
@@ -27,7 +27,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.create_timeline_event(uuid, text, uuid, text, text, text, jsonb)',
+    'public.create_timeline_event(uuid, text, uuid, text, text, text, jsonb, text, uuid)',
     'execute'
   ),
   'anonymous users cannot execute create_timeline_event'
