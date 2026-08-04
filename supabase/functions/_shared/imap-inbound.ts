@@ -86,6 +86,190 @@ export function isSyntheticImapHost(host: string): boolean {
   return h === 'imap.example.test' || h.endsWith('.example.test')
 }
 
+/** DNS resolver seam for SSRF host checks (inject in tests). */
+export type OutboundDnsResolveFn = (
+  hostname: string,
+  recordType: 'A' | 'AAAA',
+) => Promise<string[]>
+
+const BLOCKED_OUTBOUND_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  'metadata.google.internal',
+  'metadata',
+  'host.docker.internal',
+  'kubernetes.default',
+  'kubernetes.default.svc',
+  'kubernetes.default.svc.cluster.local',
+])
+
+function normalizeHostname(host: string): string {
+  return host.trim().toLowerCase().replace(/\.+$/, '')
+}
+
+function stripIpBrackets(ip: string): string {
+  const t = ip.trim().toLowerCase()
+  if (t.startsWith('[') && t.endsWith(']')) return t.slice(1, -1)
+  return t
+}
+
+function parseIpv4(ip: string): number[] | null {
+  const parts = ip.split('.')
+  if (parts.length !== 4) return null
+  const octets: number[] = []
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null
+    const n = Number(part)
+    if (!Number.isInteger(n) || n < 0 || n > 255) return null
+    octets.push(n)
+  }
+  return octets
+}
+
+function ipv4ToInt(octets: number[]): number {
+  return ((octets[0]! << 24) >>> 0) + (octets[1]! << 16) + (octets[2]! << 8) + octets[3]!
+}
+
+function inIpv4Cidr(octets: number[], base: number[], prefix: number): boolean {
+  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0
+  return (ipv4ToInt(octets) & mask) === (ipv4ToInt(base) & mask)
+}
+
+/** True for private, loopback, link-local, CGNAT, and cloud metadata ranges. */
+export function isBlockedOutboundIp(ip: string): boolean {
+  const raw = stripIpBrackets(ip)
+  if (!raw) return true
+
+  const v4 = parseIpv4(raw)
+  if (v4) {
+    return (
+      inIpv4Cidr(v4, [0, 0, 0, 0], 8) || // "this" network
+      inIpv4Cidr(v4, [10, 0, 0, 0], 8) ||
+      inIpv4Cidr(v4, [127, 0, 0, 0], 8) ||
+      inIpv4Cidr(v4, [169, 254, 0, 0], 16) || // link-local + metadata
+      inIpv4Cidr(v4, [172, 16, 0, 0], 12) ||
+      inIpv4Cidr(v4, [192, 168, 0, 0], 16) ||
+      inIpv4Cidr(v4, [100, 64, 0, 0], 10) // CGNAT
+    )
+  }
+
+  // IPv4-mapped IPv6 (::ffff:a.b.c.d)
+  const mapped = raw.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i)
+  if (mapped?.[1]) return isBlockedOutboundIp(mapped[1])
+
+  // Compressed / expanded IPv6 — normalize via URL parser when available.
+  let v6 = raw
+  if (!v6.includes(':')) return false
+  try {
+    // Deno may keep brackets on IPv6 hostnames from URL().
+    const parsed = new URL(`http://[${stripIpBrackets(v6)}]/`)
+    v6 = stripIpBrackets(parsed.hostname)
+  } catch {
+    // Keep raw; still apply prefix checks below on common forms.
+  }
+
+  if (v6 === '::1' || v6 === '0:0:0:0:0:0:0:1') return true
+  if (v6 === '::' || v6 === '0:0:0:0:0:0:0:0') return true
+
+  // Unique local fc00::/7, link-local fe80::/10
+  const head = v6.split(':')[0] ?? ''
+  if (/^f[cd]/i.test(head)) return true
+  if (/^fe[89ab]/i.test(head)) return true
+
+  return false
+}
+
+/** True for localhost / internal / metadata-style hostnames (not public DNS names). */
+export function isBlockedOutboundHostname(host: string): boolean {
+  const h = normalizeHostname(host)
+  if (!h) return true
+  if (BLOCKED_OUTBOUND_HOSTNAMES.has(h)) return true
+  if (
+    h.endsWith('.localhost') ||
+    h.endsWith('.local') ||
+    h.endsWith('.internal') ||
+    h.endsWith('.lan') ||
+    h.endsWith('.home') ||
+    h.endsWith('.corp')
+  ) {
+    return true
+  }
+  if (h === '::1' || h === '[::1]') return true
+  if (parseIpv4(h) || h.includes(':')) return isBlockedOutboundIp(h)
+  return false
+}
+
+async function defaultResolveDns(hostname: string, recordType: 'A' | 'AAAA'): Promise<string[]> {
+  try {
+    return await Deno.resolveDns(hostname, recordType)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Resolve host and reject private/link-local/metadata targets before TCP connect.
+ * Synthetic `*.example.test` hosts are allowed (mailbox test short-circuit / unit doubles).
+ */
+export async function assertSafeOutboundHost(
+  host: string,
+  resolveDns: OutboundDnsResolveFn = defaultResolveDns,
+): Promise<void> {
+  const h = host.trim()
+  if (!h) {
+    throw new ImapSyncError('imap_host_blocked', 'Mailbox host is empty', false, 'connect')
+  }
+
+  if (isSyntheticImapHost(h)) return
+
+  if (isBlockedOutboundHostname(h)) {
+    throw new ImapSyncError(
+      'imap_host_blocked',
+      'Mailbox host is not allowed (private or internal name)',
+      false,
+      'connect',
+    )
+  }
+
+  // Literal IP — no DNS needed.
+  const literal = stripIpBrackets(h)
+  if (parseIpv4(literal) || literal.includes(':')) {
+    if (isBlockedOutboundIp(literal)) {
+      throw new ImapSyncError(
+        'imap_host_blocked',
+        'Mailbox host address is not allowed',
+        false,
+        'connect',
+      )
+    }
+    return
+  }
+
+  const [aRecords, aaaaRecords] = await Promise.all([
+    resolveDns(normalizeHostname(h), 'A'),
+    resolveDns(normalizeHostname(h), 'AAAA'),
+  ])
+  const addrs = [...aRecords, ...aaaaRecords]
+  if (addrs.length === 0) {
+    throw new ImapSyncError(
+      'imap_connection_failed',
+      'Mailbox host could not be resolved',
+      false,
+      'connect',
+    )
+  }
+  for (const addr of addrs) {
+    if (isBlockedOutboundIp(addr)) {
+      throw new ImapSyncError(
+        'imap_host_blocked',
+        'Mailbox host resolves to a blocked address',
+        false,
+        'connect',
+      )
+    }
+  }
+}
+
 function timeoutStepFromLabel(label: string): string | null {
   const lower = label.toLowerCase()
   if (lower.includes('fetch')) return 'fetch'
@@ -145,6 +329,7 @@ export function safeMailboxSyncFailureMessage(
       imap_fetch_failed: 'fetch',
       imap_tls_failed: 'connect',
       imap_connection_failed: 'connect',
+      imap_host_blocked: 'connect',
       credentials_missing: 'credentials',
       lease_error: 'lease',
       not_claimed: 'lease',
@@ -164,6 +349,8 @@ export function safeMailboxSyncFailureMessage(
       'Secure connection failed — try a different security setting (SSL / STARTTLS).',
     imap_connection_failed:
       'Could not reach the mail server — check host, port, and security settings.',
+    imap_host_blocked:
+      'This mail host is not allowed — private, link-local, and metadata addresses are blocked.',
     credentials_missing: 'Mailbox credentials are missing — save a password, then try Sync again.',
     lease_error: 'Could not start sync — try again in a moment.',
     not_claimed: 'Another sync is already running — wait a moment and try again.',
@@ -559,6 +746,9 @@ async function openImapConnection(
 ): Promise<ImapSessionLike> {
   const deadline = Date.now() + Math.max(1, connectTimeoutMs)
   const remaining = () => Math.max(1, deadline - Date.now())
+
+  // Reject private/link-local/metadata targets before any TCP/TLS connect.
+  await assertSafeOutboundHost(host)
 
   try {
     if (security === 'tls') {
