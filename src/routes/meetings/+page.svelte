@@ -42,5 +42,8 @@
 		void goto(`/meetings/${meetingId}`);
 	}}
 	onClearEntityFilter={clearEntityFilter}
+	onOpenCalendar={() => {
+		void goto('/meetings/calendar');
+	}}
 	onLogout={handleLogout}
 />

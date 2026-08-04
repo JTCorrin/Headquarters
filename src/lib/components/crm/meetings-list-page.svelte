@@ -6,6 +6,7 @@
 	import MeetingsTable from './meetings-table.svelte';
 	import MeetingFormDrawer from './meeting-form-drawer.svelte';
 	import ListFilterBanner from './list-filter-banner.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface MeetingsListPageProps {
@@ -25,6 +26,7 @@
 		onValidEdit?: () => boolean | void | Promise<boolean | void>;
 		onEditMeeting?: (id: string) => void;
 		onDeleteMeeting?: (id: string) => void;
+		onOpenCalendar?: () => void;
 	}
 
 	let {
@@ -42,7 +44,8 @@
 		onValidSubmit,
 		onValidEdit,
 		onEditMeeting,
-		onDeleteMeeting
+		onDeleteMeeting,
+		onOpenCalendar
 	}: MeetingsListPageProps = $props();
 </script>
 
@@ -65,6 +68,11 @@
 				description="Upcoming and past — transcripts and AI summaries live on each meeting."
 			>
 				{#snippet actions()}
+					{#if onOpenCalendar}
+						<Button type="button" size="sm" variant="outline" onclick={onOpenCalendar}>
+							Calendar
+						</Button>
+					{/if}
 					<MeetingFormDrawer bind:open={drawerOpen} {form} {onValidSubmit} />
 				{/snippet}
 			</PageHeader>
