@@ -692,7 +692,7 @@ export type TaskRow = {
   completed_at: string | null
   blocked_reason: string | null
   source: 'manual' | 'meeting' | 'email' | 'workflow' | 'agent'
-  entity_type: 'contact' | 'lead' | 'client' | null
+  entity_type: 'contact' | 'lead' | 'client' | 'project' | null
   entity_id: string | null
   meeting_id: string | null
   project_card_id: string | null

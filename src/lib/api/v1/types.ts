@@ -615,7 +615,7 @@ export interface ApiBillListParams {
 export type ApiTaskPriority = 'p1' | 'p2' | 'p3' | 'p4';
 export type ApiTaskStatus = 'open' | 'in_progress' | 'blocked' | 'done' | 'cancelled';
 export type ApiTaskSource = 'manual' | 'meeting' | 'email' | 'workflow' | 'agent';
-export type ApiTaskEntityType = 'contact' | 'client' | 'lead';
+export type ApiTaskEntityType = 'contact' | 'client' | 'lead' | 'project';
 
 export interface ApiTask {
 	id: string;
@@ -650,10 +650,12 @@ export interface ApiTaskListParams {
 	cursor?: string;
 	status?: ApiTaskStatus;
 	assignee?: 'me';
-	/** Must be sent with `entity_id` (contact | lead | client). */
+	/** Must be sent with `entity_id` (contact | lead | client | project). */
 	entity_type?: ApiTaskEntityType;
 	/** Must be sent with `entity_type`. */
 	entity_id?: string;
+	meeting_id?: string;
+	project_card_id?: string;
 }
 
 export interface ApiTaskCreateBody {
