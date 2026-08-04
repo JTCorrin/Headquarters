@@ -65,7 +65,21 @@ log "org ${ORG_ID}"
 STARTS="$(date -u -d '+3 days' +%Y-%m-%dT10:00:00.000Z 2>/dev/null || date -u -v+3d +%Y-%m-%dT10:00:00.000Z)"
 ENDS="$(date -u -d '+3 days 1 hour' +%Y-%m-%dT11:00:00.000Z 2>/dev/null || date -u -v+3d -v+1H +%Y-%m-%dT11:00:00.000Z)"
 
-log "POST meetings"
+log "POST clients (related entity for inherit + timeline)"
+create_client="$(
+	curl -fsS --max-time 30 \
+		-X POST "${API_BASE}/api/v1/clients" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d '{"name":"M2 Proof Client","status":"active"}'
+)"
+CLIENT_ID="$(printf '%s' "$create_client" | jq -r '.data.id // empty')"
+[[ -n "$CLIENT_ID" ]] || die "client create: ${create_client}"
+log "client ${CLIENT_ID}"
+
+log "POST meetings (related client)"
 create_meeting="$(
 	curl -fsS --max-time 30 \
 		-X POST "${API_BASE}/api/v1/meetings" \
@@ -73,13 +87,26 @@ create_meeting="$(
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
 		-H "X-Org-Id: ${ORG_ID}" \
 		-H 'content-type: application/json' \
-		-d "$(jq -n --arg starts "$STARTS" --arg ends "$ENDS" \
-			'{title:"M2 assistant proof", starts_at:$starts, ends_at:$ends}')"
+		-d "$(jq -n --arg starts "$STARTS" --arg ends "$ENDS" --arg c "$CLIENT_ID" \
+			'{title:"M2 assistant proof", starts_at:$starts, ends_at:$ends,
+			  related_entity_type:"client", related_entity_id:$c}')"
 )"
 MEETING_ID="$(printf '%s' "$create_meeting" | jq -r '.data.id // empty')"
 MEETING_VER="$(printf '%s' "$create_meeting" | jq -r '.data.version // empty')"
 [[ -n "$MEETING_ID" && -n "$MEETING_VER" ]] || die "meeting create: ${create_meeting}"
 log "meeting ${MEETING_ID} v${MEETING_VER}"
+
+log "GET client timeline for meeting.scheduled"
+timeline_sched="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/entities/client/${CLIENT_ID}/timeline-events?limit=20" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+SCHED_COUNT="$(printf '%s' "$timeline_sched" | jq -r --arg mid "$MEETING_ID" \
+	'[.data[]? | select(.kind == "meeting" and (.payload.action // "") == "meeting.scheduled" and (.payload.meeting_id // "") == $mid)] | length')"
+[[ "$SCHED_COUNT" == "1" ]] || die "expected meeting.scheduled timeline card: ${timeline_sched}"
 
 log "POST transcript (plain_text stub path)"
 transcript_code="$(
@@ -141,7 +168,7 @@ PROP_STATUS="$(printf '%s' "$accept_json" | jq -r --arg id "$PROPOSAL_ID" \
 [[ -n "$TASK_ID" && "$PROP_STATUS" == "accepted" ]] || die "accept: ${accept_json}"
 log "accepted task ${TASK_ID}"
 
-log "GET task proves meeting source"
+log "GET task proves meeting source + related-entity inherit"
 task_json="$(
 	curl -fsS --max-time 30 \
 		"${API_BASE}/api/v1/tasks/${TASK_ID}" \
@@ -151,7 +178,35 @@ task_json="$(
 )"
 TASK_SOURCE="$(printf '%s' "$task_json" | jq -r '.data.source // empty')"
 TASK_MEETING="$(printf '%s' "$task_json" | jq -r '.data.meeting_id // empty')"
+TASK_ENTITY_TYPE="$(printf '%s' "$task_json" | jq -r '.data.entity_type // empty')"
+TASK_ENTITY_ID="$(printf '%s' "$task_json" | jq -r '.data.entity_id // empty')"
 [[ "$TASK_SOURCE" == "meeting" && "$TASK_MEETING" == "$MEETING_ID" ]] \
 	|| die "task get: ${task_json}"
+[[ "$TASK_ENTITY_TYPE" == "client" && "$TASK_ENTITY_ID" == "$CLIENT_ID" ]] \
+	|| die "task missing related-entity inherit: ${task_json}"
+
+log "GET tasks?meeting_id= filter"
+tasks_by_meeting="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/tasks?meeting_id=${MEETING_ID}" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+FILTER_COUNT="$(printf '%s' "$tasks_by_meeting" | jq -r --arg id "$TASK_ID" \
+	'[.data[]? | select(.id == $id)] | length')"
+[[ "$FILTER_COUNT" == "1" ]] || die "meeting_id filter missed task: ${tasks_by_meeting}"
+
+log "GET client timeline for meeting.task_accepted"
+timeline_accept="$(
+	curl -fsS --max-time 30 \
+		"${API_BASE}/api/v1/entities/client/${CLIENT_ID}/timeline-events?limit=20" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+ACCEPT_TL="$(printf '%s' "$timeline_accept" | jq -r --arg tid "$TASK_ID" \
+	'[.data[]? | select(.kind == "task" and (.payload.action // "") == "meeting.task_accepted" and (.payload.task_id // "") == $tid)] | length')"
+[[ "$ACCEPT_TL" == "1" ]] || die "expected meeting.task_accepted timeline card: ${timeline_accept}"
 
 log "OK meeting assistant proof passed"
