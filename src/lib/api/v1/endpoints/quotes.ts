@@ -1,4 +1,5 @@
 import type { ApiRequestFn } from '../request.js';
+import { newIdempotencyKey } from '../idempotency.js';
 import type {
 	ApiQuote,
 	ApiQuoteCreateBody,
@@ -61,6 +62,7 @@ export function createQuotesEndpoints(request: ApiRequestFn): QuotesEndpoints {
 				body: {},
 				orgScoped: true,
 				ifMatchVersion: version,
+				headers: { 'Idempotency-Key': newIdempotencyKey('quote-accept') },
 				signal
 			});
 			return data;

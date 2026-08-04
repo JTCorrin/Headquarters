@@ -579,6 +579,7 @@ describe('createApiV1Client', () => {
 			},
 			[`POST /api/v1/quotes/${QUOTE_ID}/accept`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
 				return {
 					headers: { etag: '"3"' },
 					body: {
@@ -732,6 +733,7 @@ describe('createApiV1Client', () => {
 			},
 			[`POST /api/v1/invoices/${INVOICE_ID}/send`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
 				return {
 					headers: { etag: '"3"' },
 					body: {
@@ -746,6 +748,7 @@ describe('createApiV1Client', () => {
 			},
 			[`POST /api/v1/invoices/${INVOICE_ID}/void`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"3"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
 				const body = await request.json();
 				expect(body.void_reason).toBe('Duplicate');
 				return {
@@ -792,6 +795,76 @@ describe('createApiV1Client', () => {
 		expect(voided.status).toBe('void');
 
 		await client.invoices.delete(INVOICE_ID, 1);
+	});
+
+	it('sends Idempotency-Key on bill receive and void', async () => {
+		const BILL_ID = 'bbbbbbbb-1111-4222-8333-cccccccccccc';
+		const sampleBillDocument = {
+			id: BILL_ID,
+			org_id: ORG_A,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			vendor_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+			number: 'BILL-0001',
+			internal_reference: null,
+			status: 'draft' as const,
+			currency: 'GBP',
+			issue_on: null,
+			received_on: '2026-03-01',
+			due_on: '2026-04-01',
+			scheduled_payment_on: null,
+			subtotal_cents: 0,
+			discount_cents: 0,
+			tax_cents: 0,
+			total_cents: 0,
+			paid_cents: 0,
+			balance_due_cents: 0,
+			party_snapshot: { name: 'Cloudflare' },
+			notes: null,
+			attachment_document_id: null,
+			paid_at: null,
+			voided_at: null,
+			void_reason: null,
+			lines: []
+		};
+
+		const fetchMock = createMockFetch({
+			[`POST /api/v1/bills/${BILL_ID}/receive`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"1"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
+				return {
+					headers: { etag: '"2"' },
+					body: {
+						data: { ...sampleBillDocument, version: 2, status: 'received' }
+					}
+				};
+			},
+			[`POST /api/v1/bills/${BILL_ID}/void`]: async (request) => {
+				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(request.headers.get('idempotency-key')).toBeTruthy();
+				return {
+					headers: { etag: '"3"' },
+					body: {
+						data: {
+							...sampleBillDocument,
+							version: 3,
+							status: 'void',
+							void_reason: 'Duplicate'
+						}
+					}
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const received = await client.bills.receive(BILL_ID, 1);
+		expect(received.status).toBe('received');
+		const voided = await client.bills.void(BILL_ID, { void_reason: 'Duplicate' }, 2);
+		expect(voided.status).toBe('void');
 	});
 
 	it('retains initiating org when token resolve races with an org switch', async () => {
