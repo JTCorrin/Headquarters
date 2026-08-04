@@ -41,6 +41,7 @@ export function buildApiV1ProxyUrl(
  * Explicit allow-list of headers forwarded upstream. Everything else (cookies,
  * hop-by-hop headers, spoofable x-forwarded-* / x-real-ip, etc.) is dropped.
  * Mirrors the headers the edge function accepts via CORS.
+ * Also forwards `mcp-*` (Cursor / MCP session headers).
  */
 const FORWARD_REQUEST_HEADERS = new Set([
 	'accept',
@@ -55,11 +56,28 @@ const FORWARD_REQUEST_HEADERS = new Set([
 	'x-request-id'
 ]);
 
-export function forwardProxyHeaders(source: Headers): Headers {
+export interface ForwardProxyHeadersOptions {
+	/**
+	 * When the inbound request has no `apikey`, inject this value (typically
+	 * `PUBLIC_SUPABASE_ANON_KEY`). Kong requires it; agents should only paste
+	 * the CRM `crm_key_…` Bearer secret.
+	 */
+	fallbackApikey?: string | null;
+}
+
+export function forwardProxyHeaders(
+	source: Headers,
+	options: ForwardProxyHeadersOptions = {}
+): Headers {
 	const headers = new Headers();
 	for (const [key, value] of source.entries()) {
-		if (!FORWARD_REQUEST_HEADERS.has(key.toLowerCase())) continue;
+		const lower = key.toLowerCase();
+		if (!FORWARD_REQUEST_HEADERS.has(lower) && !lower.startsWith('mcp-')) continue;
 		headers.set(key, value);
+	}
+	if (!headers.has('apikey')) {
+		const anon = options.fallbackApikey?.trim();
+		if (anon) headers.set('apikey', anon);
 	}
 	return headers;
 }
