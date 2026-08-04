@@ -14,3 +14,8 @@ export function getApiV1Client(): ApiV1Client {
 	}
 	return client;
 }
+
+/** Prefer for optional chrome (e.g. AppShell bell) — null when outside layout context. */
+export function getOptionalApiV1Client(): ApiV1Client | null {
+	return getContext<ApiV1Client | undefined>(API_V1_CONTEXT) ?? null;
+}
