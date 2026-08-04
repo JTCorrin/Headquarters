@@ -1280,8 +1280,9 @@ export type Database = {
       }
       user_notifications: {
         Row: UserNotificationRow
-        Insert: Partial<UserNotificationRow> &
-          Pick<
+        Insert:
+          & Partial<UserNotificationRow>
+          & Pick<
             UserNotificationRow,
             'org_id' | 'recipient_membership_id' | 'kind' | 'title' | 'source_type' | 'source_id'
           >
