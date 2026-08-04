@@ -78,10 +78,12 @@ fi
 mkdir -p supabase/functions
 cat > supabase/functions/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
+CALENDAR_SYNC_STAGING_STUB=1
 EOF
 # Mirror for any tooling that still reads the repo-root supabase/.env.
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
+CALENDAR_SYNC_STAGING_STUB=1
 EOF
 
 log "starting Supabase (migrations apply on first start)"
@@ -127,12 +129,14 @@ mkdir -p supabase/functions
 cat > supabase/functions/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
+CALENDAR_SYNC_STAGING_STUB=1
 EOF
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
+CALENDAR_SYNC_STAGING_STUB=1
 EOF
-log "wrote PUBLIC_SUPABASE_URL into supabase/functions/.env for Edge storage URL rewrite"
+log "wrote PUBLIC_SUPABASE_URL + CALENDAR_SYNC_STAGING_STUB into supabase/functions/.env"
 
 # Edge loads supabase/functions/.env on container create (supabase start), not on a
 # plain restart. CLI names use underscores (supabase_edge_runtime_*) or hyphens.
@@ -356,6 +360,17 @@ if [[ -x scripts/meetings_staging_curl_proof.sh ]]; then
 		scripts/meetings_staging_curl_proof.sh
 else
 	log "meetings curl proof script missing — skipped"
+fi
+
+# Calendar C2 sync: reserved-col reject + stub OAuth + push set/clear.
+if [[ -x scripts/calendar_sync_staging_curl_proof.sh ]]; then
+	log "running calendar sync curl proof"
+	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
+		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
+		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
+		scripts/calendar_sync_staging_curl_proof.sh
+else
+	log "calendar sync curl proof script missing — skipped"
 fi
 
 # Meeting assistant M2: transcript → summary stub → accept proposal → task.
