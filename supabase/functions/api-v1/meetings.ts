@@ -456,14 +456,18 @@ function encodeCursor(cursor: MeetingCursor): string {
     .replace(/=+$/, '')
 }
 
-export function decodeMeetingCursor(value: string, upcoming: boolean): MeetingCursor {
+/**
+ * Decode list cursor. When `byStartsAt` is true (upcoming or starts_at range mode),
+ * the cursor carries `starts_at`+`id`; otherwise `created_at`+`id`.
+ */
+export function decodeMeetingCursor(value: string, byStartsAt: boolean): MeetingCursor {
   try {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
     const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
     const padding = '='.repeat((4 - (base64.length % 4)) % 4)
     const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<MeetingCursor>
     const id = parseUuid(cursor.id ?? null, 'cursor')
-    if (upcoming) {
+    if (byStartsAt) {
       const startsAt = cursor.starts_at
       if (
         typeof startsAt !== 'string' ||
@@ -488,6 +492,55 @@ export function decodeMeetingCursor(value: string, upcoming: boolean): MeetingCu
       cursor: 'Must be a cursor returned by this endpoint',
     })
   }
+}
+
+function parseOptionalStartsBound(value: string | null, field: string): string | null {
+  if (value === null || value === '') return null
+  if (!ISO_TIMESTAMP.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new ApiError(400, 'BAD_REQUEST', `${field} is invalid`, {
+      [field]: 'Must be an ISO-8601 timestamp',
+    })
+  }
+  return new Date(Date.parse(value)).toISOString()
+}
+
+/** Parse optional calendar window; rejects inverted bounds and combo with upcoming. */
+export function parseMeetingListRange(
+  searchParams: URLSearchParams,
+  upcoming: boolean,
+): { startsAfter: string | null; startsBefore: string | null; rangeActive: boolean } {
+  const startsAfter = parseOptionalStartsBound(searchParams.get('starts_after'), 'starts_after')
+  const startsBefore = parseOptionalStartsBound(searchParams.get('starts_before'), 'starts_before')
+  const rangeActive = startsAfter !== null || startsBefore !== null
+
+  if (rangeActive && upcoming) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      'upcoming cannot be combined with starts_after or starts_before',
+      {
+        upcoming: 'Omit upcoming when using a starts_at range',
+      },
+    )
+  }
+
+  if (
+    startsAfter !== null &&
+    startsBefore !== null &&
+    Date.parse(startsAfter) > Date.parse(startsBefore)
+  ) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      'starts_after must be less than or equal to starts_before',
+      {
+        starts_after: 'Must be ≤ starts_before',
+        starts_before: 'Must be ≥ starts_after',
+      },
+    )
+  }
+
+  return { startsAfter, startsBefore, rangeActive }
 }
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
@@ -1115,6 +1168,12 @@ async function listMeetings(
     throw new ApiError(400, 'BAD_REQUEST', 'upcoming must be true or false')
   }
 
+  const { startsAfter, startsBefore, rangeActive } = parseMeetingListRange(
+    url.searchParams,
+    upcoming,
+  )
+  const byStartsAt = upcoming || rangeActive
+
   const entityType = url.searchParams.get('entity_type')
   const entityId = url.searchParams.get('entity_id')
   if ((entityType === null) !== (entityId === null)) {
@@ -1144,12 +1203,22 @@ async function listMeetings(
       .eq('related_entity_type', entityType as RelatedEntityType)
       .eq('related_entity_id', parseUuid(entityId, 'entity_id'))
   }
+  if (startsAfter !== null) {
+    query = query.gte('starts_at', startsAfter)
+  }
+  if (startsBefore !== null) {
+    query = query.lte('starts_at', startsBefore)
+  }
 
   if (upcoming) {
     const now = new Date().toISOString()
     query = query
       .gte('starts_at', now)
       .in('status', ['scheduled', 'in_progress'])
+  }
+
+  if (byStartsAt) {
+    query = query
       .order('starts_at', { ascending: true })
       .order('id', { ascending: true })
   } else {
@@ -1160,8 +1229,8 @@ async function listMeetings(
 
   const cursorValue = url.searchParams.get('cursor')
   if (cursorValue) {
-    const cursor = decodeMeetingCursor(cursorValue, upcoming)
-    if (upcoming && cursor.starts_at) {
+    const cursor = decodeMeetingCursor(cursorValue, byStartsAt)
+    if (byStartsAt && cursor.starts_at) {
       query = query.or(
         `starts_at.gt.${cursor.starts_at},and(starts_at.eq.${cursor.starts_at},id.gt.${cursor.id})`,
       )
@@ -1182,7 +1251,7 @@ async function listMeetings(
 
   let nextCursor: string | null = null
   if (hasNextPage && last) {
-    nextCursor = upcoming
+    nextCursor = byStartsAt
       ? encodeCursor({ starts_at: last.starts_at, id: last.id })
       : encodeCursor({ created_at: last.created_at, id: last.id })
   }
