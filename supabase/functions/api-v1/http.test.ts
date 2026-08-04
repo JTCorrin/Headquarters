@@ -35,7 +35,7 @@ import { billLifecycleIdempotencyPayload, validateBillBody } from './bills.ts'
 import { quoteAcceptIdempotencyPayload } from './quotes.ts'
 import { validateVendorBankDetailsBody, validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
-import { decodeMeetingCursor, validateMeetingBody } from './meetings.ts'
+import { decodeMeetingCursor, parseMeetingListRange, validateMeetingBody } from './meetings.ts'
 import {
   decodeProjectCursor,
   parseProjectStatusFilter,
@@ -1040,6 +1040,52 @@ Deno.test('meeting cursor round-trip shape', () => {
   assertEquals(decodedStarts.starts_at, startsAt)
   assertEquals(decodedStarts.id, id)
   assertThrows(() => decodeMeetingCursor('not-a-cursor', false), ApiError)
+})
+
+Deno.test('meeting list range params validate and reject bad combos', () => {
+  const ok = parseMeetingListRange(
+    new URLSearchParams({
+      starts_after: '2026-08-01T00:00:00.000Z',
+      starts_before: '2026-08-31T23:59:59.000Z',
+    }),
+    false,
+  )
+  assertEquals(ok.rangeActive, true)
+  assertEquals(ok.startsAfter, '2026-08-01T00:00:00.000Z')
+  assertEquals(ok.startsBefore, '2026-08-31T23:59:59.000Z')
+
+  const afterOnly = parseMeetingListRange(
+    new URLSearchParams({ starts_after: '2026-08-01T00:00:00Z' }),
+    false,
+  )
+  assertEquals(afterOnly.rangeActive, true)
+  assertEquals(afterOnly.startsBefore, null)
+
+  assertEquals(parseMeetingListRange(new URLSearchParams(), false).rangeActive, false)
+
+  assertThrows(
+    () =>
+      parseMeetingListRange(
+        new URLSearchParams({ starts_after: '2026-08-01T00:00:00.000Z' }),
+        true,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      parseMeetingListRange(
+        new URLSearchParams({
+          starts_after: '2026-08-31T00:00:00.000Z',
+          starts_before: '2026-08-01T00:00:00.000Z',
+        }),
+        false,
+      ),
+    ApiError,
+  )
+  assertThrows(
+    () => parseMeetingListRange(new URLSearchParams({ starts_after: 'not-a-date' }), false),
+    ApiError,
+  )
 })
 
 Deno.test('tax rate and profile preference validation', () => {

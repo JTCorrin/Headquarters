@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Prove meetings CRUD, nested attendees replace-all, upcoming filter, and stale If-Match
-# against a live stack (JWT + X-Org-Id).
+# Prove meetings CRUD, nested attendees replace-all, upcoming filter, Cal-Range
+# starts_after/starts_before window, and stale If-Match against a live stack
+# (JWT + X-Org-Id).
 #
 # Usage:
 #   SUPABASE_URL=http://192.168.5.136:54321 \
@@ -180,6 +181,57 @@ list_up="$(
 )"
 LIST_COUNT="$(printf '%s' "$list_up" | jq -r --arg id "$MEETING_ID" '[.data[]? | select(.id == $id)] | length')"
 [[ "$LIST_COUNT" == "1" ]] || die "upcoming list missing meeting: ${list_up}"
+
+# Cal-Range: bounded starts_at window (include / exclude) + reject upcoming+range
+WINDOW_AFTER="$(date -u -d "${STARTS} - 1 day" +%Y-%m-%dT00:00:00.000Z 2>/dev/null \
+	|| date -u -j -f '%Y-%m-%dT%H:%M:%S.000Z' -v-1d "${STARTS}" +%Y-%m-%dT00:00:00.000Z)"
+WINDOW_BEFORE="$(date -u -d "${STARTS} + 1 day" +%Y-%m-%dT23:59:59.000Z 2>/dev/null \
+	|| date -u -j -f '%Y-%m-%dT%H:%M:%S.000Z' -v+1d "${STARTS}" +%Y-%m-%dT23:59:59.000Z)"
+OUTSIDE_AFTER="$(date -u -d "${STARTS} + 3 days" +%Y-%m-%dT00:00:00.000Z 2>/dev/null \
+	|| date -u -j -f '%Y-%m-%dT%H:%M:%S.000Z' -v+3d "${STARTS}" +%Y-%m-%dT00:00:00.000Z)"
+OUTSIDE_BEFORE="$(date -u -d "${STARTS} + 4 days" +%Y-%m-%dT23:59:59.000Z 2>/dev/null \
+	|| date -u -j -f '%Y-%m-%dT%H:%M:%S.000Z' -v+4d "${STARTS}" +%Y-%m-%dT23:59:59.000Z)"
+
+log "GET meetings?starts_after=&starts_before= (include window)"
+list_range="$(
+	curl -fsS --get --max-time 30 \
+		"${API_BASE}/api/v1/meetings" \
+		--data-urlencode "starts_after=${WINDOW_AFTER}" \
+		--data-urlencode "starts_before=${WINDOW_BEFORE}" \
+		--data-urlencode "limit=50" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+RANGE_COUNT="$(printf '%s' "$list_range" | jq -r --arg id "$MEETING_ID" '[.data[]? | select(.id == $id)] | length')"
+[[ "$RANGE_COUNT" == "1" ]] || die "range include missing meeting: ${list_range}"
+
+log "GET meetings range outside window (exclude)"
+list_out="$(
+	curl -fsS --get --max-time 30 \
+		"${API_BASE}/api/v1/meetings" \
+		--data-urlencode "starts_after=${OUTSIDE_AFTER}" \
+		--data-urlencode "starts_before=${OUTSIDE_BEFORE}" \
+		--data-urlencode "limit=50" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+OUT_COUNT="$(printf '%s' "$list_out" | jq -r --arg id "$MEETING_ID" '[.data[]? | select(.id == $id)] | length')"
+[[ "$OUT_COUNT" == "0" ]] || die "range exclude still has meeting: ${list_out}"
+
+log "GET meetings upcoming+range → 400"
+combo_code="$(
+	curl -sS --get --max-time 30 -o "${TMPDIR_PROOF}/combo.json" -w '%{http_code}' \
+		"${API_BASE}/api/v1/meetings" \
+		--data-urlencode "upcoming=true" \
+		--data-urlencode "starts_after=${WINDOW_AFTER}" \
+		--data-urlencode "limit=5" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}"
+)"
+[[ "$combo_code" == "400" ]] || die "expected 400 for upcoming+range, got ${combo_code}: $(cat "${TMPDIR_PROOF}/combo.json")"
 
 log "PATCH meetings attendees replace-all with If-Match"
 patch_code="$(
