@@ -10,6 +10,14 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
+import {
+  hashIdempotencyRequest,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyConflictError,
+  type IdempotencyEnvelope,
+  parseIdempotencyKey,
+  sha256Hex,
+} from './idempotency.ts'
 import { assertJsonSafeLineMoney } from './quotes.ts'
 
 const INVOICE_SELECT =
@@ -464,6 +472,8 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.message?.toLowerCase().includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Invoice version does not match If-Match')
   }
+  const idempotencyError = idempotencyConflictError(error)
+  if (idempotencyError) return idempotencyError
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The invoice conflicts with an existing record')
   }
@@ -694,6 +704,30 @@ async function deleteInvoice(
   })
 }
 
+/** Idempotency request payload — omits expected_version (If-Match is first-exec only). */
+export function invoiceLifecycleIdempotencyPayload(
+  invoiceId: string,
+  extras: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return { invoice_id: invoiceId, ...extras }
+}
+
+function invoiceEnvelopeResponse(
+  envelope: IdempotencyEnvelope,
+  requestId: string,
+  rawKey: string,
+): Response {
+  return jsonResponse(
+    envelope.response_body ?? { data: null },
+    envelope.response_status ?? 200,
+    requestId,
+    {
+      ...(envelope.response_headers ?? {}),
+      [IDEMPOTENCY_KEY_HEADER]: rawKey,
+    },
+  )
+}
+
 async function sendInvoiceRoute(
   req: Request,
   db: DatabaseClient,
@@ -702,19 +736,28 @@ async function sendInvoiceRoute(
   requestId: string,
 ): Promise<Response> {
   const version = parseVersion(req)
+  const rawKey = parseIdempotencyKey(req)
+  const route = `/api/v1/invoices/${invoiceId}/send`
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    invoiceLifecycleIdempotencyPayload(invoiceId),
+  )
+  const keyHash = await sha256Hex(rawKey)
 
-  const { data, error } = await db.rpc('send_invoice', {
+  const { data, error } = await db.rpc('send_invoice_idempotent', {
     p_invoice_id: invoiceId,
     p_org_id: orgId,
     p_expected_version: version,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
   })
 
   if (error) throw databaseError(error, requestId)
-  const document = asInvoiceDocument(data)
-
-  return jsonResponse({ data: document }, 200, requestId, {
-    etag: etag(document.version),
-  })
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice send returned an unexpected payload')
+  }
+  return invoiceEnvelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
 
 async function voidInvoiceRoute(
@@ -726,20 +769,29 @@ async function voidInvoiceRoute(
 ): Promise<Response> {
   const version = parseVersion(req)
   const voidReason = validateVoidBody(await jsonBody(req))
+  const rawKey = parseIdempotencyKey(req)
+  const route = `/api/v1/invoices/${invoiceId}/void`
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    invoiceLifecycleIdempotencyPayload(invoiceId, { void_reason: voidReason }),
+  )
+  const keyHash = await sha256Hex(rawKey)
 
-  const { data, error } = await db.rpc('void_invoice', {
+  const { data, error } = await db.rpc('void_invoice_idempotent', {
     p_invoice_id: invoiceId,
     p_org_id: orgId,
     p_expected_version: version,
     p_void_reason: voidReason,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
   })
 
   if (error) throw databaseError(error, requestId)
-  const document = asInvoiceDocument(data)
-
-  return jsonResponse({ data: document }, 200, requestId, {
-    etag: etag(document.version),
-  })
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice void returned an unexpected payload')
+  }
+  return invoiceEnvelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
 
 /** Primary contract: POST /api/v1/invoices/from-quote with `{ quote_id }`. */
