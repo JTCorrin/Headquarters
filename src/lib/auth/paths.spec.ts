@@ -44,6 +44,7 @@ describe('auth paths', () => {
 		expect(requiresSelectedOrg('/tasks/abc')).toBe(true);
 		expect(requiresSelectedOrg('/meetings')).toBe(true);
 		expect(requiresSelectedOrg('/meetings/abc')).toBe(true);
+		expect(requiresSelectedOrg('/meetings/calendar')).toBe(true);
 		expect(requiresSelectedOrg('/projects')).toBe(true);
 		expect(requiresSelectedOrg('/projects/abc')).toBe(true);
 		expect(requiresSelectedOrg('/settings')).toBe(true);
