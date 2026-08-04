@@ -60,4 +60,7 @@ export interface MeetingListItem {
 	startsAt: string;
 	endsAt: string;
 	timezone: string;
+	/** Set when HQ meeting is linked to a provider event (read-only; sync path writes). */
+	calendarProvider: string | null;
+	externalEventId: string | null;
 }
