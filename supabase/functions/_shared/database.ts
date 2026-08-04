@@ -248,6 +248,29 @@ export type AuditEventRow = {
   created_at: string
 }
 
+export type ApiKeyRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  prefix: string
+  key_hash: string
+  role: MembershipRow['role']
+  scopes: string[]
+  expires_at: string | null
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+export type ApiKeyInsert =
+  & Pick<ApiKeyRow, 'org_id' | 'name' | 'prefix' | 'key_hash' | 'role'>
+  & Partial<Omit<ApiKeyRow, 'id' | 'org_id' | 'name' | 'prefix' | 'key_hash' | 'role'>>
+
 export type UserNotificationRow = {
   id: string
   org_id: string
@@ -1276,6 +1299,12 @@ export type Database = {
           & Partial<AuditEventRow>
           & Pick<AuditEventRow, 'actor_type' | 'action' | 'resource_type'>
         Update: Partial<AuditEventRow>
+        Relationships: []
+      }
+      api_keys: {
+        Row: ApiKeyRow
+        Insert: ApiKeyInsert
+        Update: Partial<ApiKeyInsert>
         Relationships: []
       }
       user_notifications: {
@@ -2397,6 +2426,31 @@ export type Database = {
       count_my_unread_notifications: {
         Args: { p_org_id: string }
         Returns: number
+      }
+      create_org_api_key: {
+        Args: {
+          p_org_id: string
+          p_name: string
+          p_role?: string
+          p_expires_at?: string | null
+        }
+        Returns: Json
+      }
+      list_org_api_keys: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      revoke_org_api_key: {
+        Args: { p_org_id: string; p_key_id: string }
+        Returns: Json
+      }
+      resolve_api_key_by_hash: {
+        Args: { p_key_hash: string }
+        Returns: Json
+      }
+      touch_api_key_last_used: {
+        Args: { p_key_id: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>

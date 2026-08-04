@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
+import { isOrgApiKeySecret, sha256Hex, validateApiKeyCreateBody } from './api-keys.ts'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
 import {
@@ -1688,5 +1689,26 @@ Deno.test('email template create validation defaults status and merge_schema', (
   assertEquals(
     validateEmailTemplateBody({ status: 'archived' }, true),
     { status: 'archived' },
+  )
+})
+
+Deno.test('API key secret shape and create body validation', async () => {
+  assertEquals(isOrgApiKeySecret('crm_key_' + 'a'.repeat(32)), true)
+  assertEquals(isOrgApiKeySecret('crm_key_short'), false)
+  assertEquals(isOrgApiKeySecret('not_a_key'), false)
+
+  const hash = await sha256Hex('crm_key_' + 'b'.repeat(32))
+  assertEquals(hash.length, 64)
+  assertEquals(/^[0-9a-f]{64}$/.test(hash), true)
+
+  assertEquals(
+    validateApiKeyCreateBody({ name: 'Agent', role: 'member' }),
+    { name: 'Agent', role: 'member', expires_at: null },
+  )
+  assertThrows(() => validateApiKeyCreateBody({ name: '' }), ApiError)
+  assertThrows(() => validateApiKeyCreateBody({ name: 'X', role: 'nope' }), ApiError)
+  assertThrows(
+    () => validateApiKeyCreateBody({ name: 'X', expires_at: '2000-01-01T00:00:00.000Z' }),
+    ApiError,
   )
 })
