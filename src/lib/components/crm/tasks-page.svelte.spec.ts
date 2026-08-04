@@ -198,4 +198,40 @@ describe('TasksPage integration', () => {
 			.element(page.getByText(/412|version does not match|changed elsewhere/i))
 			.toBeInTheDocument();
 	});
+
+	it('passes entity_type and entity_id to listTasks when filtered', async () => {
+		const entityQueries: string[] = [];
+		const ENTITY_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/tasks': async (request) => {
+				const url = new URL(request.url);
+				entityQueries.push(
+					`${url.searchParams.get('entity_type') ?? ''}|${url.searchParams.get('entity_id') ?? ''}`
+				);
+				return {
+					body: {
+						data: [sampleTask({ entity_type: 'client', entity_id: ENTITY_ID })],
+						meta: { next_cursor: null }
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(TasksPage, {
+			api,
+			session,
+			entityFilter: { entity_type: 'client', entity_id: ENTITY_ID },
+			onClearEntityFilter: () => {}
+		});
+
+		await expect
+			.element(page.getByRole('button', { name: 'Send kickoff pack', exact: true }))
+			.toBeInTheDocument();
+		await expect.element(page.getByTestId('list-filter-banner')).toBeInTheDocument();
+		expect(entityQueries).toContain(`client|${ENTITY_ID}`);
+	});
 });

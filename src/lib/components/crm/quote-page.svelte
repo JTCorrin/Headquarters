@@ -123,6 +123,8 @@
 	const navGroups = $derived(appNavGroups('Quotes', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const canEditLines = $derived(quote?.status === 'draft' || quote?.status === 'sent');
+	const canSend = $derived(quote?.status === 'draft');
+	const canReject = $derived(quote?.status === 'draft' || quote?.status === 'sent');
 	const canAccept = $derived(quote?.status === 'draft' || quote?.status === 'sent');
 	const canConvert = $derived(quote?.status === 'accepted');
 
@@ -369,12 +371,21 @@
 		}
 	}
 
-	async function onAccept() {
-		if (!quote || !canAccept) return;
+	async function runLifecycle(
+		action: 'send' | 'reject' | 'accept',
+		allowed: boolean,
+		fallback: string
+	) {
+		if (!quote || !allowed) return;
 		const epoch = captureEpoch();
 		actionPending = true;
 		try {
-			const updated = await api.quotes.accept(quote.id, quote.version);
+			const updated =
+				action === 'send'
+					? await api.quotes.send(quote.id, quote.version)
+					: action === 'reject'
+						? await api.quotes.reject(quote.id, quote.version)
+						: await api.quotes.accept(quote.id, quote.version);
 			if (isStale(epoch)) return;
 			applyDocument(updated);
 			timelineEvents = await loadEntityTimeline(api, 'quote', quoteId);
@@ -391,11 +402,25 @@
 			}
 			viewState = {
 				kind: 'validation',
-				message: userMessage(error, 'Could not accept quote — try again.')
+				message: userMessage(error, fallback)
 			};
 		} finally {
 			actionPending = false;
 		}
+	}
+
+	async function onSend() {
+		await runLifecycle('send', canSend, 'Could not send quote — try again.');
+	}
+
+	async function onReject() {
+		if (!quote || !canReject) return;
+		if (!window.confirm('Reject this quote? This cannot be undone from the UI.')) return;
+		await runLifecycle('reject', true, 'Could not reject quote — try again.');
+	}
+
+	async function onAccept() {
+		await runLifecycle('accept', canAccept, 'Could not accept quote — try again.');
 	}
 
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
@@ -484,6 +509,8 @@
 						{lineForm}
 						{products}
 						{clientOptions}
+						{canSend}
+						{canReject}
 						{canAccept}
 						{canConvert}
 						{canEditLines}
@@ -500,6 +527,8 @@
 						onSaveQuote={onSaveQuote}
 						onAddLine={onAddLine}
 						onRemoveLine={onRemoveLine}
+						onSend={onSend}
+						onReject={onReject}
 						onAccept={onAccept}
 						onConvert={onConvert}
 						{onTimelineAdd}

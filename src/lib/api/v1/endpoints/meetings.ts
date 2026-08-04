@@ -18,7 +18,9 @@ export function createMeetingsEndpoints(request: ApiRequestFn): MeetingsEndpoint
 					limit: params.limit,
 					cursor: params.cursor,
 					status: params.status,
-					upcoming: params.upcoming
+					upcoming: params.upcoming,
+					entity_type: params.entity_type,
+					entity_id: params.entity_id
 				},
 				signal
 			});
