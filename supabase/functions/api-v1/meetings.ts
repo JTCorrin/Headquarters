@@ -459,7 +459,7 @@ function encodeCursor(cursor: MeetingCursor): string {
 export function decodeMeetingCursor(value: string, upcoming: boolean): MeetingCursor {
   try {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
-    const base64 = value.replaceAll('-', '+').replaceAll('/', '_')
+    const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
     const padding = '='.repeat((4 - (base64.length % 4)) % 4)
     const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<MeetingCursor>
     const id = parseUuid(cursor.id ?? null, 'cursor')
@@ -509,12 +509,13 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.code === '23503') {
     return new ApiError(422, 'VALIDATION_ERROR', 'A referenced record is invalid')
   }
-  if (error.code === '23514' || error.code === '22023') {
-    return new ApiError(
-      422,
-      'VALIDATION_ERROR',
-      message || 'The meeting failed a database constraint',
-    )
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(422, 'VALIDATION_ERROR', message || 'Meeting validation failed')
+  }
+  if (error.code === '23514') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
+    return new ApiError(422, 'VALIDATION_ERROR', 'The meeting failed a database constraint')
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')

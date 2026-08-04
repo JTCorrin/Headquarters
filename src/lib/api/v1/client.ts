@@ -1,4 +1,4 @@
-import { ApiClientError, type ApiErrorCode } from './errors.js';
+import { API_ERROR_CODES, ApiClientError, type ApiErrorCode } from './errors.js';
 import { createAuditEventsEndpoints } from './endpoints/audit-events.js';
 import { createRecurringInvoiceSchedulesEndpoints } from './endpoints/recurring-invoice-schedules.js';
 import { createBillsEndpoints } from './endpoints/bills.js';
@@ -120,24 +120,7 @@ function appendQuery(path: string, query: ApiRequestOptions['query']): string {
 }
 
 function parseErrorCode(value: string | undefined): ApiErrorCode {
-	const known: ApiErrorCode[] = [
-		'BAD_REQUEST',
-		'CONFLICT',
-		'FORBIDDEN',
-		'INTERNAL_ERROR',
-		'METHOD_NOT_ALLOWED',
-		'NETWORK_ERROR',
-		'NOT_FOUND',
-		'ORG_CONTEXT_REQUIRED',
-		'PAYLOAD_TOO_LARGE',
-		'PRECONDITION_FAILED',
-		'PRECONDITION_REQUIRED',
-		'UNAUTHENTICATED',
-		'UNSUPPORTED_MEDIA_TYPE',
-		'VALIDATION_ERROR',
-		'UNKNOWN'
-	];
-	return known.includes(value as ApiErrorCode) ? (value as ApiErrorCode) : 'UNKNOWN';
+	return API_ERROR_CODES.includes(value as ApiErrorCode) ? (value as ApiErrorCode) : 'UNKNOWN';
 }
 
 async function readJson(response: Response): Promise<unknown> {

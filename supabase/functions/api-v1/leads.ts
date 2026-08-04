@@ -678,10 +678,7 @@ async function convertLead(
   leadId: string,
   requestId: string,
 ): Promise<Response> {
-  const current = await findLead(db, orgId, leadId, requestId)
-  if (current.org_id !== orgId) {
-    throw new ApiError(404, 'NOT_FOUND', 'Lead not found')
-  }
+  await findLead(db, orgId, leadId, requestId)
 
   const contentType = req.headers.get('content-type')?.toLowerCase() ?? ''
   const rawBody = await req.text()

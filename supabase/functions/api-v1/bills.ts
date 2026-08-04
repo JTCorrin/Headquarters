@@ -496,17 +496,13 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.code === '23505') {
     return new ApiError(409, 'CONFLICT', 'The bill conflicts with an existing record')
   }
-  if (
-    error.code === '23503' ||
-    error.code === '23514' ||
-    error.code === '22023' ||
-    error.code === '22003'
-  ) {
-    return new ApiError(
-      422,
-      'VALIDATION_ERROR',
-      error.message || 'The bill failed a database constraint',
-    )
+  if (error.code === '22023') {
+    // Deliberate RAISE from our own RPCs; the message is user-facing.
+    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Bill validation failed')
+  }
+  if (error.code === '23503' || error.code === '23514' || error.code === '22003') {
+    // Postgres-generated constraint messages leak schema details; keep generic.
+    return new ApiError(422, 'VALIDATION_ERROR', 'The bill failed a database constraint')
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
@@ -523,6 +519,9 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
 }
 
 function asBillDocument(data: Json): BillDocument {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Bill RPC returned an unexpected payload')
+  }
   const payload = data as { bill?: BillRow; lines?: BillLineRow[] }
   if (!payload.bill) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Bill RPC returned an incomplete payload')

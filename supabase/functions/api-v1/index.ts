@@ -5,7 +5,7 @@ import type { Database } from '../_shared/database.ts'
 import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { handleDocuments } from './documents.ts'
-import { ApiError, apiPath, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { ApiError, apiPath, errorResponse, jsonResponse, parseLimit, parseUuid } from './http.ts'
 import { handleAiSuggestions } from './ai-suggestions.ts'
 import { handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
@@ -29,7 +29,13 @@ import { handleQuotes } from './quotes.ts'
 import { handleTaxRates } from './tax-rates.ts'
 import { handleTimelineEvents } from './timeline-events.ts'
 
-const corsOrigin = Deno.env.get('API_CORS_ORIGIN') ?? '*'
+const configuredCorsOrigin = Deno.env.get('API_CORS_ORIGIN')
+if (!configuredCorsOrigin) {
+  console.warn(
+    'API_CORS_ORIGIN is not set; defaulting to "*". Set an explicit origin in production.',
+  )
+}
+const corsOrigin = configuredCorsOrigin ?? '*'
 
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
@@ -343,6 +349,7 @@ export default {
             entityType,
             entityEmailMatch[2],
             requestId,
+            parseLimit(new URL(req.url).searchParams.get('limit')),
           )
         }
 
