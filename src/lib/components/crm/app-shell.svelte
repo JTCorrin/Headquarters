@@ -3,12 +3,17 @@
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
+	import type { ApiV1Client } from '$lib/api/v1/client.js';
+	import { getOptionalApiV1Client } from '$lib/api/v1/context.js';
 	import {
+		canAccessPersonalConfig,
 		organisationCreateSchema,
+		type MembershipRole,
 		type OrganisationCreateData,
 		type OrgMembershipSummary
 	} from '$lib/schemas/organisation.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import NotificationsBell from './notifications-bell.svelte';
 	import OrgSwitcher from './org-switcher.svelte';
 	import OrganisationCreateDrawer from './organisation-create-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -20,6 +25,8 @@
 		/** When set with navGroups, AppNav spans the full browser/window height. */
 		orgName?: string;
 		navGroups?: AppNavGroup[];
+		/** Optional override; defaults to layout ApiV1Client context when present. */
+		api?: ApiV1Client | null;
 		switchError?: string | null;
 		busy?: boolean;
 		createError?: string | null;
@@ -38,6 +45,7 @@
 		memberships,
 		orgName,
 		navGroups,
+		api = null,
 		switchError = null,
 		busy = false,
 		createError = null,
@@ -48,6 +56,14 @@
 		onLogout,
 		onValidCreate
 	}: AppShellProps = $props();
+
+	const resolvedApi = $derived(api ?? getOptionalApiV1Client());
+	const membershipRole = $derived(
+		(memberships.find((m) => m.org_id === currentOrgId)?.role ?? null) as MembershipRole | null
+	);
+	const showNotifications = $derived(
+		Boolean(resolvedApi && currentOrgId && membershipRole && canAccessPersonalConfig(membershipRole))
+	);
 
 	let createOpen = $state(false);
 
@@ -105,6 +121,9 @@
 				}}
 			/>
 			<div class="ms-auto flex items-center gap-2">
+				{#if showNotifications && resolvedApi}
+					<NotificationsBell api={resolvedApi} orgId={currentOrgId} />
+				{/if}
 				{#if headerExtra}
 					{@render headerExtra()}
 				{/if}

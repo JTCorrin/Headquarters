@@ -1307,6 +1307,39 @@ export interface ApiDocumentMoveBody {
 }
 
 /**
+ * Personal notifications (bell) — Notif-BE `/api/v1/me/notifications*`.
+ * v1 kind: `email.received` only; source is an email_message id.
+ */
+export type ApiNotificationKind = 'email.received' | (string & {});
+export type ApiNotificationSourceType = 'email_message' | (string & {});
+
+export interface ApiUserNotification {
+	id: string;
+	org_id: string;
+	recipient_membership_id: string;
+	kind: ApiNotificationKind;
+	title: string;
+	body: string | null;
+	source_type: ApiNotificationSourceType;
+	source_id: string;
+	read_at: string | null;
+	created_at: string;
+}
+
+export interface ApiNotificationListParams {
+	limit?: number;
+	cursor?: string;
+}
+
+export interface ApiNotificationUnreadCount {
+	count: number;
+}
+
+export interface ApiNotificationMarkReadBody {
+	read: true;
+}
+
+/**
  * Personal Google Calendar connection for the current membership — secrets never returned.
  * Locked C2 contract: `GET/DELETE /api/v1/me/calendar` + OAuth start/callback.
  */

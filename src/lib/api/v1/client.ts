@@ -12,6 +12,7 @@ import { createInvoicesEndpoints } from './endpoints/invoices.js';
 import { createLeadsEndpoints } from './endpoints/leads.js';
 import { createMailboxEndpoints } from './endpoints/mailbox.js';
 import { createCalendarEndpoints } from './endpoints/calendar.js';
+import { createNotificationsEndpoints } from './endpoints/notifications.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createPaymentsEndpoints } from './endpoints/payments.js';
@@ -37,6 +38,7 @@ import type {
 	LeadsEndpoints,
 	MailboxEndpoints,
 	CalendarEndpoints,
+	NotificationsEndpoints,
 	MeetingsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
@@ -78,6 +80,7 @@ export interface ApiV1Client {
 	profilePreferences: ProfilePreferencesEndpoints;
 	mailbox: MailboxEndpoints;
 	calendar: CalendarEndpoints;
+	notifications: NotificationsEndpoints;
 	integrations: IntegrationsEndpoints;
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
@@ -249,6 +252,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		profilePreferences: createProfilePreferencesEndpoints(request),
 		mailbox: createMailboxEndpoints(request),
 		calendar: createCalendarEndpoints(request),
+		notifications: createNotificationsEndpoints(request),
 		integrations: createIntegrationsEndpoints(request),
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
