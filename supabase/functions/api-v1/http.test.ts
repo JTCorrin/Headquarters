@@ -35,10 +35,7 @@ import { billLifecycleIdempotencyPayload, validateBillBody } from './bills.ts'
 import { quoteAcceptIdempotencyPayload } from './quotes.ts'
 import { validateVendorBankDetailsBody, validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
-import {
-  calendarPayloadHasForbiddenSecretKey,
-  validateOAuthCallbackParams,
-} from './calendar.ts'
+import { calendarPayloadHasForbiddenSecretKey, validateOAuthCallbackParams } from './calendar.ts'
 import { decodeMeetingCursor, parseMeetingListRange, validateMeetingBody } from './meetings.ts'
 import {
   buildGoogleAuthUrl,
@@ -1310,7 +1307,10 @@ Deno.test('calendar OAuth callback params require code and state', () => {
     validateOAuthCallbackParams({ code: 'abc', state: '1234567890abcdef' }),
     { code: 'abc', state: '1234567890abcdef' },
   )
-  assertThrows(() => validateOAuthCallbackParams({ code: null, state: '1234567890abcdef' }), ApiError)
+  assertThrows(
+    () => validateOAuthCallbackParams({ code: null, state: '1234567890abcdef' }),
+    ApiError,
+  )
   assertThrows(() => validateOAuthCallbackParams({ code: 'abc', state: 'short' }), ApiError)
 })
 
