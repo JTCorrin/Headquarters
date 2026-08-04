@@ -171,4 +171,46 @@ describe('BillsPage integration', () => {
 		});
 		expect(createdId).toBe('22222222-3333-4444-8555-666666666666');
 	});
+
+	it('passes vendor_id to listBills when filtered', async () => {
+		const vendorQueries: string[] = [];
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					logo_url: null,
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/bills': async (request) => {
+				vendorQueries.push(new URL(request.url).searchParams.get('vendor_id') ?? '');
+				return {
+					body: { data: [sampleBill()], meta: { next_cursor: null } }
+				};
+			},
+			'GET /api/v1/vendors': async () => ({
+				body: { data: [sampleVendor()], meta: { next_cursor: null } }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(BillsPage, {
+			api,
+			session,
+			vendorId: VENDOR_ID,
+			onVendorFilterChange: () => {}
+		});
+
+		await expect.element(page.getByRole('link', { name: 'BILL-0001' })).toBeInTheDocument();
+		await expect.element(page.getByTestId('list-filter-banner')).toBeInTheDocument();
+		expect(vendorQueries).toContain(VENDOR_ID);
+	});
 });

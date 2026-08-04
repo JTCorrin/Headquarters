@@ -32,6 +32,8 @@
 		composerActor?: string;
 		lineDrawerOpen?: boolean;
 		canEditLines?: boolean;
+		canSend?: boolean;
+		canReject?: boolean;
 		canAccept?: boolean;
 		canConvert?: boolean;
 		/** Server-authoritative money totals for table/PDF (minor units). */
@@ -44,6 +46,8 @@
 		actionPending?: boolean;
 		onRemoveLine?: (id: string) => void;
 		onAddLine?: () => boolean | void | Promise<boolean | void>;
+		onSend?: () => void | Promise<void>;
+		onReject?: () => void | Promise<void>;
 		onAccept?: () => void | Promise<void>;
 		onConvert?: () => void | Promise<void>;
 		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
@@ -67,12 +71,16 @@
 		composerActor = 'You',
 		lineDrawerOpen = $bindable(false),
 		canEditLines = true,
+		canSend = false,
+		canReject = false,
 		canAccept = false,
 		canConvert = false,
 		moneyTotals = null,
 		actionPending = false,
 		onRemoveLine,
 		onAddLine,
+		onSend,
+		onReject,
 		onAccept,
 		onConvert,
 		onSaveQuote,
@@ -138,13 +146,37 @@
 				breadcrumb="Accounting / Quotes"
 				{title}
 				{status}
-				description="Edit on the left — the PDF preview updates live on the right. Lifecycle: Accept, then Convert to invoice."
+				description="Edit on the left — the PDF preview updates live on the right. Lifecycle: Send or Accept, then Convert to invoice."
 			>
 				{#snippet actions()}
+					{#if canSend}
+						<Button
+							size="sm"
+							type="button"
+							disabled={actionPending}
+							data-testid="quote-send"
+							onclick={() => void onSend?.()}
+						>
+							Send
+						</Button>
+					{/if}
+					{#if canReject}
+						<Button
+							size="sm"
+							type="button"
+							variant="outline"
+							disabled={actionPending}
+							data-testid="quote-reject"
+							onclick={() => void onReject?.()}
+						>
+							Reject
+						</Button>
+					{/if}
 					{#if canAccept}
 						<Button
 							size="sm"
 							type="button"
+							variant={canSend ? 'outline' : 'default'}
 							disabled={actionPending}
 							data-testid="quote-accept"
 							onclick={() => void onAccept?.()}
@@ -162,7 +194,7 @@
 						>
 							Convert to invoice
 						</Button>
-					{:else if canAccept}
+					{:else if canAccept || canSend}
 						<Button
 							size="sm"
 							type="button"

@@ -608,6 +608,8 @@ export interface ApiBillListParams {
 	limit?: number;
 	cursor?: string;
 	status?: ApiBillStatus;
+	/** Optional vendor filter (vendor Money / AP views). */
+	vendor_id?: string;
 }
 
 export type ApiTaskPriority = 'p1' | 'p2' | 'p3' | 'p4';
@@ -648,6 +650,10 @@ export interface ApiTaskListParams {
 	cursor?: string;
 	status?: ApiTaskStatus;
 	assignee?: 'me';
+	/** Must be sent with `entity_id` (contact | lead | client). */
+	entity_type?: ApiTaskEntityType;
+	/** Must be sent with `entity_type`. */
+	entity_id?: string;
 }
 
 export interface ApiTaskCreateBody {
@@ -800,6 +806,13 @@ export interface ApiMeetingListParams {
 	cursor?: string;
 	status?: ApiMeetingStatus;
 	upcoming?: boolean;
+	/**
+	 * Filter by related entity. Must be sent with `entity_id`.
+	 * Edge maps these to `related_entity_*` columns.
+	 */
+	entity_type?: ApiMeetingRelatedEntityType;
+	/** Must be sent with `entity_type`. */
+	entity_id?: string;
 }
 
 export interface ApiMeetingCreateBody {

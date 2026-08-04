@@ -144,6 +144,10 @@
 				}}
 				bind:lines
 				bind:lineDrawerOpen
+				canSend={status === 'Draft'}
+				canReject={status === 'Draft' || status === 'Sent'}
+				canAccept={status === 'Draft' || status === 'Sent'}
+				canConvert={status === 'Accepted'}
 				onRemoveLine={(id) => {
 					lines = lines.filter((row) => row.id !== id);
 				}}
@@ -156,11 +160,21 @@
 						actor: 'You'
 					});
 				}}
-				onChase={() => {
+				onReject={() => {
+					status = 'Rejected';
 					prependEvent({
-						kind: 'note',
-						title: 'Chase sent',
-						body: 'Friendly follow-up on outstanding quote',
+						kind: 'status',
+						title: 'Quote rejected',
+						body: 'Marked rejected',
+						actor: 'You'
+					});
+				}}
+				onAccept={() => {
+					status = 'Accepted';
+					prependEvent({
+						kind: 'status',
+						title: 'Quote accepted',
+						body: 'Accepted by client',
 						actor: 'You'
 					});
 				}}

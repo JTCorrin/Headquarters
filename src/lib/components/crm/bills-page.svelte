@@ -22,6 +22,7 @@
 		type BillVendorOption
 	} from '$lib/schemas/bill.js';
 	import { vendorFormSchema } from '$lib/schemas/vendor.js';
+	import { looksLikeVendorId } from '$lib/crm/entity-list-filter.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import BillsListPage from './bills-list-page.svelte';
@@ -30,9 +31,12 @@
 	export interface BillsPageProps {
 		api: ApiV1Client;
 		session: OrgSession;
+		/** Optional `vendor_id` list filter (deep-link / vendor AP views). */
+		vendorId?: string | null;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onCreated?: (billId: string) => void;
+		onVendorFilterChange?: (vendorId: string | null) => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -40,9 +44,11 @@
 	let {
 		api,
 		session,
+		vendorId = null,
 		onMissingOrg,
 		onSwitchNavigate,
 		onCreated,
+		onVendorFilterChange,
 		onLogout,
 		class: className
 	}: BillsPageProps = $props();
@@ -112,6 +118,12 @@
 	);
 	const navGroups = $derived(appNavGroups('Bills', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
+	const activeVendorId = $derived(looksLikeVendorId(vendorId) ? vendorId : null);
+	const vendorFilterLabel = $derived.by(() => {
+		if (!activeVendorId) return null;
+		const name = vendorOptions.find((v) => v.id === activeVendorId)?.name;
+		return name ? `Filtered by vendor: ${name}` : 'Filtered by vendor';
+	});
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
@@ -129,24 +141,35 @@
 	interface RequestEpoch {
 		orgId: string | null;
 		generation: number;
+		vendorId: string | null;
 	}
 
 	const liveEpoch: RequestEpoch = {
 		orgId: null,
-		generation: -1
+		generation: -1,
+		vendorId: null
 	};
 
 	$effect(() => {
 		liveEpoch.orgId = session.selectedOrgId;
 		liveEpoch.generation = session.cacheGeneration;
+		liveEpoch.vendorId = activeVendorId;
 	});
 
 	function captureEpoch(): RequestEpoch {
-		return { orgId: liveEpoch.orgId, generation: liveEpoch.generation };
+		return {
+			orgId: liveEpoch.orgId,
+			generation: liveEpoch.generation,
+			vendorId: liveEpoch.vendorId
+		};
 	}
 
 	function isStale(epoch: RequestEpoch): boolean {
-		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
+		return (
+			epoch.orgId !== liveEpoch.orgId ||
+			epoch.generation !== liveEpoch.generation ||
+			epoch.vendorId !== liveEpoch.vendorId
+		);
 	}
 
 	function resetOrgScopedState() {
@@ -193,7 +216,10 @@
 			}
 
 			const [listed, vendors] = await Promise.all([
-				api.bills.list({ limit: 50 }),
+				api.bills.list({
+					limit: 50,
+					...(activeVendorId ? { vendor_id: activeVendorId } : {})
+				}),
 				api.vendors.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
@@ -213,7 +239,12 @@
 			}
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No bills yet — create your first bill.' }
+					? {
+							kind: 'empty',
+							message: activeVendorId
+								? 'No bills for this vendor.'
+								: 'No bills yet — create your first bill.'
+						}
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -308,6 +339,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
+		void activeVendorId;
 		void loadAll();
 	});
 </script>
@@ -339,6 +371,14 @@
 					form={billForm}
 					vendorForm={vendorForm}
 					{vendorOptions}
+					selectedVendorId={activeVendorId}
+					filterLabel={vendorFilterLabel}
+					onVendorFilterChange={onVendorFilterChange}
+					onClearFilter={
+						activeVendorId && onVendorFilterChange
+							? () => onVendorFilterChange(null)
+							: undefined
+					}
 					bind:drawerOpen
 					bind:vendorDrawerOpen
 					onValidSubmit={onCreateBill}

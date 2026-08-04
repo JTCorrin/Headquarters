@@ -193,4 +193,43 @@ describe('MeetingsPage integration', () => {
 			attendees: [{ email: 'sam@contoso.com', name: 'Sam Ortiz' }]
 		});
 	});
+
+	it('passes entity_type and entity_id to listMeetings when filtered', async () => {
+		const entityQueries: string[] = [];
+		const ENTITY_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/meetings': async (request) => {
+				const url = new URL(request.url);
+				entityQueries.push(
+					`${url.searchParams.get('entity_type') ?? ''}|${url.searchParams.get('entity_id') ?? ''}`
+				);
+				return {
+					body: {
+						data: [
+							sampleMeeting({
+								related_entity_type: 'project',
+								related_entity_id: ENTITY_ID
+							})
+						],
+						meta: { next_cursor: null }
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(MeetingsPage, {
+			api,
+			session,
+			entityFilter: { entity_type: 'project', entity_id: ENTITY_ID },
+			onClearEntityFilter: () => {}
+		});
+
+		await expect.element(page.getByRole('link', { name: 'Q2 planning' })).toBeInTheDocument();
+		await expect.element(page.getByTestId('list-filter-banner')).toBeInTheDocument();
+		expect(entityQueries).toContain(`project|${ENTITY_ID}`);
+	});
 });

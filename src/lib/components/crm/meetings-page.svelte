@@ -13,6 +13,8 @@
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
+	import type { ApiMeetingRelatedEntityType } from '$lib/api/v1/types.js';
+	import type { EntityListFilter } from '$lib/crm/entity-list-filter.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
@@ -25,9 +27,12 @@
 	export interface MeetingsPageProps {
 		api: ApiV1Client;
 		session: OrgSession;
+		/** Optional paired entity list filter (`entity_type` + `entity_id`). */
+		entityFilter?: EntityListFilter<ApiMeetingRelatedEntityType> | null;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onCreated?: (meetingId: string) => void;
+		onClearEntityFilter?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -35,9 +40,11 @@
 	let {
 		api,
 		session,
+		entityFilter = null,
 		onMissingOrg,
 		onSwitchNavigate,
 		onCreated,
+		onClearEntityFilter,
 		onLogout,
 		class: className
 	}: MeetingsPageProps = $props();
@@ -67,6 +74,11 @@
 	);
 	const navGroups = $derived(appNavGroups('Meetings', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
+	const entityFilterLabel = $derived(
+		entityFilter
+			? `Filtered by ${entityFilter.entity_type} · ${entityFilter.entity_id.slice(0, 8)}…`
+			: null
+	);
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
@@ -84,24 +96,41 @@
 	interface RequestEpoch {
 		orgId: string | null;
 		generation: number;
+		entityKey: string;
 	}
 
 	const liveEpoch: RequestEpoch = {
 		orgId: null,
-		generation: -1
+		generation: -1,
+		entityKey: ''
 	};
+
+	function entityKey(
+		filter: EntityListFilter<ApiMeetingRelatedEntityType> | null | undefined
+	): string {
+		return filter ? `${filter.entity_type}:${filter.entity_id}` : '';
+	}
 
 	$effect(() => {
 		liveEpoch.orgId = session.selectedOrgId;
 		liveEpoch.generation = session.cacheGeneration;
+		liveEpoch.entityKey = entityKey(entityFilter);
 	});
 
 	function captureEpoch(): RequestEpoch {
-		return { orgId: liveEpoch.orgId, generation: liveEpoch.generation };
+		return {
+			orgId: liveEpoch.orgId,
+			generation: liveEpoch.generation,
+			entityKey: liveEpoch.entityKey
+		};
 	}
 
 	function isStale(epoch: RequestEpoch): boolean {
-		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
+		return (
+			epoch.orgId !== liveEpoch.orgId ||
+			epoch.generation !== liveEpoch.generation ||
+			epoch.entityKey !== liveEpoch.entityKey
+		);
 	}
 
 	function resetOrgScopedState() {
@@ -133,13 +162,23 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const listed = await api.meetings.list({ limit: 50 });
+			const listed = await api.meetings.list({
+				limit: 50,
+				...(entityFilter
+					? { entity_type: entityFilter.entity_type, entity_id: entityFilter.entity_id }
+					: {})
+			});
 			if (isStale(epoch)) return;
 
 			rows = listed.data.map(toMeetingListItem);
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No meetings yet — schedule your first meeting.' }
+					? {
+							kind: 'empty',
+							message: entityFilter
+								? 'No meetings for this entity.'
+								: 'No meetings yet — schedule your first meeting.'
+						}
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -204,6 +243,8 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
+		void entityFilter?.entity_type;
+		void entityFilter?.entity_id;
 		void loadAll();
 	});
 </script>
@@ -233,6 +274,8 @@
 					{navGroups}
 					{rows}
 					form={meetingForm}
+					filterLabel={entityFilterLabel}
+					onClearFilter={entityFilter ? onClearEntityFilter : undefined}
 					bind:drawerOpen
 					onValidSubmit={onCreateMeeting}
 					showNav={false}
