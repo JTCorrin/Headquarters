@@ -199,6 +199,26 @@ describe('createApiV1Client', () => {
 		await client.invoices.list({ client_id: CLIENT_ID, limit: 20 });
 	});
 
+	it('forwards meetings list range params', async () => {
+		const fetchMock = createMockFetch({
+			'GET /api/v1/meetings': async (request) => {
+				const url = new URL(request.url);
+				expect(url.searchParams.get('starts_after')).toBe('2026-08-01T00:00:00.000Z');
+				expect(url.searchParams.get('starts_before')).toBe('2026-08-31T23:59:59.000Z');
+				expect(url.searchParams.get('limit')).toBe('100');
+				expect(url.searchParams.get('upcoming')).toBeNull();
+				return { body: { data: [] } };
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		await client.meetings.list({
+			limit: 100,
+			starts_after: '2026-08-01T00:00:00.000Z',
+			starts_before: '2026-08-31T23:59:59.000Z'
+		});
+	});
+
 	it('omits Content-Type when there is no body', async () => {
 		const fetchMock = createMockFetch({
 			'GET /api/v1/profile/preferences': async (request) => {

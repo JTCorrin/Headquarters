@@ -809,6 +809,16 @@ export interface ApiMeetingListParams {
 	status?: ApiMeetingStatus;
 	upcoming?: boolean;
 	/**
+	 * Inclusive lower bound on `starts_at` (ISO-8601). Calendar window load.
+	 * Cannot be combined with `upcoming=true`.
+	 */
+	starts_after?: string;
+	/**
+	 * Inclusive upper bound on `starts_at` (ISO-8601). Calendar window load.
+	 * Cannot be combined with `upcoming=true`.
+	 */
+	starts_before?: string;
+	/**
 	 * Filter by related entity. Must be sent with `entity_id`.
 	 * Edge maps these to `related_entity_*` columns.
 	 */
