@@ -1535,6 +1535,18 @@ export type Database = {
         }
         Returns: Json
       }
+      accept_quote_idempotent: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_quote_id: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
       send_quote: {
         Args: {
           p_expected_version: number
@@ -1592,11 +1604,36 @@ export type Database = {
         }
         Returns: Json
       }
+      send_invoice_idempotent: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_invoice_id: string
+          p_org_id: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
       void_invoice: {
         Args: {
           p_expected_version: number
           p_invoice_id: string
           p_org_id: string
+          p_void_reason: string
+        }
+        Returns: Json
+      }
+      void_invoice_idempotent: {
+        Args: {
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_invoice_id: string
+          p_org_id: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
           p_void_reason: string
         }
         Returns: Json
@@ -1643,11 +1680,36 @@ export type Database = {
         }
         Returns: Json
       }
+      receive_bill_idempotent: {
+        Args: {
+          p_bill_id: string
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
       void_bill: {
         Args: {
           p_bill_id: string
           p_expected_version: number
           p_org_id: string
+          p_void_reason: string
+        }
+        Returns: Json
+      }
+      void_bill_idempotent: {
+        Args: {
+          p_bill_id: string
+          p_expected_version: number
+          p_idempotency_key_hash: string
+          p_org_id: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
           p_void_reason: string
         }
         Returns: Json
