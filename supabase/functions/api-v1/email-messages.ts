@@ -16,14 +16,14 @@ import {
   replySubject,
   sendSmtpMail,
   type SmtpSecurity,
-  type SmtpSendOptions,
   SmtpSendError,
+  type SmtpSendOptions,
 } from '../_shared/smtp-outbound.ts'
 import {
   hashIdempotencyRequest,
-  type IdempotencyEnvelope,
   IDEMPOTENCY_KEY_HEADER,
   idempotencyConflictError,
+  type IdempotencyEnvelope,
   parseIdempotencyKey,
   sha256Hex,
 } from './idempotency.ts'
@@ -33,7 +33,9 @@ type DatabaseClient = SupabaseClient<Database>
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
 type ImapInboundFetcher = (options: ImapFetchOptions) => Promise<InboundImapMessage[]>
-type SmtpMailSender = (options: SmtpSendOptions) => Promise<{ message_id: string; synthetic: boolean }>
+type SmtpMailSender = (
+  options: SmtpSendOptions,
+) => Promise<{ message_id: string; synthetic: boolean }>
 
 let imapInboundFetcher: ImapInboundFetcher = fetchInboundFromImap
 let smtpMailSender: SmtpMailSender = sendSmtpMail
@@ -235,8 +237,9 @@ async function replyEmailMessage(
   const smtpPort = Number(mailbox.smtp_port ?? 0)
   const fromAddress = String(mailbox.email_address ?? '')
   const toAddress = String(parent.from_address ?? '')
-  const parentProviderId =
-    typeof parent.provider_message_id === 'string' ? parent.provider_message_id : null
+  const parentProviderId = typeof parent.provider_message_id === 'string'
+    ? parent.provider_message_id
+    : null
   const subject = replySubject(
     typeof parent.subject === 'string' ? parent.subject : '',
   )

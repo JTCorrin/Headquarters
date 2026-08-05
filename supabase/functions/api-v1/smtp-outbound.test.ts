@@ -9,10 +9,7 @@ import {
   setOpenSmtpConnectionForTests,
   SmtpSendError,
 } from '../_shared/smtp-outbound.ts'
-import {
-  emailReplyIdempotencyPayload,
-  validateReplyBody,
-} from './email-messages.ts'
+import { emailReplyIdempotencyPayload, validateReplyBody } from './email-messages.ts'
 import { ApiError } from './http.ts'
 import { hashIdempotencyRequest } from './idempotency.ts'
 
