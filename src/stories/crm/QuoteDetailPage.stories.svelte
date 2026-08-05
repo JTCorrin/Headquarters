@@ -31,7 +31,8 @@
 			clientName: 'Northwind',
 			title: 'Q2 retainer',
 			currency: 'GBP',
-			status: 'draft'
+			status: 'draft',
+			recipients: []
 		},
 		zod4(quoteFormSchema)
 	);

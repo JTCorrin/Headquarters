@@ -97,7 +97,8 @@
 			clientName: '',
 			title: '',
 			currency: 'GBP',
-			status: 'draft'
+			status: 'draft',
+			recipients: []
 		},
 		zod4(quoteFormSchema)
 	);
