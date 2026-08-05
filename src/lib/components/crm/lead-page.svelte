@@ -297,6 +297,11 @@
 		}
 	}
 
+	async function onSendReply(payload: { messageId: string; body: string }) {
+		await api.emailMessages.reply(payload.messageId, { body_text: payload.body });
+		emailTab = await loadEntityEmailTab(api, 'lead', leadId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'lead', leadId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
@@ -481,6 +486,7 @@
 						{sharingId}
 						{onTimelineAdd}
 						{onAddToTimeline}
+						{onSendReply}
 						{onDraftResponse}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
