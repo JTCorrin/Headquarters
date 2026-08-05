@@ -65,6 +65,8 @@
 		viewState?: ResourceViewState;
 		moneyItems?: MoneySummaryItem[];
 		projects?: EntityProject[];
+		/** Client id for New quote deep-link (`/quotes?client_id=&new=1`). */
+		clientId?: string;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -82,6 +84,8 @@
 			text: string;
 		}) => void | Promise<void>;
 		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
+		/** Override New quote navigation (defaults to quotes create with client preselected). */
+		onNewQuote?: () => void;
 	}
 
 	let {
@@ -115,6 +119,7 @@
 		viewState = { kind: 'ready' },
 		moneyItems = [],
 		projects = [],
+		clientId,
 		showNav = true,
 		class: className,
 		onReload,
@@ -124,7 +129,8 @@
 		onSendReply,
 		onDraftResponse,
 		onUseSuggestion,
-		onDiscardSuggestion
+		onDiscardSuggestion,
+		onNewQuote
 	}: ClientProfilePageProps = $props();
 
 	const tabs = [
@@ -134,6 +140,20 @@
 		{ id: 'money', label: 'Money' },
 		{ id: 'projects', label: 'Projects' }
 	];
+
+	let activeTab = $state('details');
+
+	const newQuoteHref = $derived(
+		clientId ? `/quotes?client_id=${encodeURIComponent(clientId)}&new=1` : '/quotes?new=1'
+	);
+
+	function handleEmailClick() {
+		activeTab = 'email';
+	}
+
+	function handleNewQuoteClick() {
+		onNewQuote?.();
+	}
 </script>
 
 <div
@@ -152,8 +172,35 @@
 			<div class="shrink-0">
 				<ProfileHeader {breadcrumb} {title} {status} {subtitle}>
 					{#snippet actions()}
-						<Button variant="outline" size="sm">Email</Button>
-						<Button variant="outline" size="sm">New quote</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							data-testid="client-email-action"
+							onclick={handleEmailClick}
+						>
+							Email
+						</Button>
+						{#if onNewQuote}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								data-testid="client-new-quote-action"
+								onclick={handleNewQuoteClick}
+							>
+								New quote
+							</Button>
+						{:else}
+							<Button
+								variant="outline"
+								size="sm"
+								href={newQuoteHref}
+								data-testid="client-new-quote-action"
+							>
+								New quote
+							</Button>
+						{/if}
 						{#if clientForm}
 							<ClientFormDrawer
 								bind:open={editDrawerOpen}
@@ -176,7 +223,7 @@
 
 			<ResourceStateBanner state={viewState} {onReload} />
 
-			<ProfileTabs {tabs}>
+			<ProfileTabs {tabs} bind:value={activeTab}>
 				{#snippet children({ active })}
 					{#if active === 'details'}
 						<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">

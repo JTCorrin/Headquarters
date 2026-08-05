@@ -80,7 +80,9 @@
 			sku: '',
 			name: '',
 			description: '',
+			categoryId: '',
 			unitPrice: '',
+			taxRateId: '',
 			trackStock: false,
 			stockQty: '',
 			status: 'active'

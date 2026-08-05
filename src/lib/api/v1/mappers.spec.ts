@@ -21,6 +21,7 @@ import {
 	recipientsFromDocument,
 	toCatalogProductOption,
 	toProductCreateBody,
+	toProductFormData,
 	toProductRow,
 	toQuoteLineInput,
 	toRecurringLineInput,
@@ -480,6 +481,7 @@ describe('api mappers', () => {
 				sku: 'WID-1',
 				name: 'Widget',
 				description: '',
+				categoryId: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 				unitPrice: '25.00',
 				taxRateId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
 				trackStock: true,
@@ -490,6 +492,7 @@ describe('api mappers', () => {
 			sku: 'WID-1',
 			name: 'Widget',
 			description: null,
+			category_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 			product_type: 'product',
 			unit_price_cents: 2500,
 			currency: 'GBP',
@@ -531,6 +534,65 @@ describe('api mappers', () => {
 			lowStockAt: 2,
 			status: 'Active'
 		});
+		expect(
+			toProductRow(
+				{
+					id: 'dddddddd-dddd-4eee-8fff-000000000001',
+					org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+					created_at: '2026-01-01T00:00:00Z',
+					updated_at: '2026-01-01T00:00:00Z',
+					created_by: null,
+					updated_by: null,
+					deleted_at: null,
+					version: 1,
+					sku: 'WID-1',
+					name: 'Widget',
+					description: null,
+					category_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+					product_type: 'product',
+					unit_name: null,
+					unit_price_cents: 2500,
+					cost_price_cents: null,
+					currency: 'GBP',
+					tax_rate_id: null,
+					track_stock: false,
+					stock_qty: 0,
+					low_stock_at: null,
+					status: 'active',
+					metadata: {}
+				},
+				'Widgets'
+			)
+		).toMatchObject({
+			category: 'Widgets'
+		});
+		expect(
+			toProductFormData({
+				id: 'dddddddd-dddd-4eee-8fff-000000000001',
+				org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+				created_at: '2026-01-01T00:00:00Z',
+				updated_at: '2026-01-01T00:00:00Z',
+				created_by: null,
+				updated_by: null,
+				deleted_at: null,
+				version: 1,
+				sku: 'WID-1',
+				name: 'Widget',
+				description: null,
+				category_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+				product_type: 'product',
+				unit_name: null,
+				unit_price_cents: 2500,
+				cost_price_cents: null,
+				currency: 'GBP',
+				tax_rate_id: null,
+				track_stock: false,
+				stock_qty: 0,
+				low_stock_at: null,
+				status: 'active',
+				metadata: {}
+			}).categoryId
+		).toBe('cccccccc-cccc-4ddd-8eee-ffffffffffff');
 		expect(
 			toCatalogProductOption({
 				id: 'dddddddd-dddd-4eee-8fff-000000000001',

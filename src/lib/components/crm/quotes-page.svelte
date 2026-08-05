@@ -29,6 +29,11 @@
 	export interface QuotesPageProps {
 		api: ApiV1Client;
 		session: OrgSession;
+		/** Preselect this client in the create drawer (`?client_id=`). */
+		initialClientId?: string | null;
+		/** Open the create drawer once load completes (`?new=1`). */
+		openCreate?: boolean;
+		onOpenCreateConsumed?: () => void;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
@@ -38,6 +43,9 @@
 	let {
 		api,
 		session,
+		initialClientId = null,
+		openCreate = false,
+		onOpenCreateConsumed,
 		onMissingOrg,
 		onSwitchNavigate,
 		onLogout,
@@ -162,12 +170,19 @@
 				label: c.display_name || c.primary_email || c.id,
 				clientId: c.client_id ?? null
 			}));
-			if (clientOptions[0] && get(quoteForm.form).clientId.startsWith('00000000')) {
+			const preferred =
+				(initialClientId && clientOptions.find((c) => c.id === initialClientId)) ||
+				(get(quoteForm.form).clientId.startsWith('00000000') ? clientOptions[0] : null);
+			if (preferred) {
 				quoteForm.form.update((current) => ({
 					...current,
-					clientId: clientOptions[0]!.id,
-					clientName: clientOptions[0]!.name
+					clientId: preferred.id,
+					clientName: preferred.name
 				}));
+			}
+			if (openCreate) {
+				drawerOpen = true;
+				onOpenCreateConsumed?.();
 			}
 			viewState =
 				rows.length === 0
