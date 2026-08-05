@@ -211,6 +211,11 @@
 		}
 	}
 
+	async function onSendReply(payload: { messageId: string; body: string }) {
+		await api.emailMessages.reply(payload.messageId, { body_text: payload.body });
+		emailTab = await loadEntityEmailTab(api, 'contact', contactId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'contact', contactId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
@@ -309,6 +314,7 @@
 						documentsReloadKey={session.cacheGeneration}
 						{onTimelineAdd}
 						{onAddToTimeline}
+						{onSendReply}
 						{onDraftResponse}
 						{onUseSuggestion}
 						{onDiscardSuggestion}

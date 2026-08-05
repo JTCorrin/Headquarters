@@ -200,6 +200,11 @@
 		}
 	}
 
+	async function onSendReply(payload: { messageId: string; body: string }) {
+		await api.emailMessages.reply(payload.messageId, { body_text: payload.body });
+		await loadAll({ quiet: true });
+	}
+
 	async function onDraftResponse(payload: {
 		messageId: string;
 		tone: 'warm' | 'neutral' | 'firm';
@@ -332,6 +337,7 @@
 							bind:selectedId
 							{role}
 							canAddToTimeline={false}
+							{onSendReply}
 							{onDraftResponse}
 							{onUseSuggestion}
 							{onDiscardSuggestion}
