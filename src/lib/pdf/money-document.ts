@@ -16,6 +16,8 @@ export interface MoneyDocumentInput {
 	orgName: string;
 	partyLabel: string;
 	partyName: string;
+	/** Optional Attn line under the party name (billing + other recipients). */
+	attentionLine?: string;
 	documentNumber: string;
 	subtitle?: string;
 	currency: string;
@@ -61,6 +63,7 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 		orgName,
 		partyLabel,
 		partyName,
+		attentionLine,
 		documentNumber,
 		subtitle,
 		currency,
@@ -131,6 +134,9 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 						stack: [
 							{ text: partyLabel, style: 'label', margin: [0, 28, 0, 4] },
 							{ text: partyName || '—', style: 'party' },
+							...(attentionLine
+								? [{ text: attentionLine, style: 'muted', margin: [0, 2, 0, 0] }]
+								: []),
 							...(subtitle ? [{ text: subtitle, style: 'muted', margin: [0, 2, 0, 0] }] : [])
 						]
 					},

@@ -258,7 +258,32 @@ export interface ApiQuoteLine {
 	position: number;
 }
 
-export type ApiQuoteDocument = ApiQuote & { lines: ApiQuoteLine[] };
+/** Recipient row on quote / invoice / recurring documents (junction). */
+export interface ApiDocumentRecipient {
+	id?: string;
+	org_id?: string;
+	contact_id: string;
+	position?: number;
+	is_billing: boolean;
+	created_at?: string;
+	updated_at?: string;
+	created_by?: string | null;
+	updated_by?: string | null;
+	quote_id?: string;
+	invoice_id?: string;
+	schedule_id?: string;
+}
+
+/** Draft create/save replace payload for document recipients. */
+export interface ApiDocumentRecipientInput {
+	contact_id: string;
+	is_billing?: boolean;
+}
+
+export type ApiQuoteDocument = ApiQuote & {
+	lines: ApiQuoteLine[];
+	recipients?: ApiDocumentRecipient[];
+};
 
 /** Product line — description/unit price may be inherited server-side from the product. */
 export interface ApiQuoteProductLineInput {
@@ -287,6 +312,7 @@ export type ApiQuoteLineInput = ApiQuoteProductLineInput | ApiQuoteFreeTextLineI
 interface ApiQuoteWritableFields {
 	currency?: string;
 	contact_id?: string | null;
+	recipients?: ApiDocumentRecipientInput[];
 	owner_membership_id?: string | null;
 	issue_on?: string;
 	valid_until?: string | null;
@@ -389,7 +415,10 @@ export interface ApiInvoiceLine {
 	position: number;
 }
 
-export type ApiInvoiceDocument = ApiInvoice & { lines: ApiInvoiceLine[] };
+export type ApiInvoiceDocument = ApiInvoice & {
+	lines: ApiInvoiceLine[];
+	recipients?: ApiDocumentRecipient[];
+};
 
 /** Product line — description/unit price may be inherited server-side from the product. */
 export interface ApiInvoiceProductLineInput {
@@ -418,6 +447,7 @@ export type ApiInvoiceLineInput = ApiInvoiceProductLineInput | ApiInvoiceFreeTex
 interface ApiInvoiceWritableFields {
 	currency?: string;
 	contact_id?: string | null;
+	recipients?: ApiDocumentRecipientInput[];
 	owner_membership_id?: string | null;
 	issue_on?: string;
 	due_on?: string;
@@ -1784,6 +1814,7 @@ export interface ApiRecurringInvoiceLine {
 
 export type ApiRecurringInvoiceDocument = ApiRecurringInvoiceSchedule & {
 	lines: ApiRecurringInvoiceLine[];
+	recipients?: ApiDocumentRecipient[];
 };
 
 export interface ApiRecurringInvoiceLineInput {
@@ -1800,6 +1831,7 @@ interface ApiRecurringInvoiceWritableFields {
 	name?: string;
 	client_id?: string;
 	contact_id?: string | null;
+	recipients?: ApiDocumentRecipientInput[];
 	currency?: string;
 	frequency?: ApiRecurringInvoiceFrequency;
 	interval_count?: number;

@@ -116,13 +116,13 @@
 			{
 				clientId: '00000000-0000-4000-8000-000000000000',
 				clientName: '',
-				contactId: '',
 				currency: 'GBP' as const,
 				issueOn: '',
 				dueOn: '',
 				purchaseOrderNumber: '',
 				status: 'draft' as const,
-				quoteId: ''
+				quoteId: '',
+				recipients: []
 			},
 			zod4(invoiceFormSchema)
 		),
@@ -188,7 +188,7 @@
 	function fingerprintFrom(form: InvoiceFormData, rowLines: LineItemRow[]) {
 		return JSON.stringify({
 			clientId: form.clientId,
-			contactId: form.contactId,
+			recipients: form.recipients,
 			currency: form.currency,
 			issueOn: form.issueOn,
 			dueOn: form.dueOn,
@@ -372,8 +372,13 @@
 				label: c.display_name || c.primary_email || c.id,
 				clientId: c.client_id ?? null
 			}));
-			const selectedContactId = result.data.contact_id;
-			if (selectedContactId && !options.some((c) => c.id === selectedContactId)) {
+			const selectedIds = new Set(
+				(result.data.recipients ?? [])
+					.map((r) => r.contact_id)
+					.concat(result.data.contact_id ? [result.data.contact_id] : [])
+			);
+			for (const selectedContactId of selectedIds) {
+				if (options.some((c) => c.id === selectedContactId)) continue;
 				try {
 					const pinned = await api.contacts.get(selectedContactId);
 					if (isStale(epoch)) return;
@@ -384,9 +389,8 @@
 						clientId: pinned.data.client_id ?? null
 					});
 				} catch {
-					// Keep the form contactId; never clear solely because the option page truncated.
+					// Keep form recipients; never clear solely because the option page truncated.
 				}
-				// Rejected pin fetch still awaits; bail if org/invoice switched meanwhile.
 				if (isStale(epoch)) return;
 			}
 			contactOptions = options;

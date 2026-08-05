@@ -99,7 +99,8 @@
 	const SCHEDULE_API_TO_FORM: Record<string, string> = {
 		name: 'name',
 		client_id: 'clientId',
-		contact_id: 'contactId',
+		contact_id: 'recipients',
+		recipients: 'recipients',
 		currency: 'currency',
 		frequency: 'frequency',
 		interval_count: 'intervalCount',
