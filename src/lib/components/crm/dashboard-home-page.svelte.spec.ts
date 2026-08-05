@@ -187,7 +187,10 @@ describe('DashboardHomePage integration', () => {
 			'GET /api/v1/meetings': async (request) => {
 				seenMeetingUrls.push(request.url);
 				return { body: { data: [sampleMeeting()], meta: { next_cursor: null } } };
-			}
+			},
+			'GET /api/v1/timeline-events': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			})
 		});
 
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
@@ -197,6 +200,57 @@ describe('DashboardHomePage integration', () => {
 		await expect.poll(() => seenMeetingUrls.length).toBeGreaterThan(0);
 		expect(seenMeetingUrls.some((url) => url.includes('upcoming=true'))).toBe(true);
 		expect(seenMeetingUrls.some((url) => url.includes('limit=5'))).toBe(true);
+	});
+
+	it('loads org timeline into Recent activity with entity deep-links', async () => {
+		const seenTimelineUrls: string[] = [];
+		const session = sessionForOrg();
+		const quoteId = 'aaaaaaaa-aaaa-4bbb-8ccc-dddddddddddd';
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/tasks': async () => ({
+				body: { data: [sampleTask()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/meetings': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/timeline-events': async (request) => {
+				seenTimelineUrls.push(request.url);
+				return {
+					body: {
+						data: [
+							{
+								id: 'eeeeeeee-eeee-4fff-8aaa-bbbbbbbbbbbb',
+								org_id: ORG_A,
+								entity_type: 'quote',
+								entity_id: quoteId,
+								kind: 'status',
+								title: 'Quote accepted',
+								body: null,
+								actor_type: 'system',
+								actor_id: null,
+								source_type: 'quote',
+								source_id: quoteId,
+								payload: {},
+								occurred_at: '2026-08-05T12:00:00.000Z',
+								created_at: '2026-08-05T12:00:00.000Z'
+							}
+						],
+						meta: { next_cursor: null }
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(DashboardHomePage, { api, session });
+
+		const link = page.getByRole('link', { name: 'Quote accepted' });
+		await expect.element(link).toBeInTheDocument();
+		expect(link.element().getAttribute('href')).toBe(`/quotes/${quoteId}`);
+		await expect.poll(() => seenTimelineUrls.length).toBeGreaterThan(0);
+		expect(seenTimelineUrls.some((url) => url.includes('limit=50'))).toBe(true);
 	});
 
 	it('opens create drawer from New task and prepends My tasks on success', async () => {
