@@ -43,6 +43,10 @@ import type { VendorFormData } from '$lib/schemas/vendor.js';
 import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 import type { ProductFormData } from '$lib/schemas/product.js';
 import type { QuoteFormData, QuoteListItem } from '$lib/schemas/quote.js';
+import {
+	billingContactIdFromRecipients,
+	type DocumentRecipientFormRow
+} from '$lib/schemas/document-recipients.js';
 import type {
 	TaskAssigneeOption,
 	TaskBoardStatus,
@@ -100,6 +104,8 @@ import type {
 	ApiProductCreateBody,
 	ApiProductUpdateBody,
 	ApiProfilePreferences,
+	ApiDocumentRecipient,
+	ApiDocumentRecipientInput,
 	ApiQuote,
 	ApiQuoteCreateBody,
 	ApiQuoteDocument,
@@ -376,6 +382,44 @@ export function toQuoteListItem(quote: ApiQuote): QuoteListItem {
 	};
 }
 
+export function recipientsFromDocument(doc: {
+	recipients?: ApiDocumentRecipient[];
+	contact_id?: string | null;
+}): DocumentRecipientFormRow[] {
+	const rows = Array.isArray(doc.recipients) ? doc.recipients : [];
+	if (rows.length > 0) {
+		return [...rows]
+			.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+			.map((row) => ({
+				contactId: row.contact_id,
+				isBilling: Boolean(row.is_billing)
+			}));
+	}
+	if (doc.contact_id) {
+		return [{ contactId: doc.contact_id, isBilling: true }];
+	}
+	return [];
+}
+
+export function recipientsToApiInput(
+	recipients: DocumentRecipientFormRow[]
+): ApiDocumentRecipientInput[] {
+	return recipients.map((row) => ({
+		contact_id: row.contactId,
+		is_billing: row.isBilling
+	}));
+}
+
+function recipientsWritableFields(recipients: DocumentRecipientFormRow[]): {
+	recipients: ApiDocumentRecipientInput[];
+	contact_id: string | null;
+} {
+	return {
+		recipients: recipientsToApiInput(recipients),
+		contact_id: billingContactIdFromRecipients(recipients)
+	};
+}
+
 export function toQuoteFormData(
 	quote: ApiQuote | ApiQuoteDocument,
 	clientNameFallback = ''
@@ -398,7 +442,8 @@ export function toQuoteFormData(
 		clientName: partyNameFromSnapshot(quote.party_snapshot) || clientNameFallback,
 		title: quote.title,
 		currency,
-		status
+		status,
+		recipients: recipientsFromDocument(quote)
 	};
 }
 
@@ -407,6 +452,7 @@ export function toQuoteCreateBody(data: QuoteFormData): ApiQuoteCreateBody {
 		title: data.title.trim(),
 		client_id: data.clientId,
 		currency: data.currency,
+		...recipientsWritableFields(data.recipients),
 		lines: []
 	};
 }
@@ -415,7 +461,8 @@ export function toQuoteUpdateBody(data: QuoteFormData): ApiQuoteUpdateBody {
 	return {
 		title: data.title.trim(),
 		client_id: data.clientId,
-		currency: data.currency
+		currency: data.currency,
+		...recipientsWritableFields(data.recipients)
 	};
 }
 
@@ -600,30 +647,24 @@ export function toInvoiceFormData(
 	return {
 		clientId: invoice.client_id,
 		clientName: partyNameFromSnapshot(invoice.party_snapshot) || clientNameFallback,
-		contactId: invoice.contact_id ?? '',
 		currency,
 		issueOn: invoice.issue_on,
 		dueOn: invoice.due_on,
 		purchaseOrderNumber: invoice.purchase_order_number ?? '',
 		status,
-		quoteId: invoice.quote_id ?? ''
+		quoteId: invoice.quote_id ?? '',
+		recipients: recipientsFromDocument(invoice)
 	};
-}
-
-function optionalContactId(value: string | undefined): string | null | undefined {
-	if (value === undefined) return undefined;
-	const trimmed = value.trim();
-	return trimmed ? trimmed : null;
 }
 
 export function toInvoiceCreateBody(data: InvoiceFormData): ApiInvoiceCreateBody {
 	return {
 		client_id: data.clientId,
-		contact_id: optionalContactId(data.contactId) ?? null,
 		currency: data.currency,
 		issue_on: data.issueOn,
 		due_on: data.dueOn,
 		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		...recipientsWritableFields(data.recipients),
 		lines: []
 	};
 }
@@ -631,11 +672,11 @@ export function toInvoiceCreateBody(data: InvoiceFormData): ApiInvoiceCreateBody
 export function toInvoiceUpdateBody(data: InvoiceFormData): ApiInvoiceUpdateBody {
 	return {
 		client_id: data.clientId,
-		contact_id: optionalContactId(data.contactId) ?? null,
 		currency: data.currency,
 		issue_on: data.issueOn,
 		due_on: data.dueOn,
-		purchase_order_number: data.purchaseOrderNumber?.trim() || null
+		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		...recipientsWritableFields(data.recipients)
 	};
 }
 
@@ -1475,7 +1516,7 @@ export function emptyRecurringInvoiceFormData(): RecurringInvoiceFormData {
 		name: '',
 		clientId: '00000000-0000-4000-8000-000000000000',
 		clientName: '',
-		contactId: '',
+		recipients: [],
 		currency: 'GBP',
 		frequency: 'monthly',
 		intervalCount: 1,
@@ -1514,7 +1555,7 @@ export function toRecurringInvoiceFormData(
 		name: document.name,
 		clientId: document.client_id,
 		clientName: document.client_name ?? clientNameFallback,
-		contactId: document.contact_id ?? '',
+		recipients: recipientsFromDocument(document),
 		currency,
 		frequency: document.frequency,
 		intervalCount: document.interval_count,
@@ -1580,7 +1621,7 @@ function recurringWritableFields(
 	return {
 		name: data.name.trim(),
 		client_id: data.clientId,
-		contact_id: data.contactId?.trim() ? data.contactId.trim() : null,
+		...recipientsWritableFields(data.recipients),
 		currency: data.currency,
 		frequency: data.frequency,
 		interval_count: data.intervalCount,

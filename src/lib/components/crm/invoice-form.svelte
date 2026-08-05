@@ -12,6 +12,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import DateField from './date-field.svelte';
+	import DocumentRecipientsField from './document-recipients-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface InvoiceFormProps {
@@ -49,6 +50,9 @@
 	let submitLock = false;
 	const busy = $derived($submitting || pendingSubmit);
 
+	/** Lock party/currency only on create-from-quote prefill — not on quote-linked draft detail. */
+	const lockFromQuotePrefill = $derived(showQuotePrefill && Boolean($formData.quoteId));
+
 	const currencyOptions = [
 		{ value: 'GBP', label: 'GBP' },
 		{ value: 'USD', label: 'USD' },
@@ -63,16 +67,6 @@
 			($formData.clientName || 'Select client')
 	);
 	const useClientSelect = $derived(clientOptions.length > 0);
-	const contactsForClient = $derived(
-		contactOptions.filter(
-			(c) => !c.clientId || !$formData.clientId || c.clientId === $formData.clientId
-		)
-	);
-	const contactLabel = $derived(
-		contactsForClient.find((o) => o.id === $formData.contactId)?.label ??
-			contactOptions.find((o) => o.id === $formData.contactId)?.label ??
-			($formData.contactId ? 'Selected contact' : 'No contact')
-	);
 	const quoteLabel = $derived(
 		quoteOptions.find((o) => o.id === $formData.quoteId)?.label ?? 'Blank draft (no quote)'
 	);
@@ -86,12 +80,18 @@
 	});
 
 	$effect(() => {
-		if (!$formData.contactId) return;
-		const match = contactOptions.find((c) => c.id === $formData.contactId);
-		// Missing from the loaded page must not clear a persisted selection.
-		if (!match) return;
-		if (match.clientId && $formData.clientId && match.clientId !== $formData.clientId) {
-			$formData.contactId = '';
+		const client = $formData.clientId;
+		const next = $formData.recipients.filter((row) => {
+			const match = contactOptions.find((c) => c.id === row.contactId);
+			if (!match) return true;
+			if (match.clientId && client && match.clientId !== client) return false;
+			return true;
+		});
+		if (next.length !== $formData.recipients.length) {
+			if (next.length > 0 && !next.some((r) => r.isBilling)) {
+				next[0] = { ...next[0], isBilling: true };
+			}
+			$formData.recipients = next;
 		}
 	});
 </script>
@@ -150,7 +150,7 @@
 				type="single"
 				bind:value={$formData.clientId}
 				name="clientId"
-				disabled={readonly || Boolean($formData.quoteId)}
+				disabled={readonly || lockFromQuotePrefill}
 			>
 				<Select.Trigger id="invoice-client" class="w-full" aria-invalid={!!$errors.clientId}>
 					{clientLabel}
@@ -179,27 +179,23 @@
 		</div>
 	{/if}
 
-	{#if contactsForClient.length > 0}
-		<div class="space-y-2">
-			<Label for="invoice-contact">Billing contact</Label>
-			<Select.Root
-				type="single"
-				value={$formData.contactId || NONE}
-				onValueChange={(value) => {
-					$formData.contactId = !value || value === NONE ? '' : value;
-				}}
-				name="contactId"
-				disabled={readonly || Boolean($formData.quoteId)}
-			>
-				<Select.Trigger id="invoice-contact" class="w-full">{contactLabel}</Select.Trigger>
-				<Select.Content>
-					<Select.Item value={NONE} label="No contact">No contact</Select.Item>
-					{#each contactsForClient as option (option.id)}
-						<Select.Item value={option.id} label={option.label}>{option.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
+	{#if !lockFromQuotePrefill}
+		<DocumentRecipientsField
+			recipients={$formData.recipients}
+			{contactOptions}
+			clientId={$formData.clientId}
+			disabled={readonly}
+			onRecipientsChange={(next) => {
+				$formData.recipients = next;
+			}}
+		/>
+		{#if $errors.recipients}
+			<p class="text-destructive text-xs">{$errors.recipients}</p>
+		{/if}
+	{:else}
+		<p class="text-muted-foreground text-xs">
+			Recipients copy from the quote on convert — edit them on the draft after create.
+		</p>
 	{/if}
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -209,7 +205,7 @@
 				type="single"
 				bind:value={$formData.currency}
 				name="currency"
-				disabled={readonly || Boolean($formData.quoteId)}
+				disabled={readonly || lockFromQuotePrefill}
 			>
 				<Select.Trigger id="invoice-currency" class="w-full">{currencyLabel}</Select.Trigger>
 				<Select.Content>

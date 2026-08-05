@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { fromStore } from 'svelte/store';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteFormData } from '$lib/schemas/quote.js';
+	import type { QuoteContactOption, QuoteFormData } from '$lib/schemas/quote.js';
+	import { attentionLineFromRecipients } from '$lib/schemas/document-recipients.js';
 	import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
@@ -53,6 +54,8 @@
 		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		clientOptions?: import('$lib/schemas/quote.js').QuoteClientOption[];
+		contactOptions?: QuoteContactOption[];
+		readonly?: boolean;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -86,11 +89,17 @@
 		onSaveQuote,
 		onTimelineAdd,
 		clientOptions = [],
+		contactOptions = [],
+		readonly = false,
 		showNav = true,
 		class: className
 	}: QuoteDetailPageProps = $props();
 
 	const formData = fromStore(quoteForm.form);
+
+	const attentionLine = $derived(
+		attentionLineFromRecipients(formData.current.recipients, contactOptions)
+	);
 
 	const pdfDocument = $derived(
 		buildMoneyDocumentDef({
@@ -98,6 +107,7 @@
 			orgName,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
+			attentionLine,
 			documentNumber: title.split('·')[0]?.trim() || 'Quote',
 			subtitle: formData.current.title,
 			currency: formData.current.currency,
@@ -219,6 +229,8 @@
 							form={quoteForm}
 							submitLabel="Save details"
 							{clientOptions}
+							{contactOptions}
+							{readonly}
 							onValidSubmit={onSaveQuote}
 						/>
 					</section>

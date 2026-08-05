@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteClientOption, QuoteFormData } from '$lib/schemas/quote.js';
+	import type {
+		QuoteClientOption,
+		QuoteContactOption,
+		QuoteFormData
+	} from '$lib/schemas/quote.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import QuoteForm from './quote-form.svelte';
@@ -15,6 +19,7 @@
 		submitLabel?: string;
 		triggerLabel?: string;
 		clientOptions?: QuoteClientOption[];
+		contactOptions?: QuoteContactOption[];
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -28,6 +33,7 @@
 		submitLabel = 'Save quote',
 		triggerLabel = 'New quote',
 		clientOptions = [],
+		contactOptions = [],
 		class: className,
 		trigger,
 		onValidSubmit
@@ -53,7 +59,14 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<QuoteForm {form} {submitLabel} {clientOptions} {onValidSubmit} class="max-w-none" />
+			<QuoteForm
+				{form}
+				{submitLabel}
+				{clientOptions}
+				{contactOptions}
+				{onValidSubmit}
+				class="max-w-none"
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

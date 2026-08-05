@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteClientOption, QuoteFormData } from '$lib/schemas/quote.js';
+	import type {
+		QuoteClientOption,
+		QuoteContactOption,
+		QuoteFormData
+	} from '$lib/schemas/quote.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import QuotesTable from './quotes-table.svelte';
@@ -15,6 +19,7 @@
 		form: SuperForm<QuoteFormData>;
 		drawerOpen?: boolean;
 		clientOptions?: QuoteClientOption[];
+		contactOptions?: QuoteContactOption[];
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -28,6 +33,7 @@
 		form,
 		drawerOpen = $bindable(false),
 		clientOptions = [],
+		contactOptions = [],
 		showNav = true,
 		class: className,
 		onValidSubmit
@@ -57,6 +63,7 @@
 						bind:open={drawerOpen}
 						{form}
 						{clientOptions}
+						{contactOptions}
 						{onValidSubmit}
 						triggerLabel="New quote"
 					/>

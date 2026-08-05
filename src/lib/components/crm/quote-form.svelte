@@ -1,17 +1,25 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { QuoteClientOption, QuoteFormData } from '$lib/schemas/quote.js';
+	import type {
+		QuoteClientOption,
+		QuoteContactOption,
+		QuoteFormData
+	} from '$lib/schemas/quote.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import DocumentRecipientsField from './document-recipients-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface QuoteFormProps {
 		form: SuperForm<QuoteFormData>;
 		submitLabel?: string;
 		clientOptions?: QuoteClientOption[];
+		contactOptions?: QuoteContactOption[];
+		/** When true, recipients and party fields are not editable. */
+		readonly?: boolean;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 	}
@@ -20,6 +28,8 @@
 		form,
 		submitLabel = 'Save quote',
 		clientOptions = [],
+		contactOptions = [],
+		readonly = false,
 		class: className,
 		onValidSubmit
 	}: QuoteFormProps = $props();
@@ -63,6 +73,22 @@
 			$formData.clientName = selected.name;
 		}
 	});
+
+	$effect(() => {
+		const client = $formData.clientId;
+		const next = $formData.recipients.filter((row) => {
+			const match = contactOptions.find((c) => c.id === row.contactId);
+			if (!match) return true;
+			if (match.clientId && client && match.clientId !== client) return false;
+			return true;
+		});
+		if (next.length !== $formData.recipients.length) {
+			if (next.length > 0 && !next.some((r) => r.isBilling)) {
+				next[0] = { ...next[0], isBilling: true };
+			}
+			$formData.recipients = next;
+		}
+	});
 </script>
 
 <form
@@ -89,7 +115,12 @@
 	{#if useClientSelect}
 		<div class="space-y-2">
 			<Label for="quote-client">Client</Label>
-			<Select.Root type="single" bind:value={$formData.clientId} name="clientId">
+			<Select.Root
+				type="single"
+				bind:value={$formData.clientId}
+				name="clientId"
+				disabled={readonly}
+			>
 				<Select.Trigger id="quote-client" class="w-full" aria-invalid={!!$errors.clientId}>
 					{clientLabel}
 				</Select.Trigger>
@@ -110,10 +141,24 @@
 				bind:value={$formData.clientName}
 				placeholder="Northwind"
 				aria-invalid={!!$errors.clientName}
+				disabled={readonly}
 			/>
 			{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
 			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
 		</div>
+	{/if}
+
+	<DocumentRecipientsField
+		recipients={$formData.recipients}
+		{contactOptions}
+		clientId={$formData.clientId}
+		disabled={readonly}
+		onRecipientsChange={(next) => {
+			$formData.recipients = next;
+		}}
+	/>
+	{#if $errors.recipients}
+		<p class="text-destructive text-xs">{$errors.recipients}</p>
 	{/if}
 
 	<div class="space-y-2">
@@ -124,6 +169,7 @@
 			bind:value={$formData.title}
 			placeholder="Q2 retainer"
 			aria-invalid={!!$errors.title}
+			disabled={readonly}
 		/>
 		{#if $errors.title}<p class="text-destructive text-xs">{$errors.title}</p>{/if}
 	</div>
@@ -131,7 +177,12 @@
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="quote-currency">Currency</Label>
-			<Select.Root type="single" bind:value={$formData.currency} name="currency">
+			<Select.Root
+				type="single"
+				bind:value={$formData.currency}
+				name="currency"
+				disabled={readonly}
+			>
 				<Select.Trigger id="quote-currency" class="w-full">{currencyLabel}</Select.Trigger>
 				<Select.Content>
 					{#each currencyOptions as option (option.value)}
@@ -160,5 +211,7 @@
 		</div>
 	</div>
 
-	<Button type="submit" disabled={busy}>{submitLabel}</Button>
+	{#if !readonly}
+		<Button type="submit" disabled={busy}>{submitLabel}</Button>
+	{/if}
 </form>

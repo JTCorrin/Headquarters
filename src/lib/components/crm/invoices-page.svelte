@@ -72,13 +72,13 @@
 			{
 				clientId: '00000000-0000-4000-8000-000000000000',
 				clientName: '',
-				contactId: '',
 				currency: 'GBP' as const,
 				issueOn: todayIso(),
 				dueOn: dueInDays(30),
 				purchaseOrderNumber: '',
 				status: 'draft' as const,
-				quoteId: ''
+				quoteId: '',
+				recipients: []
 			},
 			zod4(invoiceFormSchema)
 		),
@@ -152,13 +152,13 @@
 		invoiceForm.form.set({
 			clientId: firstClient?.id ?? '00000000-0000-4000-8000-000000000000',
 			clientName: firstClient?.name ?? '',
-			contactId: '',
 			currency: 'GBP',
 			issueOn: todayIso(),
 			dueOn: dueInDays(30),
 			purchaseOrderNumber: '',
 			status: 'draft',
-			quoteId: ''
+			quoteId: '',
+			recipients: []
 		});
 	}
 

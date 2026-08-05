@@ -121,6 +121,9 @@ describe('QuotesPage integration', () => {
 					}
 				};
 			},
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			'POST /api/v1/quotes': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				createBody = await request.json();
@@ -152,6 +155,8 @@ describe('QuotesPage integration', () => {
 			title: 'New retainer',
 			client_id: CLIENT_ID,
 			currency: 'GBP',
+			contact_id: null,
+			recipients: [],
 			lines: []
 		});
 	});

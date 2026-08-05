@@ -14,9 +14,11 @@ import {
 	toContactFormData,
 	toContactListItem,
 	toInvoiceCreateBody,
+	toInvoiceFormData,
 	toInvoiceLineInput,
 	lineItemRowsToInvoiceLineInputs,
 	lineItemRowsToQuoteLineInputs,
+	recipientsFromDocument,
 	toCatalogProductOption,
 	toProductCreateBody,
 	toProductRow,
@@ -217,12 +219,15 @@ describe('api mappers', () => {
 				clientName: 'Northwind',
 				title: '  Pilot quote  ',
 				currency: 'GBP',
-				status: 'draft'
+				status: 'draft',
+				recipients: []
 			})
 		).toEqual({
 			title: 'Pilot quote',
 			client_id: sampleQuote.client_id,
 			currency: 'GBP',
+			contact_id: null,
+			recipients: [],
 			lines: []
 		});
 	});
@@ -280,7 +285,7 @@ describe('api mappers', () => {
 			toInvoiceCreateBody({
 				clientId: sampleInvoice.client_id,
 				clientName: 'Northwind',
-				contactId: '',
+				recipients: [],
 				currency: 'GBP',
 				issueOn: '2026-03-01',
 				dueOn: '2026-04-01',
@@ -291,10 +296,74 @@ describe('api mappers', () => {
 		).toEqual({
 			client_id: sampleInvoice.client_id,
 			contact_id: null,
+			recipients: [],
 			currency: 'GBP',
 			issue_on: '2026-03-01',
 			due_on: '2026-04-01',
 			purchase_order_number: 'PO-9',
+			lines: []
+		});
+		const contactA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+		const contactB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+		expect(
+			recipientsFromDocument({
+				contact_id: contactA,
+				recipients: [
+					{
+						contact_id: contactB,
+						is_billing: false,
+						position: 1
+					},
+					{
+						contact_id: contactA,
+						is_billing: true,
+						position: 0
+					}
+				]
+			})
+		).toEqual([
+			{ contactId: contactA, isBilling: true },
+			{ contactId: contactB, isBilling: false }
+		]);
+		expect(
+			toInvoiceFormData({
+				...sampleInvoice,
+				contact_id: contactA,
+				recipients: [
+					{ contact_id: contactA, is_billing: true, position: 0 },
+					{ contact_id: contactB, is_billing: false, position: 1 }
+				]
+			} as ApiInvoice).recipients
+		).toEqual([
+			{ contactId: contactA, isBilling: true },
+			{ contactId: contactB, isBilling: false }
+		]);
+		expect(
+			toInvoiceCreateBody({
+				clientId: sampleInvoice.client_id,
+				clientName: 'Northwind',
+				currency: 'GBP',
+				issueOn: '2026-03-01',
+				dueOn: '2026-04-01',
+				purchaseOrderNumber: '',
+				status: 'draft',
+				quoteId: '',
+				recipients: [
+					{ contactId: contactA, isBilling: true },
+					{ contactId: contactB, isBilling: false }
+				]
+			})
+		).toEqual({
+			client_id: sampleInvoice.client_id,
+			contact_id: contactA,
+			recipients: [
+				{ contact_id: contactA, is_billing: true },
+				{ contact_id: contactB, is_billing: false }
+			],
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			due_on: '2026-04-01',
+			purchase_order_number: null,
 			lines: []
 		});
 		expect(
