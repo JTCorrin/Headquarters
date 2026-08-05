@@ -383,7 +383,17 @@ async function routeOrgScoped(
     if (membership.role === 'readonly' && req.method !== 'GET') {
       throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify contacts')
     }
-    return await handleContacts(req, db, path, orgId, requestId)
+    return await handleContacts(
+      req,
+      db,
+      path,
+      orgId,
+      requestId,
+      actorType === 'api_key' &&
+        (req.method === 'POST' || req.method === 'PATCH')
+        ? requireUserId(userId)
+        : null,
+    )
   }
 
   if (path === '/api/v1/leads' || path.startsWith('/api/v1/leads/')) {

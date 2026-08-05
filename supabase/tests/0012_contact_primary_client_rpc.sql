@@ -5,7 +5,7 @@ select plan(18);
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_contact_with_primary_client(uuid, jsonb, uuid, boolean)',
+    'public.create_contact_with_primary_client(uuid, jsonb, uuid, boolean, uuid)',
     'execute'
   ),
   'authenticated users can execute create_contact_with_primary_client'
@@ -14,7 +14,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.update_contact_with_primary_client(uuid, uuid, integer, jsonb, uuid, boolean)',
+    'public.update_contact_with_primary_client(uuid, uuid, integer, jsonb, uuid, boolean, uuid)',
     'execute'
   ),
   'authenticated users can execute update_contact_with_primary_client'
@@ -23,7 +23,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.create_contact_with_primary_client(uuid, jsonb, uuid, boolean)',
+    'public.create_contact_with_primary_client(uuid, jsonb, uuid, boolean, uuid)',
     'execute'
   ),
   'anonymous users cannot execute create_contact_with_primary_client'
