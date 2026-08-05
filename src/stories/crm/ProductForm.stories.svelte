@@ -20,7 +20,9 @@
 			sku: '',
 			name: '',
 			description: '',
+			categoryId: '',
 			unitPrice: '',
+			taxRateId: '',
 			trackStock: true,
 			stockQty: '10',
 			status: 'active'

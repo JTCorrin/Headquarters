@@ -471,11 +471,12 @@ export function productStatusLabel(status: ApiProduct['status']): string {
 	return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-export function toProductRow(product: ApiProduct): ProductRow {
+export function toProductRow(product: ApiProduct, categoryName?: string | null): ProductRow {
 	return {
 		id: product.id,
 		sku: product.sku,
 		name: product.name,
+		category: categoryName?.trim() || undefined,
 		unitPrice: formatMoney(product.unit_price_cents, product.currency),
 		stock: product.track_stock ? product.stock_qty : undefined,
 		lowStockAt: product.low_stock_at ?? undefined,
@@ -505,6 +506,7 @@ export function toProductFormData(product: ApiProduct): ProductFormData {
 		sku: product.sku,
 		name: product.name,
 		description: product.description ?? '',
+		categoryId: product.category_id ?? '',
 		unitPrice: centsToAmountString(product.unit_price_cents) || '0',
 		taxRateId: product.tax_rate_id ?? '',
 		trackStock: product.track_stock,
@@ -515,10 +517,12 @@ export function toProductFormData(product: ApiProduct): ProductFormData {
 
 export function toProductCreateBody(data: ProductFormData): ApiProductCreateBody {
 	const taxRateId = data.taxRateId?.trim();
+	const categoryId = data.categoryId?.trim();
 	return {
 		sku: data.sku.trim(),
 		name: data.name.trim(),
 		description: data.description?.trim() || null,
+		category_id: categoryId ? categoryId : null,
 		product_type: 'product',
 		unit_price_cents: amountStringToCents(data.unitPrice) ?? 0,
 		currency: 'GBP',
@@ -530,10 +534,12 @@ export function toProductCreateBody(data: ProductFormData): ApiProductCreateBody
 
 export function toProductUpdateBody(data: ProductFormData): ApiProductUpdateBody {
 	const taxRateId = data.taxRateId?.trim();
+	const categoryId = data.categoryId?.trim();
 	return {
 		sku: data.sku.trim(),
 		name: data.name.trim(),
 		description: data.description?.trim() || null,
+		category_id: categoryId ? categoryId : null,
 		unit_price_cents: amountStringToCents(data.unitPrice) ?? 0,
 		tax_rate_id: taxRateId ? taxRateId : null,
 		track_stock: data.trackStock,

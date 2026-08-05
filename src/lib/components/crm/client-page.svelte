@@ -402,6 +402,7 @@
 						documentsReloadKey={session.cacheGeneration}
 						{projects}
 						{moneyItems}
+						clientId={client.id}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
