@@ -390,16 +390,19 @@ async function createContact(
   db: DatabaseClient,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const body = await jsonBody(req)
   const clientLink = extractContactClientId(body)
   const payload = validateContactBody(body, false)
   // Atomic contact insert + optional primary client_contacts link (no orphan on 422).
+  // API-key / service_role path has no auth.uid(); pass creator user id as p_actor_id.
   const { data, error } = await db.rpc('create_contact_with_primary_client', {
     p_org_id: orgId,
     p_payload: payload,
     p_client_id: clientLink.clientId,
     p_set_client_id: clientLink.provided,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw mapContactClientRpcError(error, requestId)
@@ -454,6 +457,7 @@ async function updateContact(
   orgId: string,
   contactId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
   const body = await jsonBody(req)
@@ -472,6 +476,7 @@ async function updateContact(
     p_payload: payload,
     p_client_id: clientLink.clientId,
     p_set_client_id: clientLink.provided,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw mapContactClientRpcError(error, requestId)
@@ -515,10 +520,13 @@ export function handleContacts(
   path: string,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   if (path === '/api/v1/contacts') {
     if (req.method === 'GET') return listContacts(req, db, orgId, requestId)
-    if (req.method === 'POST') return createContact(req, db, orgId, requestId)
+    if (req.method === 'POST') {
+      return createContact(req, db, orgId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for contacts')
   }
 
@@ -530,7 +538,7 @@ export function handleContacts(
   const contactId = itemMatch[1]
   if (req.method === 'GET') return getContact(db, orgId, contactId, requestId)
   if (req.method === 'PATCH') {
-    return updateContact(req, db, orgId, contactId, requestId)
+    return updateContact(req, db, orgId, contactId, requestId, actorUserId)
   }
   if (req.method === 'DELETE') {
     return deleteContact(req, db, orgId, contactId, requestId)
