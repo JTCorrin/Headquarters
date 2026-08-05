@@ -1591,6 +1591,7 @@ export type Database = {
       }
       create_quote_draft: {
         Args: {
+          p_actor_id?: string | null
           p_lines?: Json
           p_org_id: string
           p_payload: Json
@@ -1599,6 +1600,7 @@ export type Database = {
       }
       save_quote_draft: {
         Args: {
+          p_actor_id?: string | null
           p_expected_version: number
           p_lines?: Json | null
           p_org_id: string
@@ -1609,6 +1611,7 @@ export type Database = {
       }
       get_quote_document: {
         Args: {
+          p_actor_id?: string | null
           p_org_id: string
           p_quote_id: string
         }
@@ -1660,6 +1663,7 @@ export type Database = {
       }
       create_invoice_draft: {
         Args: {
+          p_actor_id?: string | null
           p_lines?: Json
           p_org_id: string
           p_payload: Json
@@ -1668,6 +1672,7 @@ export type Database = {
       }
       save_invoice_draft: {
         Args: {
+          p_actor_id?: string | null
           p_expected_version: number
           p_invoice_id: string
           p_lines?: Json | null
@@ -1678,6 +1683,7 @@ export type Database = {
       }
       get_invoice_document: {
         Args: {
+          p_actor_id?: string | null
           p_invoice_id: string
           p_org_id: string
         }

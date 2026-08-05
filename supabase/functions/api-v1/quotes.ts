@@ -596,6 +596,7 @@ async function createQuote(
   db: DatabaseClient,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const { data: organisation, error: orgError } = await db
     .from('organisations')
@@ -616,6 +617,7 @@ async function createQuote(
     p_org_id: orgId,
     p_payload: toRpcPayload(header) as Json,
     p_lines: lines as unknown as Json,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -632,12 +634,14 @@ async function findQuoteDocument(
   orgId: string,
   quoteId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<QuoteDocument> {
   // Single transactional RPC: FOR SHARE on the header, then lines, so a concurrent
   // save cannot return a stale ETag with replaced lines.
   const { data, error } = await db.rpc('get_quote_document', {
     p_quote_id: quoteId,
     p_org_id: orgId,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -649,8 +653,9 @@ async function getQuote(
   orgId: string,
   quoteId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
-  const data = await findQuoteDocument(db, orgId, quoteId, requestId)
+  const data = await findQuoteDocument(db, orgId, quoteId, requestId, actorUserId)
   return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
 }
 
@@ -660,9 +665,10 @@ async function updateQuote(
   orgId: string,
   quoteId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findQuoteDocument(db, orgId, quoteId, requestId)
+  const current = await findQuoteDocument(db, orgId, quoteId, requestId, actorUserId)
   if (current.version !== version) {
     throw new ApiError(412, 'PRECONDITION_FAILED', 'Quote version does not match If-Match')
   }
@@ -679,6 +685,7 @@ async function updateQuote(
     p_expected_version: version,
     p_payload: toRpcPayload(header) as Json,
     p_lines: lines === undefined ? null : lines as unknown as Json,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -846,10 +853,13 @@ export function handleQuotes(
   path: string,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   if (path === '/api/v1/quotes') {
     if (req.method === 'GET') return listQuotes(req, db, orgId, requestId)
-    if (req.method === 'POST') return createQuote(req, db, orgId, requestId)
+    if (req.method === 'POST') {
+      return createQuote(req, db, orgId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quotes')
   }
 
@@ -874,8 +884,10 @@ export function handleQuotes(
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote reject')
   }
 
-  if (req.method === 'GET') return getQuote(db, orgId, quoteId, requestId)
-  if (req.method === 'PATCH') return updateQuote(req, db, orgId, quoteId, requestId)
+  if (req.method === 'GET') return getQuote(db, orgId, quoteId, requestId, actorUserId)
+  if (req.method === 'PATCH') {
+    return updateQuote(req, db, orgId, quoteId, requestId, actorUserId)
+  }
   if (req.method === 'DELETE') return deleteQuote(req, db, orgId, quoteId, requestId)
   throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for quote')
 }
