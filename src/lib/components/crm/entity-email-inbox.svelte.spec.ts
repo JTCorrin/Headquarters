@@ -86,4 +86,58 @@ describe('EntityEmailInbox', () => {
 		await page.getByTestId('use-suggestion').click();
 		await expect.element(page.getByTestId('draft-suggestion-panel')).not.toBeInTheDocument();
 	});
+
+	it('clears the composer only after onSendReply succeeds', async () => {
+		let resolveSend!: () => void;
+		const sendPromise = new Promise<void>((resolve) => {
+			resolveSend = resolve;
+		});
+		const onSendReply = async () => {
+			await sendPromise;
+		};
+
+		render(EntityEmailInbox, {
+			messages: sampleEmailMessages,
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			onSendReply
+		});
+
+		await page.getByRole('button', { name: 'Reply' }).click();
+		await page.getByPlaceholder('Write a reply, or use Draft response…').fill('Thanks Ava');
+		await page.getByTestId('email-send').click();
+		await expect.element(page.getByTestId('email-send')).toHaveTextContent('Sending…');
+		await expect
+			.element(page.getByPlaceholder('Write a reply, or use Draft response…'))
+			.toBeInTheDocument();
+
+		resolveSend();
+		await expect.element(page.getByTestId('email-send')).not.toBeInTheDocument();
+	});
+
+	it('keeps the composer and shows sendError when onSendReply fails', async () => {
+		render(EntityEmailInbox, {
+			messages: sampleEmailMessages,
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			onSendReply: async () => {
+				throw new Error('smtp boom');
+			}
+		});
+
+		await page.getByRole('button', { name: 'Reply' }).click();
+		await page.getByPlaceholder('Write a reply, or use Draft response…').fill('Still here');
+		await page.getByTestId('email-send').click();
+		await expect
+			.element(page.getByTestId('email-send-error'))
+			.toHaveTextContent(/Could not send reply/i);
+		await expect
+			.element(page.getByPlaceholder('Write a reply, or use Draft response…'))
+			.toHaveValue('Still here');
+		await expect.element(page.getByTestId('email-send')).toHaveTextContent('Send');
+	});
 });

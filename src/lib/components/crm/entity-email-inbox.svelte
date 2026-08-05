@@ -48,7 +48,7 @@
 		canAddToTimeline?: boolean;
 		sharingId?: string | null;
 		class?: string;
-		onSendReply?: (payload: { messageId: string; body: string }) => void;
+		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
@@ -92,6 +92,8 @@
 	let tone = $state<DraftTone>('warm');
 	let draftError = $state<string | null>(null);
 	let shareError = $state<string | null>(null);
+	let sendError = $state<string | null>(null);
+	let sending = $state(false);
 
 	$effect(() => {
 		if (selectedId === undefined && messages.length > 0) {
@@ -102,7 +104,7 @@
 	const selected = $derived(messages.find((m) => m.id === selectedId));
 	const draftGate = $derived(draftResponseGateCopy(role));
 	const draftDisabled = $derived(!aiProviderConnected);
-	const sendDisabled = $derived(!smtpReady || !replyBody.trim());
+	const sendDisabled = $derived(!smtpReady || !replyBody.trim() || sending);
 
 	const emptyCopy = $derived.by(() => {
 		if (emptyMessage) {
@@ -158,6 +160,8 @@
 		suggestionId = undefined;
 		aiStatus = 'idle';
 		draftError = null;
+		sendError = null;
+		sending = false;
 	}
 
 	function cancelReply() {
@@ -167,6 +171,8 @@
 		suggestionId = undefined;
 		aiStatus = 'idle';
 		draftError = null;
+		sendError = null;
+		sending = false;
 	}
 
 	function buildDraft(message: EmailMessage, draftTone: DraftTone): string {
@@ -231,10 +237,23 @@
 		aiStatus = 'idle';
 	}
 
-	function sendReply() {
+	async function sendReply() {
 		if (!selected || sendDisabled) return;
-		onSendReply?.({ messageId: selected.id, body: replyBody.trim() });
-		cancelReply();
+		sendError = null;
+		if (!onSendReply) {
+			// Storybook / local mock — no deliver path.
+			cancelReply();
+			return;
+		}
+		sending = true;
+		try {
+			await onSendReply({ messageId: selected.id, body: replyBody.trim() });
+			cancelReply();
+		} catch {
+			sendError = 'Could not send reply — try again.';
+		} finally {
+			sending = false;
+		}
 	}
 
 	async function addToTimeline() {
@@ -430,8 +449,17 @@
 						/>
 
 						<div class="flex flex-col items-end gap-1">
+							{#if sendError}
+								<p class="text-destructive text-xs" data-testid="email-send-error">{sendError}</p>
+							{/if}
 							<div class="flex justify-end gap-2">
-								<Button type="button" size="sm" variant="outline" onclick={cancelReply}>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onclick={cancelReply}
+									disabled={sending}
+								>
 									Discard
 								</Button>
 								<Button
@@ -442,7 +470,7 @@
 									data-testid="email-send"
 									title={smtpReady ? undefined : 'Connect mailbox in My settings'}
 								>
-									Send
+									{sending ? 'Sending…' : 'Send'}
 								</Button>
 							</div>
 							{#if !smtpReady}

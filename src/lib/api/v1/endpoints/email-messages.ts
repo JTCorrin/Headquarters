@@ -1,8 +1,10 @@
 import type { ApiRequestFn } from '../request.js';
+import { newIdempotencyKey } from '../idempotency.js';
 import type {
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
+	ApiEmailMessageReplyBody,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
 	ApiEntityEmailType,
@@ -37,6 +39,19 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 			const { data } = await request<ApiEmailMessageShareResult>(
 				`/api/v1/email-messages/${messageId}/share`,
 				{ method: 'POST', body, orgScoped: true, signal }
+			);
+			return data;
+		},
+		reply: async (messageId: string, body: ApiEmailMessageReplyBody, signal) => {
+			const { data } = await request<ApiEmailMessage>(
+				`/api/v1/email-messages/${messageId}/reply`,
+				{
+					method: 'POST',
+					body,
+					orgScoped: true,
+					headers: { 'Idempotency-Key': newIdempotencyKey('email-reply') },
+					signal
+				}
 			);
 			return data;
 		},
