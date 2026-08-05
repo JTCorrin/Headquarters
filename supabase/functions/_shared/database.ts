@@ -2354,6 +2354,35 @@ export type Database = {
         Args: { p_mailbox_id: string }
         Returns: Json
       }
+      begin_email_reply_idempotent: {
+        Args: {
+          p_org_id: string
+          p_parent_message_id: string
+          p_idempotency_key_hash: string
+          p_request_hash: string
+          p_route: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      abort_email_reply_idempotent: {
+        Args: { p_org_id: string; p_idempotency_key_hash: string }
+        Returns: undefined
+      }
+      finish_email_reply_idempotent: {
+        Args: {
+          p_org_id: string
+          p_parent_message_id: string
+          p_body_text: string
+          p_body_html: string | null
+          p_subject: string
+          p_provider_message_id: string
+          p_status: string
+          p_failure_code: string | null
+          p_idempotency_key_hash: string
+        }
+        Returns: Json
+      }
       release_mailbox_sync_lease: {
         Args: {
           p_mailbox_id: string
