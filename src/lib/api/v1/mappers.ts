@@ -7,7 +7,8 @@ import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailb
 import {
 	emptyCalendarConnection,
 	mapCalendarConnectionStatus,
-	type CalendarConnectionResource
+	type CalendarConnectionResource,
+	type CaldavFormData
 } from '$lib/schemas/calendar-connection.js';
 import { amountStringToCents, centsToAmountString } from '$lib/money.js';
 import type {
@@ -87,6 +88,7 @@ import type {
 	ApiLeadConvertBody,
 	ApiLeadCreateBody,
 	ApiLeadUpdateBody,
+	ApiCalendarCaldavPutBody,
 	ApiCalendarConnection,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
@@ -1060,19 +1062,44 @@ export function toCalendarConnectionResource(
 	const config = (connection.config ?? {}) as {
 		account_email?: string | null;
 		calendar_id?: string | null;
+		caldav_url?: string | null;
+		username?: string | null;
 	};
+	const provider =
+		connection.provider === 'caldav' || connection.provider === 'google'
+			? connection.provider
+			: null;
 	const email =
 		connection.account_email?.trim() ||
 		config.account_email?.trim() ||
+		config.username?.trim() ||
 		null;
+	const caldavUrl =
+		connection.caldav_url?.trim() || config.caldav_url?.trim() || null;
+	const calendarId =
+		connection.calendar_id?.trim() || config.calendar_id?.trim() || null;
 	return {
-		provider: 'google',
+		provider,
 		credentials_configured: Boolean(connection.credentials_configured),
 		status: mapCalendarConnectionStatus(connection.status),
 		account_label: email,
+		caldav_url: provider === 'caldav' ? caldavUrl : null,
+		calendar_id: calendarId,
 		last_error_code: connection.last_error_code ?? null,
 		last_checked_at: connection.last_sync_at ?? null
 	};
+}
+
+export function toCaldavPutBody(data: CaldavFormData): ApiCalendarCaldavPutBody {
+	const body: ApiCalendarCaldavPutBody = {
+		provider: 'caldav',
+		caldav_url: data.caldavUrl.trim(),
+		username: data.username.trim(),
+		calendar_id: emptyToNull(data.calendarId)
+	};
+	const password = data.password.trim();
+	if (password) body.password = password;
+	return body;
 }
 
 export function toMailboxPutBody(data: MailboxFormData): ApiMailboxPutBody {
