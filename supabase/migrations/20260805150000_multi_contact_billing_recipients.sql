@@ -208,7 +208,7 @@ create or replace function private.normalize_recipients_array(
 )
 returns table (
   contact_id uuid,
-  position integer,
+  sort_position integer,
   is_billing boolean
 )
 language plpgsql
@@ -299,7 +299,7 @@ begin
 
   for i in 1..array_length(contact_ids, 1) loop
     contact_id := contact_ids[i];
-    position := i - 1;
+    sort_position := i - 1;
     is_billing := billing_flags[i];
     return next;
   end loop;
@@ -609,7 +609,7 @@ begin
     insert into public.quote_recipients (
       org_id, quote_id, contact_id, position, is_billing, created_by, updated_by
     ) values (
-      p_org_id, p_quote_id, rec.contact_id, rec.position, rec.is_billing, p_actor_id, p_actor_id
+      p_org_id, p_quote_id, rec.contact_id, rec.sort_position, rec.is_billing, p_actor_id, p_actor_id
     );
     if rec.is_billing then
       billing_id := rec.contact_id;
@@ -648,7 +648,7 @@ begin
     insert into public.invoice_recipients (
       org_id, invoice_id, contact_id, position, is_billing, created_by, updated_by
     ) values (
-      p_org_id, p_invoice_id, rec.contact_id, rec.position, rec.is_billing, p_actor_id, p_actor_id
+      p_org_id, p_invoice_id, rec.contact_id, rec.sort_position, rec.is_billing, p_actor_id, p_actor_id
     );
     if rec.is_billing then
       billing_id := rec.contact_id;
@@ -687,7 +687,7 @@ begin
     insert into public.recurring_invoice_schedule_recipients (
       org_id, schedule_id, contact_id, position, is_billing, created_by, updated_by
     ) values (
-      p_org_id, p_schedule_id, rec.contact_id, rec.position, rec.is_billing, p_actor_id, p_actor_id
+      p_org_id, p_schedule_id, rec.contact_id, rec.sort_position, rec.is_billing, p_actor_id, p_actor_id
     );
     if rec.is_billing then
       billing_id := rec.contact_id;
@@ -1856,7 +1856,7 @@ begin
     or recipients_changed
   then
     if recipients_input is not null then
-      select coalesce(array_agg(n.contact_id order by n.position), array[]::uuid[])
+      select coalesce(array_agg(n.contact_id order by n.sort_position), array[]::uuid[])
       into recipient_ids
       from private.normalize_recipients_array(p_org_id, recipients_input) n;
     else
