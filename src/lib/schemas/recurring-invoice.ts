@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+	documentRecipientsFieldSchema,
+	type DocumentContactOption
+} from '$lib/schemas/document-recipients.js';
 
 export const recurringInvoiceFrequencies = ['daily', 'weekly', 'monthly', 'yearly'] as const;
 export type RecurringInvoiceFrequency = (typeof recurringInvoiceFrequencies)[number];
@@ -16,7 +20,7 @@ export const recurringInvoiceFormSchema = z.object({
 	name: z.string().min(1, 'Name is required').max(160),
 	clientId: z.uuid('Select a client'),
 	clientName: z.string().max(160).optional().or(z.literal('')),
-	contactId: z.string().optional().or(z.literal('')),
+	recipients: documentRecipientsFieldSchema,
 	currency: z.enum(['GBP', 'USD', 'EUR']),
 	frequency: z.enum(recurringInvoiceFrequencies),
 	intervalCount: z.coerce.number().int().min(1).max(99),
@@ -74,11 +78,7 @@ export interface RecurringInvoiceClientOption {
 	name: string;
 }
 
-export interface RecurringInvoiceContactOption {
-	id: string;
-	label: string;
-	clientId: string | null;
-}
+export type RecurringInvoiceContactOption = DocumentContactOption;
 
 /** Run history row for detail page. */
 export interface RecurringInvoiceRunListItem {

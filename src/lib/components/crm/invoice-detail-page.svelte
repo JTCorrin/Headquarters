@@ -6,6 +6,10 @@
 		InvoiceContactOption,
 		InvoiceFormData
 	} from '$lib/schemas/invoice.js';
+	import {
+		attentionLineFromRecipients,
+		chaseGreetingName
+	} from '$lib/schemas/document-recipients.js';
 	import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
 	import type {
 		PaymentClientOption,
@@ -134,17 +138,25 @@
 
 	async function generateChaseDraft() {
 		chaseStatus = 'generating';
-		const client = formData.current.clientName || 'there';
+		const greet = chaseGreetingName(
+			formData.current.recipients,
+			contactOptions,
+			formData.current.clientName
+		);
 		const due = formData.current.dueOn || 'the due date';
 		const number = title.split('·')[0]?.trim() || 'this invoice';
 		await new Promise((r) => setTimeout(r, 650));
 		if (chaseTone === 'firm') {
-			chaseDraft = `Hi ${client},\n\nInvoice ${number} is past due (due ${due}). Please arrange payment or reply with a remittance date this week.\n\nRegards`;
+			chaseDraft = `Hi ${greet},\n\nInvoice ${number} is past due (due ${due}). Please arrange payment or reply with a remittance date this week.\n\nRegards`;
 		} else {
-			chaseDraft = `Hi ${client},\n\nFriendly reminder that invoice ${number} was due on ${due}. Happy to resend the PDF or set up a payment link if useful.\n\nThanks`;
+			chaseDraft = `Hi ${greet},\n\nFriendly reminder that invoice ${number} was due on ${due}. Happy to resend the PDF or set up a payment link if useful.\n\nThanks`;
 		}
 		chaseStatus = 'ready';
 	}
+
+	const attentionLine = $derived(
+		attentionLineFromRecipients(formData.current.recipients, contactOptions)
+	);
 
 	const pdfDocument = $derived(
 		buildMoneyDocumentDef({
@@ -152,6 +164,7 @@
 			orgName,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
+			attentionLine,
 			documentNumber: title.split('·')[0]?.trim() || 'Invoice',
 			currency: formData.current.currency,
 			status: status || formData.current.status,
