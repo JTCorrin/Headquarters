@@ -108,13 +108,15 @@
 			fields.push({ label: 'Meeting URL', value: meeting.meeting_url.trim() });
 		}
 		if (meeting.calendar_provider?.trim()) {
-			const provider = meeting.calendar_provider.trim();
+			const provider = meeting.calendar_provider.trim().toLowerCase();
 			const label =
-				provider.toLowerCase() === 'google'
+				provider === 'google'
 					? 'Google'
-					: provider.toLowerCase() === 'microsoft'
+					: provider === 'microsoft'
 						? 'Microsoft'
-						: provider;
+						: provider === 'caldav'
+							? 'CalDAV'
+							: meeting.calendar_provider.trim();
 			fields.push({ label: 'Calendar', value: `Linked · ${label}` });
 		}
 		fields.push({ label: 'Related', value: relatedTo });
