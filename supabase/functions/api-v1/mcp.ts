@@ -598,17 +598,32 @@ async function callTool(
     }
     case 'create_contact': {
       assertCanAccessContacts(membership.role, 'POST')
+      if (!auth.userId) {
+        throw new ApiError(
+          403,
+          'FORBIDDEN',
+          'This route requires a user-backed actor (JWT or API key with created_by)',
+        )
+      }
       const response = await handleContacts(
         syntheticRequest('POST', '/api/v1/contacts', args),
         db,
         '/api/v1/contacts',
         orgId,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
     case 'update_contact': {
       assertCanAccessContacts(membership.role, 'PATCH')
+      if (!auth.userId) {
+        throw new ApiError(
+          403,
+          'FORBIDDEN',
+          'This route requires a user-backed actor (JWT or API key with created_by)',
+        )
+      }
       const id = parseUuid(requireString(args, 'id'), 'id')
       const version = requireVersion(args)
       const { id: _id, version: _version, ...patch } = args
@@ -621,6 +636,7 @@ async function callTool(
         path,
         orgId,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
