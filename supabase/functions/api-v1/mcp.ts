@@ -4,6 +4,8 @@ import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
 import { handleLeads } from './leads.ts'
+import { handleMeetings } from './meetings.ts'
+import { handleProjects } from './projects.ts'
 import { handleTasks } from './tasks.ts'
 import { handleTimelineEvents } from './timeline-events.ts'
 
@@ -394,6 +396,208 @@ const TOOLS: ToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_projects',
+    description: 'List projects in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_project',
+    description: 'Get a project by id (includes columns/cards).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_project',
+    description:
+      'Create a project with default board columns (same validation as POST /api/v1/projects).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_id: { type: 'string', format: 'uuid' },
+        name: { type: 'string' },
+        description: { type: ['string', 'null'] },
+        status: {
+          type: 'string',
+          enum: ['planning', 'active', 'blocked', 'done', 'archived'],
+        },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        starts_on: { type: ['string', 'null'] },
+        due_on: { type: ['string', 'null'] },
+        completed_at: { type: ['string', 'null'] },
+        position: { type: 'number' },
+      },
+      required: ['client_id', 'name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_project',
+    description:
+      'Update a project (same validation as PATCH /api/v1/projects/{id}). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string' },
+        description: { type: ['string', 'null'] },
+        status: {
+          type: 'string',
+          enum: ['planning', 'active', 'blocked', 'done', 'archived'],
+        },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        starts_on: { type: ['string', 'null'] },
+        due_on: { type: ['string', 'null'] },
+        completed_at: { type: ['string', 'null'] },
+        position: { type: 'number' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_meetings',
+    description: 'List meetings in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string' },
+        upcoming: { type: 'boolean' },
+        starts_after: { type: 'string' },
+        starts_before: { type: 'string' },
+        entity_type: {
+          type: 'string',
+          enum: ['client', 'contact', 'lead', 'project'],
+        },
+        entity_id: { type: 'string', format: 'uuid' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_meeting',
+    description: 'Get a meeting by id (includes attendees/transcript/proposals).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_meeting',
+    description: 'Create a meeting (same validation as POST /api/v1/meetings).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['scheduled', 'in_progress', 'completed', 'cancelled'],
+        },
+        starts_at: { type: 'string' },
+        ends_at: { type: 'string' },
+        timezone: { type: 'string' },
+        location: { type: ['string', 'null'] },
+        meeting_url: { type: ['string', 'null'] },
+        organiser_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        related_entity_type: {
+          type: ['string', 'null'],
+          enum: ['client', 'contact', 'lead', 'project', null],
+        },
+        related_entity_id: { type: ['string', 'null'], format: 'uuid' },
+        metadata: { type: 'object' },
+        attendees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              email: { type: 'string' },
+              name: { type: ['string', 'null'] },
+              contact_id: { type: ['string', 'null'], format: 'uuid' },
+              membership_id: { type: ['string', 'null'], format: 'uuid' },
+              organiser: { type: 'boolean' },
+              response_status: {
+                type: ['string', 'null'],
+                enum: ['needs_action', 'accepted', 'declined', 'tentative', null],
+              },
+              attended: { type: ['boolean', 'null'] },
+            },
+            required: ['email'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['title', 'starts_at', 'ends_at'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_meeting',
+    description:
+      'Update a meeting (same validation as PATCH /api/v1/meetings/{id}). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        title: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['scheduled', 'in_progress', 'completed', 'cancelled'],
+        },
+        starts_at: { type: 'string' },
+        ends_at: { type: 'string' },
+        timezone: { type: 'string' },
+        location: { type: ['string', 'null'] },
+        meeting_url: { type: ['string', 'null'] },
+        organiser_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        related_entity_type: {
+          type: ['string', 'null'],
+          enum: ['client', 'contact', 'lead', 'project', null],
+        },
+        related_entity_id: { type: ['string', 'null'], format: 'uuid' },
+        metadata: { type: 'object' },
+        attendees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              email: { type: 'string' },
+              name: { type: ['string', 'null'] },
+              contact_id: { type: ['string', 'null'], format: 'uuid' },
+              membership_id: { type: ['string', 'null'], format: 'uuid' },
+              organiser: { type: 'boolean' },
+              response_status: {
+                type: ['string', 'null'],
+                enum: ['needs_action', 'accepted', 'declined', 'tentative', null],
+              },
+              attended: { type: ['boolean', 'null'] },
+            },
+            required: ['email'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 export function listMcpTools(): ToolDef[] {
@@ -523,6 +727,35 @@ function assertCanAccessTasks(role: MembershipRole, method: string): void {
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify tasks')
   }
+}
+
+function assertCanAccessProjects(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access projects')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify projects')
+  }
+}
+
+function assertCanAccessMeetings(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access meetings')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify meetings')
+  }
+}
+
+function requireUserBackedActor(userId: string | null): string {
+  if (!userId) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'This route requires a user-backed actor (JWT or API key with created_by)',
+    )
+  }
+  return userId
 }
 
 async function responsePayload(response: Response): Promise<unknown> {
@@ -842,6 +1075,143 @@ async function callTool(
         auth.userId,
         requestId,
         { actorType: 'api_key', apiKeyId: auth.apiKeyId },
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_projects': {
+      assertCanAccessProjects(membership.role, 'GET')
+      const path = `/api/v1/projects${optionalQuery(args, ['limit', 'cursor', 'status'])}`
+      const response = await handleProjects(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/projects',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_project': {
+      assertCanAccessProjects(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/projects/${id}`
+      const response = await handleProjects(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_project': {
+      assertCanAccessProjects(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const response = await handleProjects(
+        syntheticRequest('POST', '/api/v1/projects', args),
+        db,
+        '/api/v1/projects',
+        orgId,
+        membership.role,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_project': {
+      assertCanAccessProjects(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/projects/${id}`
+      const response = await handleProjects(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_meetings': {
+      assertCanAccessMeetings(membership.role, 'GET')
+      const path = `/api/v1/meetings${
+        optionalQuery(args, [
+          'limit',
+          'cursor',
+          'status',
+          'upcoming',
+          'starts_after',
+          'starts_before',
+          'entity_type',
+          'entity_id',
+        ])
+      }`
+      const response = await handleMeetings(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/meetings',
+        orgId,
+        membership.role,
+        requestId,
+        requireUserBackedActor(auth.userId),
+        membership.id,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_meeting': {
+      assertCanAccessMeetings(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/meetings/${id}`
+      const response = await handleMeetings(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+        requireUserBackedActor(auth.userId),
+        membership.id,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_meeting': {
+      assertCanAccessMeetings(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const response = await handleMeetings(
+        syntheticRequest('POST', '/api/v1/meetings', args),
+        db,
+        '/api/v1/meetings',
+        orgId,
+        membership.role,
+        requestId,
+        actorUserId,
+        membership.id,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_meeting': {
+      assertCanAccessMeetings(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/meetings/${id}`
+      const response = await handleMeetings(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+        actorUserId,
+        membership.id,
       )
       return await toolResultFromHttp(response)
     }
