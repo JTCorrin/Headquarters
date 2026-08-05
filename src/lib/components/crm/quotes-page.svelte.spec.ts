@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
@@ -159,5 +159,104 @@ describe('QuotesPage integration', () => {
 			recipients: [],
 			lines: []
 		});
+	});
+
+	it('opens create drawer with client preselected from initialClientId', async () => {
+		const OTHER_CLIENT = 'dddddddd-dddd-4eee-8fff-000000000001';
+		const onOpenCreateConsumed = vi.fn();
+
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					logo_url: null,
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/quotes': async () => ({
+				body: { data: [sampleQuote()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: {
+					data: [
+						{
+							id: CLIENT_ID,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							name: 'Northwind',
+							status: 'active',
+							website_url: null,
+							industry: null,
+							primary_email: null,
+							phone: null,
+							tax_identifier: null,
+							registration_number: null,
+							default_currency: 'GBP',
+							payment_terms_days: null,
+							owner_membership_id: null,
+							converted_from_lead_id: null,
+							renewal_on: null,
+							notes: null,
+							metadata: {}
+						},
+						{
+							id: OTHER_CLIENT,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							name: 'Contoso',
+							status: 'active',
+							website_url: null,
+							industry: null,
+							primary_email: null,
+							phone: null,
+							tax_identifier: null,
+							registration_number: null,
+							default_currency: 'GBP',
+							payment_terms_days: null,
+							owner_membership_id: null,
+							converted_from_lead_id: null,
+							renewal_on: null,
+							notes: null,
+							metadata: {}
+						}
+					],
+					meta: { next_cursor: null }
+				}
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(QuotesPage, {
+			api,
+			session,
+			initialClientId: OTHER_CLIENT,
+			openCreate: true,
+			onOpenCreateConsumed
+		});
+
+		await expect.element(page.getByTestId('quote-form')).toBeInTheDocument();
+		await expect.element(page.getByText('Contoso')).toBeInTheDocument();
+		expect(onOpenCreateConsumed).toHaveBeenCalled();
 	});
 });

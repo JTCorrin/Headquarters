@@ -16,6 +16,7 @@
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
 		productFormSchema,
+		type ProductCategoryOption,
 		type ProductFormData,
 		type ProductTaxRateOption
 	} from '$lib/schemas/product.js';
@@ -52,11 +53,13 @@
 	let drawerOpen = $state(false);
 
 	let taxRateOptions = $state<ProductTaxRateOption[]>([]);
+	let categoryOptions = $state<ProductCategoryOption[]>([]);
 
 	const emptyProductForm = (): ProductFormData => ({
 		sku: '',
 		name: '',
 		description: '',
+		categoryId: '',
 		unitPrice: '',
 		taxRateId: '',
 		trackStock: false,
@@ -144,9 +147,10 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [listed, rates] = await Promise.all([
+			const [listed, rates, categories] = await Promise.all([
 				api.products.list({ limit: 100 }),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.productCategories.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
@@ -156,7 +160,16 @@
 					id: r.id,
 					label: `${r.name} (${r.rate_percent}%)${r.is_default ? ' · default' : ''}`
 				}));
-			rows = listed.data.map(toProductRow);
+			categoryOptions = categories.data
+				.filter((c) => !c.deleted_at)
+				.map((c) => ({ id: c.id, label: c.name }));
+			const categoryNameById = new Map(categoryOptions.map((c) => [c.id, c.label]));
+			rows = listed.data.map((product) =>
+				toProductRow(
+					product,
+					product.category_id ? categoryNameById.get(product.category_id) : undefined
+				)
+			);
 			viewState =
 				rows.length === 0
 					? { kind: 'empty', message: 'No products yet — create a catalog item to quote.' }
@@ -261,6 +274,7 @@
 					{rows}
 					form={productForm}
 					{taxRateOptions}
+					{categoryOptions}
 					bind:drawerOpen
 					{viewState}
 					onReload={loadAll}

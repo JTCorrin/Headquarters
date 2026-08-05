@@ -50,3 +50,8 @@ export function parseMeetingEntityFilter(
 export function looksLikeVendorId(value: string | null | undefined): value is string {
 	return typeof value === 'string' && looksLikeUuid(value);
 }
+
+/** Same UUID shape check — used for `/quotes?client_id=` preselect. */
+export function looksLikeClientId(value: string | null | undefined): value is string {
+	return typeof value === 'string' && looksLikeUuid(value);
+}

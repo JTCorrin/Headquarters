@@ -18,6 +18,7 @@ import { createOrganisationConfigEndpoints } from './endpoints/organisation-conf
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createPaymentsEndpoints } from './endpoints/payments.js';
 import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
+import { createProductCategoriesEndpoints } from './endpoints/product-categories.js';
 import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
@@ -45,6 +46,7 @@ import type {
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
 	PaymentsEndpoints,
+	ProductCategoriesEndpoints,
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	ProjectsEndpoints,
@@ -85,6 +87,7 @@ export interface ApiV1Client {
 	notifications: NotificationsEndpoints;
 	integrations: IntegrationsEndpoints;
 	apiKeys: ApiKeysEndpoints;
+	productCategories: ProductCategoriesEndpoints;
 	products: ProductsEndpoints;
 	quotes: QuotesEndpoints;
 	invoices: InvoicesEndpoints;
@@ -258,6 +261,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		notifications: createNotificationsEndpoints(request),
 		integrations: createIntegrationsEndpoints(request),
 		apiKeys: createApiKeysEndpoints(request),
+		productCategories: createProductCategoriesEndpoints(request),
 		products: createProductsEndpoints(request),
 		quotes: createQuotesEndpoints(request),
 		invoices: createInvoicesEndpoints(request),

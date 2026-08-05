@@ -4,6 +4,7 @@ export const productFormSchema = z.object({
 	sku: z.string().min(1, 'SKU is required').max(64),
 	name: z.string().min(1, 'Name is required').max(160),
 	description: z.string().max(2000).optional().or(z.literal('')),
+	categoryId: z.string().optional().or(z.literal('')),
 	unitPrice: z
 		.string()
 		.min(1, 'Unit price is required')
@@ -19,6 +20,11 @@ export const productFormSchema = z.object({
 });
 
 export interface ProductTaxRateOption {
+	id: string;
+	label: string;
+}
+
+export interface ProductCategoryOption {
 	id: string;
 	label: string;
 }
