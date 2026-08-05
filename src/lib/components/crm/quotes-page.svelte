@@ -18,6 +18,7 @@
 	import {
 		quoteFormSchema,
 		type QuoteClientOption,
+		type QuoteContactOption,
 		type QuoteListItem
 	} from '$lib/schemas/quote.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -46,6 +47,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let rows = $state<QuoteListItem[]>([]);
 	let clientOptions = $state<QuoteClientOption[]>([]);
+	let contactOptions = $state<QuoteContactOption[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -58,7 +60,8 @@
 				clientName: '',
 				title: '',
 				currency: 'GBP' as const,
-				status: 'draft' as const
+				status: 'draft' as const,
+				recipients: []
 			},
 			zod4(quoteFormSchema)
 		),
@@ -121,6 +124,7 @@
 	function resetOrgScopedState() {
 		rows = [];
 		clientOptions = [];
+		contactOptions = [];
 		drawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
@@ -144,14 +148,20 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [listed, clients] = await Promise.all([
+			const [listed, clients, contacts] = await Promise.all([
 				api.quotes.list({ limit: 50, status: 'draft' }),
-				api.clients.list({ limit: 100 })
+				api.clients.list({ limit: 100 }),
+				api.contacts.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
 			rows = listed.data.map(toQuoteListItem);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			contactOptions = contacts.data.map((c) => ({
+				id: c.id,
+				label: c.display_name || c.primary_email || c.id,
+				clientId: c.client_id ?? null
+			}));
 			if (clientOptions[0] && get(quoteForm.form).clientId.startsWith('00000000')) {
 				quoteForm.form.update((current) => ({
 					...current,
@@ -189,7 +199,8 @@
 				clientName: firstClient?.name ?? '',
 				title: '',
 				currency: 'GBP',
-				status: 'draft'
+				status: 'draft',
+				recipients: []
 			});
 			drawerOpen = false;
 			return true;
@@ -262,6 +273,7 @@
 					{rows}
 					form={quoteForm}
 					{clientOptions}
+					{contactOptions}
 					bind:drawerOpen
 					onValidSubmit={onCreateQuote}
 					showNav={false}

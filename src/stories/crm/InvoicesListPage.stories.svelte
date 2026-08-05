@@ -95,7 +95,7 @@
 		{
 			clientId: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
 			clientName: '',
-			contactId: '',
+			recipients: [],
 			currency: 'GBP',
 			issueOn: '2026-03-01',
 			dueOn: '2026-04-01',
