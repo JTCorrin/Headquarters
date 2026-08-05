@@ -65,6 +65,63 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: 'create_contact',
+    description: 'Create a contact (same validation as POST /api/v1/contacts).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        display_name: { type: 'string' },
+        first_name: { type: ['string', 'null'] },
+        last_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        primary_phone: { type: ['string', 'null'] },
+        job_title: { type: ['string', 'null'] },
+        company_name: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        lifecycle_status: {
+          type: 'string',
+          enum: ['active', 'inactive', 'archived'],
+        },
+        source: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+      },
+      required: ['display_name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_contact',
+    description:
+      'Update a contact (same validation as PATCH /api/v1/contacts/{id}). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        display_name: { type: 'string' },
+        first_name: { type: ['string', 'null'] },
+        last_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        primary_phone: { type: ['string', 'null'] },
+        job_title: { type: ['string', 'null'] },
+        company_name: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        lifecycle_status: {
+          type: 'string',
+          enum: ['active', 'inactive', 'archived'],
+        },
+        source: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'list_clients',
     description: 'List clients in the organisation pinned to the API key.',
     inputSchema: {
@@ -88,6 +145,65 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: 'create_client',
+    description: 'Create a client (same validation as POST /api/v1/clients).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['prospect', 'active', 'on_hold', 'inactive', 'archived'],
+        },
+        website_url: { type: ['string', 'null'] },
+        industry: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        phone: { type: ['string', 'null'] },
+        tax_identifier: { type: ['string', 'null'] },
+        registration_number: { type: ['string', 'null'] },
+        default_currency: { type: ['string', 'null'] },
+        payment_terms_days: { type: ['integer', 'null'], minimum: 0 },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        renewal_on: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_client',
+    description:
+      'Update a client (same validation as PATCH /api/v1/clients/{id}). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['prospect', 'active', 'on_hold', 'inactive', 'archived'],
+        },
+        website_url: { type: ['string', 'null'] },
+        industry: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        phone: { type: ['string', 'null'] },
+        tax_identifier: { type: ['string', 'null'] },
+        registration_number: { type: ['string', 'null'] },
+        default_currency: { type: ['string', 'null'] },
+        payment_terms_days: { type: ['integer', 'null'], minimum: 0 },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        renewal_on: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'list_leads',
     description: 'List leads in the organisation pinned to the API key.',
     inputSchema: {
@@ -107,6 +223,67 @@ const TOOLS: ToolDef[] = [
       type: 'object',
       properties: { id: { type: 'string', format: 'uuid' } },
       required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_lead',
+    description: 'Create a lead (same validation as POST /api/v1/leads). Not for convert/won.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        company_name: { type: ['string', 'null'] },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        stage: {
+          type: 'string',
+          enum: ['new', 'qualified', 'proposal', 'lost'],
+        },
+        value_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
+        probability_percent: { type: ['integer', 'null'], minimum: 0, maximum: 100 },
+        source: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        expected_close_on: { type: ['string', 'null'] },
+        lost_reason: { type: ['string', 'null'] },
+        position: { type: 'number' },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_lead',
+    description:
+      'Update a lead (same validation as PATCH /api/v1/leads/{id}). Requires version for If-Match. Use HTTP convert to mark won.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string' },
+        company_name: { type: ['string', 'null'] },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        stage: {
+          type: 'string',
+          enum: ['new', 'qualified', 'proposal', 'lost'],
+        },
+        value_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
+        probability_percent: { type: ['integer', 'null'], minimum: 0, maximum: 100 },
+        source: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        expected_close_on: { type: ['string', 'null'] },
+        lost_reason: { type: ['string', 'null'] },
+        position: { type: 'number' },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+      },
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
@@ -276,6 +453,16 @@ function requireString(args: Record<string, unknown>, field: string): string {
   return value
 }
 
+function requireVersion(args: Record<string, unknown>): number {
+  const version = args.version
+  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'version must be a positive integer', {
+      version: 'Required positive integer',
+    })
+  }
+  return version
+}
+
 function optionalQuery(args: Record<string, unknown>, keys: string[]): string {
   const params = new URLSearchParams()
   for (const key of keys) {
@@ -409,6 +596,34 @@ async function callTool(
       )
       return await toolResultFromHttp(response)
     }
+    case 'create_contact': {
+      assertCanAccessContacts(membership.role, 'POST')
+      const response = await handleContacts(
+        syntheticRequest('POST', '/api/v1/contacts', args),
+        db,
+        '/api/v1/contacts',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_contact': {
+      assertCanAccessContacts(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/contacts/${id}`
+      const response = await handleContacts(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
     case 'list_clients': {
       assertCanAccessPipeline(membership.role, 'GET', 'clients')
       const path = `/api/v1/clients${optionalQuery(args, ['limit', 'cursor', 'status'])}`
@@ -434,6 +649,34 @@ async function callTool(
       )
       return await toolResultFromHttp(response)
     }
+    case 'create_client': {
+      assertCanAccessPipeline(membership.role, 'POST', 'clients')
+      const response = await handleClients(
+        syntheticRequest('POST', '/api/v1/clients', args),
+        db,
+        '/api/v1/clients',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_client': {
+      assertCanAccessPipeline(membership.role, 'PATCH', 'clients')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/clients/${id}`
+      const response = await handleClients(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
     case 'list_leads': {
       assertCanAccessPipeline(membership.role, 'GET', 'leads')
       const path = `/api/v1/leads${optionalQuery(args, ['limit', 'cursor', 'stage'])}`
@@ -452,6 +695,34 @@ async function callTool(
       const path = `/api/v1/leads/${id}`
       const response = await handleLeads(
         syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_lead': {
+      assertCanAccessPipeline(membership.role, 'POST', 'leads')
+      const response = await handleLeads(
+        syntheticRequest('POST', '/api/v1/leads', args),
+        db,
+        '/api/v1/leads',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_lead': {
+      assertCanAccessPipeline(membership.role, 'PATCH', 'leads')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/leads/${id}`
+      const response = await handleLeads(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
         db,
         path,
         orgId,
@@ -516,12 +787,7 @@ async function callTool(
     case 'update_task': {
       assertCanAccessTasks(membership.role, 'PATCH')
       const id = parseUuid(requireString(args, 'id'), 'id')
-      const version = args.version
-      if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-        throw new ApiError(400, 'VALIDATION_ERROR', 'version must be a positive integer', {
-          version: 'Required positive integer',
-        })
-      }
+      const version = requireVersion(args)
       const { id: _id, version: _version, ...patch } = args
       const path = `/api/v1/tasks/${id}`
       const response = await handleTasks(
