@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { isOrgApiKeySecret, sha256Hex, validateApiKeyCreateBody } from './api-keys.ts'
-import { listMcpTools, parseJsonRpcRequest } from './mcp.ts'
+import { listMcpTools, parseJsonRpcRequest, requireCreateTaskAssignee } from './mcp.ts'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
 import {
@@ -1710,6 +1710,35 @@ Deno.test('API key secret shape and create body validation', async () => {
   assertThrows(() => validateApiKeyCreateBody({ name: 'X', role: 'nope' }), ApiError)
   assertThrows(
     () => validateApiKeyCreateBody({ name: 'X', expires_at: '2000-01-01T00:00:00.000Z' }),
+    ApiError,
+  )
+})
+
+Deno.test('MCP create_task requires assignee_membership_id', () => {
+  const createTask = listMcpTools().find((tool) => tool.name === 'create_task')
+  assertEquals(createTask?.inputSchema.required, ['title', 'assignee_membership_id'])
+  assertEquals(
+    (createTask?.inputSchema.properties as Record<string, unknown>)
+      ?.assignee_membership_id,
+    { type: 'string', format: 'uuid' },
+  )
+
+  const membershipId = '11111111-1111-4111-8111-111111111111'
+  assertEquals(
+    requireCreateTaskAssignee({ assignee_membership_id: membershipId }),
+    membershipId,
+  )
+  assertThrows(() => requireCreateTaskAssignee({}), ApiError)
+  assertThrows(
+    () => requireCreateTaskAssignee({ assignee_membership_id: null }),
+    ApiError,
+  )
+  assertThrows(
+    () => requireCreateTaskAssignee({ assignee_membership_id: '' }),
+    ApiError,
+  )
+  assertThrows(
+    () => requireCreateTaskAssignee({ assignee_membership_id: 'not-a-uuid' }),
     ApiError,
   )
 })
