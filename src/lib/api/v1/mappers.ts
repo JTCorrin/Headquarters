@@ -146,6 +146,7 @@ import type {
 	ApiProjectStatus,
 	ApiProjectUpdateBody,
 	ApiAuditEvent,
+	ApiTimelineEntityType,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody
 } from './types.js';
@@ -1903,6 +1904,25 @@ function timelineActorLabel(row: ApiTimelineEvent): string | undefined {
 	return undefined;
 }
 
+const ENTITY_TIMELINE_PATH: Record<ApiTimelineEntityType, string> = {
+	contact: 'contacts',
+	lead: 'leads',
+	client: 'clients',
+	quote: 'quotes',
+	invoice: 'invoices',
+	bill: 'bills'
+};
+
+/** Profile href for a timeline entity row (org Home deep-links). */
+export function entityTimelineHref(
+	entityType: string,
+	entityId: string
+): string | undefined {
+	const segment = ENTITY_TIMELINE_PATH[entityType as ApiTimelineEntityType];
+	if (!segment || !entityId) return undefined;
+	return `/${segment}/${entityId}`;
+}
+
 /** Map API timeline row → FE `TimelineEvent` card model. */
 export function toTimelineEvent(row: ApiTimelineEvent): TimelineEvent {
 	const accent = row.payload?.accent;
@@ -1917,7 +1937,10 @@ export function toTimelineEvent(row: ApiTimelineEvent): TimelineEvent {
 		actor: timelineActorLabel(row),
 		accent: typeof accent === 'string' ? accent : undefined,
 		// System writers often omit payload.icon — fall back to kind so conversion/status cards aren't bare.
-		icon: typeof icon === 'string' ? icon : kindIcon
+		icon: typeof icon === 'string' ? icon : kindIcon,
+		entityType: row.entity_type,
+		entityId: row.entity_id,
+		href: entityTimelineHref(row.entity_type, row.entity_id)
 	};
 }
 
