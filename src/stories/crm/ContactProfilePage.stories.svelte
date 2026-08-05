@@ -33,33 +33,7 @@
 				{ label: 'Billing address', value: '12 Harbour Rd, London' }
 			],
 			emailMessages: sampleEmailMessages,
-			documents: sampleDocuments,
-			moneyItems: [
-				{
-					id: 'm1',
-					kind: 'quote',
-					label: 'Q-0142 · Q2 retainer',
-					amount: '£4,200.00',
-					status: 'Sent',
-					date: 'Mar 12'
-				},
-				{
-					id: 'm2',
-					kind: 'invoice',
-					label: 'INV-0881',
-					amount: '£4,200.00',
-					status: 'Partial',
-					date: 'Mar 1'
-				},
-				{
-					id: 'm3',
-					kind: 'payment',
-					label: 'Stripe · INV-0881',
-					amount: '£2,000.00',
-					status: 'Matched',
-					date: 'Mar 18'
-				}
-			]
+			documents: sampleDocuments
 		}
 	});
 </script>
