@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Prove MCP-Server: mint crm_key_ → tools/list → create_task → add_timeline_note.
+# Prove MCP: mint crm_key_ → tools/list → create_task → add_timeline_note
+# → create/update contact + create lead (Wave A entity writes).
 #
 # Usage:
 #   SUPABASE_URL=http://192.168.5.136:54321 \
@@ -110,7 +111,13 @@ printf '%s' "$list_json" | jq -e '
 	[.result.tools[].name] | index("create_task") != null
 	and index("add_timeline_note") != null
 	and index("list_contacts") != null
-' >/dev/null || die "tools/list missing MVP tools: ${list_json}"
+	and index("create_contact") != null
+	and index("update_contact") != null
+	and index("create_lead") != null
+	and index("update_lead") != null
+	and index("create_client") != null
+	and index("update_client") != null
+' >/dev/null || die "tools/list missing Wave A tools: ${list_json}"
 
 log "MCP tools/call create_task"
 create_task_json="$(
@@ -149,6 +156,72 @@ printf '%s' "$note_json" | jq -e '
 		// (.result.content[0].text | fromjson | .data.actor_type)) == "api_key"
 ' >/dev/null || die "timeline actor_type not api_key: ${note_json}"
 
+log "MCP tools/call create_contact"
+create_contact_json="$(
+	mcp "$(jq -n \
+		--arg name "MCP Wave A Contact $(date +%s)" \
+		'{jsonrpc:"2.0", id:5, method:"tools/call",
+			params:{name:"create_contact",
+				arguments:{display_name:$name, first_name:"Wave", last_name:"A"}}}')"
+)"
+MCP_CONTACT_ID="$(
+	printf '%s' "$create_contact_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+MCP_CONTACT_VER="$(
+	printf '%s' "$create_contact_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$MCP_CONTACT_ID" && "$MCP_CONTACT_ID" != null ]] \
+	|| die "create_contact failed: ${create_contact_json}"
+[[ -n "$MCP_CONTACT_VER" && "$MCP_CONTACT_VER" != null ]] \
+	|| die "create_contact missing version: ${create_contact_json}"
+printf '%s' "$create_contact_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_contact isError: ${create_contact_json}"
+
+log "MCP tools/call update_contact"
+update_contact_json="$(
+	mcp "$(jq -n \
+		--arg id "$MCP_CONTACT_ID" \
+		--argjson ver "$MCP_CONTACT_VER" \
+		'{jsonrpc:"2.0", id:6, method:"tools/call",
+			params:{name:"update_contact",
+				arguments:{id:$id, version:$ver, notes:"wave-a proof update"}}}')"
+)"
+UPD_CONTACT_VER="$(
+	printf '%s' "$update_contact_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+printf '%s' "$update_contact_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "update_contact isError: ${update_contact_json}"
+[[ "$UPD_CONTACT_VER" -gt "$MCP_CONTACT_VER" ]] \
+	|| die "update_contact version not bumped: ${update_contact_json}"
+
+log "MCP tools/call create_lead"
+create_lead_json="$(
+	mcp "$(jq -n \
+		--arg name "MCP Wave A Lead $(date +%s)" \
+		--arg cid "$MCP_CONTACT_ID" \
+		'{jsonrpc:"2.0", id:7, method:"tools/call",
+			params:{name:"create_lead",
+				arguments:{name:$name, stage:"new", contact_id:$cid}}}')"
+)"
+LEAD_ID="$(
+	printf '%s' "$create_lead_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+[[ -n "$LEAD_ID" && "$LEAD_ID" != null ]] || die "create_lead failed: ${create_lead_json}"
+printf '%s' "$create_lead_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_lead isError: ${create_lead_json}"
+
 log "JWT rejected on /api/v1/mcp (expect 403)"
 jwt_mcp_status="$(
 	curl -sS --max-time 45 -o /tmp/mcp-jwt.json -w '%{http_code}' \
@@ -161,4 +234,4 @@ jwt_mcp_status="$(
 )"
 [[ "$jwt_mcp_status" == "403" ]] || die "expected 403 for JWT MCP, got ${jwt_mcp_status}: $(cat /tmp/mcp-jwt.json)"
 
-log "PASS mcp initialize/list/create_task/add_timeline_note proof"
+log "PASS mcp initialize/list/create_task/add_timeline_note/create_update_contact/create_lead proof"
