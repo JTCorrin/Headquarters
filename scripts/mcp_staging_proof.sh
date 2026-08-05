@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prove MCP: mint crm_key_ → tools/list → create_task → add_timeline_note
-# → create/update contact + create lead (Wave A entity writes).
+# → create/update contact + create lead (Wave A)
+# → create project + create meeting (Wave B).
 #
 # Usage:
 #   SUPABASE_URL=http://192.168.5.136:54321 \
@@ -117,7 +118,13 @@ printf '%s' "$list_json" | jq -e '
 	and index("update_lead") != null
 	and index("create_client") != null
 	and index("update_client") != null
-' >/dev/null || die "tools/list missing Wave A tools: ${list_json}"
+	and index("list_projects") != null
+	and index("create_project") != null
+	and index("update_project") != null
+	and index("list_meetings") != null
+	and index("create_meeting") != null
+	and index("update_meeting") != null
+' >/dev/null || die "tools/list missing Wave A/B tools: ${list_json}"
 
 log "MCP tools/call create_task"
 create_task_json="$(
@@ -222,6 +229,92 @@ LEAD_ID="$(
 printf '%s' "$create_lead_json" | jq -e '.result.isError != true' >/dev/null \
 	|| die "create_lead isError: ${create_lead_json}"
 
+log "MCP tools/call create_client (for project)"
+create_client_json="$(
+	mcp "$(jq -n \
+		--arg name "MCP Wave B Client $(date +%s)" \
+		'{jsonrpc:"2.0", id:8, method:"tools/call",
+			params:{name:"create_client", arguments:{name:$name, status:"active"}}}')"
+)"
+CLIENT_ID="$(
+	printf '%s' "$create_client_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+[[ -n "$CLIENT_ID" && "$CLIENT_ID" != null ]] || die "create_client failed: ${create_client_json}"
+printf '%s' "$create_client_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_client isError: ${create_client_json}"
+
+log "MCP tools/call create_project"
+create_project_json="$(
+	mcp "$(jq -n \
+		--arg name "MCP Wave B Project $(date +%s)" \
+		--arg cid "$CLIENT_ID" \
+		'{jsonrpc:"2.0", id:10, method:"tools/call",
+			params:{name:"create_project",
+				arguments:{client_id:$cid, name:$name, status:"active"}}}')"
+)"
+PROJECT_ID="$(
+	printf '%s' "$create_project_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+PROJECT_VER="$(
+	printf '%s' "$create_project_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$PROJECT_ID" && "$PROJECT_ID" != null ]] || die "create_project failed: ${create_project_json}"
+[[ -n "$PROJECT_VER" && "$PROJECT_VER" != null ]] \
+	|| die "create_project missing version: ${create_project_json}"
+printf '%s' "$create_project_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_project isError: ${create_project_json}"
+
+log "MCP tools/call update_project"
+update_project_json="$(
+	mcp "$(jq -n \
+		--arg id "$PROJECT_ID" \
+		--argjson ver "$PROJECT_VER" \
+		'{jsonrpc:"2.0", id:11, method:"tools/call",
+			params:{name:"update_project",
+				arguments:{id:$id, version:$ver, description:"wave-b proof update"}}}')"
+)"
+printf '%s' "$update_project_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "update_project isError: ${update_project_json}"
+
+log "MCP tools/call create_meeting"
+STARTS="$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || date -u -v+1H +%Y-%m-%dT%H:%M:%S.000Z)"
+ENDS="$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || date -u -v+2H +%Y-%m-%dT%H:%M:%S.000Z)"
+create_meeting_json="$(
+	mcp "$(jq -n \
+		--arg title "MCP Wave B Meeting $(date +%s)" \
+		--arg starts "$STARTS" \
+		--arg ends "$ENDS" \
+		--arg pid "$PROJECT_ID" \
+		'{jsonrpc:"2.0", id:12, method:"tools/call",
+			params:{name:"create_meeting",
+				arguments:{
+					title:$title,
+					starts_at:$starts,
+					ends_at:$ends,
+					timezone:"UTC",
+					related_entity_type:"project",
+					related_entity_id:$pid
+				}}}')"
+)"
+MEETING_ID="$(
+	printf '%s' "$create_meeting_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+[[ -n "$MEETING_ID" && "$MEETING_ID" != null ]] || die "create_meeting failed: ${create_meeting_json}"
+printf '%s' "$create_meeting_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_meeting isError: ${create_meeting_json}"
+
 log "JWT rejected on /api/v1/mcp (expect 403)"
 jwt_mcp_status="$(
 	curl -sS --max-time 45 -o /tmp/mcp-jwt.json -w '%{http_code}' \
@@ -234,4 +327,4 @@ jwt_mcp_status="$(
 )"
 [[ "$jwt_mcp_status" == "403" ]] || die "expected 403 for JWT MCP, got ${jwt_mcp_status}: $(cat /tmp/mcp-jwt.json)"
 
-log "PASS mcp initialize/list/create_task/add_timeline_note/create_update_contact/create_lead proof"
+log "PASS mcp Wave A+B proof (contacts/leads/clients + project/meeting writes)"

@@ -718,13 +718,16 @@ async function createProject(
   db: DatabaseProject,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const body = await jsonBody(req)
   const payload = validateProjectBody(body, false)
 
+  // API-key / service_role path has no auth.uid(); pass creator user id as p_actor_id.
   const { data, error } = await db.rpc('create_project_with_defaults', {
     p_org_id: orgId,
     p_payload: payload as Json,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -1018,10 +1021,13 @@ export function handleProjects(
   orgId: string,
   _role: MembershipRole,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   if (path === '/api/v1/projects') {
     if (req.method === 'GET') return listProjects(req, db, orgId, requestId)
-    if (req.method === 'POST') return createProject(req, db, orgId, requestId)
+    if (req.method === 'POST') {
+      return createProject(req, db, orgId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for projects')
   }
 
