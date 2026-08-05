@@ -985,10 +985,11 @@ export type CalendarConnectionRow = {
   deleted_at: string | null
   version: number
   membership_id: string
-  provider: 'google'
+  provider: 'google' | 'caldav'
   external_account_id: string | null
   calendar_id: string
   account_email: string | null
+  caldav_url: string | null
   status: 'pending' | 'active' | 'error' | 'disabled'
   last_sync_at: string | null
   last_error_code: string | null
@@ -2273,7 +2274,7 @@ export type Database = {
         Returns: Json
       }
       get_calendar_connection: {
-        Args: { p_org_id: string }
+        Args: { p_org_id: string; p_provider?: string | null }
         Returns: Json
       }
       create_calendar_oauth_state: {
@@ -2294,8 +2295,18 @@ export type Database = {
         }
         Returns: Json
       }
+      upsert_calendar_caldav_connection: {
+        Args: {
+          p_org_id: string
+          p_caldav_url: string
+          p_username: string
+          p_password?: string | null
+          p_calendar_id?: string | null
+        }
+        Returns: Json
+      }
       disconnect_calendar_connection: {
-        Args: { p_org_id: string }
+        Args: { p_org_id: string; p_provider?: string }
         Returns: undefined
       }
       read_calendar_connection_credentials: {
