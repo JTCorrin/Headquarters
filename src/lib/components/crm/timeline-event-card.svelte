@@ -20,6 +20,8 @@
 		actor?: string;
 		accent?: string;
 		icon?: string;
+		/** Deep-link to the related entity profile (org Home feed). */
+		href?: string;
 		/** Hide the connecting rail below this event (last item). */
 		isLast?: boolean;
 		/** Start expanded (also expands on hover/focus by default). */
@@ -35,6 +37,7 @@
 		actor,
 		accent,
 		icon,
+		href,
 		isLast = false,
 		defaultExpanded = false,
 		class: className
@@ -96,7 +99,15 @@
 							<span class="normal-case tracking-normal"> · {actor}</span>
 						{/if}
 					</p>
-					<Card.Title class="text-base font-semibold">{title}</Card.Title>
+					<Card.Title class="text-base font-semibold">
+						{#if href}
+							<a href={href} class="hover:underline focus-visible:underline outline-none">
+								{title}
+							</a>
+						{:else}
+							{title}
+						{/if}
+					</Card.Title>
 					{#if hasBody}
 						<div
 							class={cn(
