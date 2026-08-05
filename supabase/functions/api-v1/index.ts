@@ -441,12 +441,32 @@ async function routeOrgScoped(
 
   if (path === '/api/v1/quotes' || path.startsWith('/api/v1/quotes/')) {
     assertCanAccessQuotes(membership.role, req.method)
-    return await handleQuotes(req, db, path, orgId, requestId)
+    return await handleQuotes(
+      req,
+      db,
+      path,
+      orgId,
+      requestId,
+      actorType === 'api_key' &&
+        (req.method === 'GET' || req.method === 'POST' || req.method === 'PATCH')
+        ? requireUserId(userId)
+        : null,
+    )
   }
 
   if (path === '/api/v1/invoices' || path.startsWith('/api/v1/invoices/')) {
     assertCanAccessInvoices(membership.role, req.method)
-    return await handleInvoices(req, db, path, orgId, requestId)
+    return await handleInvoices(
+      req,
+      db,
+      path,
+      orgId,
+      requestId,
+      actorType === 'api_key' &&
+        (req.method === 'GET' || req.method === 'POST' || req.method === 'PATCH')
+        ? requireUserId(userId)
+        : null,
+    )
   }
 
   if (path === '/api/v1/bills' || path.startsWith('/api/v1/bills/')) {
