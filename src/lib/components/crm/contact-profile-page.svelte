@@ -14,7 +14,6 @@
 	} from './entity-email-inbox.svelte';
 	import DocumentWorkspaceApiHost from './document-workspace-api-host.svelte';
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
-	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
@@ -45,7 +44,6 @@
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
-		moneyItems?: MoneySummaryItem[];
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -88,7 +86,6 @@
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
 		documentDrawerOpen = $bindable(false),
-		moneyItems = [],
 		showNav = true,
 		class: className,
 		onTimelineAdd,
@@ -102,8 +99,7 @@
 	const tabs = [
 		{ id: 'details', label: 'Details' },
 		{ id: 'email', label: 'Email' },
-		{ id: 'documents', label: 'Documents' },
-		{ id: 'money', label: 'Money' }
+		{ id: 'documents', label: 'Documents' }
 	];
 </script>
 
@@ -163,7 +159,7 @@
 							{onDiscardSuggestion}
 							class="min-h-0 flex-1"
 						/>
-					{:else if active === 'documents'}
+					{:else}
 						{#if documentsApi && documentsEntityId}
 							<DocumentWorkspaceApiHost
 								client={documentsApi}
@@ -184,8 +180,6 @@
 						{:else}
 							<p class="text-muted-foreground text-sm">Select a contact to browse documents.</p>
 						{/if}
-					{:else}
-						<MoneySummary items={moneyItems} />
 					{/if}
 				{/snippet}
 			</ProfileTabs>
