@@ -1,6 +1,6 @@
 begin;
 
-select plan(8);
+select plan(7);
 
 create temporary table _mcr_fix_fixture (
   owner_id uuid,
