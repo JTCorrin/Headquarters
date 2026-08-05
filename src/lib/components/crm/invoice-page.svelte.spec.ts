@@ -385,7 +385,9 @@ describe('InvoicePage detail flows', () => {
 		render(InvoicePage, { api, session, invoiceId: INVOICE_ID });
 
 		await expect.element(page.getByRole('heading', { name: 'INV-0001' })).toBeInTheDocument();
-		await expect.element(page.getByText('Ada Billing')).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId('document-recipients-chips').getByText('Ada Billing'))
+			.toBeInTheDocument();
 		await expect.element(page.getByTestId('line-items-total')).toHaveTextContent('GBP');
 		await expect.element(page.getByTestId('line-items-total')).toHaveTextContent('22.80');
 	});

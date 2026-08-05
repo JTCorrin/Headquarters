@@ -30,7 +30,11 @@
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import { quoteFormSchema, type QuoteClientOption } from '$lib/schemas/quote.js';
+	import {
+		quoteFormSchema,
+		type QuoteClientOption,
+		type QuoteContactOption
+	} from '$lib/schemas/quote.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -64,6 +68,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let quote = $state<ApiQuoteDocument | null>(null);
 	let clientOptions = $state<QuoteClientOption[]>([]);
+	let contactOptions = $state<QuoteContactOption[]>([]);
 	let products = $state<CatalogProductOption[]>([]);
 	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
@@ -91,7 +96,8 @@
 				clientName: '',
 				title: '',
 				currency: 'GBP' as const,
-				status: 'draft' as const
+				status: 'draft' as const,
+				recipients: []
 			},
 			zod4(quoteFormSchema)
 		),
@@ -184,6 +190,7 @@
 		lines = [];
 		timelineEvents = [];
 		clientOptions = [];
+		contactOptions = [];
 		products = [];
 		viewState = { kind: 'loading' };
 	}
@@ -227,9 +234,10 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, catalog, rates] = await Promise.all([
+			const [result, clients, contacts, catalog, rates] = await Promise.all([
 				api.quotes.get(quoteId),
 				api.clients.list({ limit: 100 }),
+				api.contacts.list({ limit: 100 }),
 				api.products.list({ limit: 100, status: 'active' }),
 				api.taxRates.list({ limit: 100 })
 			]);
@@ -238,6 +246,33 @@
 			taxRates = rates;
 			applyDocument(result.data);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			const options: QuoteContactOption[] = contacts.data.map((c) => ({
+				id: c.id,
+				label: c.display_name || c.primary_email || c.id,
+				clientId: c.client_id ?? null
+			}));
+			const selectedIds = new Set(
+				(result.data.recipients ?? [])
+					.map((r) => r.contact_id)
+					.concat(result.data.contact_id ? [result.data.contact_id] : [])
+			);
+			for (const selectedContactId of selectedIds) {
+				if (options.some((c) => c.id === selectedContactId)) continue;
+				try {
+					const pinned = await api.contacts.get(selectedContactId);
+					if (isStale(epoch)) return;
+					options.push({
+						id: pinned.data.id,
+						label:
+							pinned.data.display_name || pinned.data.primary_email || pinned.data.id,
+						clientId: pinned.data.client_id ?? null
+					});
+				} catch {
+					// Keep form recipients; never clear solely because the option page truncated.
+				}
+				if (isStale(epoch)) return;
+			}
+			contactOptions = options;
 			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
 			lineForm.form.set(emptyLineForm());
 			viewState = { kind: 'ready' };
@@ -509,6 +544,8 @@
 						{lineForm}
 						{products}
 						{clientOptions}
+						{contactOptions}
+						readonly={quote.status !== 'draft'}
 						{canSend}
 						{canReject}
 						{canAccept}

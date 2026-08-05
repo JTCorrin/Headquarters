@@ -1,11 +1,16 @@
 import { z } from 'zod';
+import {
+	documentRecipientsFieldSchema,
+	type DocumentContactOption
+} from '$lib/schemas/document-recipients.js';
 
 export const quoteFormSchema = z.object({
 	clientId: z.uuid('Select a client'),
 	clientName: z.string().max(160).optional().or(z.literal('')),
 	title: z.string().min(1, 'Title is required').max(160),
 	currency: z.enum(['GBP', 'USD', 'EUR']),
-	status: z.enum(['draft', 'sent', 'accepted', 'rejected', 'expired', 'void'])
+	status: z.enum(['draft', 'sent', 'accepted', 'rejected', 'expired', 'void']),
+	recipients: documentRecipientsFieldSchema
 });
 
 export type QuoteFormSchema = typeof quoteFormSchema;
@@ -25,3 +30,5 @@ export interface QuoteClientOption {
 	id: string;
 	name: string;
 }
+
+export type QuoteContactOption = DocumentContactOption;

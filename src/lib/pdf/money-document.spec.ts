@@ -38,6 +38,24 @@ describe('buildMoneyDocumentDef', () => {
 		expect(content).toContain('£18.00');
 	});
 
+	it('renders Attn line under Bill to when attentionLine is set', () => {
+		const def = buildMoneyDocumentDef({
+			kind: 'invoice',
+			orgName: 'Corrin',
+			partyLabel: 'Bill to',
+			partyName: 'Northwind',
+			attentionLine: 'Attn: Ada Billing; Bob Ops',
+			documentNumber: 'INV-0002',
+			currency: 'GBP',
+			status: 'draft',
+			lines: []
+		});
+
+		const content = JSON.stringify(def.content);
+		expect(content).toContain('Attn: Ada Billing; Bob Ops');
+		expect(content).toContain('Northwind');
+	});
+
 	it('shows Tax on quote PDFs when server totals include tax_cents', () => {
 		const def = buildMoneyDocumentDef({
 			kind: 'quote',

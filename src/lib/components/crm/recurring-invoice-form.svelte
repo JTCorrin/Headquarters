@@ -13,6 +13,7 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import DateField from './date-field.svelte';
 	import DateRangeField from './date-range-field.svelte';
+	import DocumentRecipientsField from './document-recipients-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface RecurringInvoiceFormProps {
@@ -72,26 +73,31 @@
 		label: new Date(2000, i, 1).toLocaleString(undefined, { month: 'long' })
 	}));
 
-	const NONE = '__none__';
-
 	const clientLabel = $derived(
 		clientOptions.find((o) => o.id === $formData.clientId)?.name ??
 			($formData.clientName || 'Select client')
-	);
-	const contactsForClient = $derived(
-		contactOptions.filter(
-			(c) => !c.clientId || !$formData.clientId || c.clientId === $formData.clientId
-		)
-	);
-	const contactLabel = $derived(
-		contactsForClient.find((o) => o.id === $formData.contactId)?.label ??
-			($formData.contactId ? 'Selected contact' : 'No contact')
 	);
 
 	$effect(() => {
 		const selected = clientOptions.find((o) => o.id === $formData.clientId);
 		if (selected && $formData.clientName !== selected.name) {
 			$formData.clientName = selected.name;
+		}
+	});
+
+	$effect(() => {
+		const client = $formData.clientId;
+		const next = $formData.recipients.filter((row) => {
+			const match = contactOptions.find((c) => c.id === row.contactId);
+			if (!match) return true;
+			if (match.clientId && client && match.clientId !== client) return false;
+			return true;
+		});
+		if (next.length !== $formData.recipients.length) {
+			if (next.length > 0 && !next.some((r) => r.isBilling)) {
+				next[0] = { ...next[0], isBilling: true };
+			}
+			$formData.recipients = next;
 		}
 	});
 </script>
@@ -155,26 +161,18 @@
 		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
 	</div>
 
-	<div class="space-y-2">
-		<Label for="ri-contact">Billing contact</Label>
-		<Select.Root
-			type="single"
-			value={$formData.contactId || NONE}
-			onValueChange={(value) => {
-				$formData.contactId = value === NONE ? '' : (value ?? '');
-			}}
-			disabled={readonly}
-			name="contactId"
-		>
-			<Select.Trigger id="ri-contact" class="w-full">{contactLabel}</Select.Trigger>
-			<Select.Content>
-				<Select.Item value={NONE} label="No contact">No contact</Select.Item>
-				{#each contactsForClient as contact (contact.id)}
-					<Select.Item value={contact.id} label={contact.label}>{contact.label}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
-	</div>
+	<DocumentRecipientsField
+		recipients={$formData.recipients}
+		{contactOptions}
+		clientId={$formData.clientId}
+		disabled={readonly}
+		onRecipientsChange={(next) => {
+			$formData.recipients = next;
+		}}
+	/>
+	{#if $errors.recipients}
+		<p class="text-destructive text-xs">{$errors.recipients}</p>
+	{/if}
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
