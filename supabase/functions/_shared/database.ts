@@ -1053,6 +1053,48 @@ export type QuoteLineRow = {
   position: number
 }
 
+export type QuoteRecipientRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  quote_id: string
+  contact_id: string
+  position: number
+  is_billing: boolean
+}
+
+export type InvoiceRecipientRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  invoice_id: string
+  contact_id: string
+  position: number
+  is_billing: boolean
+}
+
+export type RecurringInvoiceScheduleRecipientRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  version: number
+  schedule_id: string
+  contact_id: string
+  position: number
+  is_billing: boolean
+}
+
 type ProfileInsert = Pick<ProfileRow, 'display_name' | 'id'> & Partial<Omit<ProfileRow, 'id'>>
 type TaxRateInsert =
   & Pick<TaxRateRow, 'name' | 'org_id' | 'rate_percent'>
@@ -1361,6 +1403,17 @@ export type Database = {
         Update: Partial<QuoteLineInsert>
         Relationships: []
       }
+      quote_recipients: {
+        Row: QuoteRecipientRow
+        Insert: Partial<QuoteRecipientRow> & {
+          org_id: string
+          quote_id: string
+          contact_id: string
+          position: number
+        }
+        Update: Partial<QuoteRecipientRow>
+        Relationships: []
+      }
       invoices: {
         Row: InvoiceRow
         Insert: InvoiceInsert
@@ -1371,6 +1424,17 @@ export type Database = {
         Row: InvoiceLineRow
         Insert: InvoiceLineInsert
         Update: Partial<InvoiceLineInsert>
+        Relationships: []
+      }
+      invoice_recipients: {
+        Row: InvoiceRecipientRow
+        Insert: Partial<InvoiceRecipientRow> & {
+          org_id: string
+          invoice_id: string
+          contact_id: string
+          position: number
+        }
+        Update: Partial<InvoiceRecipientRow>
         Relationships: []
       }
 
@@ -1402,6 +1466,17 @@ export type Database = {
         Row: RecurringInvoiceLineRow
         Insert: RecurringInvoiceLineInsert
         Update: Partial<RecurringInvoiceLineInsert>
+        Relationships: []
+      }
+      recurring_invoice_schedule_recipients: {
+        Row: RecurringInvoiceScheduleRecipientRow
+        Insert: Partial<RecurringInvoiceScheduleRecipientRow> & {
+          org_id: string
+          schedule_id: string
+          contact_id: string
+          position: number
+        }
+        Update: Partial<RecurringInvoiceScheduleRecipientRow>
         Relationships: []
       }
       recurring_invoice_runs: {
