@@ -82,6 +82,28 @@ create_org="$(
 )"
 ORG_ID="$(printf '%s' "$create_org" | jq -r '.data.organisation.id // empty')"
 [[ -n "$ORG_ID" ]] || die "org create failed: ${create_org}"
+MEMBERSHIP_ID="$(printf '%s' "$create_org" | jq -r '.data.membership.id // empty')"
+if [[ -z "$MEMBERSHIP_ID" || "$MEMBERSHIP_ID" == null ]]; then
+	MEMBERSHIP_ID="$(printf '%s' "$create_org" | jq -r '
+		.data.organisation.membership_id
+		// .data.membership_id
+		// empty')"
+fi
+if [[ -z "$MEMBERSHIP_ID" || "$MEMBERSHIP_ID" == null ]]; then
+	orgs_json="$(
+		curl -fsS --max-time 30 \
+			-X GET "${API_BASE}/api/v1/organisations" \
+			-H "apikey: ${SUPABASE_ANON_KEY}" \
+			-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+			-H 'content-type: application/json'
+	)"
+	MEMBERSHIP_ID="$(printf '%s' "$orgs_json" | jq -r --arg oid "$ORG_ID" '
+		[.data[]? | select(.organisation.id == $oid or .id == $oid) | .membership.id // .membership_id][0] // empty
+	')"
+fi
+[[ -n "$MEMBERSHIP_ID" && "$MEMBERSHIP_ID" != null ]] \
+	|| die "could not resolve membership id: ${create_org}"
+log "membership ${MEMBERSHIP_ID}"
 
 log "POST contact (JWT)"
 contact_json="$(
@@ -132,12 +154,27 @@ printf '%s' "$list_json" | jq -e '
 	and index("update_invoice") != null
 ' >/dev/null || die "tools/list missing Wave A/B/C tools: ${list_json}"
 
+log "MCP tools/call create_task without assignee (expect error)"
+create_task_missing_json="$(
+	mcp "$(jq -n \
+		--arg title "MCP unassigned should fail $(date +%s)" \
+		'{jsonrpc:"2.0", id:30, method:"tools/call",
+			params:{name:"create_task", arguments:{title:$title, priority:"p2", source:"agent"}}}')"
+)"
+printf '%s' "$create_task_missing_json" | jq -e '
+	(.error != null)
+	or (.result.isError == true)
+	or ((.result.structuredContent.error // .result.content[0].text) | tostring | test("assignee_membership_id"; "i"))
+' >/dev/null || die "create_task without assignee should fail: ${create_task_missing_json}"
+
 log "MCP tools/call create_task"
 create_task_json="$(
 	mcp "$(jq -n \
 		--arg title "MCP proof task $(date +%s)" \
+		--arg mid "$MEMBERSHIP_ID" \
 		'{jsonrpc:"2.0", id:3, method:"tools/call",
-			params:{name:"create_task", arguments:{title:$title, priority:"p2", source:"agent"}}}')"
+			params:{name:"create_task",
+				arguments:{title:$title, priority:"p2", source:"agent", assignee_membership_id:$mid}}}')"
 )"
 TASK_ID="$(
 	printf '%s' "$create_task_json" | jq -r '
@@ -145,9 +182,17 @@ TASK_ID="$(
 		// (.result.content[0].text | fromjson | .data.id)
 		// empty'
 )"
+TASK_ASSIGNEE="$(
+	printf '%s' "$create_task_json" | jq -r '
+		.result.structuredContent.data.assignee_membership_id
+		// (.result.content[0].text | fromjson | .data.assignee_membership_id)
+		// empty'
+)"
 [[ -n "$TASK_ID" && "$TASK_ID" != null ]] || die "create_task failed: ${create_task_json}"
 printf '%s' "$create_task_json" | jq -e '.result.isError != true' >/dev/null \
 	|| die "create_task isError: ${create_task_json}"
+[[ "$TASK_ASSIGNEE" == "$MEMBERSHIP_ID" ]] \
+	|| die "create_task assignee mismatch: ${create_task_json}"
 
 log "MCP tools/call add_timeline_note"
 note_json="$(
