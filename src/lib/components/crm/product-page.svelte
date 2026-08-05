@@ -19,6 +19,7 @@
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
 		productFormSchema,
+		type ProductCategoryOption,
 		type ProductFormData,
 		type ProductTaxRateOption
 	} from '$lib/schemas/product.js';
@@ -58,11 +59,13 @@
 	let editOpen = $state(false);
 
 	let taxRateOptions = $state<ProductTaxRateOption[]>([]);
+	let categoryOptions = $state<ProductCategoryOption[]>([]);
 
 	const emptyProductForm = (): ProductFormData => ({
 		sku: '',
 		name: '',
 		description: '',
+		categoryId: '',
 		unitPrice: '',
 		taxRateId: '',
 		trackStock: false,
@@ -188,9 +191,10 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, rates] = await Promise.all([
+			const [result, rates, categories] = await Promise.all([
 				api.products.get(productId),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.productCategories.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 			taxRateOptions = rates
@@ -199,6 +203,9 @@
 					id: r.id,
 					label: `${r.name} (${r.rate_percent}%)${r.is_default ? ' · default' : ''}`
 				}));
+			categoryOptions = categories.data
+				.filter((c) => !c.deleted_at)
+				.map((c) => ({ id: c.id, label: c.name }));
 			product = result.data;
 			productForm.form.set(toProductFormData(result.data));
 			viewState = { kind: 'ready' };
@@ -326,6 +333,7 @@
 						bind:open={editOpen}
 						form={productForm}
 						{taxRateOptions}
+						{categoryOptions}
 						title="Edit product"
 						description="Update catalog details. Stock changes use adjust-stock."
 						submitLabel="Save changes"

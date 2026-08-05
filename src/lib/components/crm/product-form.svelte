@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProductFormData, ProductTaxRateOption } from '$lib/schemas/product.js';
+	import type {
+		ProductCategoryOption,
+		ProductFormData,
+		ProductTaxRateOption
+	} from '$lib/schemas/product.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -12,6 +16,7 @@
 	export interface ProductFormProps {
 		form: SuperForm<ProductFormData>;
 		taxRateOptions?: ProductTaxRateOption[];
+		categoryOptions?: ProductCategoryOption[];
 		submitLabel?: string;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -20,6 +25,7 @@
 	let {
 		form,
 		taxRateOptions = [],
+		categoryOptions = [],
 		submitLabel = 'Save product',
 		class: className,
 		onValidSubmit
@@ -43,10 +49,16 @@
 		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Select status'
 	);
 	const NONE_TAX = '__none__';
+	const NONE_CATEGORY = '__none__';
 	const taxLabel = $derived.by(() => {
 		const id = $formData.taxRateId;
 		if (!id) return 'No tax rate';
 		return taxRateOptions.find((o) => o.id === id)?.label ?? 'Tax rate';
+	});
+	const categoryLabel = $derived.by(() => {
+		const id = $formData.categoryId;
+		if (!id) return 'No category';
+		return categoryOptions.find((o) => o.id === id)?.label ?? 'Category';
 	});
 </script>
 
@@ -122,6 +134,34 @@
 			rows={3}
 		/>
 		{#if $errors.description}<p class="text-destructive text-xs">{$errors.description}</p>{/if}
+	</div>
+
+	<div class="space-y-2">
+		<Label for="product-category">Category</Label>
+		<Select.Root
+			type="single"
+			value={$formData.categoryId || NONE_CATEGORY}
+			onValueChange={(value) => {
+				$formData.categoryId = !value || value === NONE_CATEGORY ? '' : value;
+			}}
+			name="categoryId"
+		>
+			<Select.Trigger
+				id="product-category"
+				class="w-full"
+				data-testid="product-category-trigger"
+				aria-invalid={!!$errors.categoryId}
+			>
+				{categoryLabel}
+			</Select.Trigger>
+			<Select.Content>
+				<Select.Item value={NONE_CATEGORY} label="No category">No category</Select.Item>
+				{#each categoryOptions as option (option.id)}
+					<Select.Item value={option.id} label={option.label}>{option.label}</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+		{#if $errors.categoryId}<p class="text-destructive text-xs">{$errors.categoryId}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">

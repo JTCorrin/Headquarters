@@ -60,6 +60,8 @@ import type {
 	ApiVendorUpdateBody,
 	ApiProduct,
 	ApiProductAdjustStockBody,
+	ApiProductCategory,
+	ApiProductCategoryListParams,
 	ApiProductCreateBody,
 	ApiProductListParams,
 	ApiProductUpdateBody,
@@ -171,6 +173,13 @@ export interface TaxRatesEndpoints {
 export interface ProfilePreferencesEndpoints {
 	get(signal?: AbortSignal): Promise<ApiProfilePreferences>;
 	update(body: ApiProfilePreferencesPatch, signal?: AbortSignal): Promise<ApiProfilePreferences>;
+}
+
+export interface ProductCategoriesEndpoints {
+	list(
+		params?: ApiProductCategoryListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiProductCategory[]>>;
 }
 
 export interface ProductsEndpoints {
