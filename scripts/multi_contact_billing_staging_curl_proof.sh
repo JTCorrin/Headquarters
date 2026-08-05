@@ -141,4 +141,36 @@ INV_RECIPIENTS="$(printf '%s' "$invoice_json" | jq -r '.data.recipients | length
 [[ "$INV_RECIPIENTS" == "2" ]] || die "invoice recipients length expected 2"
 log "invoice ${INV_ID} recipients=2 contact_id=Ada"
 
-log "PASS multi-contact billing recipients curl proof"
+QUOTE_VERSION="$(printf '%s' "$quote_json" | jq -r '.data.version // empty')"
+[[ -n "$QUOTE_VERSION" ]] || die "quote version missing"
+
+log "POST quote accept (idempotent envelope must keep recipients)"
+accept_json="$(
+	curl -fsS --max-time 30 -X POST "${API_BASE}/api/v1/quotes/${QUOTE_ID}/accept" \
+		"${auth[@]}" \
+		-H "If-Match: \"${QUOTE_VERSION}\"" \
+		-H "Idempotency-Key: mcr-accept-quote-${QUOTE_ID}" \
+		-H 'content-type: application/json' \
+		-d '{}'
+)"
+ACCEPT_RECIPIENTS="$(printf '%s' "$accept_json" | jq -r '.data.recipients | length')"
+[[ "$ACCEPT_RECIPIENTS" == "2" ]] || die "quote accept recipients expected 2, got ${ACCEPT_RECIPIENTS}: ${accept_json}"
+log "quote accept recipients=2"
+
+INV_VERSION="$(printf '%s' "$invoice_json" | jq -r '.data.version // empty')"
+[[ -n "$INV_VERSION" ]] || die "invoice version missing"
+
+log "POST invoice send (idempotent envelope must keep recipients)"
+send_inv_json="$(
+	curl -fsS --max-time 30 -X POST "${API_BASE}/api/v1/invoices/${INV_ID}/send" \
+		"${auth[@]}" \
+		-H "If-Match: \"${INV_VERSION}\"" \
+		-H "Idempotency-Key: mcr-send-invoice-${INV_ID}" \
+		-H 'content-type: application/json' \
+		-d '{}'
+)"
+SEND_INV_RECIPIENTS="$(printf '%s' "$send_inv_json" | jq -r '.data.recipients | length')"
+[[ "$SEND_INV_RECIPIENTS" == "2" ]] || die "invoice send recipients expected 2, got ${SEND_INV_RECIPIENTS}: ${send_inv_json}"
+log "invoice send recipients=2"
+
+log "PASS multi-contact billing recipients curl proof (draft + accept + send shapes)"
