@@ -1714,10 +1714,13 @@ Deno.test('API key secret shape and create body validation', async () => {
   )
 })
 
-Deno.test('MCP tools/list catalog covers MVP surface', () => {
+Deno.test('MCP tools/list catalog covers MVP + Wave A entity writes', () => {
   const names = listMcpTools().map((tool) => tool.name).sort()
   assertEquals(names, [
     'add_timeline_note',
+    'create_client',
+    'create_contact',
+    'create_lead',
     'create_task',
     'get_client',
     'get_contact',
@@ -1727,6 +1730,9 @@ Deno.test('MCP tools/list catalog covers MVP surface', () => {
     'list_contacts',
     'list_leads',
     'list_tasks',
+    'update_client',
+    'update_contact',
+    'update_lead',
     'update_task',
   ])
 })
