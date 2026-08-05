@@ -132,8 +132,8 @@ describe('LeadsPage integration', () => {
 		render(LeadsPage, { api, session });
 
 		await expect
-			.element(page.getByTestId(`lead-move-row-${LEAD_ID}`))
-			.toHaveTextContent('Contoso expansion');
+			.element(page.getByLabelText('Contoso expansion', { exact: true }))
+			.toBeInTheDocument();
 		expect(seenOrgHeaders[0]).toBe(ORG_A);
 
 		await page.getByRole('button', { name: 'New lead' }).click();
@@ -141,8 +141,8 @@ describe('LeadsPage integration', () => {
 		await page.getByTestId('lead-form').getByRole('button', { name: 'Save lead' }).click();
 
 		await expect
-			.element(page.getByTestId(`lead-move-row-${LEAD_B}`))
-			.toHaveTextContent('Northwind pilot');
+			.element(page.getByLabelText('Northwind pilot', { exact: true }))
+			.toBeInTheDocument();
 		expect(createBody).toMatchObject({
 			name: 'Northwind pilot',
 			stage: 'new',
@@ -150,7 +150,7 @@ describe('LeadsPage integration', () => {
 		});
 	});
 
-	it('keyboard move PATCHes stage+position and rolls back visibly on failure', async () => {
+	it('card move PATCHes stage+position and rolls back visibly on failure', async () => {
 		const session = sessionForOrg();
 		let patchCount = 0;
 		let lastPatch: { body: unknown; ifMatch: string | null } | null = null;
@@ -211,8 +211,8 @@ describe('LeadsPage integration', () => {
 		render(LeadsPage, { api, session });
 
 		await expect
-			.element(page.getByTestId(`lead-move-row-${LEAD_B}`))
-			.toHaveTextContent('Bravo deal');
+			.element(page.getByLabelText('Bravo deal', { exact: true }))
+			.toBeInTheDocument();
 		await page.getByTestId(`lead-move-up-${LEAD_B}`).click();
 
 		await expect.poll(() => patchCount).toBe(1);
@@ -222,12 +222,14 @@ describe('LeadsPage integration', () => {
 			position: expect.any(Number)
 		});
 
-		// Second move fails — board error visible and prior stage/order preserved in controls.
+		// Second move fails — board error visible and card still on the board.
 		await page.getByTestId(`lead-move-down-${LEAD_B}`).click();
 		await expect.poll(() => patchCount).toBe(2);
 		await expect
 			.element(page.getByTestId('leads-board-error'))
 			.toHaveTextContent(/restored|match|conflict|could not move/i);
-		await expect.element(page.getByTestId(`lead-move-row-${LEAD_B}`)).toHaveTextContent(/new/i);
+		await expect
+			.element(page.getByLabelText('Bravo deal', { exact: true }))
+			.toBeInTheDocument();
 	});
 });

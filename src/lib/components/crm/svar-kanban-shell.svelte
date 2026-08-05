@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Component } from 'svelte';
 	import {
 		Kanban,
 		Willow,
@@ -20,6 +21,7 @@
 		cards: KanbanCard[];
 		columns: ColumnConfig[];
 		card?: CardShape;
+		cardContent?: Component<{ card: KanbanCard; cardShape: CardShape }>;
 		readonly?: boolean;
 		class?: string;
 		onMoveCard?: (event: MoveCardEvent) => void;
@@ -40,6 +42,7 @@
 			description: true,
 			menu: false
 		},
+		cardContent,
 		readonly = false,
 		class: className,
 		onMoveCard,
@@ -74,6 +77,7 @@
 					{cards}
 					{columns}
 					{card}
+					{cardContent}
 					{readonly}
 					init={handleInit}
 					onmovecard={onMoveCard}
@@ -87,6 +91,7 @@
 					{cards}
 					{columns}
 					{card}
+					{cardContent}
 					{readonly}
 					init={handleInit}
 					onmovecard={onMoveCard}
@@ -149,5 +154,12 @@
 		position: relative;
 		z-index: 2;
 		pointer-events: auto;
+	}
+
+	/* Compact resting card height (title + description). */
+	.crm-svar-kanban-theme :global(.wx-card) {
+		gap: 0;
+		padding: 0.55rem 0.65rem;
+		min-height: 0;
 	}
 </style>
