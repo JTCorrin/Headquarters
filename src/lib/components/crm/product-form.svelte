@@ -20,6 +20,8 @@
 		submitLabel?: string;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		/** Persist a new catalog category, then return it so the form can select it. */
+		onCreateCategory?: (name: string) => Promise<ProductCategoryOption | null>;
 	}
 
 	let {
@@ -28,7 +30,8 @@
 		categoryOptions = [],
 		submitLabel = 'Save product',
 		class: className,
-		onValidSubmit
+		onValidSubmit,
+		onCreateCategory
 	}: ProductFormProps = $props();
 
 	const formData = untrack(() => form.form);
@@ -38,7 +41,37 @@
 
 	let pendingSubmit = $state(false);
 	let submitLock = false;
-	const busy = $derived($submitting || pendingSubmit);
+	let newCategoryName = $state('');
+	let categoryCreateError = $state<string | null>(null);
+	let creatingCategory = $state(false);
+	const busy = $derived($submitting || pendingSubmit || creatingCategory);
+
+	async function handleCreateCategory() {
+		if (!onCreateCategory) return;
+		const name = newCategoryName.trim();
+		if (!name) {
+			categoryCreateError = 'Enter a category name.';
+			return;
+		}
+		creatingCategory = true;
+		categoryCreateError = null;
+		try {
+			const created = await onCreateCategory(name);
+			if (!created) {
+				categoryCreateError = 'Could not create category — try again.';
+				return;
+			}
+			$formData.categoryId = created.id;
+			newCategoryName = '';
+		} catch (error) {
+			categoryCreateError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not create category — try again.';
+		} finally {
+			creatingCategory = false;
+		}
+	}
 
 	const statusOptions = [
 		{ value: 'active', label: 'Active' },
@@ -162,6 +195,42 @@
 			</Select.Content>
 		</Select.Root>
 		{#if $errors.categoryId}<p class="text-destructive text-xs">{$errors.categoryId}</p>{/if}
+		{#if onCreateCategory}
+			<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+				<Input
+					id="product-new-category"
+					name="newCategoryName"
+					bind:value={newCategoryName}
+					placeholder={categoryOptions.length === 0
+						? 'Add your first category'
+						: 'New category name'}
+					data-testid="product-new-category-input"
+					disabled={creatingCategory}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') {
+							event.preventDefault();
+							void handleCreateCategory();
+						}
+					}}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					class="shrink-0"
+					data-testid="product-new-category-add"
+					disabled={creatingCategory}
+					onclick={() => void handleCreateCategory()}
+				>
+					{creatingCategory ? 'Adding…' : 'Add category'}
+				</Button>
+			</div>
+			{#if categoryCreateError}
+				<p class="text-destructive text-xs" role="alert" data-testid="product-category-create-error">
+					{categoryCreateError}
+				</p>
+			{/if}
+		{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">

@@ -61,6 +61,7 @@ import type {
 	ApiProduct,
 	ApiProductAdjustStockBody,
 	ApiProductCategory,
+	ApiProductCategoryCreateBody,
 	ApiProductCategoryListParams,
 	ApiProductCreateBody,
 	ApiProductListParams,
@@ -180,6 +181,7 @@ export interface ProductCategoriesEndpoints {
 		params?: ApiProductCategoryListParams,
 		signal?: AbortSignal
 	): Promise<ApiResult<ApiProductCategory[]>>;
+	create(body: ApiProductCategoryCreateBody, signal?: AbortSignal): Promise<ApiProductCategory>;
 }
 
 export interface ProductsEndpoints {
