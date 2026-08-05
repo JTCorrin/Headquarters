@@ -3,9 +3,11 @@ import type { Database } from '../_shared/database.ts'
 import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
 import { handleMeetings } from './meetings.ts'
 import { handleProjects } from './projects.ts'
+import { handleQuotes } from './quotes.ts'
 import { handleTasks } from './tasks.ts'
 import { handleTimelineEvents } from './timeline-events.ts'
 
@@ -598,6 +600,222 @@ const TOOLS: ToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_quotes',
+    description: 'List quotes in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'void'],
+        },
+        client_id: { type: 'string', format: 'uuid' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_quote',
+    description: 'Get a quote document by id (header + lines).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_quote',
+    description:
+      'Create a draft quote (same validation as POST /api/v1/quotes). Drafts only — no send/reject/accept.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        lead_id: { type: ['string', 'null'], format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        valid_until: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
+        lines: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
+              tax_rate_percent: { type: 'number' },
+              position: { type: 'number' },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_quote',
+    description:
+      'Update a draft quote (same validation as PATCH /api/v1/quotes/{id}). Requires version for If-Match. Drafts only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        title: { type: 'string' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        lead_id: { type: ['string', 'null'], format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        valid_until: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
+        lines: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
+              tax_rate_percent: { type: 'number' },
+              position: { type: 'number' },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_invoices',
+    description: 'List invoices in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: {
+          type: 'string',
+          enum: ['draft', 'sent', 'partial', 'paid', 'void'],
+        },
+        client_id: { type: 'string', format: 'uuid' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_invoice',
+    description: 'Get an invoice document by id (header + lines).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_invoice',
+    description:
+      'Create a draft invoice (same validation as POST /api/v1/invoices). Drafts only — no send/void/from-quote.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_id: { type: 'string', format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        due_on: { type: ['string', 'null'] },
+        purchase_order_number: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        payment_terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
+        lines: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
+              tax_rate_percent: { type: 'number' },
+              position: { type: 'number' },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['client_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_invoice',
+    description:
+      'Update a draft invoice (same validation as PATCH /api/v1/invoices/{id}). Requires version for If-Match. Drafts only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        client_id: { type: 'string', format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        due_on: { type: ['string', 'null'] },
+        purchase_order_number: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        payment_terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
+        lines: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
+              tax_rate_percent: { type: 'number' },
+              position: { type: 'number' },
+            },
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 export function listMcpTools(): ToolDef[] {
@@ -744,6 +962,24 @@ function assertCanAccessMeetings(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify meetings')
+  }
+}
+
+function assertCanAccessQuotes(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access quotes')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify quotes')
+  }
+}
+
+function assertCanAccessInvoices(role: MembershipRole, method: string): void {
+  if (role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read invoices')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify invoices')
   }
 }
 
@@ -1212,6 +1448,128 @@ async function callTool(
         requestId,
         actorUserId,
         membership.id,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_quotes': {
+      assertCanAccessQuotes(membership.role, 'GET')
+      const path = `/api/v1/quotes${
+        optionalQuery(args, ['limit', 'cursor', 'status', 'client_id'])
+      }`
+      const response = await handleQuotes(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/quotes',
+        orgId,
+        requestId,
+        requireUserBackedActor(auth.userId),
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_quote': {
+      assertCanAccessQuotes(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/quotes/${id}`
+      const response = await handleQuotes(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        requestId,
+        requireUserBackedActor(auth.userId),
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const response = await handleQuotes(
+        syntheticRequest('POST', '/api/v1/quotes', args),
+        db,
+        '/api/v1/quotes',
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_quote': {
+      assertCanAccessQuotes(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/quotes/${id}`
+      const response = await handleQuotes(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_invoices': {
+      assertCanAccessInvoices(membership.role, 'GET')
+      const path = `/api/v1/invoices${
+        optionalQuery(args, ['limit', 'cursor', 'status', 'client_id'])
+      }`
+      const response = await handleInvoices(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/invoices',
+        orgId,
+        requestId,
+        requireUserBackedActor(auth.userId),
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_invoice': {
+      assertCanAccessInvoices(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/invoices/${id}`
+      const response = await handleInvoices(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        requestId,
+        requireUserBackedActor(auth.userId),
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_invoice': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const response = await handleInvoices(
+        syntheticRequest('POST', '/api/v1/invoices', args),
+        db,
+        '/api/v1/invoices',
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_invoice': {
+      assertCanAccessInvoices(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/invoices/${id}`
+      const response = await handleInvoices(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+        actorUserId,
       )
       return await toolResultFromHttp(response)
     }

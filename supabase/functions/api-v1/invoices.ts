@@ -584,6 +584,7 @@ async function createInvoice(
   db: DatabaseClient,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const { data: organisation, error: orgError } = await db
     .from('organisations')
@@ -604,6 +605,7 @@ async function createInvoice(
     p_org_id: orgId,
     p_payload: toRpcPayload(header) as Json,
     p_lines: lines as unknown as Json,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -620,12 +622,14 @@ async function findInvoiceDocument(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<InvoiceDocument> {
   // Single transactional RPC: FOR SHARE on the header, then lines, so a concurrent
   // save cannot return a stale ETag with replaced lines.
   const { data, error } = await db.rpc('get_invoice_document', {
     p_invoice_id: invoiceId,
     p_org_id: orgId,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -637,8 +641,9 @@ async function getInvoice(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
-  const data = await findInvoiceDocument(db, orgId, invoiceId, requestId)
+  const data = await findInvoiceDocument(db, orgId, invoiceId, requestId, actorUserId)
   return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
 }
 
@@ -648,9 +653,10 @@ async function updateInvoice(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
-  const current = await findInvoiceDocument(db, orgId, invoiceId, requestId)
+  const current = await findInvoiceDocument(db, orgId, invoiceId, requestId, actorUserId)
   if (current.version !== version) {
     throw new ApiError(412, 'PRECONDITION_FAILED', 'Invoice version does not match If-Match')
   }
@@ -667,6 +673,7 @@ async function updateInvoice(
     p_expected_version: version,
     p_payload: toRpcPayload(header) as Json,
     p_lines: lines === undefined ? null : lines as unknown as Json,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -841,10 +848,13 @@ export function handleInvoices(
   path: string,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   if (path === '/api/v1/invoices') {
     if (req.method === 'GET') return listInvoices(req, db, orgId, requestId)
-    if (req.method === 'POST') return createInvoice(req, db, orgId, requestId)
+    if (req.method === 'POST') {
+      return createInvoice(req, db, orgId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoices')
   }
 
@@ -873,8 +883,10 @@ export function handleInvoices(
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice void')
   }
 
-  if (req.method === 'GET') return getInvoice(db, orgId, invoiceId, requestId)
-  if (req.method === 'PATCH') return updateInvoice(req, db, orgId, invoiceId, requestId)
+  if (req.method === 'GET') return getInvoice(db, orgId, invoiceId, requestId, actorUserId)
+  if (req.method === 'PATCH') {
+    return updateInvoice(req, db, orgId, invoiceId, requestId, actorUserId)
+  }
   if (req.method === 'DELETE') return deleteInvoice(req, db, orgId, invoiceId, requestId)
   throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice')
 }

@@ -124,7 +124,13 @@ printf '%s' "$list_json" | jq -e '
 	and index("list_meetings") != null
 	and index("create_meeting") != null
 	and index("update_meeting") != null
-' >/dev/null || die "tools/list missing Wave A/B tools: ${list_json}"
+	and index("list_quotes") != null
+	and index("create_quote") != null
+	and index("update_quote") != null
+	and index("list_invoices") != null
+	and index("create_invoice") != null
+	and index("update_invoice") != null
+' >/dev/null || die "tools/list missing Wave A/B/C tools: ${list_json}"
 
 log "MCP tools/call create_task"
 create_task_json="$(
@@ -314,6 +320,91 @@ MEETING_ID="$(
 [[ -n "$MEETING_ID" && "$MEETING_ID" != null ]] || die "create_meeting failed: ${create_meeting_json}"
 printf '%s' "$create_meeting_json" | jq -e '.result.isError != true' >/dev/null \
 	|| die "create_meeting isError: ${create_meeting_json}"
+
+log "MCP tools/call create_quote (draft)"
+create_quote_json="$(
+	mcp "$(jq -n \
+		--arg title "MCP Wave C Quote $(date +%s)" \
+		--arg cid "$CLIENT_ID" \
+		'{jsonrpc:"2.0", id:13, method:"tools/call",
+			params:{name:"create_quote",
+				arguments:{
+					title:$title,
+					client_id:$cid,
+					lines:[{description:"Wave C line", quantity:1, unit_price_cents:5000, tax_rate_percent:0}]
+				}}}')"
+)"
+QUOTE_ID="$(
+	printf '%s' "$create_quote_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+QUOTE_VER="$(
+	printf '%s' "$create_quote_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$QUOTE_ID" && "$QUOTE_ID" != null ]] || die "create_quote failed: ${create_quote_json}"
+[[ -n "$QUOTE_VER" && "$QUOTE_VER" != null ]] \
+	|| die "create_quote missing version: ${create_quote_json}"
+printf '%s' "$create_quote_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_quote isError: ${create_quote_json}"
+
+log "MCP tools/call update_quote (draft)"
+update_quote_json="$(
+	mcp "$(jq -n \
+		--arg id "$QUOTE_ID" \
+		--argjson ver "$QUOTE_VER" \
+		'{jsonrpc:"2.0", id:14, method:"tools/call",
+			params:{name:"update_quote",
+				arguments:{id:$id, version:$ver, notes:"wave-c proof update"}}}')"
+)"
+printf '%s' "$update_quote_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "update_quote isError: ${update_quote_json}"
+
+log "MCP tools/call create_invoice (draft)"
+create_invoice_json="$(
+	mcp "$(jq -n \
+		--arg cid "$CLIENT_ID" \
+		'{jsonrpc:"2.0", id:15, method:"tools/call",
+			params:{name:"create_invoice",
+				arguments:{
+					client_id:$cid,
+					lines:[{description:"Wave C invoice line", quantity:1, unit_price_cents:7500, tax_rate_percent:0}]
+				}}}')"
+)"
+INVOICE_ID="$(
+	printf '%s' "$create_invoice_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+INVOICE_VER="$(
+	printf '%s' "$create_invoice_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$INVOICE_ID" && "$INVOICE_ID" != null ]] \
+	|| die "create_invoice failed: ${create_invoice_json}"
+[[ -n "$INVOICE_VER" && "$INVOICE_VER" != null ]] \
+	|| die "create_invoice missing version: ${create_invoice_json}"
+printf '%s' "$create_invoice_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_invoice isError: ${create_invoice_json}"
+
+log "MCP tools/call update_invoice (draft)"
+update_invoice_json="$(
+	mcp "$(jq -n \
+		--arg id "$INVOICE_ID" \
+		--argjson ver "$INVOICE_VER" \
+		'{jsonrpc:"2.0", id:16, method:"tools/call",
+			params:{name:"update_invoice",
+				arguments:{id:$id, version:$ver, notes:"wave-c proof update"}}}')"
+)"
+printf '%s' "$update_invoice_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "update_invoice isError: ${update_invoice_json}"
 
 log "JWT rejected on /api/v1/mcp (expect 403)"
 jwt_mcp_status="$(
