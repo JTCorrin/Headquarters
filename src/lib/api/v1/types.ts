@@ -135,6 +135,25 @@ export interface ApiProfilePreferencesPatch {
 export type ApiProductType = 'product' | 'service';
 export type ApiProductStatus = 'active' | 'archived';
 
+export interface ApiProductCategory {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	description: string | null;
+	position: number;
+}
+
+export interface ApiProductCategoryListParams {
+	limit?: number;
+	cursor?: string;
+}
+
 export interface ApiProduct {
 	id: string;
 	org_id: string;
