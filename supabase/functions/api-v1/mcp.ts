@@ -319,7 +319,8 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'create_task',
-    description: 'Create a task (same validation as POST /api/v1/tasks).',
+    description:
+      'Create a task assigned to an org membership (same validation as POST /api/v1/tasks). assignee_membership_id is required — MCP tasks cannot be unassigned.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -330,7 +331,7 @@ const TOOLS: ToolDef[] = [
           type: 'string',
           enum: ['open', 'in_progress', 'blocked', 'done', 'cancelled'],
         },
-        assignee_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        assignee_membership_id: { type: 'string', format: 'uuid' },
         due_at: { type: ['string', 'null'] },
         entity_type: {
           type: ['string', 'null'],
@@ -342,7 +343,7 @@ const TOOLS: ToolDef[] = [
           enum: ['manual', 'meeting', 'email', 'workflow', 'agent'],
         },
       },
-      required: ['title'],
+      required: ['title', 'assignee_membership_id'],
       additionalProperties: false,
     },
   },
@@ -875,6 +876,22 @@ function requireString(args: Record<string, unknown>, field: string): string {
   return value
 }
 
+/** MCP create_task gate: assignee is required (HTTP may still create unassigned). */
+export function requireCreateTaskAssignee(args: Record<string, unknown>): string {
+  const value = args.assignee_membership_id
+  if (value === undefined || value === null) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'assignee_membership_id is required', {
+      assignee_membership_id: 'Required',
+    })
+  }
+  if (typeof value !== 'string' || value.trim().length < 1) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'assignee_membership_id is required', {
+      assignee_membership_id: 'Required',
+    })
+  }
+  return parseUuid(value, 'assignee_membership_id')
+}
+
 function requireVersion(args: Record<string, unknown>): number {
   const version = args.version
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
@@ -1257,8 +1274,12 @@ async function callTool(
     }
     case 'create_task': {
       assertCanAccessTasks(membership.role, 'POST')
+      const assigneeMembershipId = requireCreateTaskAssignee(args)
       const response = await handleTasks(
-        syntheticRequest('POST', '/api/v1/tasks', args),
+        syntheticRequest('POST', '/api/v1/tasks', {
+          ...args,
+          assignee_membership_id: assigneeMembershipId,
+        }),
         db,
         '/api/v1/tasks',
         orgId,
