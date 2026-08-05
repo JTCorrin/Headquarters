@@ -17,6 +17,7 @@ import {
   sha256Hex,
 } from './idempotency.ts'
 import { assertJsonSafeLineMoney } from './quotes.ts'
+import { type RecipientInput, type RecipientRow, validateRecipientsField } from './recipients.ts'
 
 const SCHEDULE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,client_id,contact_id,owner_membership_id,status,currency,frequency,interval_count,anchor_on,rule_version,weekdays,day_of_month,month_of_year,month_end_policy,timezone,local_run_time,start_on,end_on,max_occurrences,scheduled_occurrence_count,next_run_at,last_run_at,due_days,delivery_mode,pricing_mode,catch_up_policy,max_catch_up_runs,purchase_order_number,payment_terms,notes,internal_notes,activated_at,paused_at,completed_at,cancelled_at,cancelled_by'
@@ -52,6 +53,7 @@ const HEADER_WRITABLE = new Set([
   'notes',
   'internal_notes',
   'lines',
+  'recipients',
 ])
 
 const LINE_WRITABLE = new Set([
@@ -116,6 +118,7 @@ type RecurringHeaderInput = {
   payment_terms?: string | null
   notes?: string | null
   internal_notes?: string | null
+  recipients?: RecipientInput[]
 }
 
 type RecurringCreate = RecurringHeaderInput & {
@@ -129,7 +132,10 @@ type RecurringUpdate = RecurringHeaderInput & {
   lines?: RecurringLineInput[]
 }
 
-type RecurringDocument = RecurringScheduleRow & { lines: RecurringLineRow[] }
+type RecurringDocument = RecurringScheduleRow & {
+  lines: RecurringLineRow[]
+  recipients: RecipientRow[]
+}
 
 interface ScheduleCursor {
   created_at: string
@@ -582,6 +588,11 @@ export function validateRecurringScheduleBody(
     output.lines = []
   }
 
+  if ('recipients' in body) {
+    const recipients = validateRecipientsField(body.recipients, fields)
+    if (recipients !== undefined) output.recipients = recipients
+  }
+
   if (Object.keys(fields).length > 0) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'Recurring schedule validation failed', fields)
   }
@@ -688,7 +699,11 @@ function asScheduleDocument(data: Json): RecurringDocument {
       'Recurring schedule RPC returned an unexpected payload',
     )
   }
-  const payload = data as { schedule?: RecurringScheduleRow; lines?: RecurringLineRow[] }
+  const payload = data as {
+    schedule?: RecurringScheduleRow
+    lines?: RecurringLineRow[]
+    recipients?: RecipientRow[]
+  }
   if (!payload.schedule) {
     throw new ApiError(
       500,
@@ -699,6 +714,7 @@ function asScheduleDocument(data: Json): RecurringDocument {
   return {
     ...payload.schedule,
     lines: Array.isArray(payload.lines) ? payload.lines : [],
+    recipients: Array.isArray(payload.recipients) ? payload.recipients : [],
   }
 }
 

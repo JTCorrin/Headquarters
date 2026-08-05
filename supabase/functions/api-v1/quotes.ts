@@ -18,6 +18,7 @@ import {
   parseIdempotencyKey,
   sha256Hex,
 } from './idempotency.ts'
+import { type RecipientInput, type RecipientRow, validateRecipientsField } from './recipients.ts'
 
 const QUOTE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,title,client_id,lead_id,contact_id,owner_membership_id,status,currency,issue_on,valid_until,subtotal_cents,discount_cents,tax_cents,total_cents,party_snapshot,terms,notes,internal_notes,sent_at,viewed_at,accepted_at,rejected_at,converted_invoice_id'
@@ -46,6 +47,7 @@ const HEADER_WRITABLE = new Set([
   'notes',
   'internal_notes',
   'lines',
+  'recipients',
 ])
 
 const LINE_WRITABLE = new Set([
@@ -83,6 +85,7 @@ type QuoteHeaderInput = {
   terms?: string | null
   notes?: string | null
   internal_notes?: string | null
+  recipients?: RecipientInput[]
 }
 
 type QuoteCreate = QuoteHeaderInput & {
@@ -95,7 +98,7 @@ type QuoteUpdate = QuoteHeaderInput & {
   lines?: QuoteLineInput[]
 }
 
-type QuoteDocument = QuoteRow & { lines: QuoteLineRow[] }
+type QuoteDocument = QuoteRow & { lines: QuoteLineRow[]; recipients: RecipientRow[] }
 
 interface QuoteCursor {
   created_at: string
@@ -406,6 +409,11 @@ export function validateQuoteBody(
     output.lines = lines
   }
 
+  if ('recipients' in body) {
+    const recipients = validateRecipientsField(body.recipients, fields)
+    if (recipients !== undefined) output.recipients = recipients
+  }
+
   if (!partial) {
     const clientId = output.client_id
     const leadId = output.lead_id
@@ -438,6 +446,7 @@ export function validateQuoteBody(
       ...(output.terms !== undefined ? { terms: output.terms } : {}),
       ...(output.notes !== undefined ? { notes: output.notes } : {}),
       ...(output.internal_notes !== undefined ? { internal_notes: output.internal_notes } : {}),
+      ...(output.recipients !== undefined ? { recipients: output.recipients } : {}),
     }
   }
 
@@ -520,13 +529,18 @@ function asQuoteDocument(data: Json): QuoteDocument {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an unexpected payload')
   }
-  const payload = data as { quote?: QuoteRow; lines?: QuoteLineRow[] }
+  const payload = data as {
+    quote?: QuoteRow
+    lines?: QuoteLineRow[]
+    recipients?: RecipientRow[]
+  }
   if (!payload.quote) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Quote RPC returned an incomplete payload')
   }
   return {
     ...payload.quote,
     lines: Array.isArray(payload.lines) ? payload.lines : [],
+    recipients: Array.isArray(payload.recipients) ? payload.recipients : [],
   }
 }
 
