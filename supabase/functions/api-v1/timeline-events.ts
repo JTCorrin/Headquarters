@@ -366,6 +366,68 @@ async function createTimelineNote(
   })
 }
 
+export function isOrgTimelineEventsPath(path: string): boolean {
+  return path === '/api/v1/timeline-events'
+}
+
+async function listOrgTimelineEvents(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const url = new URL(req.url)
+  const limit = parseLimit(url.searchParams.get('limit'))
+  const cursor = decodeTimelineCursor(url.searchParams.get('cursor'))
+
+  const { data, error } = await db.rpc('list_org_timeline_events', {
+    p_org_id: orgId,
+    p_limit: limit + 1,
+    p_cursor_occurred_at: cursor?.occurred_at ?? null,
+    p_cursor_id: cursor?.id ?? null,
+  })
+  if (error) throw databaseError(error, requestId)
+
+  const rows = (data ?? []) as TimelineEventRow[]
+  const hasNextPage = rows.length > limit
+  const page = hasNextPage ? rows.slice(0, limit) : rows
+  const last = page.at(-1)
+
+  return jsonResponse(
+    {
+      data: page,
+      meta: {
+        next_cursor: hasNextPage && last
+          ? encodeCursor({ occurred_at: last.occurred_at, id: last.id })
+          : null,
+      },
+    },
+    200,
+    requestId,
+  )
+}
+
+/** Org-wide Home feed: GET /api/v1/timeline-events (read-only). */
+export async function handleOrgTimelineEvents(
+  req: Request,
+  db: DatabaseClient,
+  path: string,
+  orgId: string,
+  role: MembershipRole,
+  requestId: string,
+): Promise<Response> {
+  if (!isOrgTimelineEventsPath(path)) {
+    throw new ApiError(404, 'NOT_FOUND', 'Route not found')
+  }
+
+  if (req.method === 'GET') {
+    assertCanReadTimeline(role)
+    return await listOrgTimelineEvents(req, db, orgId, requestId)
+  }
+
+  throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
+}
+
 export async function handleTimelineEvents(
   req: Request,
   db: DatabaseClient,
