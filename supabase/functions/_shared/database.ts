@@ -2096,6 +2096,7 @@ export type Database = {
       }
       create_contact_with_primary_client: {
         Args: {
+          p_actor_id?: string | null
           p_client_id?: string | null
           p_org_id: string
           p_payload: Json
@@ -2105,6 +2106,7 @@ export type Database = {
       }
       update_contact_with_primary_client: {
         Args: {
+          p_actor_id?: string | null
           p_client_id?: string | null
           p_contact_id: string
           p_expected_version: number
