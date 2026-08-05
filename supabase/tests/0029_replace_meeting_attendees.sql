@@ -5,7 +5,7 @@ select plan(8);
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.replace_meeting_attendees(uuid, uuid, jsonb)',
+    'public.replace_meeting_attendees(uuid, uuid, jsonb, uuid)',
     'execute'
   ),
   'authenticated users can execute replace_meeting_attendees'

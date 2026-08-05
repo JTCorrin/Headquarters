@@ -2042,6 +2042,7 @@ export type Database = {
       }
       replace_meeting_attendees: {
         Args: {
+          p_actor_id?: string | null
           p_attendees: Json
           p_meeting_id: string
           p_org_id: string
@@ -2050,6 +2051,7 @@ export type Database = {
       }
       create_project_with_defaults: {
         Args: {
+          p_actor_id?: string | null
           p_org_id: string
           p_payload: Json
         }
