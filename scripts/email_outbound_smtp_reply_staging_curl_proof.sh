@@ -124,6 +124,15 @@ contact_json="$(
 CONTACT_ID="$(printf '%s' "$contact_json" | jq -r '.data.id // empty')"
 [[ -n "$CONTACT_ID" ]] || die "contact create failed: ${contact_json}"
 
+log "POST client for address_match (entity rail)"
+client_json="$(
+	api POST /api/v1/clients --data "$(jq -n \
+		--arg email "$PEER_EMAIL" \
+		'{name:"SMTP Peer Client", primary_email:$email, status:"active"}')"
+)"
+CLIENT_ID="$(printf '%s' "$client_json" | jq -r '.data.id // empty')"
+[[ -n "$CLIENT_ID" ]] || die "client create failed: ${client_json}"
+
 log "POST mailbox/sync (synthetic inbound parent)"
 sync_json="$(api POST /api/v1/me/mailbox/sync --data '{}')"
 printf '%s' "$sync_json" | jq -e '.data.ok == true and .data.ingested >= 1' >/dev/null \
@@ -156,6 +165,16 @@ assert_no_secret_echo "POST reply" "$reply_json"
 OUTBOUND_ID="$(printf '%s' "$reply_json" | jq -r '.data.id')"
 log "outbound ${OUTBOUND_ID} status=sent"
 
+log "GET clients/{id}/email-messages (outbound linked + sent_at/to)"
+client_mail_json="$(api GET "/api/v1/clients/${CLIENT_ID}/email-messages")"
+printf '%s' "$client_mail_json" | jq -e --arg oid "$OUTBOUND_ID" --arg pid "$PARENT_ID" '
+	([.data[] | select(.id == $pid)] | length) == 1
+	and ([.data[] | select(.id == $oid)] | length) == 1
+	and (.data[] | select(.id == $oid) | .direction == "outbound")
+	and (.data[] | select(.id == $oid) | .sent_at != null)
+	and (.data[] | select(.id == $oid) | .to_addresses | type == "array" and length >= 1)
+' >/dev/null || die "client entity list missing outbound/sent_at/to: ${client_mail_json}"
+
 log "POST reply replay (same Idempotency-Key)"
 replay_json="$(
 	api POST "/api/v1/email-messages/${PARENT_ID}/reply" \
@@ -180,4 +199,4 @@ no_key_code="$(
 )"
 [[ "$no_key_code" == "400" ]] || die "expected 400 without Idempotency-Key, got ${no_key_code}"
 
-log "PASS synthetic SMTP reply + idempotent replay"
+log "PASS synthetic SMTP reply + entity link + idempotent replay"
