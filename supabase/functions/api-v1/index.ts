@@ -493,6 +493,7 @@ async function routeOrgScoped(
       orgId,
       membership.role,
       requestId,
+      actorType === 'api_key' && req.method === 'POST' ? requireUserId(userId) : null,
     )
   }
 

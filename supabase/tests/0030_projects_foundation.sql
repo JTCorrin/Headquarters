@@ -24,7 +24,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_project_with_defaults(uuid, jsonb)',
+    'public.create_project_with_defaults(uuid, jsonb, uuid)',
     'execute'
   ),
   'authenticated users can execute create_project_with_defaults'

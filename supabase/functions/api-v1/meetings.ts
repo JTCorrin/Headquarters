@@ -668,6 +668,7 @@ async function replaceAttendees(
   meetingId: string,
   attendees: AttendeeInput[],
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<MeetingAttendeeRow[]> {
   const payload = attendees.map((attendee) => ({
     email: attendee.email,
@@ -679,10 +680,12 @@ async function replaceAttendees(
     attended: attendee.attended ?? null,
   }))
 
+  // API-key / service_role path has no auth.uid(); pass creator user id as p_actor_id.
   const { data, error } = await db.rpc('replace_meeting_attendees', {
     p_meeting_id: meetingId,
     p_org_id: orgId,
     p_attendees: payload,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -1273,6 +1276,7 @@ async function createMeeting(
   orgId: string,
   requestId: string,
   membershipId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const body = await jsonBody(req)
   const payload = validateMeetingBody(body, false)
@@ -1287,6 +1291,8 @@ async function createMeeting(
       org_id: orgId,
       transcript_status: 'none',
       summary_status: 'none',
+      // API-key path uses service_role (no auth.uid() trigger attribution).
+      ...(actorUserId ? { created_by: actorUserId, updated_by: actorUserId } : {}),
     })
     .select(MEETING_SELECT)
     .single()
@@ -1295,7 +1301,14 @@ async function createMeeting(
 
   let nested: MeetingAttendeeRow[] = []
   if (attendees) {
-    nested = await replaceAttendees(db, orgId, data.id, attendees, requestId)
+    nested = await replaceAttendees(
+      db,
+      orgId,
+      data.id,
+      attendees,
+      requestId,
+      actorUserId,
+    )
   }
 
   const synced = await pushMeetingToGoogle(db, orgId, membershipId, data, requestId)
@@ -1343,6 +1356,7 @@ async function updateMeeting(
   meetingId: string,
   requestId: string,
   membershipId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
   const current = await findMeeting(db, orgId, meetingId, requestId)
@@ -1397,7 +1411,14 @@ async function updateMeeting(
 
   let nested: MeetingAttendeeRow[] | undefined
   if (attendees !== undefined) {
-    nested = await replaceAttendees(db, orgId, meetingId, attendees, requestId)
+    nested = await replaceAttendees(
+      db,
+      orgId,
+      meetingId,
+      attendees,
+      requestId,
+      actorUserId,
+    )
   }
 
   const synced = await pushMeetingToGoogle(db, orgId, membershipId, data, requestId)
@@ -1443,7 +1464,9 @@ export function handleMeetings(
 ): Promise<Response> {
   if (path === '/api/v1/meetings') {
     if (req.method === 'GET') return listMeetings(req, db, orgId, requestId)
-    if (req.method === 'POST') return createMeeting(req, db, orgId, requestId, membershipId)
+    if (req.method === 'POST') {
+      return createMeeting(req, db, orgId, requestId, membershipId, userId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for meetings')
   }
 
@@ -1499,7 +1522,7 @@ export function handleMeetings(
   const meetingId = itemMatch[1]
   if (req.method === 'GET') return getMeeting(db, orgId, meetingId, requestId)
   if (req.method === 'PATCH') {
-    return updateMeeting(req, db, orgId, meetingId, requestId, membershipId)
+    return updateMeeting(req, db, orgId, meetingId, requestId, membershipId, userId)
   }
   if (req.method === 'DELETE') {
     return deleteMeeting(req, db, orgId, meetingId, requestId, membershipId)
