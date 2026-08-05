@@ -46,7 +46,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_invoice_draft(uuid, jsonb, jsonb)',
+    'public.create_invoice_draft(uuid, jsonb, jsonb, uuid)',
     'execute'
   ),
   'authenticated users can execute create_invoice_draft'
@@ -55,7 +55,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.save_invoice_draft(uuid, uuid, integer, jsonb, jsonb)',
+    'public.save_invoice_draft(uuid, uuid, integer, jsonb, jsonb, uuid)',
     'execute'
   ),
   'authenticated users can execute save_invoice_draft'
@@ -100,7 +100,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.create_invoice_draft(uuid, jsonb, jsonb)',
+    'public.create_invoice_draft(uuid, jsonb, jsonb, uuid)',
     'execute'
   ),
   'anonymous users cannot execute create_invoice_draft'
