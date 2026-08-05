@@ -19,6 +19,7 @@ import {
   sha256Hex,
 } from './idempotency.ts'
 import { assertJsonSafeLineMoney } from './quotes.ts'
+import { type RecipientInput, type RecipientRow, validateRecipientsField } from './recipients.ts'
 
 const INVOICE_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,number,client_id,contact_id,quote_id,owner_membership_id,source,recurring_run_id,billing_period_start,billing_period_end,status,currency,issue_on,due_on,purchase_order_number,subtotal_cents,discount_cents,tax_cents,total_cents,paid_cents,balance_due_cents,party_snapshot,payment_terms,notes,internal_notes,sent_at,viewed_at,paid_at,voided_at,void_reason'
@@ -36,6 +37,7 @@ const HEADER_WRITABLE = new Set([
   'notes',
   'internal_notes',
   'lines',
+  'recipients',
 ])
 
 const LINE_WRITABLE = new Set([
@@ -75,6 +77,7 @@ type InvoiceHeaderInput = {
   payment_terms?: string | null
   notes?: string | null
   internal_notes?: string | null
+  recipients?: RecipientInput[]
 }
 
 type InvoiceCreate = InvoiceHeaderInput & {
@@ -87,7 +90,7 @@ type InvoiceUpdate = InvoiceHeaderInput & {
   lines?: InvoiceLineInput[]
 }
 
-type InvoiceDocument = InvoiceRow & { lines: InvoiceLineRow[] }
+type InvoiceDocument = InvoiceRow & { lines: InvoiceLineRow[]; recipients: RecipientRow[] }
 
 interface InvoiceCursor {
   created_at: string
@@ -398,6 +401,11 @@ export function validateInvoiceBody(
     output.lines = lines
   }
 
+  if ('recipients' in body) {
+    const recipients = validateRecipientsField(body.recipients, fields)
+    if (recipients !== undefined) output.recipients = recipients
+  }
+
   if (Object.keys(fields).length > 0) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice validation failed', fields)
   }
@@ -420,6 +428,7 @@ export function validateInvoiceBody(
       ...(output.payment_terms !== undefined ? { payment_terms: output.payment_terms } : {}),
       ...(output.notes !== undefined ? { notes: output.notes } : {}),
       ...(output.internal_notes !== undefined ? { internal_notes: output.internal_notes } : {}),
+      ...(output.recipients !== undefined ? { recipients: output.recipients } : {}),
     }
   }
 
@@ -503,13 +512,18 @@ function asInvoiceDocument(data: Json): InvoiceDocument {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice RPC returned an unexpected payload')
   }
-  const payload = data as { invoice?: InvoiceRow; lines?: InvoiceLineRow[] }
+  const payload = data as {
+    invoice?: InvoiceRow
+    lines?: InvoiceLineRow[]
+    recipients?: RecipientRow[]
+  }
   if (!payload.invoice) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice RPC returned an incomplete payload')
   }
   return {
     ...payload.invoice,
     lines: Array.isArray(payload.lines) ? payload.lines : [],
+    recipients: Array.isArray(payload.recipients) ? payload.recipients : [],
   }
 }
 
