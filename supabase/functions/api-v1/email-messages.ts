@@ -10,18 +10,42 @@ import {
   isSyntheticImapHost,
   safeMailboxSyncFailureMessage,
 } from '../_shared/imap-inbound.ts'
+import {
+  generateOutboundMessageId,
+  isSyntheticSmtpHost,
+  replySubject,
+  sendSmtpMail,
+  type SmtpSecurity,
+  type SmtpSendOptions,
+  SmtpSendError,
+} from '../_shared/smtp-outbound.ts'
+import {
+  hashIdempotencyRequest,
+  type IdempotencyEnvelope,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyConflictError,
+  parseIdempotencyKey,
+  sha256Hex,
+} from './idempotency.ts'
 import { ApiError, jsonBody, jsonResponse, parseUuid } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
 type ImapInboundFetcher = (options: ImapFetchOptions) => Promise<InboundImapMessage[]>
+type SmtpMailSender = (options: SmtpSendOptions) => Promise<{ message_id: string; synthetic: boolean }>
 
 let imapInboundFetcher: ImapInboundFetcher = fetchInboundFromImap
+let smtpMailSender: SmtpMailSender = sendSmtpMail
 
 /** Test seam — pass null to restore the real IMAP fetcher. */
 export function setImapInboundFetcherForTests(fetcher: ImapInboundFetcher | null): void {
   imapInboundFetcher = fetcher ?? fetchInboundFromImap
+}
+
+/** Test seam — pass null to restore the real SMTP sender. */
+export function setSmtpMailSenderForTests(sender: SmtpMailSender | null): void {
+  smtpMailSender = sender ?? sendSmtpMail
 }
 
 function serviceRoleClient(): SupabaseClient {
@@ -43,6 +67,15 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
   if (error.code === 'P0002' || message.includes('not found')) {
     return new ApiError(404, 'NOT_FOUND', 'Email resource not found')
   }
+  if (
+    error.code === '22023' ||
+    message.includes('must be inbound') ||
+    message.includes('invalid outbound status')
+  ) {
+    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Email reply validation failed')
+  }
+  const conflict = idempotencyConflictError(error)
+  if (conflict) return conflict
   console.error('Email operation failed', {
     request_id: requestId,
     code: error.code ?? 'unknown',
@@ -74,6 +107,266 @@ export function validateShareBody(
     entity_type: entityType as 'contact' | 'lead' | 'client',
     entity_id: entityId,
   }
+}
+
+export function validateReplyBody(
+  body: Record<string, unknown>,
+): { body_text: string; body_html: string | null } {
+  const fields: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    if (key !== 'body_text' && key !== 'body_html') fields[key] = 'Field is not writable'
+  }
+  const bodyText = typeof body.body_text === 'string' ? body.body_text : ''
+  if (!bodyText.trim()) {
+    fields.body_text = 'Must be a non-empty string'
+  } else if (new TextEncoder().encode(bodyText).byteLength > 64_000) {
+    fields.body_text = 'Must be at most 64 KiB'
+  }
+  let bodyHtml: string | null = null
+  if (body.body_html !== undefined && body.body_html !== null) {
+    if (typeof body.body_html !== 'string') {
+      fields.body_html = 'Must be a string or null'
+    } else if (new TextEncoder().encode(body.body_html).byteLength > 64_000) {
+      fields.body_html = 'Must be at most 64 KiB'
+    } else {
+      bodyHtml = body.body_html
+    }
+  }
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Reply validation failed', fields)
+  }
+  return { body_text: bodyText, body_html: bodyHtml }
+}
+
+export function emailReplyIdempotencyPayload(
+  parentMessageId: string,
+  body: { body_text: string; body_html: string | null },
+): Record<string, unknown> {
+  return {
+    parent_message_id: parentMessageId,
+    body_text: body.body_text,
+    body_html: body.body_html,
+  }
+}
+
+function replyEnvelopeResponse(
+  envelope: IdempotencyEnvelope,
+  requestId: string,
+  rawKey: string,
+): Response {
+  return jsonResponse(
+    envelope.response_body ?? { data: null },
+    envelope.response_status ?? 200,
+    requestId,
+    {
+      ...(envelope.response_headers ?? {}),
+      [IDEMPOTENCY_KEY_HEADER]: rawKey,
+    },
+  )
+}
+
+function parseSmtpSecurity(raw: unknown): SmtpSecurity {
+  if (raw === 'starttls' || raw === 'none' || raw === 'tls') return raw
+  return 'tls'
+}
+
+async function abortReplyClaim(
+  db: DatabaseClient,
+  orgId: string,
+  keyHash: string,
+): Promise<void> {
+  await db.rpc('abort_email_reply_idempotent', {
+    p_org_id: orgId,
+    p_idempotency_key_hash: keyHash,
+  })
+}
+
+async function replyEmailMessage(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  parentMessageId: string,
+  role: MembershipRole,
+  requestId: string,
+): Promise<Response> {
+  if (role === 'billing' || role === 'readonly') {
+    throw new ApiError(403, 'FORBIDDEN', 'This membership cannot reply to email messages')
+  }
+
+  const rawKey = parseIdempotencyKey(req)
+  const route = `/api/v1/email-messages/${parentMessageId}/reply`
+  const payload = validateReplyBody(await jsonBody(req))
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    emailReplyIdempotencyPayload(parentMessageId, payload),
+  )
+  const keyHash = await sha256Hex(rawKey)
+
+  const { data: beginData, error: beginError } = await db.rpc('begin_email_reply_idempotent', {
+    p_org_id: orgId,
+    p_parent_message_id: parentMessageId,
+    p_idempotency_key_hash: keyHash,
+    p_request_hash: requestHash,
+    p_route: route,
+  })
+  if (beginError) {
+    const conflict = idempotencyConflictError(beginError)
+    if (conflict) throw conflict
+    throw databaseError(beginError, requestId)
+  }
+  if (!beginData || typeof beginData !== 'object' || Array.isArray(beginData)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Email reply begin returned an unexpected payload')
+  }
+
+  const begin = beginData as Record<string, unknown>
+  if (begin.replay === true) {
+    return replyEnvelopeResponse(begin as IdempotencyEnvelope, requestId, rawKey)
+  }
+
+  const parent = begin.parent as Record<string, unknown> | undefined
+  const mailbox = begin.mailbox as Record<string, unknown> | undefined
+  if (!parent || !mailbox) {
+    await abortReplyClaim(db, orgId, keyHash)
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Email reply begin missing parent/mailbox')
+  }
+
+  const mailboxId = String(mailbox.id ?? '')
+  const smtpHost = String(mailbox.smtp_host ?? '')
+  const smtpPort = Number(mailbox.smtp_port ?? 0)
+  const fromAddress = String(mailbox.email_address ?? '')
+  const toAddress = String(parent.from_address ?? '')
+  const parentProviderId =
+    typeof parent.provider_message_id === 'string' ? parent.provider_message_id : null
+  const subject = replySubject(
+    typeof parent.subject === 'string' ? parent.subject : '',
+  )
+
+  if (!mailbox.credentials_configured) {
+    await abortReplyClaim(db, orgId, keyHash)
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Mailbox credentials are not configured', {
+      mailbox: 'Credentials required to send mail',
+    })
+  }
+  if (!smtpHost || !Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+    await abortReplyClaim(db, orgId, keyHash)
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Mailbox SMTP settings are incomplete', {
+      smtp_host: 'Host and port are required',
+    })
+  }
+  if (!fromAddress || !toAddress) {
+    await abortReplyClaim(db, orgId, keyHash)
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Reply addresses are incomplete', {
+      from_address: !fromAddress ? 'Mailbox address required' : 'ok',
+      to_address: !toAddress ? 'Parent from_address required' : 'ok',
+    })
+  }
+
+  const messageId = generateOutboundMessageId(fromAddress)
+  let failureCode: string | null = null
+  let smtpReached = false
+
+  try {
+    const service = serviceRoleClient()
+    const { data: creds, error: credError } = await service.rpc('read_mailbox_sync_credentials', {
+      p_mailbox_id: mailboxId,
+    })
+    if (credError) throw credError
+    const row = creds as Record<string, unknown> | null
+    const password = typeof row?.password === 'string' ? row.password : null
+    const username = String(row?.username ?? mailbox.username ?? '')
+    if (!password) {
+      await abortReplyClaim(db, orgId, keyHash)
+      throw new ApiError(422, 'VALIDATION_ERROR', 'Mailbox credentials are not configured', {
+        mailbox: 'Password required to send mail',
+      })
+    }
+
+    const security = parseSmtpSecurity(row?.smtp_security ?? mailbox.smtp_security)
+    smtpReached = true
+    await smtpMailSender({
+      host: smtpHost,
+      port: smtpPort,
+      security,
+      username,
+      password,
+      from: fromAddress,
+      to: toAddress,
+      subject,
+      bodyText: payload.body_text,
+      bodyHtml: payload.body_html,
+      inReplyTo: parentProviderId,
+      references: parentProviderId,
+      messageId,
+    })
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+
+    if (error instanceof SmtpSendError) {
+      failureCode = error.code
+    } else {
+      failureCode = 'smtp_send_failed'
+    }
+    console.error('SMTP reply failed', {
+      request_id: requestId,
+      code: failureCode,
+      synthetic: isSyntheticSmtpHost(smtpHost),
+    })
+
+    if (smtpReached) {
+      const { data: failData, error: failError } = await db.rpc('finish_email_reply_idempotent', {
+        p_org_id: orgId,
+        p_parent_message_id: parentMessageId,
+        p_body_text: payload.body_text,
+        p_body_html: payload.body_html,
+        p_subject: subject,
+        p_provider_message_id: messageId,
+        p_status: 'failed',
+        p_failure_code: failureCode,
+        p_idempotency_key_hash: keyHash,
+      })
+      if (failError) {
+        await abortReplyClaim(db, orgId, keyHash)
+        throw databaseError(failError, requestId)
+      }
+      await abortReplyClaim(db, orgId, keyHash)
+      const failEnvelope = failData as IdempotencyEnvelope
+      return jsonResponse(
+        failEnvelope?.response_body ?? {
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'Outbound SMTP delivery failed',
+            request_id: requestId,
+          },
+        },
+        failEnvelope?.response_status ?? 502,
+        requestId,
+        { [IDEMPOTENCY_KEY_HEADER]: rawKey },
+      )
+    }
+
+    await abortReplyClaim(db, orgId, keyHash)
+    throw new ApiError(502, 'INTERNAL_ERROR', 'Outbound SMTP delivery failed')
+  }
+
+  const { data: finishData, error: finishError } = await db.rpc('finish_email_reply_idempotent', {
+    p_org_id: orgId,
+    p_parent_message_id: parentMessageId,
+    p_body_text: payload.body_text,
+    p_body_html: payload.body_html,
+    p_subject: subject,
+    p_provider_message_id: messageId,
+    p_status: 'sent',
+    p_failure_code: null,
+    p_idempotency_key_hash: keyHash,
+  })
+  if (finishError) {
+    await abortReplyClaim(db, orgId, keyHash)
+    throw databaseError(finishError, requestId)
+  }
+  if (!finishData || typeof finishData !== 'object' || Array.isArray(finishData)) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Email reply finish returned an unexpected payload')
+  }
+  return replyEnvelopeResponse(finishData as IdempotencyEnvelope, requestId, rawKey)
 }
 
 async function shareEmailMessage(
@@ -324,6 +617,16 @@ export function handleEmailMessages(
       throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for email share')
     }
     return shareEmailMessage(req, db, orgId, shareMatch[1], role, requestId)
+  }
+
+  const replyMatch = path.match(
+    /^\/api\/v1\/email-messages\/([0-9a-f-]{36})\/reply$/i,
+  )
+  if (replyMatch) {
+    if (req.method !== 'POST') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for email reply')
+    }
+    return replyEmailMessage(req, db, orgId, replyMatch[1], role, requestId)
   }
 
   throw new ApiError(404, 'NOT_FOUND', 'Route not found')
