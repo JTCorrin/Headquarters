@@ -16,6 +16,7 @@ export { createNotificationsEndpoints } from './notifications.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
 export { createPaymentsEndpoints } from './payments.js';
+export { createProductCategoriesEndpoints } from './product-categories.js';
 export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
@@ -45,6 +46,7 @@ export type {
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
 	PaymentsEndpoints,
+	ProductCategoriesEndpoints,
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,
 	QuotesEndpoints,

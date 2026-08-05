@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProductFormData, ProductTaxRateOption } from '$lib/schemas/product.js';
+	import type {
+		ProductCategoryOption,
+		ProductFormData,
+		ProductTaxRateOption
+	} from '$lib/schemas/product.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import ProductForm from './product-form.svelte';
@@ -10,6 +14,7 @@
 	export interface ProductFormDrawerProps {
 		form: SuperForm<ProductFormData>;
 		taxRateOptions?: ProductTaxRateOption[];
+		categoryOptions?: ProductCategoryOption[];
 		open?: boolean;
 		title?: string;
 		description?: string;
@@ -25,6 +30,7 @@
 	let {
 		form,
 		taxRateOptions = [],
+		categoryOptions = [],
 		open = $bindable(false),
 		title = 'New product',
 		description = 'Add a catalog item for quotes, invoices, and inventory.',
@@ -56,7 +62,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ProductForm {form} {taxRateOptions} {submitLabel} {onValidSubmit} />
+			<ProductForm {form} {taxRateOptions} {categoryOptions} {submitLabel} {onValidSubmit} />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

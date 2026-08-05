@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	looksLikeClientId,
 	looksLikeVendorId,
 	parseMeetingEntityFilter,
 	parseTaskEntityFilter
@@ -50,5 +51,13 @@ describe('looksLikeVendorId', () => {
 		expect(looksLikeVendorId(ID)).toBe(true);
 		expect(looksLikeVendorId('not-a-uuid')).toBe(false);
 		expect(looksLikeVendorId(null)).toBe(false);
+	});
+});
+
+describe('looksLikeClientId', () => {
+	it('accepts UUID client ids', () => {
+		expect(looksLikeClientId(ID)).toBe(true);
+		expect(looksLikeClientId('not-a-uuid')).toBe(false);
+		expect(looksLikeClientId(null)).toBe(false);
 	});
 });
