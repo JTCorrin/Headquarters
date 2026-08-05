@@ -3,11 +3,7 @@
  * Reuses IMAP SSRF policy via assertSafeOutboundHost.
  */
 
-import {
-  assertSafeOutboundHost,
-  isSyntheticImapHost,
-  withImapTimeout,
-} from './imap-inbound.ts'
+import { assertSafeOutboundHost, isSyntheticImapHost, withImapTimeout } from './imap-inbound.ts'
 
 export type SmtpSecurity = 'tls' | 'starttls' | 'none'
 
@@ -302,7 +298,11 @@ export function setOpenSmtpConnectionForTests(fn: OpenSmtpFn | null): void {
   openSmtpConnectionImpl = fn ?? openSmtpConnection
 }
 
-async function smtpAuthLogin(session: SmtpSession, username: string, password: string): Promise<void> {
+async function smtpAuthLogin(
+  session: SmtpSession,
+  username: string,
+  password: string,
+): Promise<void> {
   await session.writeLine('AUTH LOGIN')
   await session.expect([334], 'SMTP AUTH LOGIN')
   await session.writeLine(encodeBase64(username))
