@@ -100,6 +100,7 @@ import {
 import { decodeNotificationCursor } from './notifications.ts'
 import {
   decodeTimelineCursor,
+  isOrgTimelineEventsPath,
   parseEntityType,
   validateTimelineNoteBody,
 } from './timeline-events.ts'
@@ -1712,6 +1713,23 @@ Deno.test('timeline cursor decode accepts occurred_at keyset', () => {
   assertEquals(decodeTimelineCursor(encoded), { occurred_at: occurredAt, id })
   assertEquals(decodeTimelineCursor(null), null)
   assertThrows(() => decodeTimelineCursor('%%%'), ApiError)
+})
+
+Deno.test('org timeline path matcher and cursor accept +00:00', () => {
+  assertEquals(isOrgTimelineEventsPath('/api/v1/timeline-events'), true)
+  assertEquals(
+    isOrgTimelineEventsPath(
+      '/api/v1/entities/quote/11111111-1111-4111-8111-111111111111/timeline-events',
+    ),
+    false,
+  )
+  const id = '33333333-3333-4333-8333-333333333333'
+  const occurredAt = '2026-08-05T12:00:00+00:00'
+  const encoded = btoa(JSON.stringify({ occurred_at: occurredAt, id }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+  assertEquals(decodeTimelineCursor(encoded), { occurred_at: occurredAt, id })
 })
 
 Deno.test('audit cursor decode accepts created_at keyset', () => {
