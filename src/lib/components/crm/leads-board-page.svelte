@@ -67,11 +67,7 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Headquarters"
-				title="Leads"
-				description="Pipeline board — drag cards between stages, open a card for edit/convert. Won only via convert."
-			>
+			<PageHeader title="Leads">
 				{#snippet actions()}
 					<Button variant="outline" size="sm">Table view</Button>
 					<LeadFormDrawer

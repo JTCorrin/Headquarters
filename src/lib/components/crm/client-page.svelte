@@ -380,7 +380,7 @@
 					<ClientProfilePage
 						{orgName}
 						{navGroups}
-						breadcrumb="Clients / {client.name}"
+						breadcrumb="Clients"
 						title={client.name}
 						status={clientStatusLabel(client.status)}
 						subtitle={client.industry ?? undefined}

@@ -53,6 +53,8 @@
 		}
 	});
 
+	const hasSelectColumn = $derived(columns.some((column) => column.id === 'select'));
+
 	const table = createSvelteTable({
 		get data() {
 			return data;
@@ -226,7 +228,11 @@
 
 	<div class="text-muted-foreground flex flex-wrap items-center justify-between gap-3 px-1 text-sm">
 		<p>
-			{selectedCount} of {filteredCount} row(s) selected.
+			{#if hasSelectColumn}
+				{selectedCount} of {filteredCount} row(s) selected.
+			{:else}
+				{filteredCount} row(s)
+			{/if}
 		</p>
 		<div class="flex items-center gap-2">
 			<span>

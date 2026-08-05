@@ -1,13 +1,48 @@
 import { describe, expect, it } from 'vitest';
+import type { ColumnDef } from '@tanstack/table-core';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
+import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import DataTableShell from './data-table-shell.svelte';
 import { contactColumns } from './contacts-columns.js';
+import DataTableCheckbox from './data-table-checkbox.svelte';
+import DataTableSortHeader from './data-table-sort-header.svelte';
 
 const rows = [
 	{ id: '1', name: 'Zed', email: 'z@ex.com', status: 'Lead' },
 	{ id: '2', name: 'Amy', email: 'a@ex.com', status: 'Client' },
 	{ id: '3', name: 'Mia', email: 'm@ex.com', status: 'Contact' }
+];
+
+type Row = (typeof rows)[number];
+
+const selectableColumns: ColumnDef<Row>[] = [
+	{
+		id: 'select',
+		header: ({ table }) =>
+			renderComponent(DataTableCheckbox, {
+				checked: table.getIsAllPageRowsSelected(),
+				indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
+				onCheckedChange: (value) => table.toggleAllPageRowsSelected(!!value),
+				'aria-label': 'Select all'
+			}),
+		cell: ({ row }) =>
+			renderComponent(DataTableCheckbox, {
+				checked: row.getIsSelected(),
+				onCheckedChange: (value) => row.toggleSelected(!!value),
+				'aria-label': 'Select row'
+			}),
+		enableSorting: false,
+		enableHiding: false
+	},
+	{
+		accessorKey: 'name',
+		header: ({ column }) =>
+			renderComponent(DataTableSortHeader, {
+				label: 'Name',
+				onclick: column.getToggleSortingHandler()
+			})
+	}
 ];
 
 describe('DataTableShell', () => {
@@ -21,7 +56,7 @@ describe('DataTableShell', () => {
 		});
 
 		await page.getByRole('button', { name: /name/i }).click();
-		await expect.element(page.getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveTextContent(
+		await expect.element(page.getByRole('row').nth(1).getByRole('cell').nth(0)).toHaveTextContent(
 			'Amy'
 		);
 	});
@@ -40,9 +75,21 @@ describe('DataTableShell', () => {
 		await expect.element(page.getByText('Zed')).not.toBeInTheDocument();
 	});
 
-	it('selects a row via checkbox', async () => {
+	it('hides selection chrome when columns have no select column', async () => {
 		render(DataTableShell, {
 			columns: contactColumns,
+			data: rows,
+			filterColumn: 'name',
+			pageSize: 8
+		});
+
+		await expect.element(page.getByText('3 row(s)')).toBeInTheDocument();
+		await expect.element(page.getByRole('checkbox', { name: 'Select row' })).not.toBeInTheDocument();
+	});
+
+	it('selects a row via checkbox when a select column is present', async () => {
+		render(DataTableShell, {
+			columns: selectableColumns,
 			data: rows,
 			filterColumn: 'name',
 			pageSize: 8
