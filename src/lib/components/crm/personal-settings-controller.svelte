@@ -10,6 +10,7 @@
 		roleFromMemberships,
 		themePreferenceFromApi,
 		themePreferenceToApi,
+		toCaldavPutBody,
 		toCalendarConnectionResource,
 		toMailboxAccountResource,
 		toMailboxPutBody,
@@ -41,8 +42,12 @@
 		type MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
 	import {
+		caldavFormFromResource,
+		caldavFormSchema,
 		canMutateCalendarConnection,
+		emptyCaldavFormData,
 		emptyCalendarConnection,
+		type CaldavTestFeedback,
 		type CalendarConnectionResource
 	} from '$lib/schemas/calendar-connection.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -69,8 +74,11 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let mailboxAccount = $state<MailboxAccountResource | null>(null);
-	let calendarConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
+	let activeCalendarConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
+	let googleConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
+	let caldavConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
 	let calendarConnectError = $state<string | null>(null);
+	let caldavConnectError = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -88,6 +96,14 @@
 
 	const mailboxForm = superForm(defaults(emptyMailboxFormData('gmail'), zod4(mailboxFormSchema)), {
 		validators: zod4(mailboxFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
+
+	const caldavForm = superForm(defaults(emptyCaldavFormData(), zod4(caldavFormSchema)), {
+		validators: zod4(caldavFormSchema),
 		SPA: true,
 		warnings: { duplicateId: false },
 		applyAction: false,
@@ -227,13 +243,24 @@
 			}
 
 			try {
-				const connection = await api.calendar.get();
+				const [active, google, caldav] = await Promise.all([
+					api.calendar.get(),
+					api.calendar.get(undefined, { provider: 'google' }),
+					api.calendar.get(undefined, { provider: 'caldav' })
+				]);
 				if (isStale(epoch)) return;
-				calendarConnection = toCalendarConnectionResource(connection);
+				activeCalendarConnection = toCalendarConnectionResource(active);
+				googleConnection = toCalendarConnectionResource(google);
+				caldavConnection = toCalendarConnectionResource(caldav);
+				caldavForm.form.set(caldavFormFromResource(caldavConnection));
 				calendarConnectError = null;
+				caldavConnectError = null;
 			} catch (error) {
 				if (isStale(epoch)) return;
-				calendarConnection = emptyCalendarConnection();
+				activeCalendarConnection = emptyCalendarConnection();
+				googleConnection = emptyCalendarConnection();
+				caldavConnection = emptyCalendarConnection();
+				caldavForm.form.set(emptyCaldavFormData());
 				if (
 					!(
 						isApiClientError(error) &&
@@ -419,12 +446,12 @@
 		const epoch = captureEpoch();
 		calendarConnectError = null;
 		try {
-			await api.calendar.disconnect();
+			await api.calendar.disconnect({ provider: 'google' });
 			if (isStale(epoch)) {
 				void loadAll();
 				return false;
 			}
-			calendarConnection = emptyCalendarConnection();
+			void loadAll();
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -432,6 +459,87 @@
 				return false;
 			}
 			calendarConnectError = userMessage(error, 'Could not disconnect Google Calendar.');
+			return false;
+		}
+	}
+
+	async function onSaveCaldav() {
+		const epoch = captureEpoch();
+		caldavConnectError = null;
+		if (!canMutateCalendarConnection(role)) {
+			caldavConnectError = 'Readonly members cannot connect CalDAV.';
+			return false;
+		}
+		const values = get(caldavForm.form);
+		if (!caldavConnection.credentials_configured && !values.password.trim()) {
+			caldavConnectError = 'Password is required for the first CalDAV save.';
+			return false;
+		}
+		try {
+			const updated = await api.calendar.put(toCaldavPutBody(values));
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			caldavConnection = toCalendarConnectionResource(updated);
+			caldavForm.form.set(caldavFormFromResource(caldavConnection));
+			void loadAll();
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			caldavConnectError = userMessage(error, 'Could not save CalDAV connection.');
+			return false;
+		}
+	}
+
+	async function onTestCaldav(): Promise<CaldavTestFeedback | false> {
+		const epoch = captureEpoch();
+		caldavConnectError = null;
+		try {
+			const password = get(caldavForm.form).password.trim();
+			const result = await api.calendar.test(password ? { password } : undefined);
+			if (isStale(epoch)) return false;
+			if (!result.ok) {
+				return {
+					ok: false,
+					message: result.message?.trim() || result.error_code || 'CalDAV test failed.'
+				};
+			}
+			return {
+				ok: true,
+				message: result.message?.trim() || 'Connection successful.'
+			};
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			return {
+				ok: false,
+				message: userMessage(error, 'CalDAV test failed.')
+			};
+		}
+	}
+
+	async function onDisconnectCaldav() {
+		const epoch = captureEpoch();
+		caldavConnectError = null;
+		try {
+			await api.calendar.disconnect({ provider: 'caldav' });
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			caldavConnection = emptyCalendarConnection();
+			caldavForm.form.set(emptyCaldavFormData());
+			void loadAll();
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			caldavConnectError = userMessage(error, 'Could not disconnect CalDAV.');
 			return false;
 		}
 	}
@@ -497,8 +605,12 @@
 				{preferencesForm}
 				{mailboxForm}
 				{mailboxAccount}
-				{calendarConnection}
+				{googleConnection}
+				{caldavConnection}
+				{activeCalendarConnection}
 				{calendarConnectError}
+				{caldavConnectError}
+				{caldavForm}
 				{viewState}
 				onReload={() => loadAll({ forceMailboxReload: true })}
 				{onSavePreferences}
@@ -508,6 +620,9 @@
 				{onDisconnectMailbox}
 				{onConnectCalendar}
 				{onDisconnectCalendar}
+				{onSaveCaldav}
+				{onTestCaldav}
+				{onDisconnectCaldav}
 				showNav={false}
 			/>
 		</AppShell>
