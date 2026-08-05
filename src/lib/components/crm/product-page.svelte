@@ -227,6 +227,17 @@
 		}
 	}
 
+	async function onCreateCategory(name: string): Promise<ProductCategoryOption | null> {
+		const created = await api.productCategories.create({ name });
+		const option = { id: created.id, label: created.name };
+		if (!categoryOptions.some((c) => c.id === option.id)) {
+			categoryOptions = [...categoryOptions, option].sort((a, b) =>
+				a.label.localeCompare(b.label)
+			);
+		}
+		return option;
+	}
+
 	async function onSaveProduct(): Promise<boolean> {
 		if (!product) return false;
 		const epoch = captureEpoch();
@@ -339,6 +350,7 @@
 						submitLabel="Save changes"
 						showTrigger={false}
 						onValidSubmit={onSaveProduct}
+						{onCreateCategory}
 					/>
 				{/if}
 			</div>

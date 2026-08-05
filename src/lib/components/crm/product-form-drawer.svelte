@@ -25,6 +25,7 @@
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onCreateCategory?: (name: string) => Promise<ProductCategoryOption | null>;
 	}
 
 	let {
@@ -39,7 +40,8 @@
 		showTrigger = true,
 		class: className,
 		trigger,
-		onValidSubmit
+		onValidSubmit,
+		onCreateCategory
 	}: ProductFormDrawerProps = $props();
 </script>
 
@@ -62,7 +64,14 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ProductForm {form} {taxRateOptions} {categoryOptions} {submitLabel} {onValidSubmit} />
+			<ProductForm
+				{form}
+				{taxRateOptions}
+				{categoryOptions}
+				{submitLabel}
+				{onValidSubmit}
+				{onCreateCategory}
+			/>
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>
