@@ -16,7 +16,7 @@ import {
   parseUuid,
   parseVersion,
 } from './http.ts'
-import { cancelMeetingOnGoogle, pushMeetingToGoogle } from './calendar-push.ts'
+import { cancelMeetingOnCalendar, pushMeetingToCalendar } from './calendar-push.ts'
 
 const MEETING_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,title,status,starts_at,ends_at,timezone,location,meeting_url,organiser_membership_id,related_entity_type,related_entity_id,calendar_provider,external_event_id,transcript_status,summary_status,summary,metadata'
@@ -1311,7 +1311,7 @@ async function createMeeting(
     )
   }
 
-  const synced = await pushMeetingToGoogle(db, orgId, membershipId, data, requestId)
+  const synced = await pushMeetingToCalendar(db, orgId, membershipId, data, requestId)
   const host = await hostMeeting(db, orgId, synced, requestId, nested)
   return jsonResponse({ data: host }, 201, requestId, {
     etag: etag(synced.version),
@@ -1421,7 +1421,7 @@ async function updateMeeting(
     )
   }
 
-  const synced = await pushMeetingToGoogle(db, orgId, membershipId, data, requestId)
+  const synced = await pushMeetingToCalendar(db, orgId, membershipId, data, requestId)
   const host = await hostMeeting(db, orgId, synced, requestId, nested)
   return jsonResponse({ data: host }, 200, requestId, { etag: etag(synced.version) })
 }
@@ -1444,7 +1444,7 @@ async function deleteMeeting(
 
   if (error) throw databaseError(error, requestId)
 
-  await cancelMeetingOnGoogle(db, orgId, membershipId, current, requestId)
+  await cancelMeetingOnCalendar(db, orgId, membershipId, current, requestId)
 
   return new Response(null, {
     status: 204,
