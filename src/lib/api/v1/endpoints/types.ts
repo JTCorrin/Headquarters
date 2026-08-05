@@ -93,7 +93,10 @@ import type {
 	ApiProjectListParams,
 	ApiProjectUpdateBody,
 	ApiCalendarConnection,
+	ApiCalendarCaldavPutBody,
 	ApiCalendarOAuthStart,
+	ApiCalendarProvider,
+	ApiCalendarTestResult,
 	ApiNotificationListParams,
 	ApiNotificationUnreadCount,
 	ApiUserNotification,
@@ -569,11 +572,22 @@ export interface MailboxEndpoints {
 	disconnect(signal?: AbortSignal): Promise<void>;
 }
 
-/** Personal Google Calendar — mailbox-shaped; never echoes tokens. */
+/** Personal calendar (Google OAuth + CalDAV credentials) — never echoes secrets. */
 export interface CalendarEndpoints {
-	get(signal?: AbortSignal): Promise<ApiCalendarConnection>;
+	get(
+		signal?: AbortSignal,
+		options?: { provider?: ApiCalendarProvider }
+	): Promise<ApiCalendarConnection>;
+	put(body: ApiCalendarCaldavPutBody, signal?: AbortSignal): Promise<ApiCalendarConnection>;
+	test(
+		body?: { password?: string },
+		signal?: AbortSignal
+	): Promise<ApiCalendarTestResult>;
 	startOAuth(signal?: AbortSignal): Promise<ApiCalendarOAuthStart>;
-	disconnect(signal?: AbortSignal): Promise<void>;
+	disconnect(options?: {
+		provider?: ApiCalendarProvider;
+		signal?: AbortSignal;
+	}): Promise<void>;
 }
 
 /** Personal notifications bell — `/api/v1/me/notifications*`. */

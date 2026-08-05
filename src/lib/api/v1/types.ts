@@ -1340,23 +1340,28 @@ export interface ApiNotificationMarkReadBody {
 }
 
 /**
- * Personal Google Calendar connection for the current membership — secrets never returned.
- * Locked C2 contract: `GET/DELETE /api/v1/me/calendar` + OAuth start/callback.
+ * Personal calendar connection for the current membership — secrets never returned.
+ * Google: OAuth start/callback. CalDAV: mailbox-shaped PUT + optional POST …/test.
  */
-export type ApiCalendarProvider = 'google';
+export type ApiCalendarProvider = 'google' | 'caldav';
 
 export type ApiCalendarConnectionStatus =
 	| 'disconnected'
 	| 'pending'
 	| 'active'
+	| 'disabled'
 	| 'error'
 	| string;
 
 export interface ApiCalendarConnectionConfig {
-	/** Connected Google account email when known (Cal-Sync-BE). */
+	/** Connected account email / CalDAV username when known. */
 	account_email?: string | null;
-	/** Remote calendar id (default primary). */
+	/** Remote calendar id (Google default primary; CalDAV default default). */
 	calendar_id?: string | null;
+	/** CalDAV collection URL (never includes password). */
+	caldav_url?: string | null;
+	/** CalDAV username when returned in config (often mirrors account_email). */
+	username?: string | null;
 }
 
 export interface ApiCalendarConnection {
@@ -1367,8 +1372,26 @@ export interface ApiCalendarConnection {
 	/** Top-level duplicate of config.account_email from Cal-Sync-BE. */
 	account_email?: string | null;
 	calendar_id?: string | null;
+	/** Present when provider is caldav — never includes password. */
+	caldav_url?: string | null;
 	last_error_code?: string | null;
 	last_sync_at?: string | null;
+}
+
+/** `PUT /api/v1/me/calendar` — CalDAV credential connect (password omit = keep). */
+export interface ApiCalendarCaldavPutBody {
+	provider: 'caldav';
+	caldav_url: string;
+	username: string;
+	password?: string;
+	calendar_id?: string | null;
+}
+
+/** `POST /api/v1/me/calendar/test` — CalDAV PROPFIND probe. */
+export interface ApiCalendarTestResult {
+	ok: boolean;
+	error_code?: string | null;
+	message?: string | null;
 }
 
 /** `GET /api/v1/me/calendar/oauth/start` — FE redirects to `url` (Cal-Sync-BE). */

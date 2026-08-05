@@ -200,7 +200,7 @@
 					<p class="text-muted-foreground text-sm">
 						Organisation quote / invoice / campaign SMTP is a separate plane and lands later.
 						Personal mailbox IMAP/SMTP is under <a class="underline underline-offset-2" href="/settings#mail">My settings → Mail</a>.
-						Personal Google Calendar connect is under <a class="underline underline-offset-2" href="/settings#calendar">My settings → Calendar</a>.
+						Personal calendar connect (Google or CalDAV) is under <a class="underline underline-offset-2" href="/settings#calendar">My settings → Calendar</a>.
 					</p>
 				</section>
 			{/if}

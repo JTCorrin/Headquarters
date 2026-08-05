@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		calendarConnectionLabel,
+		calendarProviderDisplayName,
 		type CalendarConnectionResource
 	} from '$lib/schemas/calendar-connection.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -9,6 +10,8 @@
 
 	export interface ProfileCalendarFormProps {
 		connection?: CalendarConnectionResource | null;
+		/** True when another provider is the active push connection (XOR). */
+		otherProviderActive?: boolean;
 		connectError?: string | null;
 		/** False for readonly — status still visible. */
 		canEdit?: boolean;
@@ -19,6 +22,7 @@
 
 	let {
 		connection = null,
+		otherProviderActive = false,
 		connectError = null,
 		canEdit = true,
 		class: className,
@@ -83,9 +87,16 @@
 	</div>
 
 	<p class="text-muted-foreground text-sm">
-		Headquarters meetings stay the source of truth. When connected, create/update/delete pushes to
-		your Google Calendar. Tokens never appear here.
+		Headquarters meetings stay the source of truth. When Google is the active sync, create/update/delete
+		pushes to your Google Calendar. Tokens never appear here.
 	</p>
+
+	{#if otherProviderActive && !connected}
+		<p class="text-muted-foreground text-xs" data-testid="calendar-google-xor-note">
+			{calendarProviderDisplayName('caldav')} is the active sync. Connecting Google disables CalDAV
+			push until you reconnect it.
+		</p>
+	{/if}
 
 	{#if connectError}
 		<p class="text-destructive text-sm" role="alert" data-testid="calendar-connect-error">
@@ -118,7 +129,7 @@
 		</div>
 	{:else}
 		<p class="text-muted-foreground text-sm" data-testid="calendar-readonly-note">
-			Ask an owner, admin, or member to connect Google Calendar for push sync.
+			Ask an owner, admin, or member to connect a personal calendar for push sync.
 		</p>
 	{/if}
 </div>

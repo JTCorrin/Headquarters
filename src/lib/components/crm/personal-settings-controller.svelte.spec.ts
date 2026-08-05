@@ -48,6 +48,43 @@ function memberships() {
 	};
 }
 
+function disconnectedCalendar(provider: 'google' | 'caldav' = 'google') {
+	return {
+		provider,
+		status: 'disconnected',
+		credentials_configured: false,
+		config: {},
+		last_error_code: null,
+		last_sync_at: null
+	};
+}
+
+/** Provider-aware GET /me/calendar mock — XOR active row vs per-provider rows. */
+function calendarGetHandler(options: {
+	active?: Record<string, unknown>;
+	google?: Record<string, unknown>;
+	caldav?: Record<string, unknown>;
+}) {
+	return async (request: Request) => {
+		const provider = new URL(request.url).searchParams.get('provider');
+		if (provider === 'google') {
+			return { body: { data: options.google ?? disconnectedCalendar('google') } };
+		}
+		if (provider === 'caldav') {
+			return { body: { data: options.caldav ?? disconnectedCalendar('caldav') } };
+		}
+		return {
+			body: {
+				data:
+					options.active ??
+					options.google ??
+					options.caldav ??
+					disconnectedCalendar('google')
+			}
+		};
+	};
+}
+
 afterEach(() => {
 	resetMailboxDraftsForTests();
 });
@@ -157,18 +194,7 @@ describe('PersonalSettingsController', () => {
 					body: { data: { theme_preference: null, locale: null, timezone: null } }
 				}),
 				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
-				'GET /api/v1/me/calendar': async () => ({
-					body: {
-						data: {
-							provider: 'google',
-							status: 'disconnected',
-							credentials_configured: false,
-							config: {},
-							last_error_code: null,
-							last_sync_at: null
-						}
-					}
-				}),
+				'GET /api/v1/me/calendar': calendarGetHandler({}),
 				'GET /api/v1/me/calendar/oauth/start': async () => {
 					oauthStarts += 1;
 					// Empty URL surfaces a readable error without navigating the browser.
@@ -182,10 +208,13 @@ describe('PersonalSettingsController', () => {
 
 		await page.getByRole('tab', { name: 'Calendar' }).click();
 		await expect.element(page.getByTestId('personal-calendar-section')).toBeInTheDocument();
+		await expect.element(page.getByTestId('calendar-xor-banner')).toHaveTextContent(/XOR/i);
 		await expect.element(page.getByTestId('calendar-connection-label')).toHaveTextContent(
 			/Not connected/i
 		);
 		await expect.element(page.getByTestId('calendar-connect')).toBeInTheDocument();
+		await expect.element(page.getByTestId('profile-caldav-form')).toBeInTheDocument();
+		await expect.element(page.getByTestId('caldav-url')).toBeInTheDocument();
 
 		await page.getByTestId('calendar-connect').click();
 		await expect.poll(() => oauthStarts).toBe(1);
@@ -195,6 +224,16 @@ describe('PersonalSettingsController', () => {
 	});
 
 	it('renders connected Calendar status from GET /me/calendar', async () => {
+		const googleActive = {
+			provider: 'google',
+			status: 'active',
+			credentials_configured: true,
+			config: { account_email: 'joe@acme.test', calendar_id: 'primary' },
+			account_email: 'joe@acme.test',
+			calendar_id: 'primary',
+			last_error_code: null,
+			last_sync_at: null
+		};
 		const session = createOrgSession({
 			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
 			initialOrgId: ORG_A
@@ -206,19 +245,10 @@ describe('PersonalSettingsController', () => {
 					body: { data: { theme_preference: null, locale: null, timezone: null } }
 				}),
 				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
-				'GET /api/v1/me/calendar': async () => ({
-					body: {
-						data: {
-							provider: 'google',
-							status: 'active',
-							credentials_configured: true,
-							config: { account_email: 'joe@acme.test', calendar_id: 'primary' },
-							account_email: 'joe@acme.test',
-							calendar_id: 'primary',
-							last_error_code: null,
-							last_sync_at: null
-						}
-					}
+				'GET /api/v1/me/calendar': calendarGetHandler({
+					active: googleActive,
+					google: googleActive,
+					caldav: disconnectedCalendar('caldav')
 				})
 			}),
 			getOrgId: () => session.selectedOrgId
@@ -231,5 +261,96 @@ describe('PersonalSettingsController', () => {
 			/joe@acme.test/i
 		);
 		await expect.element(page.getByTestId('calendar-disconnect')).toBeInTheDocument();
+		await expect.element(page.getByTestId('calendar-xor-banner')).toHaveTextContent(/Google/i);
+		await expect.element(page.getByTestId('caldav-xor-note')).toHaveTextContent(/Google is the active sync/i);
+	});
+
+	it('saves and tests CalDAV connection from Settings', async () => {
+		let putBody: unknown = null;
+		let testCalls = 0;
+		const caldavActive = {
+			provider: 'caldav',
+			status: 'active',
+			credentials_configured: true,
+			config: {
+				caldav_url: 'https://caldav.example.test/SOGo/dav/user/Calendar/',
+				username: 'user@mail.test',
+				calendar_id: 'personal'
+			},
+			account_email: 'user@mail.test',
+			calendar_id: 'personal',
+			caldav_url: 'https://caldav.example.test/SOGo/dav/user/Calendar/',
+			last_error_code: null,
+			last_sync_at: null
+		};
+		let currentCaldav: Record<string, unknown> = disconnectedCalendar('caldav');
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'GET /api/v1/organisations': async () => ({ body: memberships() }),
+				'GET /api/v1/profile/preferences': async () => ({
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				}),
+				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
+				'GET /api/v1/me/calendar': calendarGetHandler({
+					get active() {
+						return currentCaldav.status === 'active' ? currentCaldav : disconnectedCalendar('google');
+					},
+					google: disconnectedCalendar('google'),
+					get caldav() {
+						return currentCaldav;
+					}
+				}),
+				'PUT /api/v1/me/calendar': async (request) => {
+					putBody = await request.json();
+					currentCaldav = caldavActive;
+					return { body: { data: caldavActive } };
+				},
+				'POST /api/v1/me/calendar/test': async () => {
+					testCalls += 1;
+					return {
+						body: {
+							data: {
+								ok: true,
+								error_code: null,
+								message: 'CalDAV PROPFIND succeeded.'
+							}
+						}
+					};
+				}
+			}),
+			getOrgId: () => session.selectedOrgId
+		});
+
+		render(PersonalSettingsController, { api, session });
+
+		await page.getByRole('tab', { name: 'Calendar' }).click();
+		await page
+			.getByTestId('caldav-url')
+			.fill('https://caldav.example.test/SOGo/dav/user/Calendar/');
+		await page.getByTestId('caldav-username').fill('user@mail.test');
+		await page.getByTestId('caldav-password').fill('app-password');
+		await page.getByTestId('caldav-submit').click();
+
+		await expect.poll(() => putBody).toEqual({
+			provider: 'caldav',
+			caldav_url: 'https://caldav.example.test/SOGo/dav/user/Calendar/',
+			username: 'user@mail.test',
+			password: 'app-password',
+			calendar_id: null
+		});
+		await expect.element(page.getByTestId('caldav-connection-label')).toHaveTextContent(
+			/user@mail.test/i
+		);
+		await expect.element(page.getByTestId('caldav-credentials-saved')).toBeInTheDocument();
+
+		await page.getByTestId('caldav-test').click();
+		await expect.poll(() => testCalls).toBe(1);
+		await expect.element(page.getByTestId('caldav-test-feedback')).toHaveTextContent(
+			/PROPFIND succeeded/i
+		);
 	});
 });
