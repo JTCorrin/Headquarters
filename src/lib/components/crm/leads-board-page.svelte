@@ -4,12 +4,16 @@
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import LeadsBoard, { type LeadBoardMove, type LeadCard } from './leads-board.svelte';
+	import { leadCardToRow } from './leads-columns.js';
+	import LeadsTable from './leads-table.svelte';
 	import LeadFormDrawer from './lead-form-drawer.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
 	} from './resource-state-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+
+	export type LeadsViewMode = 'board' | 'table';
 
 	export interface LeadsBoardPageProps {
 		orgName: string;
@@ -18,6 +22,7 @@
 		leadForm: SuperForm<LeadFormData>;
 		clientOptions?: LeadClientOption[];
 		orgCurrency?: string | null;
+		viewMode?: LeadsViewMode;
 		drawerOpen?: boolean;
 		viewState?: ResourceViewState;
 		/** Transient board interaction error (move blocked / PATCH failed). */
@@ -31,6 +36,7 @@
 		onReload?: () => void;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onCreateClient?: () => void;
+		onViewModeChange?: (mode: LeadsViewMode) => void;
 	}
 
 	let {
@@ -40,6 +46,7 @@
 		leadForm,
 		clientOptions = [],
 		orgCurrency = null,
+		viewMode = 'board',
 		drawerOpen = $bindable(false),
 		viewState = { kind: 'ready' },
 		boardError = null,
@@ -50,8 +57,11 @@
 		onMoveBlocked,
 		onReload,
 		onValidSubmit,
-		onCreateClient
+		onCreateClient,
+		onViewModeChange
 	}: LeadsBoardPageProps = $props();
+
+	const tableRows = $derived(leads.map(leadCardToRow));
 </script>
 
 <div
@@ -67,9 +77,29 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader title="Leads">
+			<PageHeader title={viewMode === 'table' ? 'Leads table' : 'Leads'}>
 				{#snippet actions()}
-					<Button variant="outline" size="sm">Table view</Button>
+					{#if viewMode === 'table'}
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							data-testid="leads-board-view"
+							onclick={() => onViewModeChange?.('board')}
+						>
+							Board view
+						</Button>
+					{:else}
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							data-testid="leads-table-view"
+							onclick={() => onViewModeChange?.('table')}
+						>
+							Table view
+						</Button>
+					{/if}
 					<LeadFormDrawer
 						bind:open={drawerOpen}
 						form={leadForm}
@@ -84,7 +114,7 @@
 
 			<ResourceStateBanner state={viewState} {onReload} />
 
-			{#if boardError}
+			{#if boardError && viewMode === 'board'}
 				<p
 					class="text-destructive rounded-3xl bg-destructive/10 px-4 py-3 text-sm"
 					role="alert"
@@ -101,6 +131,8 @@
 					>
 						No leads yet — create one to populate the board.
 					</p>
+				{:else if viewMode === 'table'}
+					<LeadsTable rows={tableRows} />
 				{:else}
 					<LeadsBoard
 						{leads}

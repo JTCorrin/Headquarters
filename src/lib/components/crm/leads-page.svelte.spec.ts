@@ -232,4 +232,36 @@ describe('LeadsPage integration', () => {
 			.element(page.getByLabelText('Bravo deal', { exact: true }))
 			.toBeInTheDocument();
 	});
+
+	it('toggles Table view from loaded leads and returns to Board view', async () => {
+		const session = sessionForOrg();
+		const fetchMock = createMockFetch({
+			'GET /api/v1/leads': async () => ({
+				body: { data: [sampleLead()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/organisation/configuration': async () => ({
+				body: { data: orgConfigBody }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(LeadsPage, { api, session });
+
+		await expect
+			.element(page.getByLabelText('Contoso expansion', { exact: true }))
+			.toBeInTheDocument();
+
+		await page.getByTestId('leads-table-view').click();
+		await expect.element(page.getByTestId('leads-table')).toBeInTheDocument();
+		const link = page.getByTestId('lead-name-link');
+		await expect.element(link).toHaveTextContent('Contoso expansion');
+		await expect.element(link).toHaveAttribute('href', `/leads/${LEAD_ID}`);
+
+		await page.getByTestId('leads-board-view').click();
+		await expect.element(page.getByTestId('leads-board')).toBeInTheDocument();
+		await expect.element(page.getByTestId('leads-table-view')).toBeInTheDocument();
+	});
 });

@@ -11,9 +11,14 @@
 	export interface ProductFormStoryHostProps {
 		categoryOptions?: ProductCategoryOption[];
 		initial?: Partial<ProductFormData>;
+		onCreateCategory?: (name: string) => Promise<ProductCategoryOption | null>;
 	}
 
-	let { categoryOptions = [], initial = {} }: ProductFormStoryHostProps = $props();
+	let {
+		categoryOptions = $bindable([] as ProductCategoryOption[]),
+		initial = {},
+		onCreateCategory
+	}: ProductFormStoryHostProps = $props();
 
 	const form = superForm(
 		defaults(
@@ -39,6 +44,20 @@
 			resetForm: false
 		}
 	);
+
+	async function handleCreateCategory(name: string): Promise<ProductCategoryOption | null> {
+		if (!onCreateCategory) return null;
+		const created = await onCreateCategory(name);
+		if (!created) return null;
+		if (!categoryOptions.some((c) => c.id === created.id)) {
+			categoryOptions = [...categoryOptions, created];
+		}
+		return created;
+	}
 </script>
 
-<ProductForm {form} {categoryOptions} />
+<ProductForm
+	{form}
+	{categoryOptions}
+	onCreateCategory={onCreateCategory ? handleCreateCategory : undefined}
+/>

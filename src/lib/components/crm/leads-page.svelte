@@ -27,7 +27,7 @@
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import ClientFormDrawer from './client-form-drawer.svelte';
-	import LeadsBoardPage from './leads-board-page.svelte';
+	import LeadsBoardPage, { type LeadsViewMode } from './leads-board-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
 	export interface LeadsPageProps {
@@ -61,6 +61,7 @@
 	let clientDrawerOpen = $state(false);
 	let moving = $state(false);
 	let boardError = $state<string | null>(null);
+	let viewMode = $state<LeadsViewMode>('board');
 
 	const emptyLeadForm = (currency = 'GBP'): LeadFormData => ({
 		name: '',
@@ -363,6 +364,7 @@
 					{leadForm}
 					{clientOptions}
 					{orgCurrency}
+					{viewMode}
 					bind:drawerOpen
 					{viewState}
 					{boardError}
@@ -371,6 +373,9 @@
 					{onSelectLead}
 					{onMoveLead}
 					{onMoveBlocked}
+					onViewModeChange={(mode) => {
+						viewMode = mode;
+					}}
 					onCreateClient={() => {
 						clientForm.form.set({
 							...emptyClientForm(),

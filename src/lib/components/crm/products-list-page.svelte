@@ -31,6 +31,7 @@
 		class?: string;
 		onReload?: () => void;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onCreateCategory?: (name: string) => Promise<ProductCategoryOption | null>;
 	}
 
 	let {
@@ -45,7 +46,8 @@
 		showNav = true,
 		class: className,
 		onReload,
-		onValidSubmit
+		onValidSubmit,
+		onCreateCategory
 	}: ProductsListPageProps = $props();
 
 	const activeCount = $derived(rows.filter((r) => r.status.toLowerCase() === 'active').length);
@@ -83,6 +85,7 @@
 						{taxRateOptions}
 						{categoryOptions}
 						{onValidSubmit}
+						{onCreateCategory}
 					>
 						{#snippet trigger()}
 							<Button type="button" size="sm">New product</Button>

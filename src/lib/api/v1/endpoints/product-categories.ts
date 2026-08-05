@@ -1,5 +1,9 @@
 import type { ApiRequestFn } from '../request.js';
-import type { ApiProductCategory, ApiProductCategoryListParams } from '../types.js';
+import type {
+	ApiProductCategory,
+	ApiProductCategoryCreateBody,
+	ApiProductCategoryListParams
+} from '../types.js';
 import type { ProductCategoriesEndpoints } from './types.js';
 
 export function createProductCategoriesEndpoints(
@@ -15,6 +19,15 @@ export function createProductCategoriesEndpoints(
 				},
 				signal
 			});
+		},
+		create: async (body: ApiProductCategoryCreateBody, signal) => {
+			const { data } = await request<ApiProductCategory>('/api/v1/product-categories', {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
 		}
 	};
 }
