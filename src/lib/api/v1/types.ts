@@ -154,6 +154,12 @@ export interface ApiProductCategoryListParams {
 	cursor?: string;
 }
 
+export interface ApiProductCategoryCreateBody {
+	name: string;
+	description?: string | null;
+	position?: number;
+}
+
 export interface ApiProduct {
 	id: string;
 	org_id: string;
