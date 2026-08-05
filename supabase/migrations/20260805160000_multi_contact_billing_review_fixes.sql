@@ -625,12 +625,9 @@ declare
   line_row public.recurring_invoice_lines;
   description text;
   line_totals record;
-  issue_on date;
-  due_on date;
+  issue_on date := p_run.occurrence_local_date;
+  due_on date := p_run.occurrence_local_date + p_schedule.due_days;
 begin
-  issue_on := (timezone('utc', now()))::date;
-  due_on := issue_on + coalesce(p_schedule.due_days, 14);
-
   for line_row in
     select *
     from public.recurring_invoice_lines
