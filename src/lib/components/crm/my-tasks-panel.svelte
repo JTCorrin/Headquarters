@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import StatusBadge from './status-badge.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
@@ -24,6 +25,8 @@
 		onViewAll?: () => void;
 		/** When false, hide the View all control (e.g. already on /tasks). */
 		showViewAll?: boolean;
+		/** Actions beside View all (e.g. New task on Home). */
+		headerActions?: Snippet;
 		class?: string;
 	}
 
@@ -35,6 +38,7 @@
 		onSelectTask,
 		onViewAll,
 		showViewAll = true,
+		headerActions,
 		class: className
 	}: MyTasksPanelProps = $props();
 
@@ -69,13 +73,18 @@
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
 			<p class="text-muted-foreground text-xs">{openCount} open</p>
 		</div>
-		{#if showViewAll}
-			{#if onViewAll}
-				<Button type="button" variant="ghost" size="sm" onclick={onViewAll}>View all</Button>
-			{:else}
-				<Button type="button" variant="ghost" size="sm" href="/tasks">View all</Button>
+		<div class="flex flex-wrap items-center gap-2">
+			{#if headerActions}
+				{@render headerActions()}
 			{/if}
-		{/if}
+			{#if showViewAll}
+				{#if onViewAll}
+					<Button type="button" variant="ghost" size="sm" onclick={onViewAll}>View all</Button>
+				{:else}
+					<Button type="button" variant="ghost" size="sm" href="/tasks">View all</Button>
+				{/if}
+			{/if}
+		</div>
 	</div>
 
 	{#if tasks.length === 0}

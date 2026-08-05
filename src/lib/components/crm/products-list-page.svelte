@@ -69,11 +69,7 @@
 				<ResourceStateBanner state={viewState} onReload={onReload} />
 			{/if}
 
-			<PageHeader
-				breadcrumb="Headquarters"
-				title="Products"
-				description="Catalog and inventory for quote and invoice lines."
-			>
+			<PageHeader title="Products">
 				{#snippet actions()}
 					<ProductFormDrawer bind:open={drawerOpen} {form} {taxRateOptions} {onValidSubmit}>
 						{#snippet trigger()}

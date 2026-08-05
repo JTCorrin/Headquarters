@@ -75,12 +75,13 @@ describe('LeadsBoard selection', () => {
 	});
 });
 
-describe('LeadsBoard keyboard moves', () => {
-	it('exposes stage and within-stage controls that emit onMoveLead', async () => {
+describe('LeadsBoard card moves', () => {
+	it('puts Move up/down on cards and emits onMoveLead', async () => {
 		const onMoveLead = vi.fn();
 		render(LeadsBoard, { leads, onMoveLead });
 
-		await expect.element(page.getByTestId('leads-board-keyboard-moves')).toBeInTheDocument();
+		await expect.element(page.getByTestId('leads-board-keyboard-moves')).not.toBeInTheDocument();
+		await expect.element(page.getByTestId(`lead-card-${leadB}`)).toBeInTheDocument();
 
 		await page.getByTestId(`lead-move-up-${leadB}`).click();
 		expect(onMoveLead).toHaveBeenCalledWith(
@@ -97,18 +98,6 @@ describe('LeadsBoard keyboard moves', () => {
 			expect.objectContaining({
 				id: leadA,
 				stage: 'new'
-			})
-		);
-
-		onMoveLead.mockClear();
-		const stageTrigger = page.getByTestId(`lead-stage-${leadC}`);
-		await stageTrigger.click();
-		await page.getByRole('option', { name: 'Qualified' }).click();
-		expect(onMoveLead).toHaveBeenCalledWith(
-			expect.objectContaining({
-				id: leadC,
-				stage: 'qualified',
-				beforeId: null
 			})
 		);
 	});

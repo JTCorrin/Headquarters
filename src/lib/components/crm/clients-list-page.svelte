@@ -53,11 +53,7 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Headquarters"
-				title="Clients"
-				description="Won accounts — money, contacts, and activity live on the profile."
-			>
+			<PageHeader title="Clients">
 				{#snippet actions()}
 					<Button type="button" variant="outline" size="sm">Import</Button>
 					<ClientFormDrawer
