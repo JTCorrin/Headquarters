@@ -37,8 +37,23 @@ import { billLifecycleIdempotencyPayload, validateBillBody } from './bills.ts'
 import { quoteAcceptIdempotencyPayload } from './quotes.ts'
 import { validateVendorBankDetailsBody, validateVendorBody } from './vendors.ts'
 import { decodeTaskCursor, validateTaskBody } from './tasks.ts'
-import { calendarPayloadHasForbiddenSecretKey, validateOAuthCallbackParams } from './calendar.ts'
+import {
+  calendarPayloadHasForbiddenSecretKey,
+  validateCaldavUpsertBody,
+  validateOAuthCallbackParams,
+} from './calendar.ts'
 import { decodeMeetingCursor, parseMeetingListRange, validateMeetingBody } from './meetings.ts'
+import {
+  buildVeventIcs,
+  createStubCaldavClient,
+  eventObjectUrl,
+  hostnameFromCaldavUrl,
+  icsEscapeText,
+  isCaldavSyncStubMode,
+  isSyntheticCaldavHost,
+  parseCaldavSecretBlob,
+  toIcsUtcDateTime,
+} from '../_shared/caldav.ts'
 import {
   buildGoogleAuthUrl,
   createStubGoogleCalendarClient,
@@ -1361,6 +1376,77 @@ Deno.test('google calendar stub client and auth url helpers', async () => {
   assertEquals(parseTokenBlob('raw-refresh').refresh_token, 'raw-refresh')
   assertEquals(isCalendarSyncStubMode(() => '1'), true)
   assertEquals(isCalendarSyncStubMode(() => undefined), false)
+})
+
+Deno.test('caldav upsert validation requires url username provider', () => {
+  const ok = validateCaldavUpsertBody({
+    provider: 'caldav',
+    caldav_url: 'https://caldav.example.test/SOGo/dav/user/Calendar/personal/',
+    username: 'user@example.test',
+    password: 'app-pass',
+  })
+  assertEquals(ok.provider, 'caldav')
+  assertEquals(ok.username, 'user@example.test')
+  assertEquals(ok.password, 'app-pass')
+
+  assertThrows(
+    () =>
+      validateCaldavUpsertBody({
+        provider: 'google',
+        caldav_url: 'https://caldav.example.test/cal/',
+        username: 'u',
+        password: 'p',
+      }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateCaldavUpsertBody({
+        provider: 'caldav',
+        caldav_url: 'not-a-url',
+        username: 'u',
+        password: 'p',
+      }),
+    ApiError,
+  )
+})
+
+Deno.test('caldav client helpers + stub put/delete', async () => {
+  assertEquals(isSyntheticCaldavHost('caldav.example.test'), true)
+  assertEquals(hostnameFromCaldavUrl('https://caldav.example.test/path/'), 'caldav.example.test')
+  assertEquals(icsEscapeText('a;b,c\nd\\e'), 'a\\;b\\,c\\nd\\\\e')
+  assertEquals(toIcsUtcDateTime('2026-09-02T10:30:00.000Z'), '20260902T103000Z')
+  assertEquals(
+    eventObjectUrl('https://caldav.example.test/cal/', 'abc-123'),
+    'https://caldav.example.test/cal/abc-123.ics',
+  )
+  assertEquals(parseCaldavSecretBlob('{"password":"x"}').password, 'x')
+  assertEquals(parseCaldavSecretBlob('plain').password, 'plain')
+  assertEquals(isCaldavSyncStubMode(() => '1'), true)
+
+  const ics = buildVeventIcs({
+    uid: 'meeting-1',
+    title: 'Sync; now',
+    starts_at: '2026-09-02T10:00:00.000Z',
+    ends_at: '2026-09-02T10:30:00.000Z',
+    timezone: 'UTC',
+    meeting_url: 'https://meet.example.test/x',
+  })
+  assertEquals(ics.includes('UID:meeting-1'), true)
+  assertEquals(ics.includes('SUMMARY:Sync\\; now'), true)
+  assertEquals(ics.includes('Meeting URL:'), true)
+
+  const client = createStubCaldavClient('meeting-1')
+  const created = await client.putEvent({
+    uid: 'meeting-1',
+    title: 'Sync',
+    starts_at: '2026-09-02T10:00:00.000Z',
+    ends_at: '2026-09-02T10:30:00.000Z',
+    timezone: 'UTC',
+  })
+  assertEquals(created.id, 'stub-meeting-1')
+  await client.deleteEvent(created.id)
+  await client.propfind()
 })
 
 Deno.test('email share validation requires entity_type and entity_id UUID', () => {
