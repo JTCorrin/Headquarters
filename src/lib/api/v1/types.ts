@@ -1552,6 +1552,12 @@ export interface ApiEmailMessageShareResult {
 	subject?: string | null;
 }
 
+/** Body for `POST /api/v1/email-messages/{id}/reply` (SMTP outbound v1). */
+export interface ApiEmailMessageReplyBody {
+	body_text: string;
+	body_html?: string | null;
+}
+
 /** Entity types supported by `GET/POST …/timeline-events`. */
 export type ApiTimelineEntityType =
 	| 'contact'

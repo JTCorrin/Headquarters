@@ -272,6 +272,11 @@
 		}
 	}
 
+	async function onSendReply(payload: { messageId: string; body: string }) {
+		await api.emailMessages.reply(payload.messageId, { body_text: payload.body });
+		emailTab = await loadEntityEmailTab(api, 'client', clientId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'client', clientId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
@@ -399,6 +404,7 @@
 						{moneyItems}
 						{onTimelineAdd}
 						{onAddToTimeline}
+						{onSendReply}
 						{onDraftResponse}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
