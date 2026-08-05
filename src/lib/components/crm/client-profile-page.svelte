@@ -72,6 +72,7 @@
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
+		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: 'warm' | 'neutral' | 'firm';
@@ -120,6 +121,7 @@
 		onValidSubmit,
 		onTimelineAdd,
 		onAddToTimeline,
+		onSendReply,
 		onDraftResponse,
 		onUseSuggestion,
 		onDiscardSuggestion
@@ -218,6 +220,7 @@
 							{mailSettingsHref}
 							{sharingId}
 							{onAddToTimeline}
+							{onSendReply}
 							{onDraftResponse}
 							{onUseSuggestion}
 							{onDiscardSuggestion}
