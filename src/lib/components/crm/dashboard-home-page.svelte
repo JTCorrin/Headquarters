@@ -37,6 +37,7 @@
 		type DashboardStat
 	} from './dashboard-page.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
+	import { loadOrgTimeline } from '$lib/crm/entity-timeline.js';
 	import type { TimelineEvent } from './timeline.svelte';
 
 	export interface DashboardHomePageProps {
@@ -60,6 +61,7 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let tasks = $state<TaskListItem[]>([]);
 	let upcomingMeetingItems = $state<MeetingListItem[]>([]);
+	let recentActivityItems = $state<TimelineEvent[]>([]);
 	let assigneeOptions = $state<TaskAssigneeOption[]>([]);
 	let currentMembershipId = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
@@ -124,7 +126,7 @@
 		}))
 	);
 
-	const recentActivity = $derived.by((): TimelineEvent[] => []);
+	const recentActivity = $derived(recentActivityItems);
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
@@ -168,6 +170,7 @@
 	function resetOrgScopedState() {
 		tasks = [];
 		upcomingMeetingItems = [];
+		recentActivityItems = [];
 		assigneeOptions = [];
 		currentMembershipId = null;
 		drawerOpen = false;
@@ -224,6 +227,15 @@
 				if (isStale(epoch)) return;
 				// Meetings API may land after this FE cut — keep Home usable.
 				upcomingMeetingItems = [];
+			}
+
+			try {
+				recentActivityItems = await loadOrgTimeline(api, { limit: 50 });
+				if (isStale(epoch)) return;
+			} catch {
+				if (isStale(epoch)) return;
+				// Org timeline soft-fail — keep Home usable without the feed.
+				recentActivityItems = [];
 			}
 			viewState = { kind: 'ready' };
 		} catch (error) {

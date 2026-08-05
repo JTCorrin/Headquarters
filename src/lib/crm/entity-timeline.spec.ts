@@ -3,7 +3,11 @@ import { createApiV1Client } from '$lib/api/v1/client.js';
 import { ApiClientError } from '$lib/api/v1/errors.js';
 import { apiError, createMockFetch } from '$lib/api/v1/mock-fetch.js';
 import type { ApiTimelineEvent } from '$lib/api/v1/types.js';
-import { createEntityTimelineEvent, loadEntityTimeline } from './entity-timeline.js';
+import {
+	createEntityTimelineEvent,
+	loadEntityTimeline,
+	loadOrgTimeline
+} from './entity-timeline.js';
 
 const sampleRow: ApiTimelineEvent = {
 	id: 'aaaaaaaa-aaaa-4bbb-8ccc-dddddddddddd',
@@ -41,6 +45,9 @@ describe('entity-timeline', () => {
 		expect(events[0]?.kind).toBe('conversion');
 		expect(events[0]?.title).toBe('Quote converted to invoice');
 		expect(events[0]?.icon).toBe('conversion');
+		expect(events[0]?.entityType).toBe('quote');
+		expect(events[0]?.entityId).toBe('quote-1');
+		expect(events[0]?.href).toBe('/quotes/quote-1');
 	});
 
 	it('soft-fails list to empty when the surface is missing', async () => {
@@ -103,5 +110,41 @@ describe('entity-timeline', () => {
 		await expect(loadEntityTimeline(api, 'invoice', 'inv-1')).rejects.toBeInstanceOf(
 			ApiClientError
 		);
+	});
+
+	it('loads org timeline via GET /api/v1/timeline-events with limit', async () => {
+		const seenUrls: string[] = [];
+		const fetchMock = createMockFetch({
+			'GET /api/v1/timeline-events': (request) => {
+				seenUrls.push(request.url);
+				return {
+					status: 200,
+					body: { data: [sampleRow], meta: { next_cursor: null } }
+				};
+			}
+		});
+		const api = createApiV1Client({
+			fetch: fetchMock,
+			getOrgId: () => 'org-1',
+			getAccessToken: async () => 'tok'
+		});
+
+		const events = await loadOrgTimeline(api, { limit: 50 });
+		expect(events).toHaveLength(1);
+		expect(events[0]?.href).toBe('/quotes/quote-1');
+		expect(seenUrls.some((url) => url.includes('limit=50'))).toBe(true);
+	});
+
+	it('soft-fails org timeline when the surface is missing', async () => {
+		const fetchMock = createMockFetch({
+			'GET /api/v1/timeline-events': () => apiError(404, 'NOT_FOUND', 'missing')
+		});
+		const api = createApiV1Client({
+			fetch: fetchMock,
+			getOrgId: () => 'org-1',
+			getAccessToken: async () => 'tok'
+		});
+
+		await expect(loadOrgTimeline(api)).resolves.toEqual([]);
 	});
 });
