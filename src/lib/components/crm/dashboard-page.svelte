@@ -178,7 +178,7 @@
 			<Timeline
 				events={recentActivity}
 				title="Recent activity"
-				emptyMessage="No org-wide activity feed yet — open a record to see its timeline."
+				emptyMessage="No recent activity yet."
 				class="bg-card rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 			/>
 		</div>

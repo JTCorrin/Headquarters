@@ -15,6 +15,11 @@
 		actor?: string;
 		accent?: TimelineAccentId | string;
 		icon?: TimelineIconId | string;
+		/** Primary entity for deep-links (org Home feed). */
+		entityType?: string;
+		entityId?: string;
+		/** Profile href when `entityType` + `entityId` map to a route. */
+		href?: string;
 	}
 
 	export interface TimelineProps {
@@ -97,6 +102,7 @@
 						actor={event.actor}
 						accent={event.accent}
 						icon={event.icon}
+						href={event.href}
 						isLast={index === events.length - 1}
 					/>
 				</li>

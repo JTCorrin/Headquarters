@@ -23,6 +23,7 @@ import type {
 	ApiTimelineEntityType,
 	ApiTimelineEvent,
 	ApiTimelineEventCreateBody,
+	ApiTimelineEventListParams,
 	ApiDocumentFinalizeBody,
 	ApiDocumentFolderCreateBody,
 	ApiDocumentFolderPatchBody,
@@ -668,11 +669,17 @@ export interface EmailTemplatesEndpoints {
 }
 
 export interface TimelineEventsEndpoints {
+	/** Entity profile rail: `GET …/entities/{type}/{id}/timeline-events`. */
 	list(
 		entityType: ApiTimelineEntityType,
 		entityId: string,
 		signal?: AbortSignal
 	): Promise<ApiTimelineEvent[]>;
+	/** Org-wide Home feed: `GET /api/v1/timeline-events`. */
+	list(
+		params?: ApiTimelineEventListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiTimelineEvent[]>>;
 	create(
 		entityType: ApiTimelineEntityType,
 		entityId: string,
