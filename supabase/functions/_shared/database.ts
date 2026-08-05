@@ -1627,6 +1627,15 @@ export type Database = {
         }
         Returns: TimelineEventRow
       }
+      list_org_timeline_events: {
+        Args: {
+          p_cursor_id?: string | null
+          p_cursor_occurred_at?: string | null
+          p_limit?: number
+          p_org_id: string
+        }
+        Returns: TimelineEventRow[]
+      }
       append_audit_event_for_api_key: {
         Args: {
           p_action: string
