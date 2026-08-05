@@ -85,24 +85,7 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Headquarters"
-				title="Home"
-				description="Your pulse for the day — tasks, money that needs a nudge, and what’s coming up."
-			>
-				{#snippet actions()}
-					{#if form}
-						<TaskFormDrawer
-							bind:open={drawerOpen}
-							{form}
-							{assigneeOptions}
-							{onValidSubmit}
-						/>
-					{:else}
-						<Button size="sm" href="/tasks">New task</Button>
-					{/if}
-				{/snippet}
-			</PageHeader>
+			<PageHeader title="Home" />
 
 			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 				{#each stats as stat (stat.label)}
@@ -116,7 +99,20 @@
 					onToggleDone={onToggleTask}
 					{onSelectTask}
 					class="self-start"
-				/>
+				>
+					{#snippet headerActions()}
+						{#if form}
+							<TaskFormDrawer
+								bind:open={drawerOpen}
+								{form}
+								{assigneeOptions}
+								{onValidSubmit}
+							/>
+						{:else}
+							<Button size="sm" href="/tasks">New task</Button>
+						{/if}
+					{/snippet}
+				</MyTasksPanel>
 
 				<div class="space-y-6">
 					<section
