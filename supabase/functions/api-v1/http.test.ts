@@ -1571,6 +1571,40 @@ Deno.test('AI completion stub path returns deterministic text', async () => {
   assertEquals(typeof isAiCompletionStubMode(), 'boolean')
 })
 
+Deno.test('AI provider auth failure returns 409 CONFLICT (not 502)', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = () =>
+    Promise.resolve(
+      new Response(JSON.stringify({ error: { message: 'Incorrect API key' } }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+  try {
+    let caught: unknown
+    try {
+      await completeAiPrompt({
+        provider: 'openrouter',
+        apiKey: 'sk-or-v1-not-real',
+        systemPrompt: 'Draft a reply',
+        userContent: 'Source email\n\nHello',
+      })
+    } catch (error) {
+      caught = error
+    }
+    assertEquals(caught instanceof ApiError, true)
+    const apiError = caught as ApiError
+    assertEquals(apiError.status, 409)
+    assertEquals(apiError.code, 'CONFLICT')
+    assertEquals(
+      apiError.message,
+      'openrouter rejected the API key — reconnect under Org → Integrations',
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 Deno.test('recurring schedule validation defaults and frequency fields', () => {
   const clientId = '11111111-1111-4111-8111-111111111111'
   const body = validateRecurringScheduleBody({

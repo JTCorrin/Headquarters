@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
+import { ApiClientError } from '$lib/api/v1/errors.js';
 import EntityEmailInbox from './entity-email-inbox.svelte';
 import { sampleEmailMessages } from '../../../stories/crm/story-fixtures.js';
 
@@ -85,6 +86,29 @@ describe('EntityEmailInbox', () => {
 		await expect.element(page.getByTestId('use-suggestion')).toBeInTheDocument();
 		await page.getByTestId('use-suggestion').click();
 		await expect.element(page.getByTestId('draft-suggestion-panel')).not.toBeInTheDocument();
+	});
+
+	it('surfaces provider API errors from onDraftResponse', async () => {
+		render(EntityEmailInbox, {
+			messages: sampleEmailMessages,
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			onDraftResponse: async () => {
+				throw new ApiClientError({
+					status: 409,
+					code: 'CONFLICT',
+					message: 'openrouter rejected the API key — reconnect under Org → Integrations'
+				});
+			}
+		});
+
+		await page.getByRole('button', { name: 'Reply' }).click();
+		await page.getByRole('button', { name: 'Draft response' }).click();
+		await expect
+			.element(page.getByTestId('draft-response-error'))
+			.toHaveTextContent(/openrouter rejected the API key/i);
 	});
 
 	it('clears the composer only after onSendReply succeeds', async () => {
