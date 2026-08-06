@@ -128,9 +128,23 @@ T_ROW="$(printf '%s' "$transcript_json" | jq -r '.data.transcript.status // empt
 	|| die "transcript attach: ${transcript_json}"
 log "transcript ready v${MEETING_VER}"
 
+log "PUT AI openrouter (sk-test key → Edge stub completion, not live HTTP)"
+ai_json="$(
+	curl -fsS --max-time 30 \
+		-X PUT "${API_BASE}/api/v1/integrations/ai/openrouter" \
+		-H "apikey: ${SUPABASE_ANON_KEY}" \
+		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
+		-H "X-Org-Id: ${ORG_ID}" \
+		-H 'content-type: application/json' \
+		-d "$(jq -n --arg key "sk-test-meeting-assistant-$(date +%s)" '{api_key:$key}')"
+)"
+printf '%s' "$ai_json" | jq -e \
+	'.data.provider == "openrouter" and .data.credentials_configured == true and .data.status == "active"' \
+	>/dev/null || die "AI connect failed: ${ai_json}"
+
 log "POST generate-summary"
 summary_code="$(
-	curl -sS --max-time 30 -o "${TMPDIR_PROOF}/summary.json" -w '%{http_code}' \
+	curl -sS --max-time 60 -o "${TMPDIR_PROOF}/summary.json" -w '%{http_code}' \
 		-X POST "${API_BASE}/api/v1/meetings/${MEETING_ID}/generate-summary" \
 		-H "apikey: ${SUPABASE_ANON_KEY}" \
 		-H "Authorization: Bearer ${ACCESS_TOKEN}" \
