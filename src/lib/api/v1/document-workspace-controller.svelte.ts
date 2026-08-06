@@ -490,7 +490,10 @@ export function createDocumentWorkspaceController(
 		const meta = metaById.get(id);
 		if (!meta || meta.kind !== 'file') return;
 		try {
-			const result = await docs.download(id);
+			const result = await docs.download(
+				id,
+				mode === 'preview' ? { inline: true } : undefined
+			);
 			if (mode === 'download') {
 				if (typeof document !== 'undefined') {
 					const anchor = document.createElement('a');

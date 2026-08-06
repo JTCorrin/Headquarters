@@ -386,7 +386,13 @@ async function finalizeUpload(
   return jsonResponse({ data }, 200, requestId, { etag: etag(document.version) })
 }
 
+function wantsInlineDocumentDownload(req: Request): boolean {
+  const value = new URL(req.url).searchParams.get('inline')?.toLowerCase()
+  return value === '1' || value === 'true'
+}
+
 async function downloadDocument(
+  req: Request,
   db: DatabaseClient,
   orgId: string,
   documentId: string,
@@ -410,12 +416,22 @@ async function downloadDocument(
     throw new ApiError(409, 'CONFLICT', 'Document is not ready for download')
   }
 
+  // Preview embeds the signed URL in <img>/<iframe>. Forcing Content-Disposition:
+  // attachment (via `download: name`) makes browsers download instead of render —
+  // PDFs can enter an unrecoverable download loop. Inline omits that option.
+  const inline = wantsInlineDocumentDownload(req)
   const admin = serviceRoleClient()
-  const { data: signed, error: signError } = await admin.storage
-    .from(doc.bucket)
-    .createSignedUrl(doc.storage_path, SIGNED_DOWNLOAD_SECONDS, {
-      download: doc.name,
-    })
+  const signedResult = inline
+    ? await admin.storage
+      .from(doc.bucket)
+      .createSignedUrl(doc.storage_path, SIGNED_DOWNLOAD_SECONDS)
+    : await admin.storage
+      .from(doc.bucket)
+      .createSignedUrl(doc.storage_path, SIGNED_DOWNLOAD_SECONDS, {
+        download: doc.name,
+      })
+  const signed = signedResult.data
+  const signError = signedResult.error
 
   if (signError || !signed?.signedUrl) {
     console.error('Signed download URL failed', {
@@ -721,7 +737,7 @@ export function handleDocuments(
 
     if (action === 'download') {
       assertCanReadDocuments(role)
-      if (req.method === 'GET') return downloadDocument(db, orgId, documentId, requestId)
+      if (req.method === 'GET') return downloadDocument(req, db, orgId, documentId, requestId)
       throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
     }
 
