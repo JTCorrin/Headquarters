@@ -2441,6 +2441,14 @@ export type Database = {
         Args: { p_org_id: string; p_provider: string }
         Returns: undefined
       }
+      get_ai_org_prompts: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      upsert_ai_org_prompts: {
+        Args: { p_org_id: string; p_prompts: Json }
+        Returns: Json
+      }
       claim_mailbox_sync_lease: {
         Args: { p_mailbox_id: string; p_holder: string; p_lease_seconds?: number }
         Returns: Json
@@ -2526,6 +2534,20 @@ export type Database = {
           p_model_provider: string
           p_model_name: string
           p_variant?: string
+          p_prompt_text?: string | null
+          p_prompt_version?: string | null
+        }
+        Returns: Json
+      }
+      create_invoice_chase_suggestion: {
+        Args: {
+          p_org_id: string
+          p_invoice_id: string
+          p_output_text: string
+          p_model_provider: string
+          p_model_name: string
+          p_variant?: string
+          p_prompt_version?: string | null
         }
         Returns: Json
       }

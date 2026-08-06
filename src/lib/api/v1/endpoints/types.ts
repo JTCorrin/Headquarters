@@ -114,6 +114,9 @@ import type {
 	ApiOrgApiKey,
 	ApiOrgApiKeyCreateBody,
 	ApiOrgApiKeyCreateResult,
+	ApiAiInvoiceChaseGenerateBody,
+	ApiAiPrompts,
+	ApiAiPromptsUpdateBody,
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
@@ -623,6 +626,8 @@ export interface IntegrationsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiAiIntegration>;
 	disconnectAi(provider: ApiAiProvider, signal?: AbortSignal): Promise<void>;
+	getAiPrompts(signal?: AbortSignal): Promise<ApiAiPrompts>;
+	updateAiPrompts(body: ApiAiPromptsUpdateBody, signal?: AbortSignal): Promise<ApiAiPrompts>;
 }
 
 /** Org API keys — `/api/v1/api-keys` (Owner/Admin; secret reveal-once on create). */
@@ -656,6 +661,10 @@ export interface EmailMessagesEndpoints {
 	): Promise<ApiEmailMessage>;
 	generateDraft(
 		body: ApiAiSuggestionGenerateBody,
+		signal?: AbortSignal
+	): Promise<ApiAiSuggestion>;
+	generateInvoiceChase(
+		body: ApiAiInvoiceChaseGenerateBody,
 		signal?: AbortSignal
 	): Promise<ApiAiSuggestion>;
 	useDraft(

@@ -1519,6 +1519,24 @@ export interface ApiAiIntegrationConnectBody {
 	api_key: string;
 }
 
+export type ApiAiPromptKey =
+	| 'email_reply'
+	| 'meeting_summary'
+	| 'meeting_task_proposals'
+	| 'invoice_chase';
+
+export type ApiAiPromptsMap = Record<ApiAiPromptKey, string>;
+
+export interface ApiAiPrompts {
+	version: number;
+	/** Only keys the org has overridden (empty string clears on PUT). */
+	overrides: Partial<ApiAiPromptsMap>;
+	defaults: ApiAiPromptsMap;
+	effective: ApiAiPromptsMap;
+}
+
+export type ApiAiPromptsUpdateBody = Partial<Record<ApiAiPromptKey, string | null>>;
+
 /**
  * Org API key row from `GET /api/v1/api-keys` (MCP-Keys-BE).
  * Secret is never listed — only returned once on create.
@@ -1725,6 +1743,12 @@ export interface ApiAiSuggestionGenerateBody {
 	variant?: 'warm' | 'neutral' | 'firm' | string;
 }
 
+export interface ApiAiInvoiceChaseGenerateBody {
+	invoice_id: string;
+	/** polite | firm (injected as TONE at generate time). */
+	variant?: 'polite' | 'firm' | string;
+}
+
 export interface ApiAiSuggestion {
 	id: string;
 	status: 'generating' | 'ready' | 'used' | 'discarded' | string;
@@ -1733,6 +1757,7 @@ export interface ApiAiSuggestion {
 	suggestion_text?: string;
 	variant?: string | null;
 	kind?: string;
+	prompt_version?: string | null;
 }
 
 export type ApiRecurringInvoiceStatus =
