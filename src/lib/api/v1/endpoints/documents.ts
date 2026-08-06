@@ -128,12 +128,15 @@ export function createDocumentsEndpoints(request: ApiRequestFn): DocumentsEndpoi
 			);
 			return data;
 		},
-		download: async (documentId, signal) => {
+		download: async (documentId, options) => {
+			const opts =
+				options instanceof AbortSignal ? { signal: options } : (options ?? {});
 			const { data } = await request<ApiDocumentDownloadResult>(
 				`/api/v1/documents/${documentId}/download`,
 				{
 					orgScoped: true,
-					signal
+					query: opts.inline ? { inline: '1' } : undefined,
+					signal: opts.signal
 				}
 			);
 			return data;
