@@ -185,7 +185,9 @@ describe('MeetingsCalendarPage integration', () => {
 
 		const form = page.getByTestId('meeting-form');
 		await expect.element(form).toBeInTheDocument();
-		await expect.element(form.getByLabelText('Starts')).toHaveValue('2026-08-12T09:00');
-		await expect.element(form.getByLabelText('Ends')).toHaveValue('2026-08-12T09:30');
+		await expect.element(form.getByTestId('meeting-start-date')).toHaveValue('2026-08-12');
+		await expect.element(form.getByTestId('meeting-start-time')).toHaveValue('09:00');
+		await expect.element(form.getByTestId('meeting-end-date')).toHaveValue('2026-08-12');
+		await expect.element(form.getByTestId('meeting-end-time')).toHaveValue('09:30');
 	});
 });

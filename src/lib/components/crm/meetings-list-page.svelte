@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
+	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import type { MeetingFormData, MeetingListItem } from '$lib/schemas/meeting.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
@@ -14,6 +15,7 @@
 		navGroups: AppNavGroup[];
 		rows: MeetingListItem[];
 		form: SuperForm<MeetingFormData>;
+		api?: ApiV1Client | null;
 		drawerOpen?: boolean;
 		editForm?: SuperForm<MeetingFormData>;
 		editDrawerOpen?: boolean;
@@ -34,6 +36,7 @@
 		navGroups,
 		rows,
 		form,
+		api = null,
 		drawerOpen = $bindable(false),
 		editForm,
 		editDrawerOpen = $bindable(false),
@@ -62,18 +65,14 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Work"
-				title="Meetings"
-				description="Upcoming and past — transcripts and AI summaries live on each meeting."
-			>
+			<PageHeader title="Meetings">
 				{#snippet actions()}
 					{#if onOpenCalendar}
 						<Button type="button" size="sm" variant="outline" onclick={onOpenCalendar}>
 							Calendar
 						</Button>
 					{/if}
-					<MeetingFormDrawer bind:open={drawerOpen} {form} {onValidSubmit} />
+					<MeetingFormDrawer bind:open={drawerOpen} {form} {api} {onValidSubmit} />
 				{/snippet}
 			</PageHeader>
 
@@ -90,6 +89,7 @@
 	<MeetingFormDrawer
 		bind:open={editDrawerOpen}
 		form={editForm}
+		{api}
 		showTrigger={false}
 		title="Edit meeting"
 		description="Update schedule, related record, or attendees. Changes use If-Match versioning."

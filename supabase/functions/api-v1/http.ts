@@ -106,17 +106,38 @@ export function requireJson(req: Request): void {
   }
 }
 
-export async function jsonBody(req: Request): Promise<Record<string, unknown>> {
+/** Default JSON body cap. Transcript attach may raise this (plain_text up to 500k chars). */
+export const DEFAULT_JSON_BODY_MAX_BYTES = 65_536
+/** Enough for meeting transcript plain_text (schema max 500_000 chars) + envelope. */
+export const TRANSCRIPT_JSON_BODY_MAX_BYTES = 600_000
+
+export async function jsonBody(
+  req: Request,
+  options: { maxBytes?: number } = {},
+): Promise<Record<string, unknown>> {
   requireJson(req)
 
+  const maxBytes = options.maxBytes ?? DEFAULT_JSON_BODY_MAX_BYTES
   const declaredLength = Number(req.headers.get('content-length') ?? 0)
-  if (Number.isFinite(declaredLength) && declaredLength > 65_536) {
-    throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds 64 KiB')
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new ApiError(
+      413,
+      'PAYLOAD_TOO_LARGE',
+      maxBytes === DEFAULT_JSON_BODY_MAX_BYTES
+        ? 'Request body exceeds 64 KiB'
+        : `Request body exceeds ${maxBytes} bytes`,
+    )
   }
 
   const body = await req.text()
-  if (new TextEncoder().encode(body).byteLength > 65_536) {
-    throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds 64 KiB')
+  if (new TextEncoder().encode(body).byteLength > maxBytes) {
+    throw new ApiError(
+      413,
+      'PAYLOAD_TOO_LARGE',
+      maxBytes === DEFAULT_JSON_BODY_MAX_BYTES
+        ? 'Request body exceeds 64 KiB'
+        : `Request body exceeds ${maxBytes} bytes`,
+    )
   }
 
   let value: unknown
