@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
 	import { draftResponseGateCopy } from '$lib/schemas/integration.js';
 	import { cn } from '$lib/utils.js';
@@ -202,9 +203,15 @@
 				suggestionId = undefined;
 			}
 			aiStatus = 'ready';
-		} catch {
+		} catch (error) {
 			aiStatus = 'idle';
-			draftError = 'Could not draft a reply — try again.';
+			if (isApiClientError(error) && error.message) {
+				draftError = error.message;
+			} else if (error instanceof Error && error.message) {
+				draftError = error.message;
+			} else {
+				draftError = 'Could not draft a reply — try again.';
+			}
 		}
 	}
 
