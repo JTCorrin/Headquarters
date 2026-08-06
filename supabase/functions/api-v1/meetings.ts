@@ -772,10 +772,9 @@ async function loadMeetingPromptBundle(
 ): Promise<{ summaryPrompt: string; proposalsPrompt: string }> {
   const { data, error } = await db.rpc('get_ai_org_prompts', { p_org_id: orgId })
   if (error) throw databaseError(error, requestId)
-  const overrides =
-    data && typeof data === 'object' && !Array.isArray(data)
-      ? ((data as Record<string, unknown>).overrides as Record<string, unknown> | undefined)
-      : undefined
+  const overrides = data && typeof data === 'object' && !Array.isArray(data)
+    ? ((data as Record<string, unknown>).overrides as Record<string, unknown> | undefined)
+    : undefined
   const effective = mergeEffectivePrompts(overrides)
   return {
     summaryPrompt: effective.meeting_summary,
