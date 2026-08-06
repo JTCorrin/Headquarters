@@ -1,10 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
 import {
+  type AiPromptKey,
   buildInvoiceChaseStubDraft,
   mergeEffectivePrompts,
   promptVersionFor,
-  type AiPromptKey,
 } from './ai-prompts.ts'
 import { ApiError, jsonBody, jsonResponse, parseUuid } from './http.ts'
 
@@ -44,10 +44,9 @@ async function loadEffectivePrompt(
 ): Promise<{ prompt: string; promptVersion: string }> {
   const { data, error } = await db.rpc('get_ai_org_prompts', { p_org_id: orgId })
   if (error) throw databaseError(error, requestId)
-  const overrides =
-    data && typeof data === 'object' && !Array.isArray(data)
-      ? ((data as Record<string, unknown>).overrides as Record<string, unknown> | undefined)
-      : undefined
+  const overrides = data && typeof data === 'object' && !Array.isArray(data)
+    ? ((data as Record<string, unknown>).overrides as Record<string, unknown> | undefined)
+    : undefined
   const effective = mergeEffectivePrompts(overrides)
   const prompt = effective[key]
   return { prompt, promptVersion: await promptVersionFor(prompt) }
@@ -200,12 +199,11 @@ async function generateInvoiceChase(
   }
 
   const party = (invoice.party_snapshot ?? {}) as Record<string, unknown>
-  const clientName =
-    typeof party.name === 'string' && party.name.trim()
-      ? party.name.trim()
-      : typeof party.client_name === 'string' && party.client_name.trim()
-      ? party.client_name.trim()
-      : 'there'
+  const clientName = typeof party.name === 'string' && party.name.trim()
+    ? party.name.trim()
+    : typeof party.client_name === 'string' && party.client_name.trim()
+    ? party.client_name.trim()
+    : 'there'
 
   const output = buildInvoiceChaseStubDraft({
     clientName,
