@@ -555,7 +555,10 @@ export interface DocumentsEndpoints {
 		body?: ApiDocumentFinalizeBody,
 		signal?: AbortSignal
 	): Promise<ApiDocumentResult>;
-	download(documentId: string, signal?: AbortSignal): Promise<ApiDocumentDownloadResult>;
+	download(
+		documentId: string,
+		options?: AbortSignal | { inline?: boolean; signal?: AbortSignal }
+	): Promise<ApiDocumentDownloadResult>;
 	rename(
 		documentId: string,
 		body: ApiDocumentRenameBody,
