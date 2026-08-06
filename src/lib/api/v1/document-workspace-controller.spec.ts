@@ -388,21 +388,25 @@ describe('createDocumentWorkspaceController', () => {
 	});
 
 	it('opens inline preview state for PDF downloads', async () => {
+		let previewDownloadUrl = '';
 		const fetchMock = createMockFetch({
 			[`GET /api/v1/entities/client/${ENTITY_ID}/documents`]: async () => ({
 				body: { data: sampleBrowse }
 			}),
-			[`GET /api/v1/documents/${DOC_ID}/download`]: async () => ({
-				body: {
-					data: {
-						document_id: DOC_ID,
-						signed_url: 'https://storage.example.test/get-msa.pdf',
-						expires_in: 60,
-						mime_type: 'application/pdf',
-						name: 'msa.pdf'
+			[`GET /api/v1/documents/${DOC_ID}/download`]: async (request) => {
+				previewDownloadUrl = request.url;
+				return {
+					body: {
+						data: {
+							document_id: DOC_ID,
+							signed_url: 'https://storage.example.test/get-msa.pdf',
+							expires_in: 60,
+							mime_type: 'application/pdf',
+							name: 'msa.pdf'
+						}
 					}
-				}
-			})
+				};
+			}
 		});
 
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
@@ -414,6 +418,7 @@ describe('createDocumentWorkspaceController', () => {
 
 		await vi.waitFor(() => expect(controller.view.kind).toBe('ready'));
 		await controller.preview(DOC_ID);
+		expect(new URL(previewDownloadUrl).searchParams.get('inline')).toBe('1');
 		expect(controller.previewState).toEqual({
 			documentId: DOC_ID,
 			url: 'https://storage.example.test/get-msa.pdf',
@@ -428,21 +433,25 @@ describe('createDocumentWorkspaceController', () => {
 		const openSpy = vi.fn(() => null);
 		vi.stubGlobal('window', { open: openSpy });
 
+		let previewDownloadUrl = '';
 		const fetchMock = createMockFetch({
 			[`GET /api/v1/entities/client/${ENTITY_ID}/documents`]: async () => ({
 				body: { data: sampleBrowse }
 			}),
-			[`GET /api/v1/documents/${DOC_ID}/download`]: async () => ({
-				body: {
-					data: {
-						document_id: DOC_ID,
-						signed_url: 'https://storage.example.test/get-msa.zip',
-						expires_in: 60,
-						mime_type: 'application/zip',
-						name: 'msa.zip'
+			[`GET /api/v1/documents/${DOC_ID}/download`]: async (request) => {
+				previewDownloadUrl = request.url;
+				return {
+					body: {
+						data: {
+							document_id: DOC_ID,
+							signed_url: 'https://storage.example.test/get-msa.zip',
+							expires_in: 60,
+							mime_type: 'application/zip',
+							name: 'msa.zip'
+						}
 					}
-				}
-			})
+				};
+			}
 		});
 
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
@@ -454,6 +463,7 @@ describe('createDocumentWorkspaceController', () => {
 
 		await vi.waitFor(() => expect(controller.view.kind).toBe('ready'));
 		await controller.preview(DOC_ID);
+		expect(new URL(previewDownloadUrl).searchParams.get('inline')).toBe('1');
 		expect(controller.previewState).toBeNull();
 		expect(openSpy).toHaveBeenCalledWith(
 			'https://storage.example.test/get-msa.zip',
@@ -461,5 +471,39 @@ describe('createDocumentWorkspaceController', () => {
 			'noopener,noreferrer'
 		);
 		vi.unstubAllGlobals();
+	});
+
+	it('does not request inline disposition for explicit downloads', async () => {
+		let downloadUrl = '';
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/entities/client/${ENTITY_ID}/documents`]: async () => ({
+				body: { data: sampleBrowse }
+			}),
+			[`GET /api/v1/documents/${DOC_ID}/download`]: async (request) => {
+				downloadUrl = request.url;
+				return {
+					body: {
+						data: {
+							document_id: DOC_ID,
+							signed_url: 'https://storage.example.test/get-msa.pdf',
+							expires_in: 60,
+							mime_type: 'application/pdf',
+							name: 'msa.pdf'
+						}
+					}
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const controller = createDocumentWorkspaceController({
+			client,
+			entityType: 'client',
+			entityId: ENTITY_ID
+		});
+
+		await vi.waitFor(() => expect(controller.view.kind).toBe('ready'));
+		await controller.download(DOC_ID);
+		expect(new URL(downloadUrl).searchParams.get('inline')).toBeNull();
 	});
 });

@@ -833,7 +833,9 @@
 		if (!sourceAttachment) return;
 		sourceAttachmentError = null;
 		try {
-			const result = await api.documents.download(sourceAttachment.id);
+			// inline=1 so storage does not force Content-Disposition: attachment
+			// (attachment signed URLs download-loop PDFs in the preview iframe).
+			const result = await api.documents.download(sourceAttachment.id, { inline: true });
 			if (!isInlineDocumentPreview(result.mime_type)) {
 				if (typeof document !== 'undefined') {
 					const anchor = document.createElement('a');
