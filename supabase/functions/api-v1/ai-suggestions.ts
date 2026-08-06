@@ -1,11 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
-import {
-  type AiPromptKey,
-  buildInvoiceChaseStubDraft,
-  mergeEffectivePrompts,
-  promptVersionFor,
-} from './ai-prompts.ts'
+import { buildToneAwareUserContent, runOrgAiCompletion } from './ai-provider.ts'
 import { ApiError, jsonBody, jsonResponse, parseUuid } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
@@ -36,39 +31,9 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
   return new ApiError(500, 'INTERNAL_ERROR', 'The AI suggestion operation failed')
 }
 
-async function loadEffectivePrompt(
-  db: DatabaseClient,
-  orgId: string,
-  key: AiPromptKey,
-  requestId: string,
-): Promise<{ prompt: string; promptVersion: string }> {
-  const { data, error } = await db.rpc('get_ai_org_prompts', { p_org_id: orgId })
-  if (error) throw databaseError(error, requestId)
-  const overrides = data && typeof data === 'object' && !Array.isArray(data)
-    ? ((data as Record<string, unknown>).overrides as Record<string, unknown> | undefined)
-    : undefined
-  const effective = mergeEffectivePrompts(overrides)
-  const prompt = effective[key]
-  return { prompt, promptVersion: await promptVersionFor(prompt) }
-}
-
-async function requireActiveAiProvider(
-  db: DatabaseClient,
-  orgId: string,
-  requestId: string,
-): Promise<string> {
-  const { data: integrations, error: listError } = await db.rpc('list_ai_integrations', {
-    p_org_id: orgId,
-  })
-  if (listError) throw databaseError(listError, requestId)
-  const active = (Array.isArray(integrations) ? integrations : []).find((row) => {
-    const r = row as Record<string, unknown>
-    return r.credentials_configured === true && r.status === 'active'
-  }) as Record<string, unknown> | undefined
-  if (!active) {
-    throw new ApiError(409, 'CONFLICT', 'No active AI integration is connected')
-  }
-  return String(active.provider ?? 'openrouter')
+/** Drop a trailing TONE: line if the model echoed the injected instruction. */
+export function sanitizeAiOutput(text: string): string {
+  return text.replace(/\n*TONE:\s*\S+\s*$/i, '').trim()
 }
 
 export function validateGenerateBody(
@@ -151,24 +116,43 @@ async function generateEmailReply(
 ): Promise<Response> {
   assertCanUseAi(role)
   const payload = validateGenerateBody(await jsonBody(req))
-  const provider = await requireActiveAiProvider(db, orgId, requestId)
-  const { prompt, promptVersion } = await loadEffectivePrompt(
+
+  const { data: context, error: contextError } = await db.rpc('get_email_message_ai_context', {
+    p_org_id: orgId,
+    p_message_id: payload.email_message_id,
+  })
+  if (contextError) throw databaseError(contextError, requestId)
+  const ctx = (context ?? {}) as Record<string, unknown>
+  const subject = typeof ctx.subject === 'string' ? ctx.subject : ''
+  const fromAddress = typeof ctx.from_address === 'string' ? ctx.from_address : ''
+  const fromName = typeof ctx.from_name === 'string' ? ctx.from_name : ''
+  const bodyText = typeof ctx.body_text === 'string' ? ctx.body_text : ''
+
+  const completion = await runOrgAiCompletion(
     db,
     orgId,
     'email_reply',
-    requestId,
+    buildToneAwareUserContent({
+      contextLabel: 'Source email',
+      contextBody: [
+        `From: ${fromName ? `${fromName} <${fromAddress}>` : fromAddress || 'unknown'}`,
+        `Subject: ${subject || '(no subject)'}`,
+        '',
+        bodyText || '(empty body)',
+      ].join('\n'),
+      tone: payload.variant,
+    }),
   )
 
-  // Empty p_output_text → RPC synthesizes using prompt + TONE inject (no per-tone sentences).
   const { data, error } = await db.rpc('create_email_reply_suggestion', {
     p_org_id: orgId,
     p_message_id: payload.email_message_id,
-    p_output_text: '',
-    p_model_provider: provider,
-    p_model_name: 'wave-b-local-draft',
+    p_output_text: sanitizeAiOutput(completion.text),
+    p_model_provider: completion.provider,
+    p_model_name: completion.model,
     p_variant: payload.variant,
-    p_prompt_text: prompt,
-    p_prompt_version: promptVersion,
+    p_prompt_text: completion.prompt,
+    p_prompt_version: completion.promptVersion,
   })
   if (error) throw databaseError(error, requestId)
   return jsonResponse({ data }, 201, requestId)
@@ -183,12 +167,10 @@ async function generateInvoiceChase(
 ): Promise<Response> {
   assertCanUseAi(role)
   const payload = validateInvoiceChaseBody(await jsonBody(req))
-  const provider = await requireActiveAiProvider(db, orgId, requestId)
-  const { promptVersion } = await loadEffectivePrompt(db, orgId, 'invoice_chase', requestId)
 
   const { data: invoice, error: invoiceError } = await db
     .from('invoices')
-    .select('id,number,due_on,party_snapshot')
+    .select('id,number,due_on,total_cents,currency,party_snapshot,balance_due_cents')
     .eq('org_id', orgId)
     .eq('id', payload.invoice_id)
     .is('deleted_at', null)
@@ -205,21 +187,32 @@ async function generateInvoiceChase(
     ? party.client_name.trim()
     : 'there'
 
-  const output = buildInvoiceChaseStubDraft({
-    clientName,
-    invoiceNumber: invoice.number,
-    dueOn: invoice.due_on,
-    tone: payload.variant,
-  })
+  const completion = await runOrgAiCompletion(
+    db,
+    orgId,
+    'invoice_chase',
+    buildToneAwareUserContent({
+      contextLabel: 'Invoice to chase',
+      contextBody: [
+        `Client: ${clientName}`,
+        `Invoice: ${invoice.number}`,
+        `Due on: ${invoice.due_on ?? 'unknown'}`,
+        `Currency: ${invoice.currency}`,
+        `Total cents: ${invoice.total_cents}`,
+        `Balance due cents: ${invoice.balance_due_cents}`,
+      ].join('\n'),
+      tone: payload.variant,
+    }),
+  )
 
   const { data, error } = await db.rpc('create_invoice_chase_suggestion', {
     p_org_id: orgId,
     p_invoice_id: payload.invoice_id,
-    p_output_text: output,
-    p_model_provider: provider,
-    p_model_name: 'wave-b-local-draft',
+    p_output_text: sanitizeAiOutput(completion.text),
+    p_model_provider: completion.provider,
+    p_model_name: completion.model,
     p_variant: payload.variant,
-    p_prompt_version: promptVersion,
+    p_prompt_version: completion.promptVersion,
   })
   if (error) throw databaseError(error, requestId)
   return jsonResponse({ data }, 201, requestId)

@@ -15,7 +15,7 @@ export const DEFAULT_AI_PROMPTS: Record<AiPromptKey, string> = {
   meeting_summary:
     'Summarise this meeting transcript into clear prose: decisions, open questions, and next steps. Keep it skimmable.',
   meeting_task_proposals:
-    'Extract 1–3 concrete follow-up tasks from the transcript. Each task needs a short title and a one-sentence description.',
+    'Extract 1–3 concrete follow-up tasks from the transcript. Reply with ONLY a JSON array of objects shaped like [{"title":"...","description":"...","confidence":0.8}]. No markdown fences or prose outside the JSON.',
   invoice_chase:
     'Draft a short payment-reminder email for this invoice. Be clear about the amount/due date when provided. Do not threaten legal action.',
 }
@@ -141,4 +141,45 @@ export function buildMeetingProposalStubs(
       confidence: Number((0.9 - index * 0.1).toFixed(4)),
     }
   })
+}
+
+/** Parse model JSON task proposals; fall back to line stubs when unparseable. */
+export function parseMeetingProposalOutput(
+  text: string,
+  plainText: string,
+  prompt: string,
+): Array<{ title: string; description: string; confidence: number }> {
+  const cleaned = text.trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+  try {
+    const parsed = JSON.parse(cleaned) as unknown
+    const rows = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { tasks?: unknown }).tasks)
+      ? (parsed as { tasks: unknown[] }).tasks
+      : null
+    if (!rows) return buildMeetingProposalStubs(plainText, prompt)
+    const out: Array<{ title: string; description: string; confidence: number }> = []
+    for (const [index, row] of rows.slice(0, 3).entries()) {
+      if (!row || typeof row !== 'object') continue
+      const r = row as Record<string, unknown>
+      const title = typeof r.title === 'string' ? r.title.trim() : ''
+      const description = typeof r.description === 'string' ? r.description.trim() : ''
+      if (!title) continue
+      let confidence = 0.8 - index * 0.1
+      if (typeof r.confidence === 'number' && Number.isFinite(r.confidence)) {
+        confidence = Math.min(1, Math.max(0, r.confidence))
+      }
+      out.push({
+        title: title.slice(0, 200),
+        description: (description || title).slice(0, 2000),
+        confidence: Number(confidence.toFixed(4)),
+      })
+    }
+    return out.length > 0 ? out : buildMeetingProposalStubs(plainText, prompt)
+  } catch {
+    return buildMeetingProposalStubs(plainText, prompt)
+  }
 }
