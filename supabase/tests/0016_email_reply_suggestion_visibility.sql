@@ -183,7 +183,7 @@ select ok(
       and prosrc ~ 'owner_membership_id'
       and prosrc ~ 'Email message not found'
     from pg_proc
-    where oid = 'public.create_email_reply_suggestion(uuid, uuid, text, text, text, text)'::regprocedure
+    where oid = 'public.create_email_reply_suggestion(uuid, uuid, text, text, text, text, text, text)'::regprocedure
   ),
   'create_email_reply_suggestion source gates on owner or timeline_share'
 );
