@@ -68,12 +68,7 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Projects / {clientName}"
-				title={projectName}
-				description={description ?? 'Inner kanban for delivery work on this client project.'}
-				status={status}
-			>
+			<PageHeader title={projectName} status={status}>
 				{#snippet actions()}
 					{#if owner}
 						<span class="text-muted-foreground hidden text-sm sm:inline">Owner {owner}</span>

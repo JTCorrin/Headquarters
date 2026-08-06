@@ -149,6 +149,20 @@ Deno.test('jsonBody rejects oversized payloads', async () => {
   )
 })
 
+Deno.test('jsonBody accepts oversized payloads when maxBytes is raised', async () => {
+  const payload = { plain_text: 'x'.repeat(70_000) }
+  const body = await jsonBody(
+    new Request('https://example.test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+    { maxBytes: 600_000 },
+  )
+  assertEquals(typeof body.plain_text, 'string')
+  assertEquals((body.plain_text as string).length, 70_000)
+})
+
 Deno.test('contact create validation strips whitespace and supplies lifecycle status', () => {
   assertEquals(
     validateContactBody(

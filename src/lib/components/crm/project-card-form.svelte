@@ -6,6 +6,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import DateField from './date-field.svelte';
 	import { cn } from '$lib/utils.js';
 
 	export interface ProjectCardFormProps {
@@ -82,11 +83,11 @@
 
 	<div class="space-y-2">
 		<Label for="project-card-due">Due</Label>
-		<Input
+		<DateField
 			id="project-card-due"
 			name="dueAt"
-			type="datetime-local"
 			bind:value={$formData.dueAt}
+			presets={['today', 'plus7', 'endOfMonth']}
 		/>
 	</div>
 
