@@ -590,6 +590,20 @@
 		);
 	}
 
+	async function onGenerateChase(payload: {
+		tone: 'polite' | 'firm';
+	}): Promise<{ suggestionText: string; suggestionId?: string }> {
+		if (!invoice) throw new Error('Invoice is not loaded');
+		const suggestion = await api.emailMessages.generateInvoiceChase({
+			invoice_id: invoice.id,
+			variant: payload.tone
+		});
+		return {
+			suggestionText: suggestion.output_text ?? suggestion.suggestion_text ?? '',
+			suggestionId: suggestion.id
+		};
+	}
+
 	async function onDelete() {
 		if (!invoice || invoice.status !== 'draft') return;
 		const epoch = captureEpoch();
@@ -791,6 +805,7 @@
 						onSend={onSend}
 						onVoid={onVoid}
 						onDelete={onDelete}
+						{onGenerateChase}
 						onRecordPayment={onRecordPayment}
 						onReversePayment={onReversePayment}
 						{onTimelineAdd}

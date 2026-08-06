@@ -64,6 +64,18 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 			});
 			return data;
 		},
+		generateInvoiceChase: async (body, signal) => {
+			const { data } = await request<ApiAiSuggestion>(
+				'/api/v1/ai-suggestions/invoice-chase',
+				{
+					method: 'POST',
+					body,
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
+		},
 		useDraft: async (suggestionId: string, acceptedText, signal) => {
 			const { data } = await request<ApiAiSuggestion>(
 				`/api/v1/ai-suggestions/${suggestionId}/use`,

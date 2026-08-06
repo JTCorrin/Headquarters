@@ -40,6 +40,42 @@ export function canMutateIntegrations(role: MembershipRole): boolean {
 	return canMutateOrgConfig(role);
 }
 
+export const aiPromptKeys = [
+	'email_reply',
+	'meeting_summary',
+	'meeting_task_proposals',
+	'invoice_chase'
+] as const;
+
+export type AiPromptKey = (typeof aiPromptKeys)[number];
+
+export const aiPromptLabels: Record<AiPromptKey, string> = {
+	email_reply: 'Email reply',
+	meeting_summary: 'Meeting summary',
+	meeting_task_proposals: 'Meeting task proposals',
+	invoice_chase: 'Invoice chase'
+};
+
+export const aiPromptHints: Record<AiPromptKey, string> = {
+	email_reply:
+		'Used by Draft response. Tone is injected at generate time as TONE: {warm|neutral|firm} — do not hardcode tone variants here.',
+	meeting_summary: 'Used by Generate summary on the meeting workspace.',
+	meeting_task_proposals: 'Used with Generate summary to propose follow-up tasks.',
+	invoice_chase:
+		'Used by Draft chase on invoices. Tone is injected as TONE: {polite|firm}.'
+};
+
+export const DEFAULT_AI_PROMPTS: Record<AiPromptKey, string> = {
+	email_reply:
+		'Draft a concise email reply based on the source message. Stay professional and actionable. Do not invent facts that are not in the thread.',
+	meeting_summary:
+		'Summarise this meeting transcript into clear prose: decisions, open questions, and next steps. Keep it skimmable.',
+	meeting_task_proposals:
+		'Extract 1–3 concrete follow-up tasks from the transcript. Each task needs a short title and a one-sentence description.',
+	invoice_chase:
+		'Draft a short payment-reminder email for this invoice. Be clear about the amount/due date when provided. Do not threaten legal action.'
+};
+
 /** True when at least one AI provider is connected for Draft response. */
 export function hasConnectedAiProvider(integrations: AiIntegrationResource[]): boolean {
 	return integrations.some((item) => item.credentials_configured && item.status === 'connected');

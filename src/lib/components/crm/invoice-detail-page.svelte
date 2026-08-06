@@ -75,6 +75,10 @@
 		onVoid?: () => void | Promise<void>;
 		onDelete?: () => void | Promise<void>;
 		onChase?: (draft?: string) => void;
+		/** Live path: call AI invoice-chase; Storybook may omit and use local stub. */
+		onGenerateChase?: (payload: {
+			tone: 'polite' | 'firm';
+		}) => Promise<{ suggestionText: string; suggestionId?: string }>;
 		onRecordPayment?: () => boolean | void | Promise<boolean | void>;
 		onReversePayment?: (paymentId: string) => void | Promise<void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
@@ -116,6 +120,7 @@
 		onVoid,
 		onDelete,
 		onChase,
+		onGenerateChase,
 		onRecordPayment,
 		onReversePayment,
 		onTimelineAdd,
@@ -138,20 +143,30 @@
 
 	async function generateChaseDraft() {
 		chaseStatus = 'generating';
-		const greet = chaseGreetingName(
-			formData.current.recipients,
-			contactOptions,
-			formData.current.clientName
-		);
-		const due = formData.current.dueOn || 'the due date';
-		const number = title.split('·')[0]?.trim() || 'this invoice';
-		await new Promise((r) => setTimeout(r, 650));
-		if (chaseTone === 'firm') {
-			chaseDraft = `Hi ${greet},\n\nInvoice ${number} is past due (due ${due}). Please arrange payment or reply with a remittance date this week.\n\nRegards`;
-		} else {
-			chaseDraft = `Hi ${greet},\n\nFriendly reminder that invoice ${number} was due on ${due}. Happy to resend the PDF or set up a payment link if useful.\n\nThanks`;
+		const tone = chaseTone === 'firm' ? 'firm' : 'polite';
+		try {
+			if (onGenerateChase) {
+				const result = await onGenerateChase({ tone });
+				chaseDraft = result.suggestionText;
+			} else {
+				// Storybook / offline fallback only — live invoice page wires onGenerateChase.
+				const greet = chaseGreetingName(
+					formData.current.recipients,
+					contactOptions,
+					formData.current.clientName
+				);
+				const due = formData.current.dueOn || 'the due date';
+				const number = title.split('·')[0]?.trim() || 'this invoice';
+				await new Promise((r) => setTimeout(r, 650));
+				chaseDraft =
+					`Hi ${greet},\n\nFriendly reminder that invoice ${number} was due on ${due}. ` +
+					`Happy to resend the PDF or set up a payment link if useful.\n\nThanks\n\nTONE: ${tone}\n`;
+			}
+			chaseStatus = 'ready';
+		} catch {
+			chaseStatus = 'idle';
+			chaseDraft = '';
 		}
-		chaseStatus = 'ready';
 	}
 
 	const attentionLine = $derived(
