@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { CalendarDate } from '@internationalized/date';
 	import type { SuperForm } from 'sveltekit-superforms';
+	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import type { MeetingFormData, MeetingListItem } from '$lib/schemas/meeting.js';
 	import { calendarMonthLabel } from '$lib/crm/meeting-calendar-range.js';
 	import type { AppNavGroup } from './app-nav.svelte';
@@ -18,6 +19,7 @@
 		days: CalendarDate[];
 		meetings: MeetingListItem[];
 		form: SuperForm<MeetingFormData>;
+		api?: ApiV1Client | null;
 		drawerOpen?: boolean;
 		showNav?: boolean;
 		class?: string;
@@ -36,6 +38,7 @@
 		days,
 		meetings,
 		form,
+		api = null,
 		drawerOpen = $bindable(false),
 		showNav = true,
 		class: className,
@@ -62,18 +65,14 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Work"
-				title="Calendar"
-				description="Meetings on a month grid — schedule from an empty day or open a meeting workspace."
-			>
+			<PageHeader title="Calendar">
 				{#snippet actions()}
 					{#if onOpenList}
 						<Button type="button" size="sm" variant="outline" onclick={onOpenList}>
 							List
 						</Button>
 					{/if}
-					<MeetingFormDrawer bind:open={drawerOpen} {form} {onValidSubmit} />
+					<MeetingFormDrawer bind:open={drawerOpen} {form} {api} {onValidSubmit} />
 				{/snippet}
 			</PageHeader>
 

@@ -9,6 +9,7 @@
 		emptyTaskFormData,
 		membershipFromCreateResult,
 		roleFromMemberships,
+		taskStatusLabel,
 		toDashboardTask,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
@@ -350,6 +351,74 @@
 		}
 	}
 
+	async function onMoveTask(move: { id: string; status: TaskListItem['rawStatus'] }) {
+		const existing = tasks.find((row) => row.id === move.id);
+		if (!existing) return;
+		if (existing.rawStatus === move.status) return;
+
+		const previous = tasks.map((row) => ({ ...row }));
+		tasks = tasks.map((row) =>
+			row.id === move.id
+				? { ...row, rawStatus: move.status, status: taskStatusLabel(move.status) }
+				: row
+		);
+
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.tasks.update(move.id, { status: move.status }, existing.version);
+			if (isStale(epoch)) return;
+			tasks = tasks.map((row) =>
+				row.id === move.id ? toTaskListItem(updated, listItemOptions()) : row
+			);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			tasks = previous;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Task version does not match If-Match.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not move task — try again.')
+			};
+		}
+	}
+
+	async function onDeleteTask() {
+		const taskId = editingTaskId;
+		if (!taskId) return;
+		const existing = tasks.find((row) => row.id === taskId);
+		if (!existing) return;
+
+		const epoch = captureEpoch();
+		try {
+			await api.tasks.delete(taskId, existing.version);
+			if (isStale(epoch)) return;
+			tasks = tasks.filter((row) => row.id !== taskId);
+			editDrawerOpen = false;
+			editingTaskId = null;
+			viewState =
+				tasks.length === 0 ? { kind: 'empty', message: 'No tasks yet.' } : { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) return;
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Task version does not match If-Match.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete task — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -420,7 +489,9 @@
 					onValidSubmit={onCreateTask}
 					onValidEdit={onEditTask}
 					onEditTask={openEdit}
+					{onDeleteTask}
 					{onToggleDone}
+					{onMoveTask}
 					onViewModeChange={(mode) => {
 						viewMode = mode;
 					}}

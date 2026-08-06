@@ -177,8 +177,10 @@ describe('MeetingsPage integration', () => {
 
 		await page.getByRole('button', { name: 'New meeting' }).click();
 		await page.getByLabelText('Title').fill('Renewal check-in');
-		await page.getByLabelText('Starts').fill('2026-08-12T11:00');
-		await page.getByLabelText('Ends').fill('2026-08-12T11:30');
+		await page.getByTestId('meeting-start-date').fill('2026-08-12');
+		await page.getByTestId('meeting-start-time').fill('11:00');
+		await page.getByTestId('meeting-end-date').fill('2026-08-12');
+		await page.getByTestId('meeting-end-time').fill('11:30');
 		await page.getByRole('button', { name: 'Add' }).click();
 		await page.getByLabelText('Email').fill('sam@contoso.com');
 		await page.getByLabelText('Name').fill('Sam Ortiz');
@@ -247,6 +249,33 @@ describe('MeetingsPage integration', () => {
 			[`GET /api/v1/meetings/${MEETING_ID}`]: async () => ({
 				body: { data: sampleMeeting() }
 			}),
+			'GET /api/v1/projects': async () => ({
+				body: {
+					data: [
+						{
+							id: PROJECT_ID,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							client_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+							name: 'Northwind rollout',
+							description: null,
+							status: 'active',
+							owner_membership_id: null,
+							position: 0,
+							starts_on: null,
+							due_on: null,
+							completed_at: null,
+							columns: []
+						}
+					],
+					meta: { next_cursor: null }
+				}
+			}),
 			[`PATCH /api/v1/meetings/${MEETING_ID}`]: async (request) => {
 				ifMatch = request.headers.get('if-match');
 				patchBody = await request.json();
@@ -273,7 +302,9 @@ describe('MeetingsPage integration', () => {
 		await editForm.getByLabelText('Title').fill('Q2 planning (updated)');
 		await editForm.getByLabelText('Related to').click();
 		await page.getByRole('option', { name: 'Project' }).click();
-		await editForm.getByLabelText('Related entity id').fill(PROJECT_ID);
+		await expect.element(page.getByTestId('meeting-related-picker')).toBeInTheDocument();
+		await page.getByTestId('meeting-related-picker').click();
+		await page.getByText('Northwind rollout').click();
 		await editForm.getByRole('button', { name: 'Save changes' }).click();
 
 		await expect

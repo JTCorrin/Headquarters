@@ -15,6 +15,7 @@ import {
   parseLimit,
   parseUuid,
   parseVersion,
+  TRANSCRIPT_JSON_BODY_MAX_BYTES,
 } from './http.ts'
 import { cancelMeetingOnCalendar, pushMeetingToCalendar } from './calendar-push.ts'
 
@@ -826,7 +827,7 @@ async function attachTranscript(
   const meeting = await findMeeting(db, orgId, meetingId, requestId)
   assertMeetingWritable(meeting, version)
 
-  const body = await jsonBody(req)
+  const body = await jsonBody(req, { maxBytes: TRANSCRIPT_JSON_BODY_MAX_BYTES })
   const documentIdRaw = body.document_id
   const plainTextRaw = body.plain_text
   const documentId = documentIdRaw === undefined || documentIdRaw === null

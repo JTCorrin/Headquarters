@@ -268,6 +268,7 @@
 					days={grid.days}
 					meetings={rows}
 					form={meetingForm}
+					{api}
 					bind:drawerOpen
 					onPrevMonth={() => {
 						month = month.subtract({ months: 1 });
