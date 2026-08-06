@@ -377,6 +377,7 @@
 					{navGroups}
 					{rows}
 					form={meetingForm}
+					{api}
 					editForm={editMeetingForm}
 					filterLabel={entityFilterLabel}
 					onClearFilter={entityFilter ? onClearEntityFilter : undefined}

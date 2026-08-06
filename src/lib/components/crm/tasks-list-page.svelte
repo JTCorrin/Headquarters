@@ -4,7 +4,7 @@
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import TasksBoard from './tasks-board.svelte';
-	import type { TaskBoardCard } from './tasks-board.svelte';
+	import type { TaskBoardCard, TaskBoardMove } from './tasks-board.svelte';
 	import TaskFormDrawer from './task-form-drawer.svelte';
 	import MyTasksPanel, { type DashboardTask } from './my-tasks-panel.svelte';
 	import ListFilterBanner from './list-filter-banner.svelte';
@@ -33,7 +33,9 @@
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onValidEdit?: () => boolean | void | Promise<boolean | void>;
 		onEditTask?: (id: string) => void;
+		onDeleteTask?: () => void | Promise<void>;
 		onToggleDone?: (id: string) => void;
+		onMoveTask?: (move: TaskBoardMove) => void | Promise<void>;
 		onViewModeChange?: (mode: TasksViewMode) => void;
 	}
 
@@ -55,7 +57,9 @@
 		onValidSubmit,
 		onValidEdit,
 		onEditTask,
+		onDeleteTask,
 		onToggleDone,
+		onMoveTask,
 		onViewModeChange
 	}: TasksListPageProps = $props();
 </script>
@@ -79,11 +83,7 @@
 			)}
 		>
 			<div class={cn(viewMode === 'board' && 'shrink-0')}>
-				<PageHeader
-					breadcrumb="Work"
-					title={viewMode === 'board' ? 'Tasks board' : 'Tasks'}
-					description="Follow-ups from meetings, emails, and pipeline stages."
-				>
+				<PageHeader title={viewMode === 'board' ? 'Tasks board' : 'Tasks'}>
 					{#snippet actions()}
 						{#if viewMode === 'board'}
 							<Button
@@ -123,7 +123,12 @@
 			{/if}
 
 			{#if viewMode === 'board'}
-				<TasksBoard tasks={boardTasks} class="min-h-0 flex-1" />
+				<TasksBoard
+					tasks={boardTasks}
+					class="min-h-0 flex-1"
+					onSelectTask={onEditTask}
+					{onMoveTask}
+				/>
 			{:else}
 				<MyTasksPanel
 					title="All tasks"
@@ -132,7 +137,7 @@
 					onToggleDone={onToggleDone}
 					onSelectTask={onEditTask}
 					showViewAll={false}
-					class="max-w-3xl"
+					class="w-full"
 				/>
 			{/if}
 		</div>
@@ -149,5 +154,6 @@
 		description="Update task details. Changes use If-Match versioning."
 		submitLabel="Save changes"
 		onValidSubmit={onValidEdit}
+		onDelete={onDeleteTask}
 	/>
 {/if}

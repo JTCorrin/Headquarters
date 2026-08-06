@@ -21,11 +21,7 @@
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
 		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
 			<div class="shrink-0">
-				<PageHeader
-					breadcrumb="Work"
-					title="Tasks board"
-					description="Drag tasks across status columns (SVAR Kanban, Luma-themed)."
-				>
+				<PageHeader title="Tasks board">
 					{#snippet actions()}
 						<Button variant="outline" size="sm">Table view</Button>
 						<Button size="sm">New task</Button>
