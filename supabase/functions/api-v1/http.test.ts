@@ -24,6 +24,7 @@ import {
   parseVersion,
 } from './http.ts'
 import {
+  sanitizeAiOutput,
   validateDecideBody,
   validateGenerateBody,
   validateInvoiceChaseBody,
@@ -31,8 +32,10 @@ import {
 import {
   DEFAULT_AI_PROMPTS,
   mergeEffectivePrompts,
+  parseMeetingProposalOutput,
   validateAiPromptsPutBody,
 } from './ai-prompts.ts'
+import { completeAiPrompt, isAiCompletionStubMode } from './ai-provider.ts'
 import { validateShareBody } from './email-messages.ts'
 import {
   parseAiProvider,
@@ -1527,6 +1530,43 @@ Deno.test('AI org prompts merge defaults and validate PUT body', () => {
   assertEquals(validateAiPromptsPutBody({ meeting_summary: null }), { meeting_summary: null })
   assertThrows(() => validateAiPromptsPutBody({ nope: 'x' }), ApiError)
   assertThrows(() => validateAiPromptsPutBody({}), ApiError)
+})
+
+Deno.test('AI output sanitize strips echoed TONE line', () => {
+  assertEquals(
+    sanitizeAiOutput('Thanks for the note.\n\nTONE: warm\n'),
+    'Thanks for the note.',
+  )
+  assertEquals(sanitizeAiOutput('Keep this TONE: warm inside.'), 'Keep this TONE: warm inside.')
+})
+
+Deno.test('AI meeting proposal JSON parse + stub fallback', () => {
+  const parsed = parseMeetingProposalOutput(
+    '```json\n[{"title":"Send pack","description":"Email the kickoff pack","confidence":0.9}]\n```',
+    'line one\nline two',
+    'Extract tasks',
+  )
+  assertEquals(parsed.length, 1)
+  assertEquals(parsed[0].title, 'Send pack')
+  assertEquals(parsed[0].confidence, 0.9)
+
+  const fallback = parseMeetingProposalOutput('not json', 'Alpha\nBeta', 'Extract tasks')
+  assertEquals(fallback.length, 2)
+  assertEquals(fallback[0].title, 'Alpha')
+})
+
+Deno.test('AI completion stub path returns deterministic text', async () => {
+  const result = await completeAiPrompt({
+    provider: 'openai',
+    apiKey: 'unused',
+    systemPrompt: 'Draft a reply',
+    userContent: 'Source email\n\nHello',
+  }, { forceStub: true })
+  assertEquals(result.provider, 'openai')
+  assertEquals(result.model.startsWith('stub-'), true)
+  assertEquals(result.text.includes('Draft a reply'), true)
+  assertEquals(result.text.includes('Source email'), true)
+  assertEquals(typeof isAiCompletionStubMode(), 'boolean')
 })
 
 Deno.test('recurring schedule validation defaults and frequency fields', () => {
