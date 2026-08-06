@@ -35,7 +35,7 @@ import {
   parseMeetingProposalOutput,
   validateAiPromptsPutBody,
 } from './ai-prompts.ts'
-import { completeAiPrompt, isAiCompletionStubMode } from './ai-provider.ts'
+import { completeAiPrompt, isAiCompletionStubMode, shouldStubAiCompletion } from './ai-provider.ts'
 import { validateShareBody } from './email-messages.ts'
 import {
   parseAiProvider,
@@ -1556,12 +1556,14 @@ Deno.test('AI meeting proposal JSON parse + stub fallback', () => {
 })
 
 Deno.test('AI completion stub path returns deterministic text', async () => {
+  assertEquals(shouldStubAiCompletion('sk-test-openai-123'), true)
+  assertEquals(shouldStubAiCompletion('sk-live-real-key'), false)
   const result = await completeAiPrompt({
     provider: 'openai',
-    apiKey: 'unused',
+    apiKey: 'sk-test-openai-proof',
     systemPrompt: 'Draft a reply',
     userContent: 'Source email\n\nHello',
-  }, { forceStub: true })
+  })
   assertEquals(result.provider, 'openai')
   assertEquals(result.model.startsWith('stub-'), true)
   assertEquals(result.text.includes('Draft a reply'), true)
