@@ -19,6 +19,8 @@
 		class?: string;
 		trigger?: Snippet;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void | Promise<void>;
+		deleteLabel?: string;
 	}
 
 	let {
@@ -32,8 +34,12 @@
 		showTrigger = true,
 		class: className,
 		trigger,
-		onValidSubmit
+		onValidSubmit,
+		onDelete,
+		deleteLabel = 'Delete task'
 	}: TaskFormDrawerProps = $props();
+
+	let deleteBusy = $state(false);
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
@@ -59,7 +65,28 @@
 		<div class="overflow-y-auto px-4 pb-2">
 			<TaskForm {form} {assigneeOptions} {submitLabel} {onValidSubmit} class="max-w-none" />
 		</div>
-		<Drawer.Footer class="pt-0">
+		<Drawer.Footer class="flex flex-wrap items-center justify-between gap-2 pt-0">
+			{#if onDelete}
+				<Button
+					type="button"
+					variant="outline"
+					disabled={deleteBusy}
+					data-testid="task-delete"
+					onclick={async () => {
+						if (!confirm('Delete this task?')) return;
+						deleteBusy = true;
+						try {
+							await onDelete();
+						} finally {
+							deleteBusy = false;
+						}
+					}}
+				>
+					{deleteLabel}
+				</Button>
+			{:else}
+				<span></span>
+			{/if}
 			<Drawer.Close>
 				<Button type="button" variant="outline">Cancel</Button>
 			</Drawer.Close>

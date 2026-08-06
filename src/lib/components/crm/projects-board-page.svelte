@@ -62,11 +62,7 @@
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-6 py-6 md:px-8">
-			<PageHeader
-				breadcrumb="Work"
-				title="Projects"
-				description="Client-attachable boards — drag projects between stages, open one for its inner kanban."
-			>
+			<PageHeader title="Projects">
 				{#snippet actions()}
 					<ProjectFormDrawer
 						bind:open={drawerOpen}

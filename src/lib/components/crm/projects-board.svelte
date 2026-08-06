@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { KanbanCard, ColumnConfig } from '@svar-ui/svelte-kanban';
 	import SvarKanbanShell, { type MoveCardEvent } from './svar-kanban-shell.svelte';
+	import CompactKanbanCard from './compact-kanban-card.svelte';
 	import { cn } from '$lib/utils.js';
 	import { computeBoardPosition } from '$lib/money.js';
 	import { projectBoardStatuses, type ProjectBoardStatus } from '$lib/schemas/project.js';
@@ -122,5 +123,10 @@
 	onclick={selectFromEvent}
 	onkeydown={onKeydown}
 >
-	<SvarKanbanShell {cards} {columns} onMoveCard={handleMoveCard} />
+	<SvarKanbanShell
+		{cards}
+		{columns}
+		cardContent={CompactKanbanCard}
+		onMoveCard={handleMoveCard}
+	/>
 </div>

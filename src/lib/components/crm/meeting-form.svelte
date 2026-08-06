@@ -2,11 +2,14 @@
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { MeetingFormData } from '$lib/schemas/meeting.js';
+	import type { NamedEntityOption } from './named-entity-picker.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import DateField from './date-field.svelte';
+	import NamedEntityPicker from './named-entity-picker.svelte';
 	import { cn } from '$lib/utils.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
@@ -15,14 +18,20 @@
 		form: SuperForm<MeetingFormData>;
 		submitLabel?: string;
 		class?: string;
+		relatedEntityOptions?: NamedEntityOption[];
+		relatedEntityLoading?: boolean;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onRelatedEntityTypeChange?: (type: MeetingFormData['relatedEntityType']) => void;
 	}
 
 	let {
 		form,
 		submitLabel = 'Save meeting',
 		class: className,
-		onValidSubmit
+		relatedEntityOptions = [],
+		relatedEntityLoading = false,
+		onValidSubmit,
+		onRelatedEntityTypeChange
 	}: MeetingFormProps = $props();
 
 	const formData = untrack(() => form.form);
@@ -32,6 +41,10 @@
 
 	let submitLock = false;
 	let pendingSubmit = $state(false);
+	let startsDateLocal = $state('');
+	let endsDateLocal = $state('');
+	let lastStartsFromForm = $state('');
+	let lastEndsFromForm = $state('');
 
 	const statusOptions = [
 		{ value: 'scheduled', label: 'Scheduled' },
@@ -54,6 +67,78 @@
 	const relatedTypeLabel = $derived(
 		relatedTypeOptions.find((o) => o.value === $formData.relatedEntityType)?.label ?? 'None'
 	);
+	const startsTime = $derived(splitLocalDatetime($formData.startsAt).time);
+	const endsTime = $derived(splitLocalDatetime($formData.endsAt).time);
+
+	const relatedPlaceholder = $derived(
+		$formData.relatedEntityType === 'client'
+			? 'Select client'
+			: $formData.relatedEntityType === 'contact'
+				? 'Select contact'
+				: $formData.relatedEntityType === 'lead'
+					? 'Select lead'
+					: $formData.relatedEntityType === 'project'
+						? 'Select project'
+						: 'Select…'
+	);
+
+	function splitLocalDatetime(value: string): { date: string; time: string } {
+		const trimmed = value?.trim() ?? '';
+		if (!trimmed) return { date: '', time: '' };
+		const [datePart, timePart = ''] = trimmed.split('T');
+		return { date: datePart ?? '', time: timePart.slice(0, 5) };
+	}
+
+	function joinLocalDatetime(date: string, time: string): string {
+		const d = date.trim();
+		if (!d) return '';
+		const t = time.trim() || '09:00';
+		return `${d}T${t}`;
+	}
+
+	function setStartsFromParts(date: string, time: string) {
+		formData.update((current) => ({
+			...current,
+			startsAt: joinLocalDatetime(date, time || splitLocalDatetime(current.startsAt).time || '09:00')
+		}));
+	}
+
+	function setEndsFromParts(date: string, time: string) {
+		formData.update((current) => ({
+			...current,
+			endsAt: joinLocalDatetime(date, time || splitLocalDatetime(current.endsAt).time || '10:00')
+		}));
+	}
+
+	$effect(() => {
+		const fromForm = splitLocalDatetime($formData.startsAt).date;
+		if (fromForm !== lastStartsFromForm) {
+			lastStartsFromForm = fromForm;
+			startsDateLocal = fromForm;
+		}
+	});
+
+	$effect(() => {
+		const fromForm = splitLocalDatetime($formData.endsAt).date;
+		if (fromForm !== lastEndsFromForm) {
+			lastEndsFromForm = fromForm;
+			endsDateLocal = fromForm;
+		}
+	});
+
+	$effect(() => {
+		const date = startsDateLocal;
+		const current = splitLocalDatetime($formData.startsAt);
+		if (date === current.date) return;
+		setStartsFromParts(date, current.time || '09:00');
+	});
+
+	$effect(() => {
+		const date = endsDateLocal;
+		const current = splitLocalDatetime($formData.endsAt);
+		if (date === current.date) return;
+		setEndsFromParts(date, current.time || '10:00');
+	});
 
 	function addAttendee() {
 		formData.update((current) => ({
@@ -105,24 +190,42 @@
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
-			<Label for="meeting-start">Starts</Label>
-			<Input
-				id="meeting-start"
-				name="startsAt"
-				type="datetime-local"
-				bind:value={$formData.startsAt}
+			<Label for="meeting-start-date">Starts</Label>
+			<input type="hidden" name="startsAt" value={$formData.startsAt} />
+			<DateField
+				id="meeting-start-date"
+				bind:value={startsDateLocal}
 				aria-invalid={!!$errors.startsAt}
+				data-testid="meeting-start-date"
+			/>
+			<Input
+				id="meeting-start-time"
+				type="time"
+				value={startsTime}
+				aria-label="Start time"
+				data-testid="meeting-start-time"
+				oninput={(e) =>
+					setStartsFromParts(startsDateLocal, (e.currentTarget as HTMLInputElement).value)}
 			/>
 			{#if $errors.startsAt}<p class="text-destructive text-xs">{$errors.startsAt}</p>{/if}
 		</div>
 		<div class="space-y-2">
-			<Label for="meeting-end">Ends</Label>
-			<Input
-				id="meeting-end"
-				name="endsAt"
-				type="datetime-local"
-				bind:value={$formData.endsAt}
+			<Label for="meeting-end-date">Ends</Label>
+			<input type="hidden" name="endsAt" value={$formData.endsAt} />
+			<DateField
+				id="meeting-end-date"
+				bind:value={endsDateLocal}
 				aria-invalid={!!$errors.endsAt}
+				data-testid="meeting-end-date"
+			/>
+			<Input
+				id="meeting-end-time"
+				type="time"
+				value={endsTime}
+				aria-label="End time"
+				data-testid="meeting-end-time"
+				oninput={(e) =>
+					setEndsFromParts(endsDateLocal, (e.currentTarget as HTMLInputElement).value)}
 			/>
 			{#if $errors.endsAt}<p class="text-destructive text-xs">{$errors.endsAt}</p>{/if}
 		</div>
@@ -164,28 +267,58 @@
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="meeting-related-type">Related to</Label>
-			<Select.Root type="single" bind:value={$formData.relatedEntityType} name="relatedEntityType">
+			<Select.Root
+				type="single"
+				value={$formData.relatedEntityType}
+				name="relatedEntityType"
+				onValueChange={(next) => {
+					const value = (next ?? 'none') as MeetingFormData['relatedEntityType'];
+					formData.update((current) => ({
+						...current,
+						relatedEntityType: value,
+						relatedEntityId: value === 'none' ? '' : ''
+					}));
+					onRelatedEntityTypeChange?.(value);
+				}}
+			>
 				<Select.Trigger id="meeting-related-type" class="w-full">{relatedTypeLabel}</Select.Trigger>
 				<Select.Content>
-				{#each relatedTypeOptions as option (option.value)}
-					<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
+					{#each relatedTypeOptions as option (option.value)}
+						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
 			{#if $errors.relatedEntityType}
 				<p class="text-destructive text-xs">{$errors.relatedEntityType}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
-			<Label for="meeting-related-id">Related entity id</Label>
-			<Input
-				id="meeting-related-id"
-				name="relatedEntityId"
-				bind:value={$formData.relatedEntityId}
-				placeholder="UUID (optional)"
-				disabled={$formData.relatedEntityType === 'none'}
-				aria-invalid={!!$errors.relatedEntityId}
-			/>
+			<Label for="meeting-related-id">
+				{$formData.relatedEntityType === 'none' ? 'Related record' : relatedTypeLabel}
+			</Label>
+			{#if $formData.relatedEntityType === 'none'}
+				<Input
+					id="meeting-related-id"
+					name="relatedEntityId"
+					value=""
+					placeholder="Choose a type first"
+					disabled
+				/>
+			{:else}
+				<NamedEntityPicker
+					id="meeting-related-id"
+					value={$formData.relatedEntityId}
+					options={relatedEntityOptions}
+					loading={relatedEntityLoading}
+					placeholder={relatedPlaceholder}
+					emptyMessage={`No ${relatedTypeLabel.toLowerCase()}s found.`}
+					aria-invalid={!!$errors.relatedEntityId}
+					data-testid="meeting-related-picker"
+					onValueChange={(id) => {
+						formData.update((current) => ({ ...current, relatedEntityId: id }));
+					}}
+				/>
+			{/if}
 			{#if $errors.relatedEntityId}
 				<p class="text-destructive text-xs">{$errors.relatedEntityId}</p>
 			{/if}

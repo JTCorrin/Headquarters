@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
@@ -197,6 +197,40 @@ describe('TasksPage integration', () => {
 		await expect
 			.element(page.getByText(/412|version does not match|changed elsewhere/i))
 			.toBeInTheDocument();
+	});
+
+	it('deletes a task from the edit drawer', async () => {
+		const session = sessionForOrg();
+		let deleted: { id: string; ifMatch: string | null } | null = null;
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/tasks': async () => ({
+				body: { data: [sampleTask({ version: 3 })], meta: { next_cursor: null } }
+			}),
+			[`DELETE /api/v1/tasks/${TASK_ID}`]: async (request) => {
+				deleted = { id: TASK_ID, ifMatch: request.headers.get('if-match') };
+				return { status: 204 };
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(TasksPage, { api, session });
+
+		await expect
+			.element(page.getByRole('button', { name: 'Send kickoff pack', exact: true }))
+			.toBeInTheDocument();
+		await page.getByRole('button', { name: 'Send kickoff pack', exact: true }).click();
+		await expect.element(page.getByText('Edit task')).toBeInTheDocument();
+
+		const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+		await page.getByTestId('task-delete').click();
+		confirmSpy.mockRestore();
+
+		await expect.poll(() => deleted?.ifMatch).toBe('"3"');
+		await expect
+			.element(page.getByRole('button', { name: 'Send kickoff pack', exact: true }))
+			.not.toBeInTheDocument();
 	});
 
 	it('passes entity_type and entity_id to listTasks when filtered', async () => {

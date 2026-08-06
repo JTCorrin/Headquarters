@@ -2341,7 +2341,7 @@ export function toProjectCardFormData(card: ApiProjectCard): ProjectCardFormData
 	return {
 		title: card.title,
 		description: card.description ?? '',
-		dueAt: isoToLocalDatetime(card.due_at)
+		dueAt: dueAtToForm(card.due_at)
 	};
 }
 
@@ -2349,7 +2349,7 @@ export function toProjectCardCreateBody(data: ProjectCardFormData): ApiProjectCa
 	return {
 		title: data.title.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
-		due_at: data.dueAt?.trim() ? localDatetimeToIso(data.dueAt.trim()) : null
+		due_at: dueOnToApi(data.dueAt)
 	};
 }
 
@@ -2357,7 +2357,7 @@ export function toProjectCardUpdateBody(data: ProjectCardFormData): ApiProjectCa
 	return {
 		title: data.title.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
-		due_at: data.dueAt?.trim() ? localDatetimeToIso(data.dueAt.trim()) : null
+		due_at: dueOnToApi(data.dueAt)
 	};
 }
 

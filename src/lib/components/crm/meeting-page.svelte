@@ -508,6 +508,7 @@
 					<MeetingFormDrawer
 						bind:open={editDrawerOpen}
 						form={editMeetingForm}
+						{api}
 						showTrigger={false}
 						title="Edit meeting"
 						description="Update schedule, related record, or attendees. Changes use If-Match versioning."
