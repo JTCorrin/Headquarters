@@ -71,7 +71,7 @@ export const DEFAULT_AI_PROMPTS: Record<AiPromptKey, string> = {
 	meeting_summary:
 		'Summarise this meeting transcript into clear prose: decisions, open questions, and next steps. Keep it skimmable.',
 	meeting_task_proposals:
-		'Extract 1–3 concrete follow-up tasks from the transcript. Each task needs a short title and a one-sentence description.',
+		'Extract 1–3 concrete follow-up tasks from the transcript. Reply with ONLY a JSON array of objects shaped like [{"title":"...","description":"...","confidence":0.8}]. No markdown fences or prose outside the JSON.',
 	invoice_chase:
 		'Draft a short payment-reminder email for this invoice. Be clear about the amount/due date when provided. Do not threaten legal action.'
 };
