@@ -23,7 +23,16 @@ import {
   parseLimit,
   parseVersion,
 } from './http.ts'
-import { validateDecideBody, validateGenerateBody } from './ai-suggestions.ts'
+import {
+  validateDecideBody,
+  validateGenerateBody,
+  validateInvoiceChaseBody,
+} from './ai-suggestions.ts'
+import {
+  DEFAULT_AI_PROMPTS,
+  mergeEffectivePrompts,
+  validateAiPromptsPutBody,
+} from './ai-prompts.ts'
 import { validateShareBody } from './email-messages.ts'
 import {
   parseAiProvider,
@@ -1495,6 +1504,29 @@ Deno.test('AI email_reply generate/decide validation', () => {
   assertEquals(validateDecideBody({ accepted_text: 'Edited' }), { accepted_text: 'Edited' })
   assertThrows(() => validateDecideBody({ accepted_text: 1 }), ApiError)
   assertThrows(() => validateDecideBody({ send: true }), ApiError)
+})
+
+Deno.test('AI invoice_chase generate validation', () => {
+  const id = '33333333-3333-4333-8333-333333333333'
+  assertEquals(validateInvoiceChaseBody({ invoice_id: id }), {
+    invoice_id: id,
+    variant: 'polite',
+  })
+  assertEquals(validateInvoiceChaseBody({ invoice_id: id, variant: 'firm' }).variant, 'firm')
+  assertThrows(() => validateInvoiceChaseBody({ invoice_id: 'x' }), ApiError)
+})
+
+Deno.test('AI org prompts merge defaults and validate PUT body', () => {
+  assertEquals(mergeEffectivePrompts({}).email_reply, DEFAULT_AI_PROMPTS.email_reply)
+  assertEquals(
+    mergeEffectivePrompts({ email_reply: ' Custom reply prompt ' }).email_reply,
+    ' Custom reply prompt ',
+  )
+  assertEquals(validateAiPromptsPutBody({ email_reply: 'Hello' }), { email_reply: 'Hello' })
+  assertEquals(validateAiPromptsPutBody({ email_reply: '  ' }), { email_reply: null })
+  assertEquals(validateAiPromptsPutBody({ meeting_summary: null }), { meeting_summary: null })
+  assertThrows(() => validateAiPromptsPutBody({ nope: 'x' }), ApiError)
+  assertThrows(() => validateAiPromptsPutBody({}), ApiError)
 })
 
 Deno.test('recurring schedule validation defaults and frequency fields', () => {

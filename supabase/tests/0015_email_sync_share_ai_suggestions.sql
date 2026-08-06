@@ -25,7 +25,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_email_reply_suggestion(uuid, uuid, text, text, text, text)',
+    'public.create_email_reply_suggestion(uuid, uuid, text, text, text, text, text, text)',
     'execute'
   ),
   'authenticated can execute create_email_reply_suggestion'

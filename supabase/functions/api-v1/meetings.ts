@@ -8,6 +8,11 @@ import type {
   MeetingTranscriptRow,
 } from '../_shared/database.ts'
 import {
+  buildMeetingProposalStubs,
+  buildMeetingSummaryStub,
+  mergeEffectivePrompts,
+} from './ai-prompts.ts'
+import {
   ApiError,
   etag,
   jsonBody,
@@ -760,30 +765,21 @@ function mapTranscriptToMeetingStatus(status: TranscriptStatus): MeetingTranscri
   return status
 }
 
-function buildStubSummary(plainText: string): string {
-  const trimmed = plainText.trim().replace(/\s+/g, ' ')
-  const excerpt = trimmed.slice(0, 280)
-  return `Meeting summary (stub): ${excerpt}${trimmed.length > 280 ? '…' : ''}`
-}
-
-function buildStubProposals(
-  plainText: string,
-): Array<{ title: string; description: string; confidence: number }> {
-  const lines = plainText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-  const seeds = lines.length > 0
-    ? lines.slice(0, 3)
-    : [plainText.trim().slice(0, 80) || 'Follow up from meeting']
-  return seeds.map((seed, index) => {
-    const title = seed.length > 120 ? `${seed.slice(0, 117)}…` : seed
-    return {
-      title: title || `Follow-up ${index + 1}`,
-      description: `Proposed from transcript line ${index + 1}.`,
-      confidence: Number((0.9 - index * 0.1).toFixed(4)),
-    }
-  })
+async function loadMeetingPromptBundle(
+  db: DatabaseMeeting,
+  orgId: string,
+  requestId: string,
+): Promise<{ summaryPrompt: string; proposalsPrompt: string }> {
+  const { data, error } = await db.rpc('get_ai_org_prompts', { p_org_id: orgId })
+  if (error) throw databaseError(error, requestId)
+  const overrides = data && typeof data === 'object' && !Array.isArray(data)
+    ? ((data as Record<string, unknown>).overrides as Record<string, unknown> | undefined)
+    : undefined
+  const effective = mergeEffectivePrompts(overrides)
+  return {
+    summaryPrompt: effective.meeting_summary,
+    proposalsPrompt: effective.meeting_task_proposals,
+  }
 }
 
 function assertMeetingWritable(meeting: MeetingRow, version: number): void {
@@ -1000,8 +996,9 @@ async function generateSummary(
     requestId,
   )
 
-  const summary = buildStubSummary(plainText)
-  const proposals = buildStubProposals(plainText)
+  const prompts = await loadMeetingPromptBundle(db, orgId, requestId)
+  const summary = buildMeetingSummaryStub(plainText, prompts.summaryPrompt)
+  const proposals = buildMeetingProposalStubs(plainText, prompts.proposalsPrompt)
 
   // Replace only still-proposed rows so accepted/dismissed history is preserved.
   const { data: openProposals, error: openError } = await db

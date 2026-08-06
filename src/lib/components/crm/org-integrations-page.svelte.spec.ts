@@ -67,9 +67,31 @@ describe('OrgIntegrationsPage', () => {
 			integrations
 		});
 
-		await expect.element(page.getByText(/Read-only for your role/i)).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId('ai-integrations-section').getByText(/Read-only for your role/i))
+			.toBeInTheDocument();
 		await expect
 			.element(page.getByTestId('ai-integration-connect-openai'))
 			.not.toBeInTheDocument();
+		await expect.element(page.getByTestId('ai-prompts-save')).not.toBeInTheDocument();
+	});
+
+	it('shows AI prompt textareas and saves for owners', async () => {
+		const onSavePrompts = vi.fn(async () => true);
+		render(OrgIntegrationsPage, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Integrations'),
+			role: 'owner',
+			integrations,
+			onSavePrompts
+		});
+
+		await expect.element(page.getByTestId('ai-prompts-section')).toBeInTheDocument();
+		await expect.element(page.getByTestId('ai-prompt-textarea-email_reply')).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId('ai-prompt-textarea-meeting_summary'))
+			.toBeInTheDocument();
+		await page.getByTestId('ai-prompts-save').click();
+		expect(onSavePrompts).toHaveBeenCalledOnce();
 	});
 });
