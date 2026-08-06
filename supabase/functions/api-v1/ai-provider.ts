@@ -168,12 +168,18 @@ export function isAiCompletionStubMode(): boolean {
   }
 }
 
+/** Staging curl proofs use `sk-test-*` keys — never send those to live providers. */
+export function shouldStubAiCompletion(apiKey: string, forceStub = false): boolean {
+  if (forceStub || isAiCompletionStubMode()) return true
+  return /^sk-test-/i.test(apiKey.trim())
+}
+
 export async function completeAiPrompt(
   request: AiCompletionRequest,
   options?: { forceStub?: boolean },
 ): Promise<AiCompletionResult> {
   const model = request.model?.trim() || DEFAULT_MODELS[request.provider]
-  if (options?.forceStub || isAiCompletionStubMode()) {
+  if (shouldStubAiCompletion(request.apiKey, options?.forceStub === true)) {
     const promptHint = request.systemPrompt.trim().split(/\n/)[0]?.slice(0, 80) ?? 'AI'
     return {
       text: `STUB completion (${request.provider}/${model}): ${promptHint}\n\n${
@@ -291,16 +297,6 @@ export async function runOrgAiCompletion(
     : undefined
   const prompt = mergeEffectivePrompts(overrides)[promptKey]
   const promptVersion = await promptVersionFor(prompt)
-
-  if (isAiCompletionStubMode()) {
-    const completion = await completeAiPrompt({
-      provider: 'openrouter',
-      apiKey: 'stub',
-      systemPrompt: prompt,
-      userContent,
-    })
-    return { ...completion, prompt, promptVersion }
-  }
 
   const provider = await resolveActiveAiProvider(db, orgId)
 
