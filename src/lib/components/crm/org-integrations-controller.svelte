@@ -9,8 +9,11 @@
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
+		aiPromptKeys,
 		aiProviders,
+		DEFAULT_AI_PROMPTS,
 		type AiIntegrationResource,
+		type AiPromptKey,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
 	import {
@@ -41,6 +44,10 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let integrations = $state<AiIntegrationResource[]>([]);
+	let prompts = $state<Record<AiPromptKey, string>>({ ...DEFAULT_AI_PROMPTS });
+	let promptDefaults = $state<Record<AiPromptKey, string>>({ ...DEFAULT_AI_PROMPTS });
+	let promptsBusy = $state(false);
+	let promptsError = $state<string | null>(null);
 	let connectError = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
@@ -133,7 +140,10 @@
 				return;
 			}
 
-			const rows = await api.integrations.list();
+			const [rows, promptBundle] = await Promise.all([
+				api.integrations.list(),
+				api.integrations.getAiPrompts()
+			]);
 			if (isStale(epoch)) return;
 			const mapped = rows.map(toAiIntegrationResource);
 			integrations = aiProviders.map(
@@ -146,6 +156,9 @@
 						last_error_code: null
 					}
 			);
+			promptDefaults = { ...DEFAULT_AI_PROMPTS, ...promptBundle.defaults };
+			prompts = { ...promptDefaults, ...promptBundle.effective };
+			promptsError = null;
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -222,6 +235,39 @@
 		}
 	}
 
+	async function onSavePrompts(
+		next: Record<AiPromptKey, string>
+	): Promise<boolean> {
+		const epoch = captureEpoch();
+		promptsBusy = true;
+		promptsError = null;
+		try {
+			const body: Partial<Record<AiPromptKey, string | null>> = {};
+			for (const key of aiPromptKeys) {
+				const value = next[key]?.trim() ?? '';
+				const fallback = promptDefaults[key] ?? DEFAULT_AI_PROMPTS[key];
+				body[key] = value === '' || value === fallback.trim() ? null : next[key];
+			}
+			const updated = await api.integrations.updateAiPrompts(body);
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			promptDefaults = { ...DEFAULT_AI_PROMPTS, ...updated.defaults };
+			prompts = { ...promptDefaults, ...updated.effective };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			promptsError = userMessage(error, 'Could not save AI prompts.');
+			return false;
+		} finally {
+			promptsBusy = false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -265,11 +311,16 @@
 					{navGroups}
 					{role}
 					{integrations}
+					{prompts}
+					{promptDefaults}
+					{promptsBusy}
+					{promptsError}
 					{viewState}
 					{connectError}
 					onReload={loadAll}
 					{onConnect}
 					{onDisconnect}
+					{onSavePrompts}
 					showNav={false}
 				/>
 			{/if}

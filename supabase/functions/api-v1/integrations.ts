@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
+import {
+  DEFAULT_AI_PROMPTS,
+  mergeEffectivePrompts,
+  validateAiPromptsPutBody,
+} from './ai-prompts.ts'
 import { ApiError, jsonBody, jsonResponse } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
@@ -19,6 +24,10 @@ function assertCanWriteAiIntegrations(role: MembershipRole): void {
   if (role !== 'owner') {
     throw new ApiError(403, 'FORBIDDEN', 'Only owners can connect AI providers')
   }
+}
+
+function assertCanWriteAiPrompts(role: MembershipRole): void {
+  assertCanWriteAiIntegrations(role)
 }
 
 function databaseError(error: { code?: string; message?: string }, requestId: string): ApiError {
@@ -127,6 +136,70 @@ async function deleteAiIntegration(
   })
 }
 
+function overridesFromRpc(data: unknown): Record<string, unknown> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {}
+  const overrides = (data as Record<string, unknown>).overrides
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) return {}
+  return overrides as Record<string, unknown>
+}
+
+function versionFromRpc(data: unknown): number {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 0
+  const version = (data as Record<string, unknown>).version
+  return typeof version === 'number' && Number.isFinite(version) ? version : 0
+}
+
+async function getAiPrompts(
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const { data, error } = await db.rpc('get_ai_org_prompts', { p_org_id: orgId })
+  if (error) throw databaseError(error, requestId)
+  const overrides = overridesFromRpc(data)
+  const effective = mergeEffectivePrompts(overrides)
+  return jsonResponse(
+    {
+      data: {
+        version: versionFromRpc(data),
+        overrides,
+        defaults: DEFAULT_AI_PROMPTS,
+        effective,
+      },
+    },
+    200,
+    requestId,
+  )
+}
+
+async function putAiPrompts(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const payload = validateAiPromptsPutBody(await jsonBody(req))
+  const { data, error } = await db.rpc('upsert_ai_org_prompts', {
+    p_org_id: orgId,
+    p_prompts: payload,
+  })
+  if (error) throw databaseError(error, requestId)
+  const overrides = overridesFromRpc(data)
+  const effective = mergeEffectivePrompts(overrides)
+  return jsonResponse(
+    {
+      data: {
+        version: versionFromRpc(data),
+        overrides,
+        defaults: DEFAULT_AI_PROMPTS,
+        effective,
+      },
+    },
+    200,
+    requestId,
+  )
+}
+
 export function handleIntegrations(
   req: Request,
   db: DatabaseClient,
@@ -139,6 +212,16 @@ export function handleIntegrations(
     assertCanReadIntegrations(role)
     if (req.method === 'GET') return listIntegrations(db, orgId, requestId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for integrations')
+  }
+
+  if (path === '/api/v1/integrations/ai/prompts') {
+    assertCanReadIntegrations(role)
+    if (req.method === 'GET') return getAiPrompts(db, orgId, requestId)
+    if (req.method === 'PUT') {
+      assertCanWriteAiPrompts(role)
+      return putAiPrompts(req, db, orgId, requestId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for AI prompts')
   }
 
   const aiMatch = path.match(/^\/api\/v1\/integrations\/ai\/([a-z]+)$/i)
