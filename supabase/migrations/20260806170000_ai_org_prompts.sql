@@ -407,46 +407,13 @@ begin
 end;
 $$;
 
--- Compatibility overload for existing pgTAP / callers that use the 6-arg form.
-create or replace function public.create_email_reply_suggestion(
-  p_org_id uuid,
-  p_message_id uuid,
-  p_output_text text,
-  p_model_provider text,
-  p_model_name text,
-  p_variant text default 'neutral'
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  return public.create_email_reply_suggestion(
-    p_org_id,
-    p_message_id,
-    p_output_text,
-    p_model_provider,
-    p_model_name,
-    p_variant,
-    null,
-    null
-  );
-end;
-$$;
-
+-- Single 8-arg signature (trailing defaults). Do not add a 6-arg overload —
+-- Postgres treats it as ambiguous with the defaulted parameters.
 revoke all on function public.create_email_reply_suggestion(
   uuid, uuid, text, text, text, text, text, text
 ) from public, anon;
 grant execute on function public.create_email_reply_suggestion(
   uuid, uuid, text, text, text, text, text, text
-) to authenticated;
-
-revoke all on function public.create_email_reply_suggestion(
-  uuid, uuid, text, text, text, text
-) from public, anon;
-grant execute on function public.create_email_reply_suggestion(
-  uuid, uuid, text, text, text, text
 ) to authenticated;
 
 revoke all on function public.create_invoice_chase_suggestion(uuid, uuid, text, text, text, text, text)
