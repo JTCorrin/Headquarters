@@ -7,11 +7,8 @@ import type {
   MeetingTaskProposalRow,
   MeetingTranscriptRow,
 } from '../_shared/database.ts'
-import {
-  buildMeetingProposalStubs,
-  buildMeetingSummaryStub,
-  mergeEffectivePrompts,
-} from './ai-prompts.ts'
+import { mergeEffectivePrompts, parseMeetingProposalOutput } from './ai-prompts.ts'
+import { runOrgAiCompletion } from './ai-provider.ts'
 import {
   ApiError,
   etag,
@@ -997,8 +994,34 @@ async function generateSummary(
   )
 
   const prompts = await loadMeetingPromptBundle(db, orgId, requestId)
-  const summary = buildMeetingSummaryStub(plainText, prompts.summaryPrompt)
-  const proposals = buildMeetingProposalStubs(plainText, prompts.proposalsPrompt)
+  const transcriptContext = [
+    'Meeting transcript',
+    '',
+    plainText.slice(0, 14000),
+  ].join('\n')
+
+  const summaryCompletion = await runOrgAiCompletion(
+    db,
+    orgId,
+    'meeting_summary',
+    transcriptContext,
+  )
+  const summary = summaryCompletion.text.trim()
+  if (!summary) {
+    throw new ApiError(502, 'INTERNAL_ERROR', 'AI returned an empty meeting summary')
+  }
+
+  const proposalsCompletion = await runOrgAiCompletion(
+    db,
+    orgId,
+    'meeting_task_proposals',
+    transcriptContext,
+  )
+  const proposals = parseMeetingProposalOutput(
+    proposalsCompletion.text,
+    plainText,
+    prompts.proposalsPrompt,
+  )
 
   // Replace only still-proposed rows so accepted/dismissed history is preserved.
   const { data: openProposals, error: openError } = await db
