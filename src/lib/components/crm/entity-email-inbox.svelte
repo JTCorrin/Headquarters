@@ -175,16 +175,14 @@
 		sending = false;
 	}
 
+	/** Storybook-only fallback when `onDraftResponse` is omitted. Live pages always wire the API. */
 	function buildDraft(message: EmailMessage, draftTone: DraftTone): string {
 		const firstName = message.from.split('@')[0]?.split('.')[0] ?? 'there';
 		const greeting = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-		if (draftTone === 'firm') {
-			return `Hi ${greeting},\n\nThanks for your note on “${message.subject}”.\n\nI can confirm Thursday morning works on our side. Please send the updated agenda by Wednesday EOD so we can prepare.\n\nBest regards`;
-		}
-		if (draftTone === 'neutral') {
-			return `Hi ${greeting},\n\nThanks for getting back about “${message.subject}”.\n\nThursday morning works for me — happy to adjust if needed. Let me know what time suits you best.\n\nThanks`;
-		}
-		return `Hi ${greeting},\n\nThanks so much for the update on “${message.subject}” — Thursday morning sounds perfect.\n\nI’ll hold that slot and send a short agenda beforehand. Looking forward to it.\n\nWarm regards`;
+		return (
+			`Hi ${greeting},\n\nThanks for your email about “${message.subject}”.\n\n` +
+			`I will follow up shortly.\n\nThanks\n\nTONE: ${draftTone}\n`
+		);
 	}
 
 	async function draftResponse() {

@@ -2,10 +2,15 @@
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
 	import { roleLabel } from '$lib/schemas/organisation.js';
 	import {
+		aiPromptHints,
+		aiPromptKeys,
+		aiPromptLabels,
 		aiProviderLabels,
 		aiProviders,
 		canMutateIntegrations,
+		DEFAULT_AI_PROMPTS,
 		type AiIntegrationResource,
+		type AiPromptKey,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
@@ -16,13 +21,21 @@
 	import StatusBadge from './status-badge.svelte';
 	import AiProviderConnectDrawer from './ai-provider-connect-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { cn } from '$lib/utils.js';
+
+	export type AiPromptsFormState = Record<AiPromptKey, string>;
 
 	export interface OrgIntegrationsPageProps {
 		orgName: string;
 		navGroups: AppNavGroup[];
 		role: MembershipRole;
 		integrations?: AiIntegrationResource[];
+		prompts?: AiPromptsFormState;
+		promptDefaults?: AiPromptsFormState;
+		promptsBusy?: boolean;
+		promptsError?: string | null;
 		viewState?: ResourceViewState;
 		connectError?: string | null;
 		class?: string;
@@ -30,6 +43,7 @@
 		onReload?: () => void;
 		onConnect?: (provider: AiProvider, apiKey: string) => boolean | void | Promise<boolean | void>;
 		onDisconnect?: (provider: AiProvider) => boolean | void | Promise<boolean | void>;
+		onSavePrompts?: (prompts: AiPromptsFormState) => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -37,13 +51,18 @@
 		navGroups,
 		role,
 		integrations = [],
+		prompts = { ...DEFAULT_AI_PROMPTS },
+		promptDefaults = { ...DEFAULT_AI_PROMPTS },
+		promptsBusy = false,
+		promptsError = null,
 		viewState = { kind: 'ready' },
 		connectError = null,
 		class: className,
 		showNav = true,
 		onReload,
 		onConnect,
-		onDisconnect
+		onDisconnect,
+		onSavePrompts
 	}: OrgIntegrationsPageProps = $props();
 
 	const canEdit = $derived(canMutateIntegrations(role));
@@ -54,6 +73,11 @@
 	let drawerOpen = $state(false);
 	let activeProvider = $state<AiProvider | null>(null);
 	let disconnectBusy = $state<AiProvider | null>(null);
+	let draftPrompts = $state<AiPromptsFormState>({ ...DEFAULT_AI_PROMPTS });
+
+	$effect(() => {
+		draftPrompts = { ...prompts };
+	});
 
 	function statusFor(provider: AiProvider): AiIntegrationResource {
 		return (
@@ -86,6 +110,15 @@
 		} finally {
 			disconnectBusy = null;
 		}
+	}
+
+	function resetPrompt(key: AiPromptKey) {
+		draftPrompts = { ...draftPrompts, [key]: promptDefaults[key] };
+	}
+
+	async function handleSavePrompts() {
+		if (!canEdit || promptsBusy) return;
+		await onSavePrompts?.({ ...draftPrompts });
 	}
 </script>
 
@@ -193,6 +226,67 @@
 							</li>
 						{/each}
 					</ul>
+				</section>
+
+				<section class="space-y-4" data-testid="ai-prompts-section">
+					<div class="flex flex-wrap items-start justify-between gap-3">
+						<div>
+							<h2 class="text-lg font-semibold tracking-tight">AI prompts</h2>
+							<p class="text-muted-foreground text-sm">
+								Defaults ship with the product. Edit to tune Draft response, meeting summary, and
+								chase assists for this organisation.
+								{#if !canEdit}
+									Read-only for your role.
+								{/if}
+							</p>
+						</div>
+						{#if canEdit}
+							<Button
+								type="button"
+								size="sm"
+								disabled={promptsBusy}
+								data-testid="ai-prompts-save"
+								onclick={() => void handleSavePrompts()}
+							>
+								{promptsBusy ? 'Saving…' : 'Save prompts'}
+							</Button>
+						{/if}
+					</div>
+
+					{#if promptsError}
+						<p class="text-destructive text-sm" role="alert" data-testid="ai-prompts-error">
+							{promptsError}
+						</p>
+					{/if}
+
+					<div class="space-y-5 rounded-3xl border p-4" data-testid="ai-prompts-form">
+						{#each aiPromptKeys as key (key)}
+							<div class="space-y-2" data-testid={`ai-prompt-field-${key}`}>
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<Label for={`ai-prompt-${key}`}>{aiPromptLabels[key]}</Label>
+									{#if canEdit}
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											data-testid={`ai-prompt-reset-${key}`}
+											onclick={() => resetPrompt(key)}
+										>
+											Reset to default
+										</Button>
+									{/if}
+								</div>
+								<p class="text-muted-foreground text-xs">{aiPromptHints[key]}</p>
+								<Textarea
+									id={`ai-prompt-${key}`}
+									rows={4}
+									disabled={!canEdit || promptsBusy}
+									bind:value={draftPrompts[key]}
+									data-testid={`ai-prompt-textarea-${key}`}
+								/>
+							</div>
+						{/each}
+					</div>
 				</section>
 
 				<section class="space-y-2" data-testid="email-sending-plane-note">
