@@ -32,8 +32,13 @@ const DEFAULT_MODELS: Record<AiProviderName, string> = {
 function providerError(provider: AiProviderName, status: number, body: string): ApiError {
   const snippet = body.replace(/\s+/g, ' ').trim().slice(0, 240)
   console.error('AI provider HTTP failed', { provider, status, snippet })
+  // Auth failures are org config, not gateway failures — avoid HTTP 502 "Bad Gateway".
   if (status === 401 || status === 403) {
-    return new ApiError(502, 'INTERNAL_ERROR', `${provider} rejected the API key`)
+    return new ApiError(
+      409,
+      'CONFLICT',
+      `${provider} rejected the API key — reconnect under Org → Integrations`,
+    )
   }
   if (status === 429) {
     return new ApiError(502, 'INTERNAL_ERROR', `${provider} rate limit exceeded`)
