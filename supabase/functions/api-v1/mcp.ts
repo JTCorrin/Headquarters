@@ -1048,6 +1048,35 @@ async function toolResultFromHttp(response: Response): Promise<Record<string, un
   }
 }
 
+/**
+ * Tool-layer failure payload for thrown ApiErrors during tools/call.
+ * Must stay inside JSON-RPC result (HTTP 200): Streamable HTTP clients (Cursor)
+ * treat non-2xx MCP POSTs as transport errors and drop the session.
+ */
+export function mcpToolFailureResult(
+  error: ApiError,
+  requestId: string,
+): Record<string, unknown> {
+  const payload = {
+    error: {
+      code: error.code,
+      message: error.message,
+      ...(error.fields ? { fields: error.fields } : {}),
+      request_id: requestId,
+    },
+  }
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(payload, null, 2),
+      },
+    ],
+    structuredContent: payload,
+    isError: true,
+  }
+}
+
 async function callTool(
   auth: McpAuth,
   name: string,
@@ -1627,6 +1656,10 @@ function apiErrorToRpc(id: JsonRpcId | undefined, error: ApiError): unknown {
     ? -32003
     : error.status === 401
     ? -32001
+    : error.status === 412
+    ? -32012
+    : error.status === 409
+    ? -32009
     : error.status === 422 || error.status === 400
     ? -32602
     : -32000
@@ -1756,12 +1789,23 @@ export async function handleMcp(
     return jsonResponse(dispatched.body, dispatched.status, requestId)
   } catch (error) {
     if (error instanceof ApiError) {
-      // Protocol-level validation → JSON-RPC error envelope (HTTP 200).
+      // tools/call: never return non-2xx — Cursor Streamable HTTP maps that to
+      // transport_error and fails the MCP connection (seen on If-Match 412).
+      if (message.method === 'tools/call') {
+        return jsonResponse(
+          rpcResult(message.id, mcpToolFailureResult(error, requestId)),
+          200,
+          requestId,
+        )
+      }
+      // Other JSON-RPC methods: keep protocol-ish statuses as JSON-RPC errors.
       if (
         error.status === 400 ||
         error.status === 422 ||
         error.status === 404 ||
-        error.status === 403
+        error.status === 403 ||
+        error.status === 409 ||
+        error.status === 412
       ) {
         return jsonResponse(apiErrorToRpc(message.id, error), 200, requestId)
       }

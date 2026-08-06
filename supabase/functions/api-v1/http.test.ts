@@ -1,6 +1,11 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert'
 import { isOrgApiKeySecret, sha256Hex, validateApiKeyCreateBody } from './api-keys.ts'
-import { listMcpTools, parseJsonRpcRequest, requireCreateTaskAssignee } from './mcp.ts'
+import {
+  listMcpTools,
+  mcpToolFailureResult,
+  parseJsonRpcRequest,
+  requireCreateTaskAssignee,
+} from './mcp.ts'
 import { validateClientBody } from './clients.ts'
 import { decodeCursor, extractContactClientId, validateContactBody } from './contacts.ts'
 import {
@@ -1907,4 +1912,34 @@ Deno.test('MCP JSON-RPC parse rejects non-objects and bad jsonrpc', () => {
   )
   assertThrows(() => parseJsonRpcRequest([]), ApiError)
   assertThrows(() => parseJsonRpcRequest({ jsonrpc: '1.0', method: 'ping' }), ApiError)
+})
+
+Deno.test('MCP tool failure result keeps If-Match conflicts as isError tool results', () => {
+  const result = mcpToolFailureResult(
+    new ApiError(412, 'PRECONDITION_FAILED', 'Lead version does not match If-Match'),
+    'req-412',
+  )
+  assertEquals(result.isError, true)
+  const structured = result.structuredContent as {
+    error: { code: string; message: string; request_id: string }
+  }
+  assertEquals(structured.error.code, 'PRECONDITION_FAILED')
+  assertEquals(structured.error.message, 'Lead version does not match If-Match')
+  assertEquals(structured.error.request_id, 'req-412')
+  const text = (result.content as { type: string; text: string }[])[0]?.text ?? ''
+  assertEquals(text.includes('PRECONDITION_FAILED'), true)
+})
+
+Deno.test('MCP tool failure result includes validation fields for agents', () => {
+  const result = mcpToolFailureResult(
+    new ApiError(422, 'VALIDATION_ERROR', 'Client validation failed', {
+      primary_email: 'Must be a valid email address',
+    }),
+    'req-422',
+  )
+  assertEquals(result.isError, true)
+  const structured = result.structuredContent as {
+    error: { fields?: Record<string, string> }
+  }
+  assertEquals(structured.error.fields?.primary_email, 'Must be a valid email address')
 })
