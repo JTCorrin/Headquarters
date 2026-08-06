@@ -2449,6 +2449,14 @@ export type Database = {
         Args: { p_org_id: string; p_prompts: Json }
         Returns: Json
       }
+      read_ai_integration_credentials: {
+        Args: { p_org_id: string; p_provider: string }
+        Returns: Json
+      }
+      get_email_message_ai_context: {
+        Args: { p_org_id: string; p_message_id: string }
+        Returns: Json
+      }
       claim_mailbox_sync_lease: {
         Args: { p_mailbox_id: string; p_holder: string; p_lease_seconds?: number }
         Returns: Json
