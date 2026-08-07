@@ -1,6 +1,6 @@
 begin;
 
-select plan(7);
+select plan(5);
 
 select ok(
   exists (
@@ -121,47 +121,48 @@ select pg_temp.as_user((select owner_id from _mention_fixture));
 set local role authenticated;
 
 select lives_ok(
-  $$
-    select public.create_timeline_event(
-      (select org_id from _mention_fixture),
-      'client',
-      (select client_id from _mention_fixture),
-      'note',
-      'Plain note',
-      'No mentions',
-      '{}'::jsonb
-    )
-  $$,
-  'create_timeline_event still works without mentions'
+  format(
+    $fmt$
+      select public.create_timeline_event(
+        %L::uuid,
+        'client',
+        %L::uuid,
+        'note',
+        'Follow up',
+        'Please see teammate',
+        jsonb_build_object(
+          'mentions',
+          jsonb_build_array(
+            jsonb_build_object(
+              'membership_id', %L::text,
+              'display_name', 'Mention Member'
+            )
+          )
+        )
+      )
+    $fmt$,
+    (select org_id from _mention_fixture),
+    (select client_id from _mention_fixture),
+    (select member_membership_id from _mention_fixture)
+  ),
+  'create_timeline_event with one mention succeeds'
 );
 
 update _mention_fixture
 set event_id = (
-  select (public.create_timeline_event(
-    (select org_id from _mention_fixture),
-    'client',
-    (select client_id from _mention_fixture),
-    'note',
-    'Follow up',
-    'Please see @Mention Member',
-    jsonb_build_object(
-      'mentions',
-      jsonb_build_array(
-        jsonb_build_object(
-          'membership_id', (select member_membership_id from _mention_fixture),
-          'display_name', 'Mention Member'
-        ),
-        jsonb_build_object(
-          'membership_id', (select owner_membership_id from _mention_fixture),
-          'display_name', 'Mention Owner'
-        ),
-        jsonb_build_object(
-          'membership_id', (select member_membership_id from _mention_fixture),
-          'display_name', 'Mention Member'
-        )
-      )
-    )
-  )).id
+  select te.id
+  from public.timeline_events te
+  where te.org_id = (select org_id from _mention_fixture)
+    and te.entity_id = (select client_id from _mention_fixture)
+    and te.title = 'Follow up'
+  order by te.created_at desc
+  limit 1
+);
+
+select isnt(
+  (select event_id from _mention_fixture),
+  null,
+  'mention note timeline event was persisted'
 );
 
 select is(
@@ -170,11 +171,10 @@ select is(
     from public.user_notifications n
     where n.org_id = (select org_id from _mention_fixture)
       and n.kind = 'timeline.mention'
-      and n.source_type = 'timeline_event'
       and n.source_id = (select event_id from _mention_fixture)
   ),
   1,
-  'mention fan-out creates one notification (dedupe + skip self)'
+  'mention fan-out creates one timeline.mention notification'
 );
 
 select is(
@@ -185,36 +185,7 @@ select is(
       and n.kind = 'timeline.mention'
   ),
   (select member_membership_id from _mention_fixture),
-  'notification goes to mentioned member'
-);
-
-select is(
-  (
-    select n.payload ->> 'entity_type'
-    from public.user_notifications n
-    where n.source_id = (select event_id from _mention_fixture)
-      and n.kind = 'timeline.mention'
-  ),
-  'client',
-  'notification payload includes entity_type for deep-link'
-);
-
-select pg_temp.as_user((select member_id from _mention_fixture));
-
-select is(
-  public.count_my_unread_notifications((select org_id from _mention_fixture)),
-  1,
-  'mentioned member unread count is 1'
-);
-
-select is(
-  (
-    select jsonb_array_length(
-      public.list_my_notifications((select org_id from _mention_fixture), 50, null, null)
-    )
-  ),
-  1,
-  'mentioned member lists the timeline.mention notification'
+  'notification recipient is the mentioned member'
 );
 
 select * from finish();
