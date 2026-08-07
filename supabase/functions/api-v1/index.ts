@@ -39,6 +39,7 @@ import { handleQuotes } from './quotes.ts'
 import { handleTaxRates } from './tax-rates.ts'
 import { handleMcp } from './mcp.ts'
 import { handleOrgTimelineEvents, handleTimelineEvents } from './timeline-events.ts'
+import { buildApiV1CorsHeaders, resolveApiKeyOrgId } from './org-context.ts'
 
 const configuredCorsOrigin = Deno.env.get('API_CORS_ORIGIN')
 if (!configuredCorsOrigin) {
@@ -46,15 +47,7 @@ if (!configuredCorsOrigin) {
     'API_CORS_ORIGIN is not set; defaulting to "*". Set an explicit origin in production.',
   )
 }
-const corsOrigin = configuredCorsOrigin ?? '*'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': corsOrigin,
-  'Access-Control-Allow-Headers':
-    'authorization, apikey, content-type, if-match, idempotency-key, x-client-info, x-org-id, x-request-id, mcp-protocol-version, mcp-method, mcp-name',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Expose-Headers': 'etag, location, x-request-id',
-}
+const corsHeaders = buildApiV1CorsHeaders(configuredCorsOrigin)
 
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
@@ -695,18 +688,7 @@ async function handleApiKeyRequest(req: Request, requestId: string): Promise<Res
   }
 
   const resolved = await resolveOrgApiKey(token)
-  const orgHeader = req.headers.get('x-org-id')
-  if (orgHeader) {
-    const headerOrg = parseUuid(orgHeader, 'x-org-id')
-    if (headerOrg !== resolved.org_id) {
-      throw new ApiError(
-        403,
-        'FORBIDDEN',
-        'X-Org-Id does not match the organisation pinned on this API key',
-      )
-    }
-  }
-  const orgId = resolved.org_id
+  const orgId = resolveApiKeyOrgId(req.headers.get('x-org-id'), resolved.org_id)
   const db = serviceRoleDb()
 
   // Prefer membership id from resolve RPC (no second Data API round-trip).
