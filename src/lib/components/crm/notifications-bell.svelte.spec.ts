@@ -60,4 +60,65 @@ describe('NotificationsBell', () => {
 			`/email?message=${MESSAGE_ID}`
 		);
 	});
+
+	it('labels timeline.mention and deep-links to the entity timeline', async () => {
+		const EVENT_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee9999';
+		const CLIENT_ID = 'cccccccc-dddd-4eee-8fff-000000000001';
+		const onNavigate = vi.fn(() => Promise.resolve());
+		const fetchMock = createMockFetch({
+			'GET /api/v1/me/notifications/unread-count': async () => ({
+				body: { data: { count: 1 } }
+			}),
+			'GET /api/v1/me/notifications': async () => ({
+				body: {
+					data: [
+						sampleNotification({
+							kind: 'timeline.mention',
+							title: 'Mentioned you on a Client',
+							body: 'Follow up',
+							source_type: 'timeline_event',
+							source_id: EVENT_ID,
+							payload: {
+								entity_type: 'client',
+								entity_id: CLIENT_ID,
+								timeline_event_id: EVENT_ID
+							}
+						})
+					],
+					meta: { next_cursor: null }
+				}
+			}),
+			[`PATCH /api/v1/me/notifications/${NOTIF_ID}`]: async () => ({
+				body: {
+					data: sampleNotification({
+						kind: 'timeline.mention',
+						read_at: '2026-08-07T12:05:00.000Z',
+						source_type: 'timeline_event',
+						source_id: EVENT_ID,
+						payload: {
+							entity_type: 'client',
+							entity_id: CLIENT_ID,
+							timeline_event_id: EVENT_ID
+						}
+					})
+				}
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		render(NotificationsBell, { api, orgId: ORG_A, onNavigate });
+
+		await page.getByTestId('notifications-bell').click();
+		await expect
+			.element(page.getByText('Mentioned you', { exact: true }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByText('Mentioned you on a Client', { exact: true }))
+			.toBeInTheDocument();
+		await page.getByTestId('notification-item').click();
+
+		await expect.poll(() => onNavigate.mock.calls.at(-1)?.[0]).toBe(
+			`/clients/${CLIENT_ID}?timeline=${EVENT_ID}`
+		);
+	});
 });

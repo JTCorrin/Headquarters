@@ -1938,11 +1938,14 @@ const ENTITY_TIMELINE_PATH: Record<ApiTimelineEntityType, string> = {
 /** Profile href for a timeline entity row (org Home deep-links). */
 export function entityTimelineHref(
 	entityType: string,
-	entityId: string
+	entityId: string,
+	timelineEventId?: string
 ): string | undefined {
 	const segment = ENTITY_TIMELINE_PATH[entityType as ApiTimelineEntityType];
 	if (!segment || !entityId) return undefined;
-	return `/${segment}/${entityId}`;
+	const base = `/${segment}/${entityId}`;
+	if (!timelineEventId) return base;
+	return `${base}?timeline=${encodeURIComponent(timelineEventId)}`;
 }
 
 /** Map API timeline row → FE `TimelineEvent` card model. */
@@ -1966,17 +1969,21 @@ export function toTimelineEvent(row: ApiTimelineEvent): TimelineEvent {
 	};
 }
 
-/** Map composer submit → create body (accent/icon in payload). */
+/** Map composer submit → create body (accent/icon/mentions in payload). */
 export function toTimelineEventCreateBody(
 	submit: TimelineComposerSubmit
 ): ApiTimelineEventCreateBody {
+	const mentions = (submit.mentions ?? [])
+		.filter((m) => m.membership_id && m.display_name)
+		.slice(0, 20);
 	return {
 		kind: submit.kind,
 		title: submit.title,
 		body: submit.body.trim() ? submit.body : null,
 		payload: {
 			accent: submit.accent,
-			icon: submit.icon
+			icon: submit.icon,
+			...(mentions.length > 0 ? { mentions } : {})
 		}
 	};
 }

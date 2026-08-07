@@ -4,6 +4,7 @@
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import type { ApiUserNotification } from '$lib/api/v1/types.js';
 	import { startVisibilityPoll } from '$lib/browser/visibility-poll.js';
+	import { notificationDeepLink } from '$lib/crm/notification-deep-link.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { cn } from '$lib/utils.js';
@@ -34,6 +35,8 @@
 		switch (kind) {
 			case 'email.received':
 				return 'New email';
+			case 'timeline.mention':
+				return 'Mentioned you';
 			default:
 				return 'Notification';
 		}
@@ -52,13 +55,6 @@
 		if (Math.abs(deltaHr) < 48) return rtf.format(deltaHr, 'hour');
 		const deltaDay = Math.round(deltaHr / 24);
 		return rtf.format(deltaDay, 'day');
-	}
-
-	function deepLinkFor(row: ApiUserNotification): string | null {
-		if (row.source_type === 'email_message' && row.source_id) {
-			return `/email?message=${encodeURIComponent(row.source_id)}`;
-		}
-		return null;
 	}
 
 	async function refreshUnread() {
@@ -105,7 +101,7 @@
 				);
 				unreadCount = Math.max(0, unreadCount - 1);
 			}
-			const href = deepLinkFor(row);
+			const href = notificationDeepLink(row);
 			open = false;
 			if (href) {
 				if (onNavigate) await onNavigate(href);
