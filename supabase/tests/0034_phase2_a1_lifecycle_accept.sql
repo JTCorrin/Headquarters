@@ -1,6 +1,6 @@
 begin;
 
-select plan(10);
+select plan(11);
 
 select ok(
   has_function_privilege(
@@ -290,6 +290,21 @@ select is(
   ),
   'meeting',
   'accept_meeting_task_proposal creates meeting-sourced task'
+);
+
+select is(
+  (
+    select assignee_membership_id from public.tasks
+    where id = (select accepted_task_id from _a1_fixture)
+  ),
+  (
+    select m.id
+    from public.memberships m
+    join _a1_fixture f on f.org_id = m.org_id and f.owner_id = m.user_id
+    where m.status = 'active'
+    limit 1
+  ),
+  'accept without suggested assignee assigns task to accepting member'
 );
 
 select throws_ok(
