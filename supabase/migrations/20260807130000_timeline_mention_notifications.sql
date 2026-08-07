@@ -94,6 +94,37 @@ revoke all on function private.create_user_notification(
   uuid, uuid, text, text, uuid, text, text, jsonb
 ) from public, anon, authenticated;
 
+-- Compatibility for callers compiled against the pre-payload signature.
+create or replace function private.create_user_notification(
+  p_org_id uuid,
+  p_recipient_membership_id uuid,
+  p_kind text,
+  p_source_type text,
+  p_source_id uuid,
+  p_title text,
+  p_body text
+)
+returns uuid
+language sql
+security definer
+set search_path = ''
+as $$
+  select private.create_user_notification(
+    p_org_id,
+    p_recipient_membership_id,
+    p_kind,
+    p_source_type,
+    p_source_id,
+    p_title,
+    p_body,
+    '{}'::jsonb
+  );
+$$;
+
+revoke all on function private.create_user_notification(
+  uuid, uuid, text, text, uuid, text, text
+) from public, anon, authenticated;
+
 create or replace function private.fanout_timeline_mentions(
   p_event public.timeline_events
 )
@@ -196,6 +227,11 @@ begin
       notif_payload
     );
   end loop;
+exception
+  when others then
+    -- Never block timeline note creation on mention fan-out errors.
+    raise warning 'fanout_timeline_mentions failed: %', sqlerrm;
+    return;
 end;
 $$;
 
