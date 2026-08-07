@@ -1,6 +1,6 @@
 begin;
 
-select plan(8);
+select plan(7);
 
 select ok(
   has_function_privilege(
@@ -160,7 +160,7 @@ select throws_ok(
     select public.list_org_members((select org_id from _org_members_fixture))
   $$,
   '42501',
-  null,
+  'Forbidden',
   'billing role cannot list org members'
 );
 
@@ -173,7 +173,7 @@ select throws_ok(
     select public.list_org_members('00000000-0000-4000-8000-000000000099'::uuid)
   $$,
   '42501',
-  null,
+  'Forbidden',
   'list_org_members forbids foreign org'
 );
 
