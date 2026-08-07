@@ -17,9 +17,6 @@ import {
   sha256Hex,
 } from './idempotency.ts'
 
-const PAYMENT_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,version,direction,client_id,vendor_id,amount_cents,currency,method,status,occurred_on,reference,provider,provider_payment_id,notes,reverses_payment_id,completed_at,metadata'
-
 const DIRECTIONS = new Set(['inbound', 'outbound'])
 const METHODS = new Set(['bank', 'card', 'cash', 'stripe', 'other'])
 const STATUSES = new Set([

@@ -14,7 +14,8 @@ test.describe('CRM onboarding journey (staging)', () => {
 		// Org-scoped chrome should load without bouncing to login.
 		await page.goto('/');
 		await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
-		await expect(page.getByTestId('dashboard-home-page').or(page.locator('body'))).toBeVisible();
+		await expect(page).toHaveURL(/\/(select-org|$|org\/|contacts|tasks)/);
+		await expect(page.locator('body')).toBeVisible();
 	});
 
 	test('sign-in after signup reaches an org-scoped route', async ({ page, context }) => {
