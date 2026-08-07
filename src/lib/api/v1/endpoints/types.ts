@@ -103,6 +103,7 @@ import type {
 	ApiCalendarTestResult,
 	ApiNotificationListParams,
 	ApiNotificationUnreadCount,
+	ApiOrgMember,
 	ApiUserNotification,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
@@ -153,6 +154,10 @@ import type {
 export interface OrganisationsEndpoints {
 	list(signal?: AbortSignal): Promise<ApiOrganisationMembership[]>;
 	create(body: ApiOrganisationCreateBody, signal?: AbortSignal): Promise<ApiOrganisationCreateResult>;
+}
+
+export interface OrgMembersEndpoints {
+	list(signal?: AbortSignal): Promise<ApiOrgMember[]>;
 }
 
 export interface OrganisationConfigEndpoints {

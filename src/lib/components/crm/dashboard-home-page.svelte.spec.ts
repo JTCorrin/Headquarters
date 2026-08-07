@@ -100,6 +100,20 @@ function organisationsListBody() {
 	};
 }
 
+function orgMembersListBody() {
+	return {
+		data: [
+			{
+				membership_id: MEMBERSHIP_ID,
+				user_id: '99999999-9999-4999-8999-999999999999',
+				display_name: 'Joe Thomas',
+				role: 'owner',
+				job_title: null
+			}
+		]
+	};
+}
+
 function sampleMeeting(overrides: Record<string, unknown> = {}) {
 	return {
 		id: MEETING_ID,
@@ -139,6 +153,7 @@ describe('DashboardHomePage integration', () => {
 		const session = sessionForOrg();
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async (request) => {
 				seenTaskUrls.push(request.url);
@@ -180,6 +195,7 @@ describe('DashboardHomePage integration', () => {
 		const session = sessionForOrg();
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async () => ({
 				body: { data: [sampleTask()], meta: { next_cursor: null } }
@@ -208,6 +224,7 @@ describe('DashboardHomePage integration', () => {
 		const quoteId = 'aaaaaaaa-aaaa-4bbb-8ccc-dddddddddddd';
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async () => ({
 				body: { data: [sampleTask()], meta: { next_cursor: null } }
@@ -258,6 +275,7 @@ describe('DashboardHomePage integration', () => {
 		const session = sessionForOrg();
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async () => ({
 				body: { data: [sampleTask()], meta: { next_cursor: null } }
