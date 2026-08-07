@@ -8,6 +8,7 @@
 			provider: 'openai',
 			credentials_configured: false,
 			status: 'disconnected',
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: null
 		},
@@ -15,6 +16,7 @@
 			provider: 'anthropic',
 			credentials_configured: false,
 			status: 'disconnected',
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: null
 		},
@@ -22,6 +24,7 @@
 			provider: 'google',
 			credentials_configured: false,
 			status: 'disconnected',
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: null
 		},
@@ -29,6 +32,7 @@
 			provider: 'openrouter',
 			credentials_configured: false,
 			status: 'disconnected',
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: null
 		}
@@ -39,6 +43,7 @@
 			provider: 'openai',
 			credentials_configured: true,
 			status: 'connected',
+			selected_model: null,
 			last_verified_at: '2026-08-02T12:00:00Z',
 			last_error_code: null
 		},
@@ -46,6 +51,7 @@
 			provider: 'anthropic',
 			credentials_configured: false,
 			status: 'disconnected',
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: null
 		},
@@ -53,6 +59,7 @@
 			provider: 'google',
 			credentials_configured: true,
 			status: 'error',
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: 'invalid_api_key'
 		},
@@ -60,6 +67,7 @@
 			provider: 'openrouter',
 			credentials_configured: true,
 			status: 'connected',
+			selected_model: null,
 			last_verified_at: '2026-08-01T09:00:00Z',
 			last_error_code: null
 		}

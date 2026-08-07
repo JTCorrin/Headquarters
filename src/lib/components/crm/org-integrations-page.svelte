@@ -10,6 +10,7 @@
 		canMutateIntegrations,
 		DEFAULT_AI_PROMPTS,
 		type AiIntegrationResource,
+		type AiModelOption,
 		type AiPromptKey,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
@@ -26,12 +27,16 @@
 	import { cn } from '$lib/utils.js';
 
 	export type AiPromptsFormState = Record<AiPromptKey, string>;
+	export type AiModelCatalogs = Partial<Record<AiProvider, AiModelOption[]>>;
 
 	export interface OrgIntegrationsPageProps {
 		orgName: string;
 		navGroups: AppNavGroup[];
 		role: MembershipRole;
 		integrations?: AiIntegrationResource[];
+		modelCatalogs?: AiModelCatalogs;
+		modelsBusy?: AiProvider | null;
+		modelError?: string | null;
 		prompts?: AiPromptsFormState;
 		promptDefaults?: AiPromptsFormState;
 		promptsBusy?: boolean;
@@ -43,6 +48,7 @@
 		onReload?: () => void;
 		onConnect?: (provider: AiProvider, apiKey: string) => boolean | void | Promise<boolean | void>;
 		onDisconnect?: (provider: AiProvider) => boolean | void | Promise<boolean | void>;
+		onSelectModel?: (provider: AiProvider, model: string) => boolean | void | Promise<boolean | void>;
 		onSavePrompts?: (prompts: AiPromptsFormState) => boolean | void | Promise<boolean | void>;
 	}
 
@@ -51,6 +57,9 @@
 		navGroups,
 		role,
 		integrations = [],
+		modelCatalogs = {},
+		modelsBusy = null,
+		modelError = null,
 		prompts = { ...DEFAULT_AI_PROMPTS },
 		promptDefaults = { ...DEFAULT_AI_PROMPTS },
 		promptsBusy = false,
@@ -62,6 +71,7 @@
 		onReload,
 		onConnect,
 		onDisconnect,
+		onSelectModel,
 		onSavePrompts
 	}: OrgIntegrationsPageProps = $props();
 
@@ -85,10 +95,17 @@
 				provider,
 				credentials_configured: false,
 				status: 'disconnected',
+				selected_model: null,
 				last_verified_at: null,
 				last_error_code: null
 			}
 		);
+	}
+
+	async function handleSelectModel(provider: AiProvider, event: Event) {
+		const value = (event.currentTarget as HTMLSelectElement).value;
+		if (!value || !canEdit) return;
+		await onSelectModel?.(provider, value);
 	}
 
 	function openConnect(provider: AiProvider) {
@@ -163,69 +180,106 @@
 					<ul class="divide-border divide-y rounded-3xl border" data-testid="ai-integrations-list">
 						{#each aiProviders as provider (provider)}
 							{@const item = statusFor(provider)}
-							<li
-								class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-								data-testid={`ai-integration-row-${provider}`}
-							>
-								<div class="min-w-0 space-y-1">
-									<div class="flex flex-wrap items-center gap-2">
-										<p class="truncate font-medium">{aiProviderLabels[provider]}</p>
-										{#if item.credentials_configured && item.status === 'connected'}
-											<StatusBadge status="Connected" />
-										{:else if item.status === 'error'}
-											<StatusBadge status="Error" />
-										{:else}
-											<StatusBadge status="Not connected" />
-										{/if}
+							{@const catalog = modelCatalogs[provider] ?? []}
+							<li class="space-y-3 px-4 py-3" data-testid={`ai-integration-row-${provider}`}>
+								<div class="flex flex-wrap items-center justify-between gap-3">
+									<div class="min-w-0 space-y-1">
+										<div class="flex flex-wrap items-center gap-2">
+											<p class="truncate font-medium">{aiProviderLabels[provider]}</p>
+											{#if item.credentials_configured && item.status === 'connected'}
+												<StatusBadge status="Connected" />
+											{:else if item.status === 'error'}
+												<StatusBadge status="Error" />
+											{:else}
+												<StatusBadge status="Not connected" />
+											{/if}
+										</div>
+										<p class="text-muted-foreground text-sm">
+											{#if item.credentials_configured}
+												Key saved{item.last_verified_at ? ` · verified ${item.last_verified_at}` : ''}.
+												{#if item.selected_model}
+													· model <span class="text-foreground">{item.selected_model}</span>
+												{/if}
+											{:else}
+												Paste an API key to enable Draft response for the org.
+											{/if}
+											{#if item.last_error_code}
+												<span class="text-destructive"> {item.last_error_code}</span>
+											{/if}
+										</p>
 									</div>
-									<p class="text-muted-foreground text-sm">
-										{#if item.credentials_configured}
-											Key saved{item.last_verified_at ? ` · verified ${item.last_verified_at}` : ''}.
-										{:else}
-											Paste an API key to enable Draft response for the org.
-										{/if}
-										{#if item.last_error_code}
-											<span class="text-destructive"> {item.last_error_code}</span>
-										{/if}
-									</p>
+									{#if canEdit}
+										<div class="flex flex-wrap gap-2">
+											{#if item.credentials_configured}
+												<Button
+													type="button"
+													size="sm"
+													variant="outline"
+													data-testid={`ai-integration-reconnect-${provider}`}
+													onclick={() => openConnect(provider)}
+												>
+													Replace key
+												</Button>
+												<Button
+													type="button"
+													size="sm"
+													variant="ghost"
+													disabled={disconnectBusy === provider}
+													data-testid={`ai-integration-disconnect-${provider}`}
+													onclick={() => handleDisconnect(provider)}
+												>
+													{disconnectBusy === provider ? 'Disconnecting…' : 'Disconnect'}
+												</Button>
+											{:else}
+												<Button
+													type="button"
+													size="sm"
+													data-testid={`ai-integration-connect-${provider}`}
+													onclick={() => openConnect(provider)}
+												>
+													Connect
+												</Button>
+											{/if}
+										</div>
+									{/if}
 								</div>
-								{#if canEdit}
-									<div class="flex flex-wrap gap-2">
-										{#if item.credentials_configured}
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												data-testid={`ai-integration-reconnect-${provider}`}
-												onclick={() => openConnect(provider)}
-											>
-												Replace key
-											</Button>
-											<Button
-												type="button"
-												size="sm"
-												variant="ghost"
-												disabled={disconnectBusy === provider}
-												data-testid={`ai-integration-disconnect-${provider}`}
-												onclick={() => handleDisconnect(provider)}
-											>
-												{disconnectBusy === provider ? 'Disconnecting…' : 'Disconnect'}
-											</Button>
-										{:else}
-											<Button
-												type="button"
-												size="sm"
-												data-testid={`ai-integration-connect-${provider}`}
-												onclick={() => openConnect(provider)}
-											>
-												Connect
-											</Button>
-										{/if}
+
+								{#if item.credentials_configured && item.status === 'connected'}
+									<div class="max-w-xl space-y-1.5" data-testid={`ai-model-picker-${provider}`}>
+										<Label for={`ai-model-${provider}`}>Model</Label>
+										<select
+											id={`ai-model-${provider}`}
+											class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+											disabled={!canEdit || modelsBusy === provider || catalog.length === 0}
+											value={item.selected_model ?? ''}
+											onchange={(event) => void handleSelectModel(provider, event)}
+											data-testid={`ai-model-select-${provider}`}
+										>
+											<option value="" disabled>
+												{modelsBusy === provider
+													? 'Loading models…'
+													: catalog.length === 0
+														? 'No models available'
+														: 'Select a model'}
+											</option>
+											{#each catalog as model (model.id)}
+												<option value={model.id}>{model.label}</option>
+											{/each}
+										</select>
+										<p class="text-muted-foreground text-xs">
+											Used for Draft response, Generate summary, and Draft chase when this
+											provider is active.
+										</p>
 									</div>
 								{/if}
 							</li>
 						{/each}
 					</ul>
+					{#if modelError}
+						<p class="text-destructive text-sm" role="alert" data-testid="ai-model-error">
+							{modelError}
+						</p>
+					{/if}
 				</section>
 
 				<section class="space-y-4" data-testid="ai-prompts-section">
