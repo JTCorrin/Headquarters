@@ -22,11 +22,202 @@ export interface AiCompletionResult {
   provider: AiProviderName
 }
 
-const DEFAULT_MODELS: Record<AiProviderName, string> = {
+export const DEFAULT_MODELS: Record<AiProviderName, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-5-haiku-latest',
   google: 'gemini-2.0-flash',
   openrouter: 'openai/gpt-4o-mini',
+}
+
+export interface AiModelOption {
+  id: string
+  label: string
+}
+
+function sortModelOptions(models: AiModelOption[]): AiModelOption[] {
+  return [...models].sort((a, b) => a.id.localeCompare(b.id))
+}
+
+function isOpenAiChatModel(id: string): boolean {
+  const lower = id.toLowerCase()
+  if (
+    lower.includes('embed') ||
+    lower.includes('whisper') ||
+    lower.includes('tts') ||
+    lower.includes('dall-e') ||
+    lower.includes('moderation') ||
+    lower.includes('realtime') ||
+    lower.includes('audio') ||
+    lower.includes('transcribe') ||
+    lower.includes('image')
+  ) {
+    return false
+  }
+  return (
+    lower.startsWith('gpt-') ||
+    lower.startsWith('o1') ||
+    lower.startsWith('o3') ||
+    lower.startsWith('o4') ||
+    lower.startsWith('chatgpt-')
+  )
+}
+
+function normalizeGoogleModelId(name: string): string {
+  return name.startsWith('models/') ? name.slice('models/'.length) : name
+}
+
+function stubModelCatalog(provider: AiProviderName): AiModelOption[] {
+  const primary = DEFAULT_MODELS[provider]
+  return sortModelOptions([
+    { id: primary, label: primary },
+    ...(provider === 'openai'
+      ? [{ id: 'gpt-4o', label: 'gpt-4o' }]
+      : provider === 'anthropic'
+      ? [{ id: 'claude-sonnet-4-0', label: 'claude-sonnet-4-0' }]
+      : provider === 'google'
+      ? [{ id: 'gemini-2.0-flash-lite', label: 'gemini-2.0-flash-lite' }]
+      : [{ id: 'anthropic/claude-3.5-sonnet', label: 'anthropic/claude-3.5-sonnet' }]),
+  ])
+}
+
+/** List chat-capable models for the connected provider key. */
+export async function listProviderModels(
+  provider: AiProviderName,
+  apiKey: string,
+): Promise<AiModelOption[]> {
+  if (shouldStubAiCompletion(apiKey)) {
+    return stubModelCatalog(provider)
+  }
+
+  if (provider === 'openai') {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: { authorization: `Bearer ${apiKey}` },
+    })
+    const raw = await response.text()
+    if (!response.ok) throw providerError('openai', response.status, raw)
+    let parsed: { data?: Array<{ id?: string }> }
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      throw new ApiError(502, 'INTERNAL_ERROR', 'openai returned non-JSON models')
+    }
+    const models = (parsed.data ?? [])
+      .map((row) => (typeof row.id === 'string' ? row.id.trim() : ''))
+      .filter((id) => id !== '' && isOpenAiChatModel(id))
+      .map((id) => ({ id, label: id }))
+    return sortModelOptions(models)
+  }
+
+  if (provider === 'anthropic') {
+    const models: AiModelOption[] = []
+    let afterId: string | null = null
+    for (let page = 0; page < 10; page++) {
+      const url = new URL('https://api.anthropic.com/v1/models')
+      url.searchParams.set('limit', '100')
+      if (afterId) url.searchParams.set('after_id', afterId)
+      const response = await fetch(url, {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+      })
+      const raw = await response.text()
+      if (!response.ok) throw providerError('anthropic', response.status, raw)
+      let parsed: {
+        data?: Array<{ id?: string; display_name?: string }>
+        has_more?: boolean
+        last_id?: string | null
+      }
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        throw new ApiError(502, 'INTERNAL_ERROR', 'anthropic returned non-JSON models')
+      }
+      for (const row of parsed.data ?? []) {
+        const id = typeof row.id === 'string' ? row.id.trim() : ''
+        if (!id) continue
+        const label = typeof row.display_name === 'string' && row.display_name.trim() !== ''
+          ? `${row.display_name.trim()} (${id})`
+          : id
+        models.push({ id, label })
+      }
+      if (!parsed.has_more || !parsed.last_id) break
+      afterId = parsed.last_id
+    }
+    return sortModelOptions(models)
+  }
+
+  if (provider === 'google') {
+    const models: AiModelOption[] = []
+    let pageToken: string | null = null
+    for (let page = 0; page < 10; page++) {
+      const url = new URL('https://generativelanguage.googleapis.com/v1beta/models')
+      url.searchParams.set('pageSize', '100')
+      if (pageToken) url.searchParams.set('pageToken', pageToken)
+      const response = await fetch(url, {
+        headers: { 'x-goog-api-key': apiKey },
+      })
+      const raw = await response.text()
+      if (!response.ok) throw providerError('google', response.status, raw)
+      let parsed: {
+        models?: Array<{
+          name?: string
+          displayName?: string
+          supportedGenerationMethods?: string[]
+        }>
+        nextPageToken?: string
+      }
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        throw new ApiError(502, 'INTERNAL_ERROR', 'google returned non-JSON models')
+      }
+      for (const row of parsed.models ?? []) {
+        const methods = row.supportedGenerationMethods ?? []
+        if (!methods.includes('generateContent')) continue
+        const id = normalizeGoogleModelId(typeof row.name === 'string' ? row.name.trim() : '')
+        if (!id) continue
+        const label = typeof row.displayName === 'string' && row.displayName.trim() !== ''
+          ? `${row.displayName.trim()} (${id})`
+          : id
+        models.push({ id, label })
+      }
+      if (!parsed.nextPageToken) break
+      pageToken = parsed.nextPageToken
+    }
+    return sortModelOptions(models)
+  }
+
+  // openrouter
+  const response = await fetch(
+    'https://openrouter.ai/api/v1/models?output_modalities=text&limit=500',
+    {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://headquarters.local',
+        'X-Title': 'Headquarters',
+      },
+    },
+  )
+  const raw = await response.text()
+  if (!response.ok) throw providerError('openrouter', response.status, raw)
+  let parsed: { data?: Array<{ id?: string; name?: string }> }
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new ApiError(502, 'INTERNAL_ERROR', 'openrouter returned non-JSON models')
+  }
+  const models = (parsed.data ?? [])
+    .map((row) => {
+      const id = typeof row.id === 'string' ? row.id.trim() : ''
+      if (!id) return null
+      const label = typeof row.name === 'string' && row.name.trim() !== ''
+        ? `${row.name.trim()} (${id})`
+        : id
+      return { id, label }
+    })
+    .filter((row): row is AiModelOption => row !== null)
+  return sortModelOptions(models)
 }
 
 function providerError(provider: AiProviderName, status: number, body: string): ApiError {
@@ -263,10 +454,15 @@ function serviceRoleClient(): DatabaseClient {
   })
 }
 
+export interface ActiveAiProvider {
+  provider: AiProviderName
+  selectedModel: string | null
+}
+
 export async function resolveActiveAiProvider(
   db: DatabaseClient,
   orgId: string,
-): Promise<AiProviderName> {
+): Promise<ActiveAiProvider> {
   const { data: integrations, error } = await db.rpc('list_ai_integrations', {
     p_org_id: orgId,
   })
@@ -284,7 +480,14 @@ export async function resolveActiveAiProvider(
   if (!['openai', 'anthropic', 'google', 'openrouter'].includes(provider)) {
     throw new ApiError(409, 'CONFLICT', 'Active AI provider is not supported')
   }
-  return provider
+  const fromSelected = typeof active.selected_model === 'string' ? active.selected_model.trim() : ''
+  const fromConfig = active.config && typeof active.config === 'object' &&
+      !Array.isArray(active.config) &&
+      typeof (active.config as Record<string, unknown>).model === 'string'
+    ? String((active.config as Record<string, unknown>).model).trim()
+    : ''
+  const selectedModel = fromSelected || fromConfig || null
+  return { provider, selectedModel: selectedModel || null }
 }
 
 export async function runOrgAiCompletion(
@@ -303,12 +506,12 @@ export async function runOrgAiCompletion(
   const prompt = mergeEffectivePrompts(overrides)[promptKey]
   const promptVersion = await promptVersionFor(prompt)
 
-  const provider = await resolveActiveAiProvider(db, orgId)
+  const active = await resolveActiveAiProvider(db, orgId)
 
   const service = serviceRoleClient()
   const { data: creds, error: credError } = await service.rpc('read_ai_integration_credentials', {
     p_org_id: orgId,
-    p_provider: provider,
+    p_provider: active.provider,
   })
   if (credError) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Could not read AI credentials')
@@ -321,10 +524,11 @@ export async function runOrgAiCompletion(
   }
 
   const completion = await completeAiPrompt({
-    provider,
+    provider: active.provider,
     apiKey,
     systemPrompt: prompt,
     userContent,
+    model: active.selectedModel ?? undefined,
   })
   return { ...completion, prompt, promptVersion }
 }
