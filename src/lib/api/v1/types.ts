@@ -1377,7 +1377,7 @@ export interface ApiOrgMember {
 
 /**
  * Personal notifications (bell) — Notif-BE `/api/v1/me/notifications*`.
- * v1 kind: `email.received` only; source is an email_message id.
+ * Kinds: `email.received`, `timeline.mention`.
  */
 export type ApiNotificationKind = 'email.received' | 'timeline.mention' | (string & {});
 export type ApiNotificationSourceType = 'email_message' | 'timeline_event' | (string & {});

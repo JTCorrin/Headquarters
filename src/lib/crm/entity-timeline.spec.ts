@@ -96,6 +96,51 @@ describe('entity-timeline', () => {
 		expect(event.title).toBe('Follow up');
 	});
 
+	it('includes payload.mentions on create when the composer submits them', async () => {
+		let posted: unknown;
+		const created: ApiTimelineEvent = {
+			...sampleRow,
+			id: 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			kind: 'note',
+			title: 'Follow up',
+			body: 'Ping @Ada',
+			payload: {
+				accent: 'slate',
+				icon: 'note',
+				mentions: [{ membership_id: 'm-ada', display_name: 'Ada' }]
+			}
+		};
+		const fetchMock = createMockFetch({
+			'POST /api/v1/entities/client/client-1/timeline-events': async (request) => {
+				posted = await request.json();
+				return { status: 201, body: { data: created } };
+			}
+		});
+		const api = createApiV1Client({
+			fetch: fetchMock,
+			getOrgId: () => 'org-1',
+			getAccessToken: async () => 'tok'
+		});
+
+		await createEntityTimelineEvent(api, 'client', 'client-1', {
+			kind: 'note',
+			title: 'Follow up',
+			body: 'Ping @Ada',
+			accent: 'slate',
+			icon: 'note',
+			mentions: [{ membership_id: 'm-ada', display_name: 'Ada' }]
+		});
+
+		expect(posted).toMatchObject({
+			kind: 'note',
+			payload: {
+				accent: 'slate',
+				icon: 'note',
+				mentions: [{ membership_id: 'm-ada', display_name: 'Ada' }]
+			}
+		});
+	});
+
 	it('rethrows unexpected list failures', async () => {
 		const fetchMock = createMockFetch({
 			'GET /api/v1/entities/invoice/inv-1/timeline-events': () =>
