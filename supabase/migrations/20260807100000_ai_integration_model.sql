@@ -25,7 +25,8 @@ begin
       using errcode = '42501';
   end if;
 
-  if not private.has_org_role(p_org_id, array['owner', 'admin']) then
+  -- Wave B: AI writes are owner-only (not owner/admin).
+  if not private.has_org_role(p_org_id, array['owner']) then
     raise exception 'Forbidden'
       using errcode = '42501';
   end if;
@@ -159,7 +160,8 @@ begin
       using errcode = '42501';
   end if;
 
-  if not private.has_org_role(p_org_id, array['owner', 'admin']) then
+  -- Wave B: AI writes are owner-only (not owner/admin).
+  if not private.has_org_role(p_org_id, array['owner']) then
     raise exception 'Forbidden'
       using errcode = '42501';
   end if;
