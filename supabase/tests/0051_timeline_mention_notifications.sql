@@ -1,6 +1,6 @@
 begin;
 
-select plan(6);
+select plan(7);
 
 select ok(
   exists (
@@ -119,6 +119,21 @@ from created_client;
 
 select pg_temp.as_user((select owner_id from _mention_fixture));
 set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.create_timeline_event(
+      (select org_id from _mention_fixture),
+      'client',
+      (select client_id from _mention_fixture),
+      'note',
+      'Plain note',
+      'No mentions',
+      '{}'::jsonb
+    )
+  $$,
+  'create_timeline_event still works without mentions'
+);
 
 update _mention_fixture
 set event_id = (
