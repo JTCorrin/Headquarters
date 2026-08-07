@@ -1846,6 +1846,26 @@ Deno.test('timeline entity type and note body validation', () => {
     () => validateTimelineNoteBody({ title: 'X', payload: [] }),
     ApiError,
   )
+  const memberId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+  assertEquals(
+    validateTimelineNoteBody({
+      title: 'Ping',
+      payload: {
+        mentions: [{ membership_id: memberId, display_name: 'Ada' }],
+      },
+    }).payload,
+    {
+      mentions: [{ membership_id: memberId, display_name: 'Ada' }],
+    },
+  )
+  assertThrows(
+    () =>
+      validateTimelineNoteBody({
+        title: 'Ping',
+        payload: { mentions: [{ display_name: 'Ada' }] },
+      }),
+    ApiError,
+  )
 })
 
 Deno.test('timeline cursor decode accepts occurred_at keyset', () => {
