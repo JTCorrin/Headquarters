@@ -120,8 +120,9 @@ from created_client;
 select pg_temp.as_user((select owner_id from _mention_fixture));
 set local role authenticated;
 
-with created as (
-  select public.create_timeline_event(
+update _mention_fixture
+set event_id = (
+  select (public.create_timeline_event(
     (select org_id from _mention_fixture),
     'client',
     (select client_id from _mention_fixture),
@@ -145,11 +146,8 @@ with created as (
         )
       )
     )
-  ) as row
-)
-update _mention_fixture
-set event_id = (created.row).id
-from created;
+  )).id
+);
 
 select is(
   (
