@@ -213,6 +213,8 @@ describe('MeetingPage integration', () => {
 			}),
 			[`POST /api/v1/meetings/${MEETING_ID}/generate-summary`]: async (request) => {
 				expect(request.headers.get('if-match')).toBe('"2"');
+				expect(request.headers.get('content-type')).toMatch(/application\/json/i);
+				await expect(request.json()).resolves.toEqual({});
 				meetingState = sampleMeeting({
 					version: 3,
 					transcript_status: 'ready',
