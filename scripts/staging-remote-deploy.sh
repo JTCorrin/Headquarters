@@ -73,17 +73,30 @@ if [[ -f supabase/config.toml ]]; then
 		supabase/config.toml
 fi
 
+# Persist cron secrets across deploys (do not regenerate every run).
+STAGING_SECRETS_DIR="${STAGING_SECRETS_DIR:-${HOME}/.crm-staging}"
+mkdir -p "$STAGING_SECRETS_DIR"
+RECURRING_SECRET_FILE="${STAGING_SECRETS_DIR}/recurring-invoices-cron-secret"
+if [[ ! -s "$RECURRING_SECRET_FILE" ]]; then
+	openssl rand -hex 32 >"$RECURRING_SECRET_FILE"
+	chmod 600 "$RECURRING_SECRET_FILE"
+	log "generated RECURRING_INVOICES_CRON_SECRET at ${RECURRING_SECRET_FILE}"
+fi
+RECURRING_INVOICES_CRON_SECRET="$(tr -d '[:space:]' <"$RECURRING_SECRET_FILE")"
+
 # Edge secrets load from supabase/functions/.env (CLI default), not supabase/.env.
 # api-v1 defaults to `*` when unset; pin staging origin explicitly.
 mkdir -p supabase/functions
 cat > supabase/functions/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
+RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 EOF
 # Mirror for any tooling that still reads the repo-root supabase/.env.
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
+RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 EOF
 
 log "starting Supabase (migrations apply on first start)"
@@ -130,13 +143,15 @@ cat > supabase/functions/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
+RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 EOF
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
+RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 EOF
-log "wrote PUBLIC_SUPABASE_URL + CALENDAR_SYNC_STAGING_STUB into supabase/functions/.env"
+log "wrote PUBLIC_SUPABASE_URL + CALENDAR_SYNC_STAGING_STUB + recurring cron secret into supabase/functions/.env"
 
 # Edge loads supabase/functions/.env on container create (supabase start), not on a
 # plain restart. CLI names use underscores (supabase_edge_runtime_*) or hyphens.
@@ -470,6 +485,33 @@ if [[ -x scripts/documents_signed_url_staging_curl_proof.sh ]]; then
 		scripts/documents_signed_url_staging_curl_proof.sh
 else
 	log "documents signed URL curl proof script missing — skipped"
+fi
+
+# Recurring invoices due-claim cron (every 5m). Wrapper keeps the secret off argv/ps.
+RECURRING_CRON_WRAPPER="${STAGING_SECRETS_DIR}/run-recurring-invoices-cron.sh"
+cat >"$RECURRING_CRON_WRAPPER" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+SECRET=\$(tr -d '[:space:]' <"${RECURRING_SECRET_FILE}")
+exec curl -fsS -X POST \\
+  -H "x-recurring-invoices-cron-secret: \${SECRET}" \\
+  "http://127.0.0.1:54321/functions/v1/jobs-recurring-invoices"
+EOF
+chmod 700 "$RECURRING_CRON_WRAPPER"
+CRON_LINE="*/5 * * * * ${RECURRING_CRON_WRAPPER} >>${STAGING_SECRETS_DIR}/recurring-invoices-cron.log 2>&1"
+if command -v crontab >/dev/null 2>&1; then
+	existing="$(crontab -l 2>/dev/null || true)"
+	filtered="$(printf '%s\n' "$existing" | awk '!/run-recurring-invoices-cron\\.sh/')"
+	printf '%s\n%s\n' "$filtered" "$CRON_LINE" | crontab -
+	log "installed recurring invoices cron (every 5m → jobs-recurring-invoices)"
+	# Immediate tick so due schedules after deploy do not wait for the next 5m boundary.
+	if "$RECURRING_CRON_WRAPPER"; then
+		log "recurring invoices cron tick ok"
+	else
+		log "recurring invoices cron tick failed (non-fatal — check Edge secret load)"
+	fi
+else
+	log "crontab not available — skipping recurring invoices schedule install"
 fi
 
 log "done"
