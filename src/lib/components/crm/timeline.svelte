@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { cn } from '$lib/utils.js';
 	import TimelineEventCard from './timeline-event-card.svelte';
 	import TimelineComposer, { type TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -29,6 +30,8 @@
 		/** Show the ad-hoc note/event composer above the list. */
 		composable?: boolean;
 		composerActor?: string;
+		/** Override `?timeline=` focus (tests). */
+		focusEventId?: string | null;
 		class?: string;
 		headerActions?: Snippet;
 		onAdd?: (event: TimelineComposerSubmit) => void;
@@ -40,10 +43,20 @@
 		emptyMessage = 'No activity yet.',
 		composable = false,
 		composerActor = 'You',
+		focusEventId = null,
 		class: className,
 		headerActions,
 		onAdd
 	}: TimelineProps = $props();
+
+	const resolvedFocusId = $derived.by(() => {
+		if (focusEventId) return focusEventId;
+		try {
+			return page.url.searchParams.get('timeline');
+		} catch {
+			return null;
+		}
+	});
 
 	function handleComposerSubmit(payload: TimelineComposerSubmit) {
 		if (onAdd) {
@@ -95,6 +108,7 @@
 			{#each events as event, index (event.id)}
 				<li>
 					<TimelineEventCard
+						eventId={event.id}
 						kind={event.kind}
 						title={event.title}
 						body={event.body}
@@ -103,6 +117,7 @@
 						accent={event.accent}
 						icon={event.icon}
 						href={event.href}
+						highlighted={resolvedFocusId === event.id}
 						isLast={index === events.length - 1}
 					/>
 				</li>
