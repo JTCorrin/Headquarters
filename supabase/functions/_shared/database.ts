@@ -2037,6 +2037,21 @@ export type Database = {
         }
         Returns: Json
       }
+      list_payments: {
+        Args: {
+          p_org_id: string
+          p_limit?: number
+          p_cursor_created_at?: string | null
+          p_cursor_id?: string | null
+          p_direction?: string | null
+          p_status?: string | null
+          p_client_id?: string | null
+          p_vendor_id?: string | null
+          p_invoice_id?: string | null
+          p_bill_id?: string | null
+        }
+        Returns: PaymentRow[]
+      }
       get_payment: {
         Args: {
           p_org_id: string
