@@ -99,6 +99,20 @@ function organisationsListBody() {
 	};
 }
 
+function orgMembersListBody() {
+	return {
+		data: [
+			{
+				membership_id: MEMBERSHIP_ID,
+				user_id: '99999999-9999-4999-8999-999999999999',
+				display_name: 'Joe Thomas',
+				role: 'owner',
+				job_title: null
+			}
+		]
+	};
+}
+
 describe('TasksPage integration', () => {
 	it('lists tasks with X-Org-Id and creates a task', async () => {
 		const seenOrgHeaders: string[] = [];
@@ -107,6 +121,7 @@ describe('TasksPage integration', () => {
 		const session = sessionForOrg();
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 				return { body: organisationsListBody() };
@@ -160,6 +175,7 @@ describe('TasksPage integration', () => {
 		let lastPatch: { body: unknown; ifMatch: string | null } | null = null;
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async () => ({
 				body: { data: [sampleTask({ version: 2 })], meta: { next_cursor: null } }
@@ -204,6 +220,7 @@ describe('TasksPage integration', () => {
 		let deleted: { id: string; ifMatch: string | null } | null = null;
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async () => ({
 				body: { data: [sampleTask({ version: 3 })], meta: { next_cursor: null } }
@@ -239,6 +256,7 @@ describe('TasksPage integration', () => {
 		const session = sessionForOrg();
 
 		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
 			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
 			'GET /api/v1/tasks': async (request) => {
 				const url = new URL(request.url);
