@@ -68,7 +68,8 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: https://data.forgejo.org/actions/upload-artifact@v4
+        # Forgejo/act does not support upload-artifact@v4 (GHESNotSupportedError).
+        uses: https://data.forgejo.org/actions/upload-artifact@v3
         with:
           name: playwright-report
           path: |
