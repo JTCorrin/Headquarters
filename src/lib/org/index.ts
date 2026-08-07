@@ -7,6 +7,7 @@ export {
 } from './selected-org.js';
 export {
 	createOrgSession,
+	getOptionalOrgSession,
 	getOrgSession,
 	setOrgSession,
 	type CreateOrgSessionOptions,

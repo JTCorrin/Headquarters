@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getOptionalApiV1Client } from '$lib/api/v1/context.js';
 	import type { ApiOrgMember } from '$lib/api/v1/types.js';
+	import { getOptionalOrgSession } from '$lib/org/session.svelte.js';
 	import {
 		dedupeMentions,
 		filterMentionCandidates,
@@ -110,7 +111,15 @@
 			return;
 		}
 		try {
-			orgMembers = await api.orgMembers.list();
+			const listed = await api.orgMembers.list();
+			const org = getOptionalOrgSession();
+			const selfMembershipId = org?.selectedOrgId
+				? org.memberships.find((m) => m.org_id === org.selectedOrgId)?.membership_id
+				: undefined;
+			// Mentions-BE skips the author; hide self so solo tenants aren't confused.
+			orgMembers = selfMembershipId
+				? listed.filter((m) => m.membership_id !== selfMembershipId)
+				: listed;
 			membersError = null;
 		} catch {
 			orgMembers = [];
@@ -392,6 +401,10 @@
 								<p class="text-muted-foreground px-3 py-2 text-xs">Loading teammates…</p>
 							{:else if membersError}
 								<p class="text-destructive px-3 py-2 text-xs" role="alert">{membersError}</p>
+							{:else if orgMembers.length === 0}
+								<p class="text-muted-foreground px-3 py-2 text-xs">
+									No other teammates to mention yet.
+								</p>
 							{:else if mentionCandidates.length === 0}
 								<p class="text-muted-foreground px-3 py-2 text-xs">No matching teammates.</p>
 							{:else}
