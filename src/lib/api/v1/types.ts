@@ -1379,18 +1379,20 @@ export interface ApiOrgMember {
  * Personal notifications (bell) — Notif-BE `/api/v1/me/notifications*`.
  * v1 kind: `email.received` only; source is an email_message id.
  */
-export type ApiNotificationKind = 'email.received' | (string & {});
-export type ApiNotificationSourceType = 'email_message' | (string & {});
+export type ApiNotificationKind = 'email.received' | 'timeline.mention' | (string & {});
+export type ApiNotificationSourceType = 'email_message' | 'timeline_event' | (string & {});
 
 export interface ApiUserNotification {
 	id: string;
 	org_id: string;
-	recipient_membership_id: string;
+	recipient_membership_id?: string;
 	kind: ApiNotificationKind;
 	title: string;
 	body: string | null;
 	source_type: ApiNotificationSourceType;
 	source_id: string;
+	/** Deep-link metadata (e.g. timeline.mention → entity_type / entity_id). */
+	payload?: Record<string, unknown>;
 	read_at: string | null;
 	created_at: string;
 }

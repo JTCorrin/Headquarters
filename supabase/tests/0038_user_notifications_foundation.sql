@@ -22,10 +22,15 @@ select ok(
 );
 
 select ok(
-  not has_function_privilege(
-    'authenticated',
-    'private.create_user_notification(uuid, uuid, text, text, uuid, text, text)',
-    'execute'
+  (
+    select coalesce(
+      bool_and(not has_function_privilege('authenticated', p.oid, 'execute')),
+      true
+    )
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private'
+      and p.proname = 'create_user_notification'
   ),
   'authenticated cannot call private.create_user_notification'
 );
