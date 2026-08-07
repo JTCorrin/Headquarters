@@ -6,7 +6,7 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
-		assigneeOptionsFromMemberships,
+		assigneeOptionsFromOrgMembers,
 		emptyTaskFormData,
 		isTaskDueBeforeToday,
 		membershipFromCreateResult,
@@ -19,7 +19,7 @@
 		toTaskCreateBody,
 		toTaskListItem
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiOrganisationMembership } from '$lib/api/v1/types.js';
+	import type { ApiOrganisationMembership, ApiOrgMember } from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
@@ -177,10 +177,10 @@
 		viewState = { kind: 'loading' };
 	}
 
-	function syncAssigneeContext(rows: ApiOrganisationMembership[]) {
-		assigneeOptions = assigneeOptionsFromMemberships(rows, session.selectedOrgId);
+	function syncAssigneeContext(rows: ApiOrganisationMembership[], members: ApiOrgMember[]) {
 		const current = rows.find((row) => row.organisation.id === session.selectedOrgId);
 		currentMembershipId = current?.membership.id ?? null;
+		assigneeOptions = assigneeOptionsFromOrgMembers(members, currentMembershipId);
 	}
 
 	function listItemOptions() {
@@ -207,12 +207,15 @@
 		const epoch = captureEpoch();
 		viewState = { kind: 'loading' };
 		try {
-			const membershipRows = await api.organisations.list();
+			const [membershipRows, orgMembers] = await Promise.all([
+				api.organisations.list(),
+				api.orgMembers.list()
+			]);
 			if (isStale(epoch)) return;
 			if (session.memberships.length === 0) {
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
-			syncAssigneeContext(membershipRows);
+			syncAssigneeContext(membershipRows, orgMembers);
 
 			const listed = await api.tasks.list({ limit: 50, assignee: 'me' });
 			if (isStale(epoch)) return;
