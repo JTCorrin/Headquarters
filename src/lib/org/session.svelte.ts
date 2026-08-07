@@ -129,3 +129,8 @@ export function getOrgSession(): OrgSession {
 	}
 	return session;
 }
+
+/** Prefer for optional chrome — null when outside layout context. */
+export function getOptionalOrgSession(): OrgSession | null {
+	return getContext<OrgSession | undefined>(ORG_SESSION_CONTEXT) ?? null;
+}
