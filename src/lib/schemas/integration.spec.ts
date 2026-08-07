@@ -12,6 +12,7 @@ describe('integration helpers', () => {
 				provider: 'openai',
 				credentials_configured: true,
 				status: 'connected',
+				selected_model: null,
 				last_verified_at: null,
 				last_error_code: null
 			}

@@ -1,10 +1,11 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
 import {
   DEFAULT_AI_PROMPTS,
   mergeEffectivePrompts,
   validateAiPromptsPutBody,
 } from './ai-prompts.ts'
+import { type AiProviderName, listProviderModels } from './ai-provider.ts'
 import { ApiError, jsonBody, jsonResponse } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
@@ -90,6 +91,54 @@ export function validateAiConnectBody(body: Record<string, unknown>): { api_key:
   return { api_key: apiKey!.trim() }
 }
 
+export function validateAiModelBody(body: Record<string, unknown>): { model: string } {
+  const fields: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    if (key !== 'model') fields[key] = 'Field is not writable'
+  }
+  const model = typeof body.model === 'string' ? body.model.trim() : ''
+  if (model.length < 1) {
+    fields.model = 'Must be a non-empty string'
+  } else if (model.length > 256) {
+    fields.model = 'Must be at most 256 characters'
+  }
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'AI model validation failed', fields)
+  }
+  return { model }
+}
+
+function serviceRoleClient(): DatabaseClient {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Service credentials are unavailable')
+  }
+  return createClient<Database>(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+async function readProviderApiKey(
+  orgId: string,
+  provider: AiProvider,
+  requestId: string,
+): Promise<string> {
+  const service = serviceRoleClient()
+  const { data: creds, error } = await service.rpc('read_ai_integration_credentials', {
+    p_org_id: orgId,
+    p_provider: provider,
+  })
+  if (error) throw databaseError(error, requestId)
+  const apiKey = creds && typeof creds === 'object' && !Array.isArray(creds)
+    ? (creds as Record<string, unknown>).api_key
+    : null
+  if (typeof apiKey !== 'string' || apiKey.trim() === '') {
+    throw new ApiError(409, 'CONFLICT', 'AI integration credentials are unavailable')
+  }
+  return apiKey.trim()
+}
+
 async function listIntegrations(
   db: DatabaseClient,
   orgId: string,
@@ -172,6 +221,58 @@ async function getAiPrompts(
   )
 }
 
+async function listAiModels(
+  db: DatabaseClient,
+  orgId: string,
+  provider: AiProvider,
+  requestId: string,
+): Promise<Response> {
+  // Ensure the integration is connected for this org before reading secrets.
+  const { data: integrations, error } = await db.rpc('list_ai_integrations', { p_org_id: orgId })
+  if (error) throw databaseError(error, requestId)
+  const row = (Array.isArray(integrations) ? integrations : []).find((item) => {
+    const r = item as Record<string, unknown>
+    return r.provider === provider && r.credentials_configured === true && r.status === 'active'
+  })
+  if (!row) {
+    throw new ApiError(409, 'CONFLICT', 'Connect this AI provider before listing models')
+  }
+  const apiKey = await readProviderApiKey(orgId, provider, requestId)
+  const models = await listProviderModels(provider as AiProviderName, apiKey)
+  const selectedModel = typeof (row as Record<string, unknown>).selected_model === 'string'
+    ? String((row as Record<string, unknown>).selected_model)
+    : null
+  return jsonResponse(
+    {
+      data: {
+        provider,
+        selected_model: selectedModel,
+        models,
+      },
+    },
+    200,
+    requestId,
+  )
+}
+
+async function putAiModel(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  provider: AiProvider,
+  requestId: string,
+): Promise<Response> {
+  const payload = validateAiModelBody(await jsonBody(req))
+  const { data, error } = await db.rpc('set_ai_integration_model', {
+    p_org_id: orgId,
+    p_provider: provider,
+    p_model: payload.model,
+  })
+  if (error) throw databaseError(error, requestId)
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
+}
+
 async function putAiPrompts(
   req: Request,
   db: DatabaseClient,
@@ -222,6 +323,24 @@ export function handleIntegrations(
       return putAiPrompts(req, db, orgId, requestId)
     }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for AI prompts')
+  }
+
+  const aiModelsMatch = path.match(/^\/api\/v1\/integrations\/ai\/([a-z]+)\/models$/i)
+  if (aiModelsMatch) {
+    const provider = parseAiProvider(aiModelsMatch[1].toLowerCase())
+    assertCanReadIntegrations(role)
+    if (req.method === 'GET') return listAiModels(db, orgId, provider, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for AI models')
+  }
+
+  const aiModelMatch = path.match(/^\/api\/v1\/integrations\/ai\/([a-z]+)\/model$/i)
+  if (aiModelMatch) {
+    const provider = parseAiProvider(aiModelMatch[1].toLowerCase())
+    if (req.method === 'PUT') {
+      assertCanWriteAiIntegrations(role)
+      return putAiModel(req, db, orgId, provider, requestId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for AI model')
   }
 
   const aiMatch = path.match(/^\/api\/v1\/integrations\/ai\/([a-z]+)$/i)
