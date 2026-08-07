@@ -215,7 +215,7 @@
 					<RecurringLinesTable
 						rows={lines}
 						readonly={!isEditable}
-						{onRemoveLine}
+						onRemove={onRemoveLine}
 					>
 						{#snippet headerActions()}
 							{#if isEditable}
