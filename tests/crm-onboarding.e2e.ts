@@ -19,8 +19,15 @@ test.describe('CRM onboarding journey (staging)', () => {
 
 	test('sign-in after signup reaches an org-scoped route', async ({ page, context }) => {
 		const session = await bootstrapOwnerSession(page, env!);
+		// Supabase stores the session in localStorage; cookies alone are not enough.
 		await context.clearCookies();
 		await page.goto('/login');
+		await page.evaluate(() => {
+			localStorage.clear();
+			sessionStorage.clear();
+		});
+		await page.goto('/login');
+		await expect(page.getByTestId('auth-email')).toBeVisible({ timeout: 30_000 });
 		await page.getByTestId('auth-email').fill(session.email);
 		await page.getByTestId('auth-password').fill(session.password);
 		await page.getByTestId('auth-submit').click();

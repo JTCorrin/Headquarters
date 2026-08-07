@@ -46,8 +46,11 @@ async function proxy(event: Parameters<RequestHandler>[0]): Promise<Response> {
 	try {
 		const upstreamResponse = await event.fetch(target, init);
 		const responseHeaders = new Headers(upstreamResponse.headers);
+		// undici may decompress while leaving upstream Content-Length; mismatched
+		// lengths make strict clients (Playwright request, curl) abort the body.
 		responseHeaders.delete('content-encoding');
 		responseHeaders.delete('transfer-encoding');
+		responseHeaders.delete('content-length');
 		return new Response(upstreamResponse.body, {
 			status: upstreamResponse.status,
 			statusText: upstreamResponse.statusText,

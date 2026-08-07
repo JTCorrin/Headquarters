@@ -30,7 +30,13 @@ export async function signInViaUi(page: Page, session: E2ESession): Promise<void
 	await expect(page).not.toHaveURL(/\/login$/, { timeout: 30_000 });
 }
 
-/** Create first org through onboarding UI and wait for an authenticated app shell. */
+/**
+ * Create first org through onboarding UI and wait for an authenticated app shell.
+ *
+ * Staging historically persisted `hq.selected-org-id` after a successful POST but
+ * failed to client-navigate (goto raced the layout guard / Superforms enhance).
+ * Prefer URL change; fall back to a hard navigation once selection is persisted.
+ */
 export async function createOrgViaUi(
 	page: Page,
 	options: { name: string; slug: string }
@@ -41,9 +47,29 @@ export async function createOrgViaUi(
 	await expect(page.getByTestId('organisation-create-form')).toBeVisible({ timeout: 30_000 });
 	await page.locator('#org-create-name').fill(options.name);
 	await page.locator('#org-create-slug').fill(options.slug);
+
+	const createResponse = page.waitForResponse(
+		(response) =>
+			response.url().includes('/api/v1/organisations') &&
+			response.request().method() === 'POST',
+		{ timeout: 45_000 }
+	);
 	await page.getByTestId('organisation-create-submit').click();
-	// After create, app selects the org and routes to /org/config or home.
+	const response = await createResponse;
+	expect(response.ok(), `org create HTTP ${response.status()}`).toBeTruthy();
+
+	await expect
+		.poll(async () => page.evaluate(() => localStorage.getItem('hq.selected-org-id')), {
+			timeout: 45_000
+		})
+		.toBeTruthy();
+
+	if (page.url().includes('/onboarding/create-org')) {
+		await page.goto('/');
+	}
+
 	await expect(page).toHaveURL(/\/(org\/config|$|contacts|select-org)/, { timeout: 45_000 });
+	await expect(page).not.toHaveURL(/\/onboarding\/create-org/);
 }
 
 /** Bootstrap: signup → create org → ready for CRM journeys. */

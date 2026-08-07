@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { get } from 'svelte/store';
+	import { tick } from 'svelte';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { getAuthSession } from '$lib/auth/index.js';
+	import { getAuthSession, postAuthDestination } from '$lib/auth/index.js';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import { membershipFromCreateResult, toOrganisationCreateBody } from '$lib/api/v1/mappers.js';
@@ -49,7 +50,16 @@
 			const membership = membershipFromCreateResult(result);
 			orgSession.setMemberships([membership]);
 			orgSession.selectOrg(membership.org_id);
-			void goto('/org/config');
+			// Flush membership/selection before navigating — a same-tick goto races the
+			// root layout guard (empty memberships → bounce back to create-org) and
+			// Superforms enhance can drop an un-awaited navigation entirely.
+			await tick();
+			await goto(
+				postAuthDestination({
+					membershipCount: orgSession.memberships.length,
+					selectedOrgId: orgSession.selectedOrgId
+				})
+			);
 			return true;
 		} catch (error) {
 			if (isApiClientError(error)) {
