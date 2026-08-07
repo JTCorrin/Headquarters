@@ -109,7 +109,7 @@
 			id="rline-description"
 			name="descriptionTemplate"
 			bind:value={$formData.descriptionTemplate}
-			placeholder="Retainer — {{period_start}} to {{period_end}}"
+			placeholder={'Retainer — {{period_start}} to {{period_end}}'}
 			aria-invalid={!!$errors.descriptionTemplate}
 		/>
 		{#if $errors.descriptionTemplate}

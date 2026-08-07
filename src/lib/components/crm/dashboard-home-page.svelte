@@ -233,8 +233,9 @@
 			}
 
 			try {
-				recentActivityItems = await loadOrgTimeline(api, { limit: 50 });
+				const timeline = await loadOrgTimeline(api, { limit: 50 });
 				if (isStale(epoch)) return;
+				recentActivityItems = timeline;
 			} catch {
 				if (isStale(epoch)) return;
 				// Org timeline soft-fail — keep Home usable without the feed.

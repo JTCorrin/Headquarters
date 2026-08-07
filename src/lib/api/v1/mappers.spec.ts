@@ -627,6 +627,42 @@ describe('api mappers', () => {
 			taxRateId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
 			taxRatePercent: '20'
 		});
+
+		// Array.prototype.map passes (el, index, array). Passing the mapper
+		// unbound makes index the taxRates arg and throws on taxed products.
+		const taxedProduct = {
+			id: 'dddddddd-dddd-4eee-8fff-000000000001',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			sku: 'WID-1',
+			name: 'Widget',
+			description: null,
+			category_id: null,
+			product_type: 'product' as const,
+			unit_name: null,
+			unit_price_cents: 2500,
+			cost_price_cents: null,
+			currency: 'GBP',
+			tax_rate_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+			track_stock: false,
+			stock_qty: 0,
+			low_stock_at: null,
+			status: 'active' as const,
+			metadata: {}
+		};
+		expect(() => [taxedProduct].map(toCatalogProductOption)).toThrow();
+		expect(
+			[taxedProduct].map((p) =>
+				toCatalogProductOption(p, [
+					{ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', rate_percent: 20 }
+				])
+			)[0].taxRatePercent
+		).toBe('20');
 	});
 
 	it('maps leads between API and form/board shapes', () => {

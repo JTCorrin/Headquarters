@@ -123,7 +123,83 @@ function sessionForOrg() {
 	});
 }
 
+const TAX_RATE_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+function sampleTaxedProduct() {
+	return {
+		id: PRODUCT_ID,
+		org_id: ORG_A,
+		created_at: '2026-01-01T00:00:00Z',
+		updated_at: '2026-01-01T00:00:00Z',
+		created_by: null,
+		updated_by: null,
+		deleted_at: null,
+		version: 1,
+		sku: 'HOST-M',
+		name: 'Monthly hosting',
+		description: null,
+		category_id: null,
+		product_type: 'service',
+		unit_name: null,
+		unit_price_cents: 1900,
+		cost_price_cents: null,
+		currency: 'GBP',
+		tax_rate_id: TAX_RATE_ID,
+		track_stock: false,
+		stock_qty: 0,
+		low_stock_at: null,
+		status: 'active',
+		metadata: {}
+	};
+}
+
 describe('BillPage detail flows', () => {
+	it('loads taxed catalog products without crashing', async () => {
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
+				body: { data: sampleBill() }
+			}),
+			'GET /api/v1/vendors': async () => ({
+				body: { data: [sampleVendor()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [sampleTaxedProduct()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/tax-rates': async () => ({
+				body: {
+					data: [
+						{
+							id: TAX_RATE_ID,
+							org_id: ORG_A,
+							created_at: '2026-01-01T00:00:00Z',
+							updated_at: '2026-01-01T00:00:00Z',
+							created_by: null,
+							updated_by: null,
+							deleted_at: null,
+							version: 1,
+							name: 'VAT 20%',
+							rate_percent: 20,
+							is_default: true,
+							active: true
+						}
+					]
+				}
+			}),
+			'GET /api/v1/payments': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			})
+		});
+
+		const session = sessionForOrg();
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(BillPage, { api, session, billId: BILL_ID });
+
+		await expect.element(page.getByRole('heading', { name: 'BILL-0001' })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('cell', { name: 'Monthly hosting', exact: true }))
+			.toBeInTheDocument();
+	});
+
 	it('preserves product_id, discount, and tax on line replacement saves', async () => {
 		let patchBody: unknown;
 
@@ -135,6 +211,9 @@ describe('BillPage detail flows', () => {
 				body: { data: [sampleVendor()], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/tax-rates': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/payments': async () => ({
@@ -191,6 +270,9 @@ describe('BillPage detail flows', () => {
 			'GET /api/v1/products': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
+			'GET /api/v1/tax-rates': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
 			'GET /api/v1/payments': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
@@ -233,6 +315,9 @@ describe('BillPage detail flows', () => {
 				body: { data: [sampleVendor()], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/tax-rates': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/payments': async () => ({
@@ -279,6 +364,9 @@ describe('BillPage detail flows', () => {
 				body: { data: [sampleVendor()], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/tax-rates': async () => ({
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/payments': async () => ({
