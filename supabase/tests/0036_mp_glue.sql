@@ -1,6 +1,6 @@
 begin;
 
-select plan(7);
+select plan(8);
 
 create temporary table _mp_glue_fixture (
   owner_id uuid,
@@ -187,6 +187,15 @@ select is(
   ),
   'client',
   'accept inherits meeting related_entity_type onto task'
+);
+
+select ok(
+  (
+    select assignee_membership_id is not null
+    from public.tasks
+    where id = (select accepted_task_id from _mp_glue_fixture)
+  ),
+  'accept assigns created task to accepting member when proposal has no suggestion'
 );
 
 select is(
