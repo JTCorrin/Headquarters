@@ -13,6 +13,7 @@
 		aiProviders,
 		DEFAULT_AI_PROMPTS,
 		type AiIntegrationResource,
+		type AiModelOption,
 		type AiPromptKey,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
@@ -22,7 +23,7 @@
 	} from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
-	import OrgIntegrationsPage from './org-integrations-page.svelte';
+	import OrgIntegrationsPage, { type AiModelCatalogs } from './org-integrations-page.svelte';
 
 	export interface OrgIntegrationsControllerProps {
 		api: ApiV1Client;
@@ -44,6 +45,9 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let integrations = $state<AiIntegrationResource[]>([]);
+	let modelCatalogs = $state<AiModelCatalogs>({});
+	let modelsBusy = $state<AiProvider | null>(null);
+	let modelError = $state<string | null>(null);
 	let prompts = $state<Record<AiPromptKey, string>>({ ...DEFAULT_AI_PROMPTS });
 	let promptDefaults = $state<Record<AiPromptKey, string>>({ ...DEFAULT_AI_PROMPTS });
 	let promptsBusy = $state(false);
@@ -105,9 +109,49 @@
 			provider,
 			credentials_configured: false,
 			status: 'disconnected' as const,
+			selected_model: null,
 			last_verified_at: null,
 			last_error_code: null
 		}));
+	}
+
+	async function refreshModelsFor(
+		provider: AiProvider,
+		epoch: RequestEpoch
+	): Promise<AiModelOption[]> {
+		modelsBusy = provider;
+		modelError = null;
+		try {
+			const bundle = await api.integrations.listAiModels(provider);
+			if (isStale(epoch)) return [];
+			const models = bundle.models ?? [];
+			modelCatalogs = { ...modelCatalogs, [provider]: models };
+			if (bundle.selected_model) {
+				integrations = integrations.map((item) =>
+					item.provider === provider
+						? { ...item, selected_model: bundle.selected_model }
+						: item
+				);
+			}
+			return models;
+		} catch (error) {
+			if (!isStale(epoch)) {
+				modelError = userMessage(error, 'Could not load models for this provider.');
+			}
+			return [];
+		} finally {
+			if (modelsBusy === provider) modelsBusy = null;
+		}
+	}
+
+	async function loadConnectedModelCatalogs(
+		rows: AiIntegrationResource[],
+		epoch: RequestEpoch
+	): Promise<void> {
+		const connected = rows.filter(
+			(item) => item.credentials_configured && item.status === 'connected'
+		);
+		await Promise.all(connected.map((item) => refreshModelsFor(item.provider, epoch)));
 	}
 
 	async function loadAll() {
@@ -123,6 +167,7 @@
 		const epoch = captureEpoch();
 		viewState = { kind: 'loading' };
 		connectError = null;
+		modelError = null;
 		try {
 			if (session.memberships.length === 0) {
 				const rows = await api.organisations.list();
@@ -152,6 +197,7 @@
 						provider,
 						credentials_configured: false,
 						status: 'disconnected' as const,
+						selected_model: null,
 						last_verified_at: null,
 						last_error_code: null
 					}
@@ -160,10 +206,12 @@
 			prompts = { ...promptDefaults, ...promptBundle.effective };
 			promptsError = null;
 			viewState = { kind: 'ready' };
+			void loadConnectedModelCatalogs(integrations, epoch);
 		} catch (error) {
 			if (isStale(epoch)) return;
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				integrations = emptyIntegrations();
+				modelCatalogs = {};
 				viewState = { kind: 'ready' };
 				return;
 			}
@@ -191,6 +239,7 @@
 			integrations = integrations.map((item) =>
 				item.provider === provider ? resource : item
 			);
+			void refreshModelsFor(provider, epoch);
 			return true;
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -216,11 +265,15 @@
 							provider,
 							credentials_configured: false,
 							status: 'disconnected',
+							selected_model: null,
 							last_verified_at: null,
 							last_error_code: null
 						}
 					: item
 			);
+			const nextCatalogs = { ...modelCatalogs };
+			delete nextCatalogs[provider];
+			modelCatalogs = nextCatalogs;
 			return true;
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -231,6 +284,30 @@
 				kind: 'validation',
 				message: userMessage(error, 'Could not disconnect provider.')
 			};
+			return false;
+		}
+	}
+
+	async function onSelectModel(provider: AiProvider, model: string): Promise<boolean> {
+		const epoch = captureEpoch();
+		modelError = null;
+		try {
+			const updated = await api.integrations.setAiModel(provider, { model });
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			const resource = toAiIntegrationResource(updated);
+			integrations = integrations.map((item) =>
+				item.provider === provider ? resource : item
+			);
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			modelError = userMessage(error, 'Could not save model selection.');
 			return false;
 		}
 	}
@@ -311,6 +388,9 @@
 					{navGroups}
 					{role}
 					{integrations}
+					{modelCatalogs}
+					{modelsBusy}
+					{modelError}
 					{prompts}
 					{promptDefaults}
 					{promptsBusy}
@@ -320,6 +400,7 @@
 					onReload={loadAll}
 					{onConnect}
 					{onDisconnect}
+					{onSelectModel}
 					{onSavePrompts}
 					showNav={false}
 				/>

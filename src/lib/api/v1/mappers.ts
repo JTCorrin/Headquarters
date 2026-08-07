@@ -1178,6 +1178,7 @@ export function toAiIntegrationResource(item: ApiAiIntegration): AiIntegrationRe
 		provider: item.provider,
 		credentials_configured: item.credentials_configured,
 		status: mapAiIntegrationStatus(item.status),
+		selected_model: item.selected_model?.trim() ? item.selected_model.trim() : null,
 		last_verified_at: item.last_verified_at ?? null,
 		last_error_code: item.last_error_code
 	};

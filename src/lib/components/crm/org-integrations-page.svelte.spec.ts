@@ -10,6 +10,7 @@ const integrations: AiIntegrationResource[] = [
 		provider: 'openai',
 		credentials_configured: false,
 		status: 'disconnected',
+		selected_model: null,
 		last_verified_at: null,
 		last_error_code: null
 	},
@@ -17,6 +18,7 @@ const integrations: AiIntegrationResource[] = [
 		provider: 'anthropic',
 		credentials_configured: true,
 		status: 'connected',
+		selected_model: null,
 		last_verified_at: '2026-08-02T12:00:00Z',
 		last_error_code: null
 	},
@@ -24,6 +26,7 @@ const integrations: AiIntegrationResource[] = [
 		provider: 'google',
 		credentials_configured: false,
 		status: 'disconnected',
+		selected_model: null,
 		last_verified_at: null,
 		last_error_code: null
 	},
@@ -31,12 +34,32 @@ const integrations: AiIntegrationResource[] = [
 		provider: 'openrouter',
 		credentials_configured: false,
 		status: 'disconnected',
+		selected_model: null,
 		last_verified_at: null,
 		last_error_code: null
 	}
 ];
 
 describe('OrgIntegrationsPage', () => {
+	it('shows a model picker for connected providers', async () => {
+		render(OrgIntegrationsPage, {
+			orgName: 'Acme',
+			navGroups: navGroupsWithActive('Integrations'),
+			role: 'owner',
+			integrations,
+			modelCatalogs: {
+				anthropic: [
+					{ id: 'claude-3-5-haiku-latest', label: 'claude-3-5-haiku-latest' },
+					{ id: 'claude-sonnet-4-0', label: 'Claude Sonnet 4 (claude-sonnet-4-0)' }
+				]
+			}
+		});
+
+		await expect.element(page.getByTestId('ai-model-picker-anthropic')).toBeInTheDocument();
+		await expect.element(page.getByTestId('ai-model-select-anthropic')).toBeInTheDocument();
+		await expect.element(page.getByTestId('ai-model-picker-openai')).not.toBeInTheDocument();
+	});
+
 	it('lists all four AI providers with honest API-key connect', async () => {
 		const onConnect = vi.fn(async () => true);
 		render(OrgIntegrationsPage, {

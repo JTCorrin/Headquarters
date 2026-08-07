@@ -110,6 +110,8 @@ import type {
 	ApiMailboxTestResult,
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
+	ApiAiModelUpdateBody,
+	ApiAiModelsBundle,
 	ApiAiProvider,
 	ApiOrgApiKey,
 	ApiOrgApiKeyCreateBody,
@@ -626,6 +628,12 @@ export interface IntegrationsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiAiIntegration>;
 	disconnectAi(provider: ApiAiProvider, signal?: AbortSignal): Promise<void>;
+	listAiModels(provider: ApiAiProvider, signal?: AbortSignal): Promise<ApiAiModelsBundle>;
+	setAiModel(
+		provider: ApiAiProvider,
+		body: ApiAiModelUpdateBody,
+		signal?: AbortSignal
+	): Promise<ApiAiIntegration>;
 	getAiPrompts(signal?: AbortSignal): Promise<ApiAiPrompts>;
 	updateAiPrompts(body: ApiAiPromptsUpdateBody, signal?: AbortSignal): Promise<ApiAiPrompts>;
 }
