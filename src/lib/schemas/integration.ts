@@ -32,8 +32,15 @@ export interface AiIntegrationResource {
 	/** True when a key is stored — never echo the key or secret_ref. */
 	credentials_configured: boolean;
 	status: AiIntegrationStatus;
+	/** Selected completion model for this provider; null until chosen. */
+	selected_model: string | null;
 	last_verified_at: string | null;
 	last_error_code: string | null;
+}
+
+export interface AiModelOption {
+	id: string;
+	label: string;
 }
 
 export function canMutateIntegrations(role: MembershipRole): boolean {

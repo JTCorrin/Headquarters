@@ -1511,12 +1511,29 @@ export interface ApiAiIntegration {
 	credentials_configured: boolean;
 	/** Wire status from `integrations.status` — FE maps `active` → connected. */
 	status: 'disconnected' | 'connected' | 'pending' | 'active' | 'error' | 'disabled' | string;
+	/** Org-selected model id for this provider (from config.model). */
+	selected_model?: string | null;
 	last_verified_at?: string | null;
 	last_error_code: string | null;
 }
 
 export interface ApiAiIntegrationConnectBody {
 	api_key: string;
+}
+
+export interface ApiAiModelOption {
+	id: string;
+	label: string;
+}
+
+export interface ApiAiModelsBundle {
+	provider: ApiAiProvider;
+	selected_model: string | null;
+	models: ApiAiModelOption[];
+}
+
+export interface ApiAiModelUpdateBody {
+	model: string;
 }
 
 export type ApiAiPromptKey =
