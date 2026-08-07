@@ -2437,6 +2437,10 @@ export type Database = {
         Args: { p_org_id: string; p_provider: string; p_api_key: string }
         Returns: Json
       }
+      set_ai_integration_model: {
+        Args: { p_org_id: string; p_provider: string; p_model: string }
+        Returns: Json
+      }
       disconnect_ai_integration: {
         Args: { p_org_id: string; p_provider: string }
         Returns: undefined

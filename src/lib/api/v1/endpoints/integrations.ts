@@ -2,6 +2,8 @@ import type { ApiRequestFn } from '../request.js';
 import type {
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
+	ApiAiModelUpdateBody,
+	ApiAiModelsBundle,
 	ApiAiPrompts,
 	ApiAiPromptsUpdateBody,
 	ApiAiProvider
@@ -35,6 +37,28 @@ export function createIntegrationsEndpoints(request: ApiRequestFn): Integrations
 				orgScoped: true,
 				signal
 			});
+		},
+		listAiModels: async (provider: ApiAiProvider, signal) => {
+			const { data } = await request<ApiAiModelsBundle>(
+				`/api/v1/integrations/ai/${provider}/models`,
+				{
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
+		},
+		setAiModel: async (provider: ApiAiProvider, body: ApiAiModelUpdateBody, signal) => {
+			const { data } = await request<ApiAiIntegration>(
+				`/api/v1/integrations/ai/${provider}/model`,
+				{
+					method: 'PUT',
+					body,
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
 		},
 		getAiPrompts: async (signal) => {
 			const { data } = await request<ApiAiPrompts>('/api/v1/integrations/ai/prompts', {

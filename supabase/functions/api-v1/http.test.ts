@@ -35,12 +35,18 @@ import {
   parseMeetingProposalOutput,
   validateAiPromptsPutBody,
 } from './ai-prompts.ts'
-import { completeAiPrompt, isAiCompletionStubMode, shouldStubAiCompletion } from './ai-provider.ts'
+import {
+  completeAiPrompt,
+  isAiCompletionStubMode,
+  listProviderModels,
+  shouldStubAiCompletion,
+} from './ai-provider.ts'
 import { validateShareBody } from './email-messages.ts'
 import {
   parseAiProvider,
   payloadHasForbiddenSecretKey,
   validateAiConnectBody,
+  validateAiModelBody,
 } from './integrations.ts'
 import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
@@ -1313,6 +1319,9 @@ Deno.test('AI connect validation requires api_key and parses providers', () => {
   assertEquals(validateAiConnectBody({ api_key: 'sk-test-123456' }).api_key, 'sk-test-123456')
   assertThrows(() => validateAiConnectBody({ api_key: 'short' }), ApiError)
   assertThrows(() => validateAiConnectBody({ api_key: 'sk-test-123456', oauth: true }), ApiError)
+  assertEquals(validateAiModelBody({ model: 'gpt-4o-mini' }).model, 'gpt-4o-mini')
+  assertThrows(() => validateAiModelBody({ model: '' }), ApiError)
+  assertThrows(() => validateAiModelBody({ model: 'gpt-4o', extra: true }), ApiError)
   assertEquals(parseAiProvider('openai'), 'openai')
   assertEquals(parseAiProvider('openrouter'), 'openrouter')
   assertThrows(() => parseAiProvider('azure'), ApiError)
@@ -1569,6 +1578,12 @@ Deno.test('AI completion stub path returns deterministic text', async () => {
   assertEquals(result.text.includes('Draft a reply'), true)
   assertEquals(result.text.includes('Source email'), true)
   assertEquals(typeof isAiCompletionStubMode(), 'boolean')
+})
+
+Deno.test('AI stub keys return a local model catalog', async () => {
+  const models = await listProviderModels('openrouter', 'sk-test-openrouter-catalog')
+  assertEquals(models.some((row) => row.id === 'openai/gpt-4o-mini'), true)
+  assertEquals(models.every((row) => row.id.length > 0 && row.label.length > 0), true)
 })
 
 Deno.test('AI provider auth failure returns 409 CONFLICT (not 502)', async () => {
