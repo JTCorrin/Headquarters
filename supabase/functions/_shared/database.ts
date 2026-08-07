@@ -275,11 +275,12 @@ export type UserNotificationRow = {
   id: string
   org_id: string
   recipient_membership_id: string
-  kind: 'email.received'
+  kind: 'email.received' | 'timeline.mention'
   title: string
   body: string | null
-  source_type: 'email_message'
+  source_type: 'email_message' | 'timeline_event'
   source_id: string
+  payload: Json
   read_at: string | null
   created_at: string
 }

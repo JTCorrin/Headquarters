@@ -163,7 +163,31 @@ export function validateTimelineNoteBody(
     if (!isPlainObject(body.payload)) {
       fields.payload = 'Must be a JSON object'
     } else {
-      payload = body.payload as Json
+      const raw = body.payload
+      if ('mentions' in raw) {
+        const mentions = raw.mentions
+        if (!Array.isArray(mentions)) {
+          fields.payload = 'mentions must be an array'
+        } else if (mentions.length > 20) {
+          fields.payload = 'mentions must not exceed 20 entries'
+        } else {
+          for (const item of mentions) {
+            if (!isPlainObject(item) || typeof item.membership_id !== 'string') {
+              fields.payload = 'each mention requires membership_id'
+              break
+            }
+            try {
+              parseUuid(item.membership_id, 'payload.mentions.membership_id')
+            } catch {
+              fields.payload = 'each mention membership_id must be a UUID'
+              break
+            }
+          }
+        }
+      }
+      if (!fields.payload) {
+        payload = raw as Json
+      }
     }
   }
 
