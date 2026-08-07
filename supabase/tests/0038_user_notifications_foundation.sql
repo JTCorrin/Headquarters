@@ -24,7 +24,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'authenticated',
-    'private.create_user_notification(uuid, uuid, text, text, uuid, text, text)',
+    'private.create_user_notification(uuid, uuid, text, text, uuid, text, text, jsonb)',
     'execute'
   ),
   'authenticated cannot call private.create_user_notification'
