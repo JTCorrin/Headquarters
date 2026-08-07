@@ -26,6 +26,10 @@
 		isLast?: boolean;
 		/** Start expanded (also expands on hover/focus by default). */
 		defaultExpanded?: boolean;
+		/** Mentions deep-link target — scroll/highlight this card. */
+		highlighted?: boolean;
+		/** Stable id for `?timeline=` deep-links. */
+		eventId?: string;
 		class?: string;
 	}
 
@@ -40,8 +44,17 @@
 		href,
 		isLast = false,
 		defaultExpanded = false,
+		highlighted = false,
+		eventId,
 		class: className
 	}: TimelineEventCardProps = $props();
+
+	let rootEl = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		if (!highlighted || !rootEl) return;
+		rootEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+	});
 
 	const kindLabel = $derived(timelineKindLabel(kind));
 	const markerClass = $derived(
@@ -54,9 +67,14 @@
 </script>
 
 <article
+	bind:this={rootEl}
+	id={eventId ? `timeline-event-${eventId}` : undefined}
+	data-testid={eventId ? `timeline-event-${eventId}` : undefined}
+	data-highlighted={highlighted ? 'true' : undefined}
 	class={cn(
 		'group/timeline-card relative flex gap-3',
 		hasBody && 'cursor-default',
+		highlighted && 'rounded-3xl ring-2 ring-foreground/30 ring-offset-2 ring-offset-background',
 		className
 	)}
 >
