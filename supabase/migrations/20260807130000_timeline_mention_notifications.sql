@@ -153,16 +153,13 @@ begin
       continue;
     end if;
 
-    begin
-      mention_membership_id := (mention ->> 'membership_id')::uuid;
-    exception
-      when others then
-        continue;
-    end;
-
-    if mention_membership_id is null then
+    if coalesce(mention ->> 'membership_id', '') !~*
+      '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then
       continue;
     end if;
+
+    mention_membership_id := (mention ->> 'membership_id')::uuid;
 
     if author_membership_id is not null
       and mention_membership_id = author_membership_id
