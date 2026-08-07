@@ -133,24 +133,7 @@ select is(
   'meeting create with related client writes meeting.scheduled timeline card'
 );
 
-update public.meetings
-set status = 'completed'
-where id = (select meeting_id from _mp_glue_fixture);
-
-select is(
-  (
-    select count(*)::integer
-    from public.timeline_events
-    where org_id = (select org_id from _mp_glue_fixture)
-      and entity_type = 'client'
-      and entity_id = (select client_id from _mp_glue_fixture)
-      and kind = 'meeting'
-      and payload ->> 'action' = 'meeting.completed'
-  ),
-  1,
-  'meeting completed writes meeting.completed timeline card'
-);
-
+-- Accept while the meeting is still non-terminal (scheduled / in_progress).
 with proposal as (
   insert into public.meeting_task_proposals (
     org_id, meeting_id, title, description, confidence, status
@@ -220,6 +203,24 @@ select is(
   ),
   1,
   'accept writes task timeline card on related entity'
+);
+
+update public.meetings
+set status = 'completed'
+where id = (select meeting_id from _mp_glue_fixture);
+
+select is(
+  (
+    select count(*)::integer
+    from public.timeline_events
+    where org_id = (select org_id from _mp_glue_fixture)
+      and entity_type = 'client'
+      and entity_id = (select client_id from _mp_glue_fixture)
+      and kind = 'meeting'
+      and payload ->> 'action' = 'meeting.completed'
+  ),
+  1,
+  'meeting completed writes meeting.completed timeline card'
 );
 
 with created_project as (
