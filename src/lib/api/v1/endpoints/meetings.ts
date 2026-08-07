@@ -83,6 +83,8 @@ export function createMeetingsEndpoints(request: ApiRequestFn): MeetingsEndpoint
 				`/api/v1/meetings/${id}/generate-summary`,
 				{
 					method: 'POST',
+					// Edge `jsonBody` requires application/json even when no fields are sent.
+					body: {},
 					orgScoped: true,
 					ifMatchVersion: version,
 					signal
@@ -95,6 +97,7 @@ export function createMeetingsEndpoints(request: ApiRequestFn): MeetingsEndpoint
 				`/api/v1/meetings/${meetingId}/task-proposals/${proposalId}/accept`,
 				{
 					method: 'POST',
+					body: {},
 					orgScoped: true,
 					ifMatchVersion: version,
 					signal
@@ -107,6 +110,7 @@ export function createMeetingsEndpoints(request: ApiRequestFn): MeetingsEndpoint
 				`/api/v1/meetings/${meetingId}/task-proposals/${proposalId}/dismiss`,
 				{
 					method: 'POST',
+					body: {},
 					orgScoped: true,
 					ifMatchVersion: version,
 					signal
