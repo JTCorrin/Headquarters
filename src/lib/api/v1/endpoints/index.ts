@@ -13,6 +13,7 @@ export { createLeadsEndpoints } from './leads.js';
 export { createMailboxEndpoints } from './mailbox.js';
 export { createCalendarEndpoints } from './calendar.js';
 export { createNotificationsEndpoints } from './notifications.js';
+export { createOrgMembersEndpoints } from './org-members.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
 export { createPaymentsEndpoints } from './payments.js';
@@ -45,6 +46,7 @@ export type {
 	ProjectsEndpoints,
 	OrganisationConfigEndpoints,
 	OrganisationsEndpoints,
+	OrgMembersEndpoints,
 	PaymentsEndpoints,
 	ProductCategoriesEndpoints,
 	ProductsEndpoints,

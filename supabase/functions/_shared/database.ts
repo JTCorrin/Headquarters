@@ -2599,6 +2599,10 @@ export type Database = {
         }
         Returns: Json
       }
+      list_org_members: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
       mark_notification_read: {
         Args: {
           p_org_id: string

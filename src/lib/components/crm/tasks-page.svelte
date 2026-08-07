@@ -5,7 +5,7 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
-		assigneeOptionsFromMemberships,
+		assigneeOptionsFromOrgMembers,
 		emptyTaskFormData,
 		membershipFromCreateResult,
 		roleFromMemberships,
@@ -19,7 +19,7 @@
 		toTaskListItem,
 		toTaskUpdateBody
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiOrganisationMembership, ApiTaskEntityType } from '$lib/api/v1/types.js';
+	import type { ApiOrganisationMembership, ApiOrgMember, ApiTaskEntityType } from '$lib/api/v1/types.js';
 	import type { EntityListFilter } from '$lib/crm/entity-list-filter.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -182,10 +182,10 @@
 		viewState = { kind: 'loading' };
 	}
 
-	function syncAssigneeContext(rows: ApiOrganisationMembership[]) {
-		assigneeOptions = assigneeOptionsFromMemberships(rows, session.selectedOrgId);
+	function syncAssigneeContext(rows: ApiOrganisationMembership[], members: ApiOrgMember[]) {
 		const current = rows.find((row) => row.organisation.id === session.selectedOrgId);
 		currentMembershipId = current?.membership.id ?? null;
+		assigneeOptions = assigneeOptionsFromOrgMembers(members, currentMembershipId);
 	}
 
 	function resetCreateForm() {
@@ -213,17 +213,16 @@
 		const epoch = captureEpoch();
 		viewState = { kind: 'loading' };
 		try {
-			let membershipRows: ApiOrganisationMembership[] = [];
+			const [membershipRows, orgMembers] = await Promise.all([
+				api.organisations.list(),
+				api.orgMembers.list()
+			]);
+			if (isStale(epoch)) return;
 			if (session.memberships.length === 0) {
-				membershipRows = await api.organisations.list();
-				if (isStale(epoch)) return;
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
-			} else {
-				membershipRows = await api.organisations.list();
-				if (isStale(epoch)) return;
 			}
 
-			syncAssigneeContext(membershipRows);
+			syncAssigneeContext(membershipRows, orgMembers);
 
 			const listed = await api.tasks.list({
 				limit: 100,
