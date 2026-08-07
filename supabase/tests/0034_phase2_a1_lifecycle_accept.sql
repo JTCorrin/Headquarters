@@ -1,6 +1,6 @@
 begin;
 
-select plan(11);
+select plan(13);
 
 select ok(
   has_function_privilege(
@@ -318,6 +318,59 @@ select throws_ok(
   'P0001',
   null,
   're-accepting a decided proposal conflicts'
+);
+
+-- Fresh proposals must still fail once the meeting is terminal.
+with proposal as (
+  insert into public.meeting_task_proposals (
+    org_id, meeting_id, title, description, confidence, status
+  )
+  select
+    org_id,
+    meeting_id,
+    'After completed',
+    'Should reject',
+    0.5000,
+    'proposed'
+  from _a1_fixture
+  returning id
+)
+update _a1_fixture
+set proposal_id = proposal.id
+from proposal;
+
+update public.meetings
+set status = 'completed'
+where id = (select meeting_id from _a1_fixture);
+
+select throws_ok(
+  $$
+    select public.accept_meeting_task_proposal(
+      (select org_id from _a1_fixture),
+      (select meeting_id from _a1_fixture),
+      (select proposal_id from _a1_fixture)
+    )
+  $$,
+  'P0001',
+  'Meeting is not open for accept',
+  'accept rejects when meeting is completed'
+);
+
+update public.meetings
+set status = 'cancelled'
+where id = (select meeting_id from _a1_fixture);
+
+select throws_ok(
+  $$
+    select public.accept_meeting_task_proposal(
+      (select org_id from _a1_fixture),
+      (select meeting_id from _a1_fixture),
+      (select proposal_id from _a1_fixture)
+    )
+  $$,
+  'P0001',
+  'Meeting is not open for accept',
+  'accept rejects when meeting is cancelled'
 );
 
 select * from finish();
