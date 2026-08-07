@@ -99,6 +99,7 @@ import type {
 	ApiOrganisationConfiguration,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
+	ApiOrgMember,
 	ApiOrganisationMembership,
 	ApiProduct,
 	ApiProductCreateBody,
@@ -1269,6 +1270,20 @@ export function assigneeOptionsFromMemberships(
 	const row = membershipRows.find((entry) => entry.organisation.id === selectedOrgId);
 	if (!row) return [];
 	return [{ id: row.membership.id, label: 'Me' }];
+}
+
+/** Prefer `GET /me/org-members` so assignees include teammates, not only “Me”. */
+export function assigneeOptionsFromOrgMembers(
+	members: ApiOrgMember[],
+	currentMembershipId?: string | null
+): TaskAssigneeOption[] {
+	return members.map((member) => ({
+		id: member.membership_id,
+		label:
+			currentMembershipId && member.membership_id === currentMembershipId
+				? 'Me'
+				: member.display_name
+	}));
 }
 
 export function toTaskListItem(

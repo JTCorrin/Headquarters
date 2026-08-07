@@ -1362,6 +1362,20 @@ export interface ApiDocumentMoveBody {
 }
 
 /**
+ * Active org directory — `GET /api/v1/me/org-members`.
+ * Excludes billing; used for @mentions and task assignees.
+ */
+export type ApiOrgMemberRole = 'owner' | 'admin' | 'member' | 'readonly';
+
+export interface ApiOrgMember {
+	membership_id: string;
+	user_id: string;
+	display_name: string;
+	role: ApiOrgMemberRole;
+	job_title: string | null;
+}
+
+/**
  * Personal notifications (bell) — Notif-BE `/api/v1/me/notifications*`.
  * v1 kind: `email.received` only; source is an email_message id.
  */
