@@ -1,6 +1,6 @@
 begin;
 
-select plan(5);
+select plan(8);
 
 select ok(
   exists (
@@ -165,6 +165,10 @@ select isnt(
   'mention note timeline event was persisted'
 );
 
+-- Fan-out rows belong to the mentioned member; owner RLS cannot see them.
+-- Assert as table owner (same pattern as 0038_user_notifications_foundation).
+reset role;
+
 select is(
   (
     select count(*)::integer
@@ -186,6 +190,40 @@ select is(
   ),
   (select member_membership_id from _mention_fixture),
   'notification recipient is the mentioned member'
+);
+
+-- Mentioned member can list the notification via the RPC.
+select pg_temp.as_user((select member_id from _mention_fixture));
+set local role authenticated;
+
+select is(
+  (
+    select jsonb_array_length(
+      public.list_my_notifications((select org_id from _mention_fixture), 50, null, null)
+    )
+  ),
+  1,
+  'mentioned member list_my_notifications returns the mention'
+);
+
+select is(
+  (
+    select public.list_my_notifications(
+      (select org_id from _mention_fixture), 50, null, null
+    ) -> 0 ->> 'kind'
+  ),
+  'timeline.mention',
+  'listed notification kind is timeline.mention'
+);
+
+select is(
+  (
+    select public.list_my_notifications(
+      (select org_id from _mention_fixture), 50, null, null
+    ) -> 0 -> 'payload' ->> 'timeline_event_id'
+  ),
+  (select event_id::text from _mention_fixture),
+  'listed notification payload deep-links to the timeline event'
 );
 
 select * from finish();
