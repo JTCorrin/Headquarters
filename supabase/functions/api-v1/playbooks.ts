@@ -1,9 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, MembershipRow, PlaybookRow } from '../_shared/database.ts'
-import {
-  defaultPlaybookGraphJson,
-  validatePlaybookGraphJson,
-} from '../_shared/playbook-graph.ts'
+import type { Database, Json, MembershipRow, PlaybookRow } from '../_shared/database.ts'
+import { defaultPlaybookGraphJson, validatePlaybookGraphJson } from '../_shared/playbook-graph.ts'
 import {
   ApiError,
   etag,
@@ -203,10 +200,12 @@ export function handlePlaybooks(
         const payload = validatePlaybookBody(await jsonBody(req), false)
         const { data, error } = await db
           .from('playbooks')
-          .insert({
-            ...payload,
-            org_id: orgId,
-          } as Database['public']['Tables']['playbooks']['Insert'])
+          .insert(
+            {
+              ...payload,
+              org_id: orgId,
+            } as Database['public']['Tables']['playbooks']['Insert'],
+          )
           .select(SELECT)
           .single()
         if (error) throw databaseError(error, requestId)
@@ -254,19 +253,17 @@ export function handlePlaybooks(
         } catch {
           body = {}
         }
-        const rootType =
-          typeof body.root_entity_type === 'string' ? body.root_entity_type : null
+        const rootType = typeof body.root_entity_type === 'string' ? body.root_entity_type : null
         const rootIdRaw = body.root_entity_id
-        const rootId =
-          typeof rootIdRaw === 'string' && rootIdRaw
-            ? parseUuid(rootIdRaw, 'root_entity_id')
-            : null
+        const rootId = typeof rootIdRaw === 'string' && rootIdRaw
+          ? parseUuid(rootIdRaw, 'root_entity_id')
+          : null
         const { data, error } = await db.rpc('start_playbook_run_manual', {
           p_org_id: orgId,
           p_playbook_id: playbookId,
           p_root_entity_type: rootType,
           p_root_entity_id: rootId,
-          p_trigger_payload: (body.trigger_payload as Record<string, unknown>) ?? {},
+          p_trigger_payload: (body.trigger_payload as Json) ?? {},
         })
         if (error) throw databaseError(error, requestId)
         return jsonResponse({ data }, 201, requestId)
@@ -283,7 +280,7 @@ export function handlePlaybooks(
 
   if (req.method === 'GET') {
     return findPlaybook(db, orgId, playbookId, requestId).then((data) =>
-      jsonResponse({ data }, 200, requestId, { etag: etag(data.version) }),
+      jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
     )
   }
 
