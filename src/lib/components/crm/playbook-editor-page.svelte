@@ -9,7 +9,7 @@
 		roleFromMemberships,
 		toOrganisationCreateBody
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiPlaybook } from '$lib/api/v1/types.js';
+	import type { ApiPlaybook, ApiPlaybookRun } from '$lib/api/v1/types.js';
 	import {
 		flowFromUnknownGraph,
 		flowToPlaybookGraph,
@@ -68,6 +68,8 @@
 	let switchError = $state<string | null>(null);
 	let busy = $state(false);
 	let emailTemplates = $state<{ id: string; name: string }[]>([]);
+	let runs = $state<ApiPlaybookRun[]>([]);
+	let runMessage = $state<string | null>(null);
 
 	setContext(PLAYBOOK_TEMPLATES_CTX, () => emailTemplates);
 
@@ -129,15 +131,19 @@
 		saveError = null;
 		saveOk = null;
 		try {
-			const [result, templatesResult] = await Promise.all([
+			const [result, templatesResult, runsResult] = await Promise.all([
 				api.playbooks.get(playbookId),
-				api.emailTemplates.list({ limit: 100 }).catch(() => ({ data: [] as { id: string; name: string }[] }))
+				api.emailTemplates
+					.list({ limit: 100 })
+					.catch(() => ({ data: [] as { id: string; name: string }[] })),
+				api.playbooks.listRuns(playbookId, { limit: 20 }).catch(() => ({ data: [] as ApiPlaybookRun[] }))
 			]);
 			playbook = result.data;
 			name = playbook.name;
 			description = playbook.description ?? '';
 			isActive = playbook.is_active;
 			emailTemplates = (templatesResult.data ?? []).map((t) => ({ id: t.id, name: t.name }));
+			runs = runsResult.data ?? [];
 			const flow = flowFromUnknownGraph(playbook.graph_json);
 			flowNodes = flow.nodes;
 			flowEdges = flow.edges;
@@ -234,6 +240,28 @@
 		syncGraphTextFromFlow();
 	}
 
+	async function runManual() {
+		if (!playbook) return;
+		busy = true;
+		runMessage = null;
+		saveError = null;
+		try {
+			// Persist latest graph before running.
+			await save();
+			if (saveError) return;
+			const run = await api.playbooks.startRun(playbook.id, {});
+			runs = [run, ...runs.filter((r) => r.id !== run.id)].slice(0, 20);
+			runMessage =
+				run.status === 'skipped_busy'
+					? 'Skipped — an active run already exists for this playbook/entity.'
+					: `Run ${run.status}${run.next_action_at ? ` · next tick ${run.next_action_at}` : ''}`;
+		} catch (error) {
+			saveError = userMessage(error, 'Failed to start run.');
+		} finally {
+			busy = false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -290,6 +318,13 @@
 					>
 						{#snippet actions()}
 							<Button type="button" variant="outline" size="sm" href="/playbooks">Back</Button>
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								disabled={busy}
+								onclick={() => void runManual()}>Run manual</Button
+							>
 							<Button type="button" size="sm" disabled={busy} onclick={() => void save()}
 								>Save</Button
 							>
@@ -352,6 +387,31 @@
 						{#if saveOk}
 							<p class="text-muted-foreground text-sm">{saveOk}</p>
 						{/if}
+						{#if runMessage}
+							<p class="text-muted-foreground text-sm">{runMessage}</p>
+						{/if}
+
+						{#if runs.length > 0}
+							<div class="space-y-2">
+								<p class="text-sm font-medium">Recent runs</p>
+								<ul class="divide-border border-border divide-y rounded-lg border text-sm">
+									{#each runs as run (run.id)}
+										<li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+											<span class="font-mono text-xs">{run.id.slice(0, 8)}</span>
+											<span class="text-muted-foreground text-xs">{run.status}</span>
+											<span class="text-muted-foreground text-xs"
+												>{new Date(run.created_at).toLocaleString()}</span
+											>
+										</li>
+									{/each}
+								</ul>
+								<p class="text-muted-foreground text-xs">
+									Waiting runs resume via <code>jobs-playbooks</code> cron
+									(<code>PLAYBOOKS_CRON_SECRET</code>).
+								</p>
+							</div>
+						{/if}
+
 						<div>
 							<Button
 								type="button"
