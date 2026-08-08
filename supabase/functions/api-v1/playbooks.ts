@@ -219,6 +219,62 @@ export function handlePlaybooks(
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for playbooks')
   }
 
+  const runsMatch = path.match(
+    /^\/api\/v1\/playbooks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/runs$/i,
+  )
+  if (runsMatch) {
+    const playbookId = parseUuid(runsMatch[1], 'id')
+    if (req.method === 'GET') {
+      return (async () => {
+        await findPlaybook(db, orgId, playbookId, requestId)
+        const url = new URL(req.url)
+        const limit = parseLimit(url.searchParams.get('limit'))
+        const { data, error } = await db
+          .from('playbook_runs')
+          .select(
+            'id,org_id,playbook_id,created_at,updated_at,status,trigger_kind,trigger_payload,root_entity_type,root_entity_id,current_node_id,next_action_at,playbook_version,last_error',
+          )
+          .eq('org_id', orgId)
+          .eq('playbook_id', playbookId)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        if (error) throw databaseError(error, requestId)
+        return jsonResponse({ data: data ?? [] }, 200, requestId)
+      })()
+    }
+    if (req.method === 'POST') {
+      if (!canMutate(role)) {
+        throw new ApiError(403, 'FORBIDDEN', 'Only members can run playbooks')
+      }
+      return (async () => {
+        await findPlaybook(db, orgId, playbookId, requestId)
+        let body: Record<string, unknown> = {}
+        try {
+          body = await jsonBody(req)
+        } catch {
+          body = {}
+        }
+        const rootType =
+          typeof body.root_entity_type === 'string' ? body.root_entity_type : null
+        const rootIdRaw = body.root_entity_id
+        const rootId =
+          typeof rootIdRaw === 'string' && rootIdRaw
+            ? parseUuid(rootIdRaw, 'root_entity_id')
+            : null
+        const { data, error } = await db.rpc('start_playbook_run_manual', {
+          p_org_id: orgId,
+          p_playbook_id: playbookId,
+          p_root_entity_type: rootType,
+          p_root_entity_id: rootId,
+          p_trigger_payload: (body.trigger_payload as Record<string, unknown>) ?? {},
+        })
+        if (error) throw databaseError(error, requestId)
+        return jsonResponse({ data }, 201, requestId)
+      })()
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for playbook runs')
+  }
+
   const itemMatch = path.match(
     /^\/api\/v1\/playbooks\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i,
   )
