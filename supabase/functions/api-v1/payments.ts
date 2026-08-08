@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json, PaymentAllocationRow, PaymentRow } from '../_shared/database.ts'
+import { dispatchPlaybookTriggersSafe, extractEnvelopeData } from '../_shared/playbook-dispatch.ts'
 import {
   ApiError,
   etag,
@@ -648,7 +649,29 @@ async function createPayment(
       'create payment returned an unexpected payload',
     )
   }
-  return envelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
+  const envelope = data as IdempotencyEnvelope
+  if (envelope.replay !== true) {
+    const payment = extractEnvelopeData(envelope)
+    if (
+      payment &&
+      payment.direction === 'inbound' &&
+      typeof payment.id === 'string'
+    ) {
+      await dispatchPlaybookTriggersSafe({
+        orgId,
+        triggerKind: 'payment.received',
+        rootEntityType: 'payment',
+        rootEntityId: payment.id,
+        payload: {
+          payment_id: payment.id,
+          client_id: payment.client_id ?? null,
+          amount_cents: payment.amount_cents ?? null,
+          currency: payment.currency ?? null,
+        },
+      })
+    }
+  }
+  return envelopeResponse(envelope, requestId, rawKey)
 }
 
 /** Allocate/reverse omit expected_version from the hash: If-Match is first-exec only. */

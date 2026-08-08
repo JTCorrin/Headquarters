@@ -27,6 +27,7 @@ import { handlePayments } from './payments.ts'
 import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleEmailTemplates } from './email-templates.ts'
+import { handlePlaybooks } from './playbooks.ts'
 import { handleMailbox, listEntityEmailMessages, listMyEmailMessages } from './mailbox.ts'
 import { handleNotifications } from './notifications.ts'
 import { handleOrgMembers } from './org-members.ts'
@@ -302,6 +303,17 @@ async function routeOrgScoped(
     path.startsWith('/api/v1/email-templates/')
   ) {
     return await handleEmailTemplates(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    )
+  }
+
+  if (path === '/api/v1/playbooks' || path.startsWith('/api/v1/playbooks/')) {
+    return await handlePlaybooks(
       req,
       db,
       path,

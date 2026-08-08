@@ -87,6 +87,56 @@ export type EmailTemplateInsert = {
   deleted_at?: string | null
 }
 
+export type PlaybookRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  description: string | null
+  graph_json: Json
+  is_active: boolean
+}
+
+export type PlaybookInsert = {
+  org_id: string
+  name: string
+  description?: string | null
+  graph_json: Json
+  is_active?: boolean
+  deleted_at?: string | null
+}
+
+export type PlaybookRunRow = {
+  id: string
+  org_id: string
+  playbook_id: string
+  created_at: string
+  updated_at: string
+  status:
+    | 'scheduled'
+    | 'running'
+    | 'waiting'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+    | 'skipped_busy'
+  trigger_kind: string
+  trigger_payload: Json
+  root_entity_type: string | null
+  root_entity_id: string | null
+  context: Json
+  current_node_id: string | null
+  next_action_at: string | null
+  playbook_version: number
+  graph_snapshot: Json
+  last_error: string | null
+}
+
 export type MembershipRow = {
   id: string
   org_id: string
@@ -1301,6 +1351,70 @@ export type Database = {
         Update: Partial<EmailTemplateInsert>
         Relationships: []
       }
+      playbooks: {
+        Row: PlaybookRow
+        Insert: PlaybookInsert
+        Update: Partial<PlaybookInsert>
+        Relationships: []
+      }
+      playbook_runs: {
+        Row: PlaybookRunRow
+        Insert: Partial<PlaybookRunRow> & {
+          org_id: string
+          playbook_id: string
+          status: PlaybookRunRow['status']
+          trigger_kind: string
+          playbook_version: number
+          graph_snapshot: Json
+        }
+        Update: Partial<PlaybookRunRow>
+        Relationships: []
+      }
+      playbook_run_steps: {
+        Row: {
+          id: string
+          org_id: string
+          run_id: string
+          created_at: string
+          node_id: string
+          node_type: string
+          status: 'started' | 'completed' | 'failed' | 'skipped'
+          started_at: string
+          finished_at: string | null
+          result: Json
+          error: string | null
+        }
+        Insert: {
+          org_id: string
+          run_id: string
+          node_id: string
+          node_type: string
+          status: 'started' | 'completed' | 'failed' | 'skipped'
+          finished_at?: string | null
+          result?: Json
+          error?: string | null
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      playbook_send_ledger: {
+        Row: {
+          id: string
+          org_id: string
+          run_id: string
+          node_id: string
+          dedupe_key: string
+          created_at: string
+        }
+        Insert: {
+          org_id: string
+          run_id: string
+          node_id: string
+          dedupe_key: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
       memberships: {
         Row: MembershipRow
         Insert: MembershipInsert
@@ -2256,6 +2370,97 @@ export type Database = {
           p_template_id: string
         }
         Returns: undefined
+      }
+      soft_delete_playbook: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_playbook_id: string
+        }
+        Returns: undefined
+      }
+      start_playbook_run_manual: {
+        Args: {
+          p_org_id: string
+          p_playbook_id: string
+          p_root_entity_type?: string | null
+          p_root_entity_id?: string | null
+          p_trigger_payload?: Json
+        }
+        Returns: Json
+      }
+      start_playbook_run: {
+        Args: {
+          p_org_id: string
+          p_playbook_id: string
+          p_trigger_kind: string
+          p_root_entity_type?: string | null
+          p_root_entity_id?: string | null
+          p_trigger_payload?: Json
+          p_require_active?: boolean
+        }
+        Returns: Json
+      }
+      dispatch_playbook_triggers: {
+        Args: {
+          p_org_id: string
+          p_trigger_kind: string
+          p_root_entity_type: string
+          p_root_entity_id: string
+          p_trigger_payload?: Json
+        }
+        Returns: Json
+      }
+      list_playbook_client_contact_ids: {
+        Args: {
+          p_org_id: string
+          p_client_id: string
+        }
+        Returns: string[]
+      }
+      cancel_playbook_run: {
+        Args: {
+          p_org_id: string
+          p_run_id: string
+        }
+        Returns: undefined
+      }
+      claim_due_playbook_runs: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: PlaybookRunRow[]
+      }
+      create_playbook_timeline_note: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_title: string
+          p_body?: string | null
+          p_payload?: Json
+        }
+        Returns: Json
+      }
+      create_playbook_notification: {
+        Args: {
+          p_org_id: string
+          p_recipient_membership_id: string
+          p_run_id: string
+          p_title: string
+          p_body?: string | null
+          p_payload?: Json
+          p_source_id?: string | null
+        }
+        Returns: string
+      }
+      resolve_playbook_entity_email: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+        }
+        Returns: string | null
       }
       browse_entity_documents: {
         Args: {

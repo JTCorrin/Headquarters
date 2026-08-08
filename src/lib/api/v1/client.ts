@@ -7,6 +7,7 @@ import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
 import { createEmailMessagesEndpoints } from './endpoints/email-messages.js';
 import { createEmailTemplatesEndpoints } from './endpoints/email-templates.js';
+import { createPlaybooksEndpoints } from './endpoints/playbooks.js';
 import { createIntegrationsEndpoints } from './endpoints/integrations.js';
 import { createApiKeysEndpoints } from './endpoints/api-keys.js';
 import { createInvoicesEndpoints } from './endpoints/invoices.js';
@@ -37,6 +38,7 @@ import type {
 	DocumentsEndpoints,
 	EmailMessagesEndpoints,
 	EmailTemplatesEndpoints,
+	PlaybooksEndpoints,
 	IntegrationsEndpoints,
 	InvoicesEndpoints,
 	LeadsEndpoints,
@@ -107,6 +109,7 @@ export interface ApiV1Client {
 	documents: DocumentsEndpoints;
 	emailMessages: EmailMessagesEndpoints;
 	emailTemplates: EmailTemplatesEndpoints;
+	playbooks: PlaybooksEndpoints;
 	timelineEvents: TimelineEventsEndpoints;
 	auditEvents: AuditEventsEndpoints;
 }
@@ -282,6 +285,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		documents: createDocumentsEndpoints(request),
 		emailMessages: createEmailMessagesEndpoints(request),
 		emailTemplates: createEmailTemplatesEndpoints(request),
+		playbooks: createPlaybooksEndpoints(request),
 		timelineEvents: createTimelineEventsEndpoints(request),
 		auditEvents: createAuditEventsEndpoints(request)
 	};
