@@ -19,7 +19,7 @@
 		toPaymentListItem,
 		toVendorCreateBody
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiBillDocument } from '$lib/api/v1/types.js';
+	import type { ApiBillDocument, ApiTaxRate } from '$lib/api/v1/types.js';
 	import {
 		createEntityTimelineEvent,
 		loadEntityTimeline
@@ -84,6 +84,7 @@
 	let bill = $state<ApiBillDocument | null>(null);
 	let vendorOptions = $state<BillVendorOption[]>([]);
 	let products = $state<CatalogProductOption[]>([]);
+	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let timelineEvents = $state<TimelineEvent[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
@@ -286,6 +287,7 @@
 		paymentRows = [];
 		vendorOptions = [];
 		products = [];
+		taxRates = [];
 		savedFingerprint = '';
 		paymentDrawerOpen = false;
 		sourceAttachment = null;
@@ -375,20 +377,22 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, vendors, catalog] = await Promise.all([
+			const [result, vendors, catalog, rates] = await Promise.all([
 				api.bills.get(billId),
 				api.vendors.list({ limit: 100 }),
-				api.products.list({ limit: 100, status: 'active' })
+				api.products.list({ limit: 100, status: 'active' }),
+				api.taxRates.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
+			taxRates = rates;
 			applyDocument(result.data);
 			vendorOptions = vendors.data.map((v) => ({
 				id: v.id,
 				name: v.name,
 				defaultCurrency: v.default_currency
 			}));
-			products = catalog.data.map(toCatalogProductOption);
+			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
 
 			const listedPayments = await api.payments.list({
 				limit: 50,

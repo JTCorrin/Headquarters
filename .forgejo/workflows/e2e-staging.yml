@@ -1,0 +1,78 @@
+name: E2E Staging (Playwright)
+
+on:
+  pull_request:
+    branches: [dev, main, staging]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-staging:
+    name: Playwright CRM journeys against staging
+    if: forgejo.event_name == 'workflow_dispatch' || forgejo.event.pull_request.head.repo.full_name == forgejo.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out pull request
+        uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Require E2E secrets
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+        run: |
+          missing=0
+          for key in E2E_BASE_URL E2E_SUPABASE_URL E2E_SUPABASE_ANON_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing Forgejo secret $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add E2E_BASE_URL, E2E_SUPABASE_URL, E2E_SUPABASE_ANON_KEY on the repo, then re-run."
+            exit 1
+          fi
+          echo "E2E_BASE_URL host: $(printf '%s' "$E2E_BASE_URL" | sed -E 's#https?://##' | cut -d/ -f1)"
+
+      - name: Setup Node.js
+        uses: https://github.com/actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10 --activate
+
+      - name: Install dependencies (lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run staging CRM Playwright suite
+        env:
+          CI: 'true'
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+          E2E_ORG_ID: ${{ secrets.E2E_ORG_ID }}
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        # Forgejo/act does not support upload-artifact@v4 (GHESNotSupportedError).
+        uses: https://data.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7

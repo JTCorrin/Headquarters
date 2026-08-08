@@ -46,23 +46,40 @@ async function proxy(event: Parameters<RequestHandler>[0]): Promise<Response> {
 	try {
 		const upstreamResponse = await event.fetch(target, init);
 		const responseHeaders = new Headers(upstreamResponse.headers);
+		// undici may decompress while leaving upstream Content-Length; mismatched
+		// lengths make strict clients (Playwright request, curl) abort the body.
 		responseHeaders.delete('content-encoding');
 		responseHeaders.delete('transfer-encoding');
+		responseHeaders.delete('content-length');
 		return new Response(upstreamResponse.body, {
 			status: upstreamResponse.status,
 			statusText: upstreamResponse.statusText,
 			headers: responseHeaders
 		});
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Upstream request failed';
+		const requestId =
+			event.request.headers.get('x-request-id')?.trim() || crypto.randomUUID();
+		console.error('API v1 proxy upstream failure', {
+			requestId,
+			method: event.request.method,
+			pathname,
+			message: error instanceof Error ? error.message : String(error)
+		});
 		return new Response(
 			JSON.stringify({
 				error: {
 					code: 'NETWORK_ERROR',
-					message
+					message: 'Upstream request failed',
+					request_id: requestId
 				}
 			}),
-			{ status: 502, headers: { 'content-type': 'application/json; charset=utf-8' } }
+			{
+				status: 502,
+				headers: {
+					'content-type': 'application/json; charset=utf-8',
+					'x-request-id': requestId
+				}
+			}
 		);
 	}
 }

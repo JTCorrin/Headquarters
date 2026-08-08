@@ -66,3 +66,13 @@ jobs:
         env:
           PUBLIC_API_BASE_URL: ''
         run: pnpm build-storybook
+
+      # R1 soft gate — report debt without blocking merges until error counts are tractable.
+      # Hard-fail once svelte-check is near-zero (see PLANS/CODE_REVIEW_AUG7_REMEDIATION.md Wave F).
+      - name: svelte-check (report only)
+        continue-on-error: true
+        run: pnpm check
+
+      - name: ESLint (report only)
+        continue-on-error: true
+        run: pnpm lint
