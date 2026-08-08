@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, InvoiceLineRow, InvoiceRow, Json } from '../_shared/database.ts'
+import { dispatchPlaybookTriggersSafe } from '../_shared/playbook-dispatch.ts'
 import {
   ApiError,
   etag,
@@ -778,7 +779,17 @@ async function sendInvoiceRoute(
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice send returned an unexpected payload')
   }
-  return invoiceEnvelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
+  const envelope = data as IdempotencyEnvelope
+  if (envelope.replay !== true) {
+    await dispatchPlaybookTriggersSafe(db, {
+      orgId,
+      triggerKind: 'invoice.sent',
+      rootEntityType: 'invoice',
+      rootEntityId: invoiceId,
+      payload: { invoice_id: invoiceId },
+    })
+  }
+  return invoiceEnvelopeResponse(envelope, requestId, rawKey)
 }
 
 async function voidInvoiceRoute(

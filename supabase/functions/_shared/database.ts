@@ -2374,6 +2374,35 @@ export type Database = {
         }
         Returns: Json
       }
+      start_playbook_run: {
+        Args: {
+          p_org_id: string
+          p_playbook_id: string
+          p_trigger_kind: string
+          p_root_entity_type?: string | null
+          p_root_entity_id?: string | null
+          p_trigger_payload?: Json
+          p_require_active?: boolean
+        }
+        Returns: Json
+      }
+      dispatch_playbook_triggers: {
+        Args: {
+          p_org_id: string
+          p_trigger_kind: string
+          p_root_entity_type: string
+          p_root_entity_id: string
+          p_trigger_payload?: Json
+        }
+        Returns: Json
+      }
+      list_playbook_client_contact_ids: {
+        Args: {
+          p_org_id: string
+          p_client_id: string
+        }
+        Returns: string[]
+      }
       cancel_playbook_run: {
         Args: {
           p_org_id: string

@@ -1,11 +1,18 @@
 /**
- * Edge cron entry for due playbook runs (wait / waitUntil resume + side effects).
+ * Edge cron entry for due playbook runs + Phase E trigger scanners.
  * Header: x-playbooks-cron-secret = PLAYBOOKS_CRON_SECRET
  */
 import { createClient } from '@supabase/supabase-js'
 import type { Database, Json } from '../_shared/database.ts'
 import type { PlaybookActionContext } from '../_shared/playbook-actions.ts'
-import { executeNode, type GraphSnapshot } from '../_shared/playbook-runtime.ts'
+import { scanOutstandingInvoices, scanScheduleCron } from '../_shared/playbook-cron-scan.ts'
+import {
+  asLoopState,
+  continueLoopAfterBody,
+  executeNode,
+  type GraphSnapshot,
+  type TickResult,
+} from '../_shared/playbook-runtime.ts'
 
 function timingSafeEqual(a: string, b: string): boolean {
   const encoder = new TextEncoder()
@@ -48,6 +55,9 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
+  const outstanding = await scanOutstandingInvoices(service)
+  const schedules = await scanScheduleCron(service)
+
   const { data: claimed, error: claimError } = await service.rpc('claim_due_playbook_runs', {
     p_limit: 20,
   })
@@ -64,15 +74,24 @@ Deno.serve(async (req) => {
     const orgId = String(run.org_id)
     const nodeId = run.current_node_id ? String(run.current_node_id) : ''
     const graph = run.graph_snapshot as GraphSnapshot
+    // Keep DB root_entity_* as the trigger subject (unique busy-skip key).
+    // Loop iterations override ctx.root* in memory via context.loop.
+    const persistedRootType = typeof run.root_entity_type === 'string' ? run.root_entity_type : null
+    const persistedRootId = typeof run.root_entity_id === 'string' ? run.root_entity_id : null
     const ctx: PlaybookActionContext = {
       db: service,
       orgId,
       runId,
       playbookVersion: Number(run.playbook_version ?? 1),
-      rootEntityType: typeof run.root_entity_type === 'string' ? run.root_entity_type : null,
-      rootEntityId: typeof run.root_entity_id === 'string' ? run.root_entity_id : null,
+      rootEntityType: persistedRootType,
+      rootEntityId: persistedRootId,
       context: asRecord(run.context),
       triggerPayload: asRecord(run.trigger_payload),
+    }
+    const resumeLoop = asLoopState(ctx.context)
+    if (resumeLoop && resumeLoop.ids[resumeLoop.index]) {
+      ctx.rootEntityType = 'contact'
+      ctx.rootEntityId = resumeLoop.ids[resumeLoop.index]!
     }
 
     if (!nodeId) {
@@ -85,23 +104,44 @@ Deno.serve(async (req) => {
       continue
     }
 
-    // Process up to 25 nodes per tick; stop on wait/terminal/fail.
     let current = nodeId
     let finalStatus = 'running'
     for (let i = 0; i < 25; i++) {
-      const tick = await executeNode(graph, current, ctx)
-      const node = graph.nodes.find((n) => n.id === current)
+      let tick: TickResult = await executeNode(graph, current, ctx)
 
       await service.from('playbook_run_steps').insert({
         org_id: orgId,
         run_id: runId,
         node_id: current,
-        node_type: node?.type ?? 'unknown',
+        node_type: graph.nodes.find((n) => n.id === current)?.type ?? 'unknown',
         status: tick.kind === 'failed' ? 'failed' : 'completed',
         finished_at: new Date().toISOString(),
         result: (tick.kind === 'failed' ? {} : tick.stepResult) as Json,
         error: tick.kind === 'failed' ? tick.error : null,
       })
+
+      if (tick.kind === 'advance' && !tick.terminal) {
+        const loopNext = continueLoopAfterBody(ctx, tick.nextNodeId)
+        if (loopNext) {
+          tick = loopNext
+          if (loopNext.kind === 'advance') {
+            await service.from('playbook_run_steps').insert({
+              org_id: orgId,
+              run_id: runId,
+              node_id: current,
+              node_type: 'loopRelated',
+              status: 'completed',
+              finished_at: new Date().toISOString(),
+              result: loopNext.stepResult as Json,
+              error: null,
+            })
+          }
+        }
+      }
+
+      if (tick.context) {
+        ctx.context = tick.context
+      }
 
       if (tick.kind === 'failed') {
         await service
@@ -110,6 +150,7 @@ Deno.serve(async (req) => {
             status: 'failed',
             last_error: tick.error,
             next_action_at: null,
+            context: ctx.context as Json,
             updated_at: new Date().toISOString(),
           })
           .eq('id', runId)
@@ -126,23 +167,11 @@ Deno.serve(async (req) => {
             status: 'waiting',
             current_node_id: resume,
             next_action_at: tick.nextActionAt.toISOString(),
+            context: ctx.context as Json,
             updated_at: new Date().toISOString(),
           })
           .eq('id', runId)
           .eq('org_id', orgId)
-
-        if (!resume) {
-          await service
-            .from('playbook_runs')
-            .update({
-              status: 'waiting',
-              current_node_id: null,
-              next_action_at: tick.nextActionAt.toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', runId)
-            .eq('org_id', orgId)
-        }
         finalStatus = 'waiting'
         break
       }
@@ -154,6 +183,7 @@ Deno.serve(async (req) => {
             status: 'completed',
             current_node_id: null,
             next_action_at: null,
+            context: ctx.context as Json,
             updated_at: new Date().toISOString(),
           })
           .eq('id', runId)
@@ -168,6 +198,7 @@ Deno.serve(async (req) => {
         .update({
           current_node_id: current,
           status: 'running',
+          context: ctx.context as Json,
           updated_at: new Date().toISOString(),
         })
         .eq('id', runId)
@@ -177,8 +208,18 @@ Deno.serve(async (req) => {
     results.push({ run_id: runId, status: finalStatus })
   }
 
-  return new Response(JSON.stringify({ data: { processed: results.length, results } }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
+  return new Response(
+    JSON.stringify({
+      data: {
+        outstanding_dispatched: outstanding.dispatched,
+        schedule_dispatched: schedules.dispatched,
+        processed: results.length,
+        results,
+      },
+    }),
+    {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    },
+  )
 })

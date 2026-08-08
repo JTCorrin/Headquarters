@@ -1,5 +1,5 @@
 /**
- * Playbook run interpreter: wait / waitUntil / stop + Phase D side effects.
+ * Playbook run interpreter: wait / waitUntil / stop / loopRelated + side effects.
  */
 import {
   executeSideEffect,
@@ -17,13 +17,31 @@ export type GraphEdge = { id: string; source: string; target: string }
 
 export type GraphSnapshot = { nodes: GraphNode[]; edges: GraphEdge[] }
 
+export type LoopState = {
+  node_id: string
+  relation: string
+  ids: string[]
+  index: number
+  body_entry: string
+  exit_node: string | null
+  parent_entity_type: string
+  parent_entity_id: string
+}
+
 export type TickResult =
-  | { kind: 'waiting'; nextNodeId: string; nextActionAt: Date; stepResult: Record<string, unknown> }
+  | {
+    kind: 'waiting'
+    nextNodeId: string
+    nextActionAt: Date
+    stepResult: Record<string, unknown>
+    context?: Record<string, unknown>
+  }
   | {
     kind: 'advance'
     nextNodeId: string | null
     terminal: boolean
     stepResult: Record<string, unknown>
+    context?: Record<string, unknown>
   }
   | { kind: 'failed'; error: string }
 
@@ -31,13 +49,86 @@ export function getNode(graph: GraphSnapshot, nodeId: string): GraphNode | undef
   return graph.nodes.find((n) => n.id === nodeId)
 }
 
-export function nextNodeId(graph: GraphSnapshot, currentId: string): string | null {
-  const outs = graph.edges
+export function outEdges(graph: GraphSnapshot, currentId: string): GraphEdge[] {
+  return graph.edges
     .filter((e) => e.source === currentId)
     .sort((a, b) =>
       a.target === b.target ? a.id.localeCompare(b.id) : a.target.localeCompare(b.target)
     )
-  return outs[0]?.target ?? null
+}
+
+export function nextNodeId(graph: GraphSnapshot, currentId: string): string | null {
+  return outEdges(graph, currentId)[0]?.target ?? null
+}
+
+export function asLoopState(context: Record<string, unknown> | undefined): LoopState | null {
+  const raw = context?.loop
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const loop = raw as Record<string, unknown>
+  if (typeof loop.node_id !== 'string' || typeof loop.body_entry !== 'string') return null
+  if (!Array.isArray(loop.ids)) return null
+  return {
+    node_id: loop.node_id,
+    relation: String(loop.relation ?? 'client.contacts'),
+    ids: loop.ids.filter((id): id is string => typeof id === 'string'),
+    index: Number(loop.index ?? 0),
+    body_entry: loop.body_entry,
+    exit_node: typeof loop.exit_node === 'string' ? loop.exit_node : null,
+    parent_entity_type: String(loop.parent_entity_type ?? ''),
+    parent_entity_id: String(loop.parent_entity_id ?? ''),
+  }
+}
+
+/** After a body step, either re-enter body for next contact or exit the loop. */
+export function continueLoopAfterBody(
+  ctx: PlaybookActionContext,
+  nextNodeIdValue: string | null,
+): TickResult | null {
+  const loop = asLoopState(ctx.context)
+  if (!loop) return null
+  const finishedIteration = nextNodeIdValue === null || nextNodeIdValue === loop.exit_node
+  if (!finishedIteration) return null
+
+  const nextIndex = loop.index + 1
+  if (nextIndex < loop.ids.length) {
+    const nextId = loop.ids[nextIndex]!
+    const nextLoop: LoopState = { ...loop, index: nextIndex }
+    ctx.context = { ...ctx.context, loop: nextLoop }
+    ctx.rootEntityType = 'contact'
+    ctx.rootEntityId = nextId
+    return {
+      kind: 'advance',
+      nextNodeId: loop.body_entry,
+      terminal: false,
+      stepResult: {
+        loop_advance: true,
+        index: nextIndex,
+        contact_id: nextId,
+      },
+      context: ctx.context,
+    }
+  }
+
+  const { loop: _drop, ...rest } = ctx.context
+  ctx.context = rest
+  ctx.rootEntityType = loop.parent_entity_type || ctx.rootEntityType
+  ctx.rootEntityId = loop.parent_entity_id || ctx.rootEntityId
+  if (!loop.exit_node) {
+    return {
+      kind: 'advance',
+      nextNodeId: null,
+      terminal: true,
+      stepResult: { loop_done: true, iterated: loop.ids.length },
+      context: ctx.context,
+    }
+  }
+  return {
+    kind: 'advance',
+    nextNodeId: loop.exit_node,
+    terminal: false,
+    stepResult: { loop_done: true, iterated: loop.ids.length },
+    context: ctx.context,
+  }
 }
 
 export function waitDurationMs(data: Record<string, unknown> | undefined): number {
@@ -168,12 +259,105 @@ export async function executeNode(
   }
 
   if (node.type === 'loopRelated') {
-    // Phase E: real fan-out. Advance past the loop node for now.
-    return advanceResult(graph, nodeId, {
-      stub: true,
-      node_type: node.type,
-      note: 'loopRelated execution deferred to Phase E',
+    if (!ctx) {
+      return advanceResult(graph, nodeId, { stub: true, node_type: node.type })
+    }
+    const relation = String(data.relation ?? 'client.contacts')
+    if (relation !== 'client.contacts') {
+      return { kind: 'failed', error: `Unsupported loop relation: ${relation}` }
+    }
+
+    const outs = outEdges(graph, nodeId)
+    const bodyEntry = outs[0]?.target ?? null
+    const exitNode = outs[1]?.target ?? null
+    if (!bodyEntry) {
+      return advanceResult(graph, nodeId, {
+        loop_skipped: true,
+        reason: 'no_body_edge',
+      })
+    }
+
+    let clientId: string | null = null
+    if (ctx.rootEntityType === 'client' && ctx.rootEntityId) {
+      clientId = ctx.rootEntityId
+    } else if (ctx.rootEntityType === 'invoice' && ctx.rootEntityId) {
+      const { data: inv } = await ctx.db
+        .from('invoices')
+        .select('client_id')
+        .eq('org_id', ctx.orgId)
+        .eq('id', ctx.rootEntityId)
+        .maybeSingle()
+      clientId = typeof inv?.client_id === 'string' ? inv.client_id : null
+    } else if (ctx.rootEntityType === 'payment' && ctx.rootEntityId) {
+      const { data: pay } = await ctx.db
+        .from('payments')
+        .select('client_id')
+        .eq('org_id', ctx.orgId)
+        .eq('id', ctx.rootEntityId)
+        .maybeSingle()
+      clientId = typeof pay?.client_id === 'string' ? pay.client_id : null
+    }
+
+    if (!clientId) {
+      return {
+        kind: 'failed',
+        error: 'loopRelated requires a client (or invoice/payment with client)',
+      }
+    }
+
+    const { data: ids, error } = await ctx.db.rpc('list_playbook_client_contact_ids', {
+      p_org_id: ctx.orgId,
+      p_client_id: clientId,
     })
+    if (error) return { kind: 'failed', error: error.message }
+    const contactIds = Array.isArray(ids)
+      ? ids.filter((id): id is string => typeof id === 'string')
+      : []
+
+    if (contactIds.length === 0) {
+      if (!exitNode) {
+        return {
+          kind: 'advance',
+          nextNodeId: null,
+          terminal: true,
+          stepResult: { loop_empty: true, relation },
+          context: ctx.context,
+        }
+      }
+      return {
+        kind: 'advance',
+        nextNodeId: exitNode,
+        terminal: false,
+        stepResult: { loop_empty: true, relation },
+        context: ctx.context,
+      }
+    }
+
+    const loop: LoopState = {
+      node_id: nodeId,
+      relation,
+      ids: contactIds,
+      index: 0,
+      body_entry: bodyEntry,
+      exit_node: exitNode,
+      parent_entity_type: ctx.rootEntityType ?? 'client',
+      parent_entity_id: ctx.rootEntityId ?? clientId,
+    }
+    ctx.context = { ...ctx.context, loop }
+    ctx.rootEntityType = 'contact'
+    ctx.rootEntityId = contactIds[0]!
+    return {
+      kind: 'advance',
+      nextNodeId: bodyEntry,
+      terminal: false,
+      stepResult: {
+        loop_started: true,
+        relation,
+        count: contactIds.length,
+        contact_id: contactIds[0],
+      },
+      context: ctx.context,
+    }
   }
 
   if (isSideEffectNodeType(node.type)) {
@@ -182,9 +366,11 @@ export async function executeNode(
     }
     const effect = await executeSideEffect(node, ctx)
     if (!effect.ok) return { kind: 'failed', error: effect.error }
-    return advanceResult(graph, nodeId, effect.result)
+    const advanced = advanceResult(graph, nodeId, effect.result)
+    return advanced.kind === 'advance' ? { ...advanced, context: ctx.context } : advanced
   }
 
   // Unknown / trigger nodes: advance.
-  return advanceResult(graph, nodeId, { stub: true, node_type: node.type })
+  const advanced = advanceResult(graph, nodeId, { stub: true, node_type: node.type })
+  return ctx && advanced.kind === 'advance' ? { ...advanced, context: ctx.context } : advanced
 }
