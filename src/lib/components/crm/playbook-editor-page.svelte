@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { setContext } from 'svelte';
+	import type { Edge, Node } from '@xyflow/svelte';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
@@ -8,6 +10,11 @@
 		toOrganisationCreateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiPlaybook } from '$lib/api/v1/types.js';
+	import {
+		flowFromUnknownGraph,
+		flowToPlaybookGraph,
+		playbookGraphToFlow
+	} from '$lib/playbook/playbook-flow.js';
 	import {
 		createDefaultPlaybookGraph,
 		validatePlaybookGraph
@@ -20,6 +27,8 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import AppShell from './app-shell.svelte';
 	import PageHeader from './page-header.svelte';
+	import { PLAYBOOK_TEMPLATES_CTX } from '$lib/playbook/playbook-context.js';
+	import PlaybookWorkflowCanvas from './playbook-workflow-canvas.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
 	} from './resource-state-banner.svelte';
@@ -49,12 +58,18 @@
 	let name = $state('');
 	let description = $state('');
 	let isActive = $state(false);
+	let flowNodes = $state<Node[]>([]);
+	let flowEdges = $state<Edge[]>([]);
+	let showJson = $state(false);
 	let graphText = $state('');
 	let saveError = $state<string | null>(null);
 	let saveOk = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let busy = $state(false);
+	let emailTemplates = $state<{ id: string; name: string }[]>([]);
+
+	setContext(PLAYBOOK_TEMPLATES_CTX, () => emailTemplates);
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -80,6 +95,30 @@
 		return fallback;
 	}
 
+	function syncGraphTextFromFlow() {
+		graphText = JSON.stringify(flowToPlaybookGraph(flowNodes, flowEdges), null, 2);
+	}
+
+	function applyGraphTextToFlow() {
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(graphText);
+		} catch {
+			saveError = 'graph_json must be valid JSON';
+			return false;
+		}
+		const validated = validatePlaybookGraph(parsed);
+		if (!validated.ok) {
+			saveError = validated.errors.join(' ');
+			return false;
+		}
+		const flow = playbookGraphToFlow(validated.graph);
+		flowNodes = flow.nodes;
+		flowEdges = flow.edges;
+		saveError = null;
+		return true;
+	}
+
 	async function load() {
 		if (!session.selectedOrgId) {
 			viewState = { kind: 'empty', message: 'Select an organisation to edit playbooks.' };
@@ -90,12 +129,19 @@
 		saveError = null;
 		saveOk = null;
 		try {
-			const result = await api.playbooks.get(playbookId);
+			const [result, templatesResult] = await Promise.all([
+				api.playbooks.get(playbookId),
+				api.emailTemplates.list({ limit: 100 }).catch(() => ({ data: [] as { id: string; name: string }[] }))
+			]);
 			playbook = result.data;
 			name = playbook.name;
 			description = playbook.description ?? '';
 			isActive = playbook.is_active;
-			graphText = JSON.stringify(playbook.graph_json, null, 2);
+			emailTemplates = (templatesResult.data ?? []).map((t) => ({ id: t.id, name: t.name }));
+			const flow = flowFromUnknownGraph(playbook.graph_json);
+			flowNodes = flow.nodes;
+			flowEdges = flow.edges;
+			syncGraphTextFromFlow();
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isApiClientError(error) && error.status === 404) {
@@ -109,22 +155,37 @@
 		}
 	}
 
+	function currentGraphPayload(): unknown | null {
+		if (showJson) {
+			try {
+				const parsed = JSON.parse(graphText);
+				const validated = validatePlaybookGraph(parsed);
+				if (!validated.ok) {
+					saveError = validated.errors.join(' ');
+					return null;
+				}
+				return validated.graph;
+			} catch {
+				saveError = 'graph_json must be valid JSON';
+				return null;
+			}
+		}
+		const raw = flowToPlaybookGraph(flowNodes, flowEdges);
+		const validated = validatePlaybookGraph(raw);
+		if (!validated.ok) {
+			saveError = validated.errors.join(' ');
+			return null;
+		}
+		return validated.graph;
+	}
+
 	async function save() {
 		if (!playbook) return;
 		busy = true;
 		saveError = null;
 		saveOk = null;
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(graphText);
-		} catch {
-			saveError = 'graph_json must be valid JSON';
-			busy = false;
-			return;
-		}
-		const validated = validatePlaybookGraph(parsed);
-		if (!validated.ok) {
-			saveError = validated.errors.join(' ');
+		const graph = currentGraphPayload();
+		if (!graph) {
 			busy = false;
 			return;
 		}
@@ -135,12 +196,15 @@
 					name: name.trim(),
 					description: description.trim() || null,
 					is_active: isActive,
-					graph_json: validated.graph as unknown as Record<string, unknown>
+					graph_json: graph as unknown as Record<string, unknown>
 				},
 				playbook.version
 			);
 			playbook = updated;
-			graphText = JSON.stringify(updated.graph_json, null, 2);
+			const flow = flowFromUnknownGraph(updated.graph_json);
+			flowNodes = flow.nodes;
+			flowEdges = flow.edges;
+			syncGraphTextFromFlow();
 			saveOk = 'Saved';
 		} catch (error) {
 			saveError = userMessage(error, 'Failed to save playbook.');
@@ -164,7 +228,10 @@
 	}
 
 	function resetGraph() {
-		graphText = JSON.stringify(createDefaultPlaybookGraph(), null, 2);
+		const flow = playbookGraphToFlow(createDefaultPlaybookGraph());
+		flowNodes = flow.nodes;
+		flowEdges = flow.edges;
+		syncGraphTextFromFlow();
 	}
 
 	function onSwitchOrg(orgId: string) {
@@ -219,7 +286,7 @@
 					<PageHeader
 						breadcrumb="Comms / Playbooks"
 						title={playbook.name}
-						description="Phase A editor: persist name, active flag, and validated graph JSON. Visual canvas lands in Phase B."
+						description="Visual playbook editor. Drag from a node handle to insert the next step."
 					>
 						{#snippet actions()}
 							<Button type="button" variant="outline" size="sm" href="/playbooks">Back</Button>
@@ -229,34 +296,56 @@
 						{/snippet}
 					</PageHeader>
 
-					<div class="grid max-w-3xl gap-4">
-						<div class="space-y-1">
-							<Label for="pb-name">Name</Label>
-							<Input id="pb-name" bind:value={name} disabled={busy} />
-						</div>
-						<div class="space-y-1">
-							<Label for="pb-desc">Description</Label>
-							<Input id="pb-desc" bind:value={description} disabled={busy} />
+					<div class="grid max-w-5xl gap-4">
+						<div class="grid gap-4 sm:grid-cols-2">
+							<div class="space-y-1">
+								<Label for="pb-name">Name</Label>
+								<Input id="pb-name" bind:value={name} disabled={busy} />
+							</div>
+							<div class="space-y-1">
+								<Label for="pb-desc">Description</Label>
+								<Input id="pb-desc" bind:value={description} disabled={busy} />
+							</div>
 						</div>
 						<label class="flex items-center gap-2 text-sm">
 							<input type="checkbox" bind:checked={isActive} disabled={busy} />
 							Active (eligible for triggers once runner ships)
 						</label>
-						<div class="space-y-1">
-							<div class="flex items-center justify-between gap-2">
-								<Label for="pb-graph">Graph JSON</Label>
-								<Button type="button" variant="ghost" size="sm" onclick={resetGraph}
-									>Reset to default trigger</Button
-								>
+
+						<div class="space-y-2">
+							<div class="flex flex-wrap items-center justify-between gap-2">
+								<p class="text-sm font-medium">Workflow</p>
+								<div class="flex gap-2">
+									<Button type="button" variant="ghost" size="sm" onclick={resetGraph}
+										>Reset to trigger</Button
+									>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										onclick={() => {
+											if (!showJson) syncGraphTextFromFlow();
+											else applyGraphTextToFlow();
+											showJson = !showJson;
+										}}
+									>
+										{showJson ? 'Show canvas' : 'Edit JSON'}
+									</Button>
+								</div>
 							</div>
-							<textarea
-								id="pb-graph"
-								class="border-input bg-background focus-visible:ring-ring min-h-[320px] w-full rounded-md border px-3 py-2 font-mono text-xs focus-visible:ring-2 focus-visible:outline-none"
-								bind:value={graphText}
-								disabled={busy}
-								spellcheck="false"
-							></textarea>
+							{#if showJson}
+								<textarea
+									id="pb-graph"
+									class="border-input bg-background focus-visible:ring-ring min-h-[320px] w-full rounded-md border px-3 py-2 font-mono text-xs focus-visible:ring-2 focus-visible:outline-none"
+									bind:value={graphText}
+									disabled={busy}
+									spellcheck="false"
+								></textarea>
+							{:else}
+								<PlaybookWorkflowCanvas bind:nodes={flowNodes} bind:edges={flowEdges} />
+							{/if}
 						</div>
+
 						{#if saveError}
 							<p class="text-destructive text-sm">{saveError}</p>
 						{/if}
