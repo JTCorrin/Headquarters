@@ -87,6 +87,30 @@ export type EmailTemplateInsert = {
   deleted_at?: string | null
 }
 
+export type PlaybookRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  description: string | null
+  graph_json: Json
+  is_active: boolean
+}
+
+export type PlaybookInsert = {
+  org_id: string
+  name: string
+  description?: string | null
+  graph_json: Json
+  is_active?: boolean
+  deleted_at?: string | null
+}
+
 export type MembershipRow = {
   id: string
   org_id: string
@@ -1301,6 +1325,12 @@ export type Database = {
         Update: Partial<EmailTemplateInsert>
         Relationships: []
       }
+      playbooks: {
+        Row: PlaybookRow
+        Insert: PlaybookInsert
+        Update: Partial<PlaybookInsert>
+        Relationships: []
+      }
       memberships: {
         Row: MembershipRow
         Insert: MembershipInsert
@@ -2239,6 +2269,14 @@ export type Database = {
           p_expected_version: number
           p_org_id: string
           p_template_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_playbook: {
+        Args: {
+          p_expected_version: number
+          p_org_id: string
+          p_playbook_id: string
         }
         Returns: undefined
       }

@@ -84,6 +84,7 @@ export function appNavGroups(
 			items: [
 				{ label: 'Email', href: '/email', active: mark('Email') },
 				{ label: 'Templates', href: '/email/templates', active: mark('Templates') },
+				{ label: 'Playbooks', href: '/playbooks', active: mark('Playbooks') },
 				{ label: 'Documents', href: '/documents', active: mark('Documents') }
 			]
 		},
