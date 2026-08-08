@@ -3,6 +3,8 @@ import type {
 	ApiPlaybook,
 	ApiPlaybookCreateBody,
 	ApiPlaybookListParams,
+	ApiPlaybookRun,
+	ApiPlaybookRunCreateBody,
 	ApiPlaybookUpdateBody
 } from '../types.js';
 import type { PlaybooksEndpoints } from './types.js';
@@ -52,6 +54,22 @@ export function createPlaybooksEndpoints(request: ApiRequestFn): PlaybooksEndpoi
 				ifMatchVersion: version,
 				signal
 			});
+		},
+		listRuns: async (playbookId, params = {}, signal) => {
+			return request<ApiPlaybookRun[]>(`/api/v1/playbooks/${playbookId}/runs`, {
+				orgScoped: true,
+				query: { limit: params.limit },
+				signal
+			});
+		},
+		startRun: async (playbookId, body: ApiPlaybookRunCreateBody = {}, signal) => {
+			const { data } = await request<ApiPlaybookRun>(`/api/v1/playbooks/${playbookId}/runs`, {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
 		}
 	};
 }

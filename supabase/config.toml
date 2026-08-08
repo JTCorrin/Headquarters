@@ -443,3 +443,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/jobs-recurring-invoices/deno.json"
 entrypoint = "./functions/jobs-recurring-invoices/index.ts"
+
+# Playbook runs: resume waiting/scheduled ticks.
+# Schedule externally against /functions/v1/jobs-playbooks
+# with header x-playbooks-cron-secret = PLAYBOOKS_CRON_SECRET.
+[functions.jobs-playbooks]
+enabled = true
+verify_jwt = false
+import_map = "./functions/jobs-playbooks/deno.json"
+entrypoint = "./functions/jobs-playbooks/index.ts"

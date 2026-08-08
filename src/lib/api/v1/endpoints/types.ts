@@ -133,6 +133,8 @@ import type {
 	ApiPlaybook,
 	ApiPlaybookCreateBody,
 	ApiPlaybookListParams,
+	ApiPlaybookRun,
+	ApiPlaybookRunCreateBody,
 	ApiPlaybookUpdateBody,
 	ApiEntityEmailType,
 	ApiMyEmailMessageListParams,
@@ -722,6 +724,16 @@ export interface PlaybooksEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiPlaybook>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	listRuns(
+		playbookId: string,
+		params?: { limit?: number },
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiPlaybookRun[]>>;
+	startRun(
+		playbookId: string,
+		body?: ApiPlaybookRunCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiPlaybookRun>;
 }
 
 export interface TimelineEventsEndpoints {

@@ -111,6 +111,32 @@ export type PlaybookInsert = {
   deleted_at?: string | null
 }
 
+export type PlaybookRunRow = {
+  id: string
+  org_id: string
+  playbook_id: string
+  created_at: string
+  updated_at: string
+  status:
+    | 'scheduled'
+    | 'running'
+    | 'waiting'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+    | 'skipped_busy'
+  trigger_kind: string
+  trigger_payload: Json
+  root_entity_type: string | null
+  root_entity_id: string | null
+  context: Json
+  current_node_id: string | null
+  next_action_at: string | null
+  playbook_version: number
+  graph_snapshot: Json
+  last_error: string | null
+}
+
 export type MembershipRow = {
   id: string
   org_id: string
@@ -1331,6 +1357,46 @@ export type Database = {
         Update: Partial<PlaybookInsert>
         Relationships: []
       }
+      playbook_runs: {
+        Row: PlaybookRunRow
+        Insert: Partial<PlaybookRunRow> & {
+          org_id: string
+          playbook_id: string
+          status: PlaybookRunRow['status']
+          trigger_kind: string
+          playbook_version: number
+          graph_snapshot: Json
+        }
+        Update: Partial<PlaybookRunRow>
+        Relationships: []
+      }
+      playbook_run_steps: {
+        Row: {
+          id: string
+          org_id: string
+          run_id: string
+          created_at: string
+          node_id: string
+          node_type: string
+          status: 'started' | 'completed' | 'failed' | 'skipped'
+          started_at: string
+          finished_at: string | null
+          result: Json
+          error: string | null
+        }
+        Insert: {
+          org_id: string
+          run_id: string
+          node_id: string
+          node_type: string
+          status: 'started' | 'completed' | 'failed' | 'skipped'
+          finished_at?: string | null
+          result?: Json
+          error?: string | null
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
       memberships: {
         Row: MembershipRow
         Insert: MembershipInsert
@@ -2279,6 +2345,29 @@ export type Database = {
           p_playbook_id: string
         }
         Returns: undefined
+      }
+      start_playbook_run_manual: {
+        Args: {
+          p_org_id: string
+          p_playbook_id: string
+          p_root_entity_type?: string | null
+          p_root_entity_id?: string | null
+          p_trigger_payload?: Json
+        }
+        Returns: Json
+      }
+      cancel_playbook_run: {
+        Args: {
+          p_org_id: string
+          p_run_id: string
+        }
+        Returns: undefined
+      }
+      claim_due_playbook_runs: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: PlaybookRunRow[]
       }
       browse_entity_documents: {
         Args: {
