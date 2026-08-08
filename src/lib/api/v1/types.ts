@@ -1707,15 +1707,19 @@ export type ApiTimelineEventKind =
 	| 'task'
 	| 'conversion';
 
+export type ApiTimelineActorType = 'user' | 'agent' | 'system' | 'integration';
+
+/** Row from `GET/POST …/timeline-events` (dictionary §9.1). */
 export interface ApiTimelineEvent {
 	id: string;
 	org_id: string;
 	entity_type: ApiTimelineEntityType;
 	entity_id: string;
-	kind: ApiTimelineEventKind | string;
+	/** Known kinds plus forward-compatible strings from the API. */
+	kind: ApiTimelineEventKind | (string & {});
 	title: string;
 	body: string | null;
-	actor_type: 'user' | 'agent' | 'system' | 'integration' | string;
+	actor_type: ApiTimelineActorType | (string & {});
 	actor_id: string | null;
 	source_type: string | null;
 	source_id: string | null;
@@ -1724,12 +1728,12 @@ export interface ApiTimelineEvent {
 	created_at: string;
 }
 
-/** Body for `POST /api/v1/entities/{type}/{id}/timeline-events`. */
+/** Body for `POST /api/v1/entities/{type}/{id}/timeline-events`. Default `kind=note`; rejects `conversion`. */
 export interface ApiTimelineEventCreateBody {
 	title: string;
 	body?: string | null;
 	kind?: Exclude<ApiTimelineEventKind, 'conversion'>;
-	/** Render metadata (e.g. accent, icon) for TimelineComposer. */
+	/** Render metadata (e.g. accent, icon) and Mentions-BE fan-out. */
 	payload?: Record<string, unknown>;
 }
 
@@ -2165,51 +2169,3 @@ export interface ApiAuditEventListParams {
 	actor_id?: string;
 }
 
-/** Entity types that host a profile timeline feed. */
-export type ApiTimelineEntityType =
-	| 'contact'
-	| 'lead'
-	| 'client'
-	| 'quote'
-	| 'invoice'
-	| 'bill';
-
-export type ApiTimelineEventKind =
-	| 'note'
-	| 'email'
-	| 'call'
-	| 'payment'
-	| 'document'
-	| 'status'
-	| 'meeting'
-	| 'task'
-	| 'conversion'
-	| string;
-
-export type ApiTimelineActorType = 'user' | 'agent' | 'system' | 'integration' | string;
-
-/** Row from `GET/POST …/timeline-events` (dictionary §9.1). */
-export interface ApiTimelineEvent {
-	id: string;
-	org_id: string;
-	entity_type: ApiTimelineEntityType | string;
-	entity_id: string;
-	kind: ApiTimelineEventKind;
-	title: string;
-	body: string | null;
-	actor_type: ApiTimelineActorType;
-	actor_id: string | null;
-	source_type: string | null;
-	source_id: string | null;
-	payload: Record<string, unknown>;
-	occurred_at: string;
-	created_at: string;
-}
-
-/** Body for composer note create (`POST …/timeline-events`). Default `kind=note`; rejects `conversion`. */
-export interface ApiTimelineEventCreateBody {
-	title: string;
-	body?: string | null;
-	kind?: ApiTimelineEventKind;
-	payload?: Record<string, unknown>;
-}

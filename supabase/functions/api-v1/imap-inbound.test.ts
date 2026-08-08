@@ -92,7 +92,11 @@ Deno.test('withImapTimeout maps deadline to timeout code (not connection_failed)
 })
 
 Deno.test('withImapTimeout resolves when work finishes before deadline', async () => {
-  const value = await withImapTimeout(Promise.resolve(42), IMAP_CONNECT_TIMEOUT_MS, 'fast')
+  const value = await withImapTimeout(
+    Promise.resolve(42),
+    IMAP_CONNECT_TIMEOUT_MS,
+    'fast',
+  )
   assertEquals(value, 42)
 })
 
@@ -131,7 +135,11 @@ Deno.test('probeImap maps LOGIN NO to imap_auth_failed', async () => {
             untagged: [] as string[],
           })
         }
-        return Promise.resolve({ status: 'OK', text: 'OK', untagged: [] as string[] })
+        return Promise.resolve({
+          status: 'OK',
+          text: 'OK',
+          untagged: [] as string[],
+        })
       },
       readGreeting: () => Promise.resolve(),
       close: () => {},
@@ -188,16 +196,27 @@ Deno.test('Dovecot-style FETCH literals: no phantom post-literal CRLF', async ()
 })
 
 Deno.test('safeMailboxSyncFailureMessage keeps select/search/fetch distinct', () => {
-  assertEquals(safeMailboxSyncFailureMessage('imap_select_failed').step, 'select')
-  assertEquals(safeMailboxSyncFailureMessage('imap_search_failed').step, 'search')
-  assertEquals(safeMailboxSyncFailureMessage('imap_fetch_failed').step, 'fetch')
+  assertEquals(
+    safeMailboxSyncFailureMessage('imap_select_failed').step,
+    'select',
+  )
+  assertEquals(
+    safeMailboxSyncFailureMessage('imap_search_failed').step,
+    'search',
+  )
+  assertEquals(
+    safeMailboxSyncFailureMessage('imap_fetch_failed').step,
+    'fetch',
+  )
   assertEquals(safeMailboxSyncFailureMessage('timeout', 'fetch').step, 'fetch')
   assertEquals(
     safeMailboxSyncFailureMessage('timeout', 'fetch').message.includes('fetch'),
     true,
   )
   assertEquals(
-    safeMailboxSyncFailureMessage('imap_connection_failed').message.includes('reach'),
+    safeMailboxSyncFailureMessage('imap_connection_failed').message.includes(
+      'reach',
+    ),
     true,
   )
 })
@@ -321,13 +340,19 @@ Deno.test('assertSafeOutboundHost blocks DNS that resolves to private IPs', asyn
   assertEquals(error.code, 'imap_host_blocked')
 })
 
-Deno.test('assertSafeOutboundHost allows public A records', async () => {
-  await assertSafeOutboundHost('imap.gmail.com', (_host, type) => {
-    if (type === 'A') return Promise.resolve(['142.250.1.108'])
-    return Promise.resolve([])
-  })
+Deno.test('assertSafeOutboundHost allows public A records and pins the address', async () => {
+  const target = await assertSafeOutboundHost(
+    'imap.gmail.com',
+    (_host, type) => {
+      if (type === 'A') return Promise.resolve(['142.250.1.108'])
+      return Promise.resolve([])
+    },
+  )
+  assertEquals(target.hostname, 'imap.gmail.com')
+  assertEquals(target.connectHost, '142.250.1.108')
 })
 
 Deno.test('assertSafeOutboundHost allows synthetic example.test hosts', async () => {
-  await assertSafeOutboundHost('imap.example.test')
+  const target = await assertSafeOutboundHost('imap.example.test')
+  assertEquals(target.connectHost, 'imap.example.test')
 })

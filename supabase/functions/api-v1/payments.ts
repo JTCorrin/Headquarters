@@ -17,9 +17,6 @@ import {
   sha256Hex,
 } from './idempotency.ts'
 
-const PAYMENT_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,version,direction,client_id,vendor_id,amount_cents,currency,method,status,occurred_on,reference,provider,provider_payment_id,notes,reverses_payment_id,completed_at,metadata'
-
 const DIRECTIONS = new Set(['inbound', 'outbound'])
 const METHODS = new Set(['bank', 'card', 'cash', 'stripe', 'other'])
 const STATUSES = new Set([
@@ -93,7 +90,8 @@ function isValidDateOnly(value: string): boolean {
 }
 
 function isSafePositiveInt(value: number): boolean {
-  return Number.isInteger(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER
+  return Number.isInteger(value) && value > 0 &&
+    value <= Number.MAX_SAFE_INTEGER
 }
 
 function validateAllocations(value: unknown): AllocationInput[] {
@@ -152,7 +150,12 @@ function validateAllocations(value: unknown): AllocationInput[] {
     }
 
     if (Object.keys(fields).length > 0) {
-      throw new ApiError(422, 'VALIDATION_ERROR', 'Payment validation failed', fields)
+      throw new ApiError(
+        422,
+        'VALIDATION_ERROR',
+        'Payment validation failed',
+        fields,
+      )
     }
 
     return {
@@ -163,7 +166,9 @@ function validateAllocations(value: unknown): AllocationInput[] {
   })
 }
 
-export function validateCreateBody(body: Record<string, unknown>): PaymentCreate {
+export function validateCreateBody(
+  body: Record<string, unknown>,
+): PaymentCreate {
   const fields: Record<string, string> = {}
   const writable = new Set([
     'direction',
@@ -240,7 +245,9 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
 
   let occurredOn: string | undefined
   if ('occurred_on' in body && body.occurred_on != null) {
-    if (typeof body.occurred_on !== 'string' || !isValidDateOnly(body.occurred_on)) {
+    if (
+      typeof body.occurred_on !== 'string' || !isValidDateOnly(body.occurred_on)
+    ) {
       fields.occurred_on = 'Must be a YYYY-MM-DD date'
     } else {
       occurredOn = body.occurred_on
@@ -250,7 +257,9 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
   let reference: string | null | undefined
   if ('reference' in body) {
     if (body.reference === null) reference = null
-    else if (typeof body.reference !== 'string' || body.reference.trim().length > 200) {
+    else if (
+      typeof body.reference !== 'string' || body.reference.trim().length > 200
+    ) {
       fields.reference = 'Must be a string up to 200 characters or null'
     } else {
       reference = body.reference.trim() || null
@@ -285,7 +294,9 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
   let notes: string | null | undefined
   if ('notes' in body) {
     if (body.notes === null) notes = null
-    else if (typeof body.notes !== 'string' || body.notes.trim().length > 4000) {
+    else if (
+      typeof body.notes !== 'string' || body.notes.trim().length > 4000
+    ) {
       fields.notes = 'Must be a string up to 4000 characters or null'
     } else {
       notes = body.notes.trim() || null
@@ -294,10 +305,14 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
 
   let metadata: Record<string, unknown> | undefined
   if ('metadata' in body) {
-    if (!body.metadata || typeof body.metadata !== 'object' || Array.isArray(body.metadata)) {
+    if (
+      !body.metadata || typeof body.metadata !== 'object' ||
+      Array.isArray(body.metadata)
+    ) {
       fields.metadata = 'Must be an object'
     } else if (
-      new TextEncoder().encode(JSON.stringify(body.metadata)).byteLength > 16_384
+      new TextEncoder().encode(JSON.stringify(body.metadata)).byteLength >
+        16_384
     ) {
       fields.metadata = 'Must not exceed 16 KiB'
     } else {
@@ -316,7 +331,12 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
   }
 
   if (Object.keys(fields).length > 0) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Payment validation failed', fields)
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'Payment validation failed',
+      fields,
+    )
   }
 
   return {
@@ -336,27 +356,47 @@ export function validateCreateBody(body: Record<string, unknown>): PaymentCreate
   }
 }
 
-export function validateAllocateBody(body: Record<string, unknown>): AllocationInput[] {
+export function validateAllocateBody(
+  body: Record<string, unknown>,
+): AllocationInput[] {
   if (!('allocations' in body)) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Payment allocate validation failed', {
-      allocations: 'Required',
-    })
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'Payment allocate validation failed',
+      {
+        allocations: 'Required',
+      },
+    )
   }
   const allocations = validateAllocations(body.allocations)
   if (allocations.length < 1) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Payment allocate validation failed', {
-      allocations: 'Must contain at least one allocation',
-    })
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'Payment allocate validation failed',
+      {
+        allocations: 'Must contain at least one allocation',
+      },
+    )
   }
   return allocations
 }
 
 export function validateReverseBody(body: Record<string, unknown>): string {
   const value = body.reason ?? body.reversal_reason
-  if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > 2000) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Payment reverse validation failed', {
-      reason: 'Must be a string between 1 and 2000 characters',
-    })
+  if (
+    typeof value !== 'string' || value.trim().length < 1 ||
+    value.trim().length > 2000
+  ) {
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'Payment reverse validation failed',
+      {
+        reason: 'Must be a string between 1 and 2000 characters',
+      },
+    )
   }
   return value.trim()
 }
@@ -373,7 +413,9 @@ export function decodePaymentCursor(value: string): PaymentCursor {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url')
     const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
     const padding = '='.repeat((4 - (base64.length % 4)) % 4)
-    const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<PaymentCursor>
+    const cursor = JSON.parse(atob(`${base64}${padding}`)) as Partial<
+      PaymentCursor
+    >
     const createdAt = cursor.created_at
     const id = parseUuid(cursor.id ?? null, 'cursor')
     if (typeof createdAt !== 'string' || !isStrictIsoTimestamp(createdAt)) {
@@ -389,11 +431,16 @@ export function decodePaymentCursor(value: string): PaymentCursor {
 
 function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (error.message?.toLowerCase().includes('version conflict')) {
-    return new ApiError(412, 'PRECONDITION_FAILED', 'Payment version does not match If-Match')
+    return new ApiError(
+      412,
+      'PRECONDITION_FAILED',
+      'Payment version does not match If-Match',
+    )
   }
   if (
     error.message?.toLowerCase().includes('idempotency-key was reused') ||
-    (error.code === '23505' && error.message?.toLowerCase().includes('idempotency'))
+    (error.code === '23505' &&
+      error.message?.toLowerCase().includes('idempotency'))
   ) {
     return new ApiError(
       409,
@@ -402,18 +449,36 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
     )
   }
   if (error.code === '23505') {
-    return new ApiError(409, 'CONFLICT', 'The payment conflicts with an existing record')
+    return new ApiError(
+      409,
+      'CONFLICT',
+      'The payment conflicts with an existing record',
+    )
   }
   if (error.code === '55000') {
-    return new ApiError(409, 'CONFLICT', 'An identical request is already in progress')
+    return new ApiError(
+      409,
+      'CONFLICT',
+      'An identical request is already in progress',
+    )
   }
   if (error.code === '22023') {
     // Deliberate RAISE from our own RPCs; the message is user-facing.
-    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Payment validation failed')
+    return new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      error.message || 'Payment validation failed',
+    )
   }
-  if (error.code === '23503' || error.code === '23514' || error.code === '22003') {
+  if (
+    error.code === '23503' || error.code === '23514' || error.code === '22003'
+  ) {
     // Postgres-generated constraint messages leak schema details; keep generic.
-    return new ApiError(422, 'VALIDATION_ERROR', 'The payment failed a database constraint')
+    return new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'The payment failed a database constraint',
+    )
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
@@ -436,7 +501,11 @@ function asPaymentDocument(data: Json): PaymentDocument {
     reversing_payment?: PaymentRow
   }
   if (!payload.payment) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Payment RPC returned an incomplete payload')
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Payment RPC returned an incomplete payload',
+    )
   }
   return {
     ...payload.payment,
@@ -488,74 +557,46 @@ async function listPayments(
     })
   }
   if (invoiceIdParam && billIdParam) {
-    throw new ApiError(400, 'BAD_REQUEST', 'invoice_id and bill_id are mutually exclusive', {
-      invoice_id: 'Provide at most one of invoice_id or bill_id',
-      bill_id: 'Provide at most one of invoice_id or bill_id',
-    })
-  }
-
-  // Doc filters resolve payment ids via payment_allocations (includes reversed history).
-  let paymentIdsFilter: string[] | null = null
-  if (invoiceIdParam) {
-    const invoiceId = parseUuid(invoiceIdParam, 'invoice_id')
-    const { data: allocRows, error: allocError } = await db
-      .from('payment_allocations')
-      .select('payment_id')
-      .eq('org_id', orgId)
-      .eq('invoice_id', invoiceId)
-    if (allocError) throw databaseError(allocError, requestId)
-    paymentIdsFilter = [
-      ...new Set((allocRows ?? []).map((row) => (row as { payment_id: string }).payment_id)),
-    ]
-    if (paymentIdsFilter.length === 0) {
-      return jsonResponse({ data: [], meta: { next_cursor: null } }, 200, requestId)
-    }
-  } else if (billIdParam) {
-    const billId = parseUuid(billIdParam, 'bill_id')
-    const { data: allocRows, error: allocError } = await db
-      .from('payment_allocations')
-      .select('payment_id')
-      .eq('org_id', orgId)
-      .eq('bill_id', billId)
-    if (allocError) throw databaseError(allocError, requestId)
-    paymentIdsFilter = [
-      ...new Set((allocRows ?? []).map((row) => (row as { payment_id: string }).payment_id)),
-    ]
-    if (paymentIdsFilter.length === 0) {
-      return jsonResponse({ data: [], meta: { next_cursor: null } }, 200, requestId)
-    }
-  }
-
-  let query = db
-    .from('payments')
-    .select(PAYMENT_SELECT)
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit + 1)
-
-  if (direction) query = query.eq('direction', direction as PaymentRow['direction'])
-  if (status) query = query.eq('status', status as PaymentRow['status'])
-  if (clientId) query = query.eq('client_id', parseUuid(clientId, 'client_id'))
-  if (vendorId) query = query.eq('vendor_id', parseUuid(vendorId, 'vendor_id'))
-  if (paymentIdsFilter) query = query.in('id', paymentIdsFilter)
-
-  if (cursorParam) {
-    const cursor = decodePaymentCursor(cursorParam)
-    query = query.or(
-      `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      'invoice_id and bill_id are mutually exclusive',
+      {
+        invoice_id: 'Provide at most one of invoice_id or bill_id',
+        bill_id: 'Provide at most one of invoice_id or bill_id',
+      },
     )
   }
 
-  const { data, error } = await query
+  // Org-scoped join RPC — avoids max_rows truncation when filtering by document.
+  const cursor = cursorParam ? decodePaymentCursor(cursorParam) : null
+  const { data, error } = await db.rpc('list_payments', {
+    p_org_id: orgId,
+    p_limit: limit + 1,
+    p_cursor_created_at: cursor?.created_at ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    p_direction: direction,
+    p_status: status,
+    p_client_id: clientId ? parseUuid(clientId, 'client_id') : null,
+    p_vendor_id: vendorId ? parseUuid(vendorId, 'vendor_id') : null,
+    p_invoice_id: invoiceIdParam ? parseUuid(invoiceIdParam, 'invoice_id') : null,
+    p_bill_id: billIdParam ? parseUuid(billIdParam, 'bill_id') : null,
+  })
   if (error) throw databaseError(error, requestId)
   const rows = (data ?? []) as PaymentRow[]
   const page = rows.slice(0, limit)
   const next = rows.length > limit
-    ? encodeCursor({ created_at: page[page.length - 1].created_at, id: page[page.length - 1].id })
+    ? encodeCursor({
+      created_at: page[page.length - 1].created_at,
+      id: page[page.length - 1].id,
+    })
     : null
 
-  return jsonResponse({ data: page, meta: { next_cursor: next } }, 200, requestId)
+  return jsonResponse(
+    { data: page, meta: { next_cursor: next } },
+    200,
+    requestId,
+  )
 }
 
 async function getPayment(
@@ -570,7 +611,9 @@ async function getPayment(
   })
   if (error) throw databaseError(error, requestId)
   const document = asPaymentDocument(data as Json)
-  return jsonResponse({ data: document }, 200, requestId, { etag: etag(document.version) })
+  return jsonResponse({ data: document }, 200, requestId, {
+    etag: etag(document.version),
+  })
 }
 
 async function createPayment(
@@ -599,7 +642,11 @@ async function createPayment(
   })
   if (error) throw databaseError(error, requestId)
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'create payment returned an unexpected payload')
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'create payment returned an unexpected payload',
+    )
   }
   return envelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
@@ -640,7 +687,11 @@ async function allocatePayment(
   })
   if (error) throw databaseError(error, requestId)
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'allocate payment returned an unexpected payload')
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'allocate payment returned an unexpected payload',
+    )
   }
   return envelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
@@ -673,7 +724,11 @@ async function reversePayment(
   })
   if (error) throw databaseError(error, requestId)
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'reverse payment returned an unexpected payload')
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'reverse payment returned an unexpected payload',
+    )
   }
   return envelopeResponse(data as IdempotencyEnvelope, requestId, rawKey)
 }
@@ -688,7 +743,11 @@ export function handlePayments(
   if (path === '/api/v1/payments') {
     if (req.method === 'GET') return listPayments(req, db, orgId, requestId)
     if (req.method === 'POST') return createPayment(req, db, orgId, requestId)
-    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for payments')
+    throw new ApiError(
+      405,
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for payments',
+    )
   }
 
   const allocateMatch = path.match(
@@ -696,7 +755,11 @@ export function handlePayments(
   )
   if (allocateMatch) {
     if (req.method !== 'POST') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for payment allocate')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for payment allocate',
+      )
     }
     return allocatePayment(req, db, orgId, allocateMatch[1], requestId)
   }
@@ -706,7 +769,11 @@ export function handlePayments(
   )
   if (reverseMatch) {
     if (req.method !== 'POST') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for payment reverse')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for payment reverse',
+      )
     }
     return reversePayment(req, db, orgId, reverseMatch[1], requestId)
   }
@@ -715,6 +782,12 @@ export function handlePayments(
     /^\/api\/v1\/payments\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i,
   )
   if (!itemMatch) throw new ApiError(404, 'NOT_FOUND', 'Route not found')
-  if (req.method === 'GET') return getPayment(db, orgId, itemMatch[1], requestId)
-  throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for payment')
+  if (req.method === 'GET') {
+    return getPayment(db, orgId, itemMatch[1], requestId)
+  }
+  throw new ApiError(
+    405,
+    'METHOD_NOT_ALLOWED',
+    'Method not allowed for payment',
+  )
 }

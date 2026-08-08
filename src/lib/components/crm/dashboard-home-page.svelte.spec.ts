@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
@@ -7,7 +7,9 @@ import { createOrgSession } from '$lib/org/session.svelte.js';
 import DashboardHomePage from './dashboard-home-page.svelte';
 
 const ORG_A = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const ORG_B = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
 const MEMBERSHIP_ID = 'bbbbbbbb-bbbb-4ccc-8ddd-ffffffffffff';
+const MEMBERSHIP_B = 'cccccccc-cccc-4ddd-8eee-111111111111';
 const TASK_ID = '11111111-2222-4333-8444-555555555555';
 const TASK_B = '22222222-3333-4444-8555-666666666666';
 const MEETING_ID = '33333333-4444-4555-8666-777777777777';
@@ -326,5 +328,119 @@ describe('DashboardHomePage integration', () => {
 			status: 'open',
 			source: 'manual'
 		});
+	});
+
+	it('discards a delayed org timeline that completes after org switch', async () => {
+		let releaseTimeline: (() => void) | undefined;
+		const timelineGate = new Promise<void>((resolve) => {
+			releaseTimeline = resolve;
+		});
+		let timelineStarted = false;
+		let timelineCompletions = 0;
+		const staleTitle = 'Stale org A quote accepted';
+
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					logo_url: null,
+					role: 'owner',
+					membership_id: MEMBERSHIP_ID,
+					theme_default: 'system'
+				},
+				{
+					org_id: ORG_B,
+					org_name: 'Certivue',
+					org_slug: 'certivue',
+					logo_url: null,
+					role: 'owner',
+					membership_id: MEMBERSHIP_B,
+					theme_default: 'system'
+				}
+			]
+		});
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
+			'GET /api/v1/organisations': async () => ({
+				body: {
+					data: [
+						...organisationsListBody().data,
+						{
+							membership: {
+								id: MEMBERSHIP_B,
+								role: 'owner',
+								status: 'active',
+								joined_at: '2026-01-01T00:00:00Z'
+							},
+							organisation: {
+								id: ORG_B,
+								name: 'Certivue',
+								slug: 'certivue',
+								logo_path: null,
+								default_currency: 'USD',
+								timezone: 'UTC',
+								locale: 'en-GB',
+								country_code: 'GB',
+								theme_default: 'system'
+							}
+						}
+					]
+				}
+			}),
+			'GET /api/v1/tasks': async () => ({
+				body: { data: [sampleTask()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/meetings': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/timeline-events': async (request) => {
+				const orgId = request.headers.get('x-org-id');
+				if (orgId === ORG_A) {
+					timelineStarted = true;
+					await timelineGate;
+					timelineCompletions += 1;
+					return {
+						body: {
+							data: [
+								{
+									id: 'eeeeeeee-eeee-4fff-8aaa-bbbbbbbbbbbb',
+									org_id: ORG_A,
+									entity_type: 'quote',
+									entity_id: 'aaaaaaaa-aaaa-4bbb-8ccc-dddddddddddd',
+									kind: 'status',
+									title: staleTitle,
+									body: null,
+									actor_type: 'system',
+									actor_id: null,
+									source_type: 'quote',
+									source_id: 'aaaaaaaa-aaaa-4bbb-8ccc-dddddddddddd',
+									payload: {},
+									occurred_at: '2026-08-05T12:00:00.000Z',
+									created_at: '2026-08-05T12:00:00.000Z'
+								}
+							],
+							meta: { next_cursor: null }
+						}
+					};
+				}
+				return { body: { data: [], meta: { next_cursor: null } } };
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(DashboardHomePage, { api, session });
+
+		await vi.waitFor(() => expect(timelineStarted).toBe(true));
+		session.selectOrg(ORG_B);
+		await vi.waitFor(() => expect(session.selectedOrgId).toBe(ORG_B));
+
+		releaseTimeline?.();
+		await vi.waitFor(() => expect(timelineCompletions).toBe(1));
+		await expect.element(page.getByText(staleTitle)).not.toBeInTheDocument();
 	});
 });

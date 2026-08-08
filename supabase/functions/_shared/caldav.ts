@@ -163,11 +163,15 @@ function basicAuthHeader(username: string, password: string): string {
   return `Basic ${token}`
 }
 
-export function createStubCaldavClient(meetingIdForStub?: string): CaldavClient {
+export function createStubCaldavClient(
+  meetingIdForStub?: string,
+): CaldavClient {
   return {
     putEvent(event) {
       const id = event.uid || meetingIdForStub || crypto.randomUUID()
-      return Promise.resolve({ id: id.startsWith('stub-') ? id : `stub-${id}` })
+      return Promise.resolve({
+        id: id.startsWith('stub-') ? id : `stub-${id}`,
+      })
     },
     deleteEvent(_eventId) {
       return Promise.resolve()
@@ -186,6 +190,8 @@ export type LiveCaldavClientOptions = {
   resolveDns?: Parameters<typeof assertSafeOutboundHost>[1]
 }
 
+const CALDAV_MAX_REDIRECTS = 5
+
 export async function createLiveCaldavClient(
   options: LiveCaldavClientOptions,
 ): Promise<CaldavClient> {
@@ -203,22 +209,64 @@ export async function createLiveCaldavClient(
   const auth = basicAuthHeader(options.username, options.password)
   const collectionUrl = options.caldavUrl.trim().replace(/\/+$/, '') + '/'
 
+  async function assertSafeUrl(url: string): Promise<void> {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new CaldavError('caldav_host_blocked', 'CalDAV URL is invalid')
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new CaldavError(
+        'caldav_host_blocked',
+        'CalDAV URL scheme is not allowed',
+      )
+    }
+    try {
+      await assertSafeOutboundHost(parsed.hostname, options.resolveDns)
+    } catch (err) {
+      if (err instanceof ImapSyncError) {
+        throw new CaldavError('caldav_host_blocked', err.message)
+      }
+      throw err
+    }
+  }
+
   async function request(
     method: string,
     url: string,
     init: { body?: string; contentType?: string; depth?: string } = {},
   ): Promise<Response> {
-    const headers: Record<string, string> = {
-      authorization: auth,
+    let current = url
+    for (let hop = 0; hop <= CALDAV_MAX_REDIRECTS; hop++) {
+      await assertSafeUrl(current)
+      const headers: Record<string, string> = {
+        authorization: auth,
+      }
+      if (init.contentType) headers['content-type'] = init.contentType
+      if (init.depth) headers.depth = init.depth
+      const res = await fetchImpl(current, {
+        method,
+        headers,
+        body: init.body,
+        redirect: 'manual',
+      })
+      if (res.status < 300 || res.status >= 400) return res
+      const location = res.headers.get('location')
+      if (!location) {
+        throw new CaldavError(
+          'caldav_redirect_failed',
+          `CalDAV redirect missing Location (${res.status})`,
+        )
+      }
+      current = new URL(location, current).toString()
+      // Only GET-style methods are typically redirected with body dropped; CalDAV
+      // PUT/DELETE/PROPFIND must re-issue the same method after each hop.
     }
-    if (init.contentType) headers['content-type'] = init.contentType
-    if (init.depth) headers.depth = init.depth
-    const res = await fetchImpl(url, {
-      method,
-      headers,
-      body: init.body,
-    })
-    return res
+    throw new CaldavError(
+      'caldav_redirect_failed',
+      'CalDAV redirect limit exceeded',
+    )
   }
 
   return {
