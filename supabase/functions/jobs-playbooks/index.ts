@@ -3,10 +3,7 @@
  * Header: x-playbooks-cron-secret = PLAYBOOKS_CRON_SECRET
  */
 import { createClient } from '@supabase/supabase-js'
-import {
-  executeNode,
-  type GraphSnapshot,
-} from '../_shared/playbook-runtime.ts'
+import { executeNode, type GraphSnapshot } from '../_shared/playbook-runtime.ts'
 
 function timingSafeEqual(a: string, b: string): boolean {
   const encoder = new TextEncoder()
@@ -113,12 +110,10 @@ Deno.serve(async (req) => {
             next_action_at: tick.nextActionAt.toISOString(),
             updated_at: new Date().toISOString(),
             // If no resume node, complete when wait elapses via empty current on next claim.
-            ...(resume
-              ? {}
-              : {
-                  // Terminal wait: mark completed after delay by setting current null + waiting
-                  // next claim with null current completes — use completed immediately if no next.
-                }),
+            ...(resume ? {} : {
+              // Terminal wait: mark completed after delay by setting current null + waiting
+              // next claim with null current completes — use completed immediately if no next.
+            }),
           })
           .eq('id', runId)
           .eq('org_id', orgId)

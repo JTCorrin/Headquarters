@@ -88,13 +88,12 @@ export function validatePlaybookGraphJson(input: unknown): PlaybookGraphValidati
     nodes.push({
       id: String(node.id ?? ''),
       type: String(node.type ?? ''),
-      position:
-        node.position && typeof node.position === 'object'
-          ? {
-              x: Number((node.position as { x?: unknown }).x ?? 0),
-              y: Number((node.position as { y?: unknown }).y ?? 0),
-            }
-          : { x: 0, y: 0 },
+      position: node.position && typeof node.position === 'object'
+        ? {
+          x: Number((node.position as { x?: unknown }).x ?? 0),
+          y: Number((node.position as { y?: unknown }).y ?? 0),
+        }
+        : { x: 0, y: 0 },
       data: (node.data as Record<string, unknown>) ?? {},
     })
   }
