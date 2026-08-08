@@ -73,6 +73,7 @@
 		"@supabase/supabase-js": "^2.111.0",
 		"@svar-ui/svelte-kanban": "^2.6.0",
 		"@tanstack/table-core": "^8.21.3",
+		"@xyflow/svelte": "^1.6.2",
 		"pdfmake": "^0.3.11",
 		"pdfmake-html-renderer": "^0.4.1"
 	}
