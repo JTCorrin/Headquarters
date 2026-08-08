@@ -130,6 +130,10 @@ import type {
 	ApiEmailTemplateCreateBody,
 	ApiEmailTemplateListParams,
 	ApiEmailTemplateUpdateBody,
+	ApiPlaybook,
+	ApiPlaybookCreateBody,
+	ApiPlaybookListParams,
+	ApiPlaybookUpdateBody,
 	ApiEntityEmailType,
 	ApiMyEmailMessageListParams,
 	ApiRecurringInvoiceCreateBody,
@@ -701,6 +705,22 @@ export interface EmailTemplatesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiEmailTemplate>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface PlaybooksEndpoints {
+	list(
+		params?: ApiPlaybookListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiPlaybook[]>>;
+	create(body: ApiPlaybookCreateBody, signal?: AbortSignal): Promise<ApiPlaybook>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiPlaybook>>;
+	update(
+		id: string,
+		body: ApiPlaybookUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiPlaybook>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 }
 
