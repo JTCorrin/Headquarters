@@ -56,7 +56,12 @@ export class ImapSyncError extends Error {
   /** Sync pipeline step hint for API clients (connect/login/select/search/fetch/…). */
   readonly step: string | null
 
-  constructor(code: string, message: string, authFailed = false, step: string | null = null) {
+  constructor(
+    code: string,
+    message: string,
+    authFailed = false,
+    step: string | null = null,
+  ) {
     super(message)
     this.name = 'ImapSyncError'
     this.code = code
@@ -72,7 +77,10 @@ export class ImapSyncError extends Error {
 export const IMAP_FETCH_BATCH_SIZE = 1
 
 /** Split UIDs into batches of 1–5 (default {@link IMAP_FETCH_BATCH_SIZE}). */
-export function chunkUids(uids: number[], batchSize = IMAP_FETCH_BATCH_SIZE): number[][] {
+export function chunkUids(
+  uids: number[],
+  batchSize = IMAP_FETCH_BATCH_SIZE,
+): number[][] {
   const size = Math.max(1, Math.min(5, Math.floor(batchSize)))
   const batches: number[][] = []
   for (let i = 0; i < uids.length; i += size) {
@@ -127,7 +135,8 @@ function parseIpv4(ip: string): number[] | null {
 }
 
 function ipv4ToInt(octets: number[]): number {
-  return ((octets[0]! << 24) >>> 0) + (octets[1]! << 16) + (octets[2]! << 8) + octets[3]!
+  return ((octets[0]! << 24) >>> 0) + (octets[1]! << 16) + (octets[2]! << 8) +
+    octets[3]!
 }
 
 function inIpv4Cidr(octets: number[], base: number[], prefix: number): boolean {
@@ -199,7 +208,10 @@ export function isBlockedOutboundHostname(host: string): boolean {
   return false
 }
 
-async function defaultResolveDns(hostname: string, recordType: 'A' | 'AAAA'): Promise<string[]> {
+async function defaultResolveDns(
+  hostname: string,
+  recordType: 'A' | 'AAAA',
+): Promise<string[]> {
   try {
     return await Deno.resolveDns(hostname, recordType)
   } catch {
@@ -207,20 +219,41 @@ async function defaultResolveDns(hostname: string, recordType: 'A' | 'AAAA'): Pr
   }
 }
 
+/** Result of an outbound SSRF check: connect to `connectHost`, TLS-verify as `hostname`. */
+export type SafeOutboundTarget = {
+  /** Original hostname (or literal) for TLS SNI / certificate verification. */
+  hostname: string
+  /** Address used for TCP connect — pinned public IP when DNS was used. */
+  connectHost: string
+}
+
+function formatConnectHost(ip: string): string {
+  const raw = stripIpBrackets(ip)
+  return raw.includes(':') ? `[${raw}]` : raw
+}
+
 /**
  * Resolve host and reject private/link-local/metadata targets before TCP connect.
+ * Returns a DNS-pinned connect address so later TCP/TLS cannot rebind to a private IP.
  * Synthetic `*.example.test` hosts are allowed (mailbox test short-circuit / unit doubles).
  */
 export async function assertSafeOutboundHost(
   host: string,
   resolveDns: OutboundDnsResolveFn = defaultResolveDns,
-): Promise<void> {
+): Promise<SafeOutboundTarget> {
   const h = host.trim()
   if (!h) {
-    throw new ImapSyncError('imap_host_blocked', 'Mailbox host is empty', false, 'connect')
+    throw new ImapSyncError(
+      'imap_host_blocked',
+      'Mailbox host is empty',
+      false,
+      'connect',
+    )
   }
 
-  if (isSyntheticImapHost(h)) return
+  if (isSyntheticImapHost(h)) {
+    return { hostname: h, connectHost: h }
+  }
 
   if (isBlockedOutboundHostname(h)) {
     throw new ImapSyncError(
@@ -242,12 +275,13 @@ export async function assertSafeOutboundHost(
         'connect',
       )
     }
-    return
+    return { hostname: h, connectHost: formatConnectHost(literal) }
   }
 
+  const normalized = normalizeHostname(h)
   const [aRecords, aaaaRecords] = await Promise.all([
-    resolveDns(normalizeHostname(h), 'A'),
-    resolveDns(normalizeHostname(h), 'AAAA'),
+    resolveDns(normalized, 'A'),
+    resolveDns(normalized, 'AAAA'),
   ])
   const addrs = [...aRecords, ...aaaaRecords]
   if (addrs.length === 0) {
@@ -268,6 +302,10 @@ export async function assertSafeOutboundHost(
       )
     }
   }
+
+  // Prefer first A, then AAAA — pin that address for the TCP connect.
+  const pinned = aRecords[0] ?? aaaaRecords[0]!
+  return { hostname: normalized, connectHost: formatConnectHost(pinned) }
 }
 
 function timeoutStepFromLabel(label: string): string | null {
@@ -276,7 +314,10 @@ function timeoutStepFromLabel(label: string): string | null {
   if (lower.includes('search')) return 'search'
   if (lower.includes('select')) return 'select'
   if (lower.includes('login') || lower.includes('probe')) return 'login'
-  if (lower.includes('connect') || lower.includes('greeting') || lower.includes('starttls')) {
+  if (
+    lower.includes('connect') || lower.includes('greeting') ||
+    lower.includes('starttls')
+  ) {
     return 'connect'
   }
   if (lower.includes('sync')) return 'sync'
@@ -297,18 +338,35 @@ export async function withImapTimeout<T>(
       promise,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
-          reject(new ImapSyncError('timeout', `${label} timed out after ${budget}ms`, false, step))
+          reject(
+            new ImapSyncError(
+              'timeout',
+              `${label} timed out after ${budget}ms`,
+              false,
+              step,
+            ),
+          )
         }, budget)
       }),
     ])
   } catch (error) {
     if (error instanceof ImapSyncError) throw error
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`, false, step)
+      throw new ImapSyncError(
+        'timeout',
+        `${label} timed out after ${budget}ms`,
+        false,
+        step,
+      )
     }
     const message = error instanceof Error ? error.message : String(error)
     if (/timed?\s*out|aborted|abort/i.test(message)) {
-      throw new ImapSyncError('timeout', `${label} timed out after ${budget}ms`, false, step)
+      throw new ImapSyncError(
+        'timeout',
+        `${label} timed out after ${budget}ms`,
+        false,
+        step,
+      )
     }
     throw error
   } finally {
@@ -379,7 +437,10 @@ const MONTHS = [
 ] as const
 
 /** IMAP SEARCH SINCE date: `01-Jan-2026` (UTC calendar day). */
-export function formatImapSinceDate(lookbackDays: number, now = new Date()): string {
+export function formatImapSinceDate(
+  lookbackDays: number,
+  now = new Date(),
+): string {
   const d = new Date(now.getTime() - Math.max(lookbackDays, 0) * 86_400_000)
   const day = String(d.getUTCDate()).padStart(2, '0')
   const month = MONTHS[d.getUTCMonth()]
@@ -444,7 +505,9 @@ function normalizeCharset(charset: string): string {
   const c = charset.trim().toLowerCase().replace(/_/g, '-')
   if (c === 'utf8') return 'utf-8'
   if (c === 'us-ascii' || c === 'ascii') return 'utf-8'
-  if (c === 'latin1' || c === 'latin-1' || c === 'iso-8859-1') return 'iso-8859-1'
+  if (c === 'latin1' || c === 'latin-1' || c === 'iso-8859-1') {
+    return 'iso-8859-1'
+  }
   return c || 'utf-8'
 }
 
@@ -540,7 +603,9 @@ function decodeMultipartAlternative(body: string): string | null {
   if (boundary.endsWith('--')) boundary = boundary.slice(0, -2)
   if (!boundary) return null
 
-  const delim = new RegExp(`(?:^|\r?\n)--${escapeRegExp(boundary)}(?:--)?(?=\r?\n|$)`)
+  const delim = new RegExp(
+    `(?:^|\r?\n)--${escapeRegExp(boundary)}(?:--)?(?=\r?\n|$)`,
+  )
   const segments = trimmed.split(delim)
   let plain: string | null = null
   let html: string | null = null
@@ -552,7 +617,9 @@ function decodeMultipartAlternative(body: string): string | null {
     const headers = parseHeaderBlock(segment.slice(0, headerEnd))
     const contentType = headers['content-type'] ?? ''
     const ctLower = contentType.toLowerCase()
-    if (!ctLower.includes('text/plain') && !ctLower.includes('text/html')) continue
+    if (!ctLower.includes('text/plain') && !ctLower.includes('text/html')) {
+      continue
+    }
 
     const partRaw = segment.slice(headerEnd).replace(/^\r?\n\r?\n/, '')
     const decoded = decodeTransferEncoding(
@@ -639,7 +706,10 @@ class ImapSession {
       const chunk = new Uint8Array(8192)
       const n = await this.conn.read(chunk)
       if (n === null) {
-        throw new ImapSyncError('imap_connection_failed', 'IMAP connection closed')
+        throw new ImapSyncError(
+          'imap_connection_failed',
+          'IMAP connection closed',
+        )
       }
       const next = new Uint8Array(this.buffer.length + n)
       next.set(this.buffer)
@@ -671,7 +741,10 @@ class ImapSession {
   async readGreeting(): Promise<void> {
     const line = this.decoder.decode(await this.readLineBytes())
     if (!/^\* (OK|PREAUTH)/i.test(line)) {
-      throw new ImapSyncError('imap_connection_failed', `Unexpected IMAP greeting: ${line}`)
+      throw new ImapSyncError(
+        'imap_connection_failed',
+        `Unexpected IMAP greeting: ${line}`,
+      )
     }
   }
 
@@ -679,7 +752,11 @@ class ImapSession {
     payload: string,
     label = 'IMAP command',
   ): Promise<{ status: string; text: string; untagged: string[] }> {
-    return await withImapTimeout(this.commandInner(payload), this.commandTimeoutMs, label)
+    return await withImapTimeout(
+      this.commandInner(payload),
+      this.commandTimeoutMs,
+      label,
+    )
   }
 
   private async commandInner(
@@ -747,26 +824,33 @@ async function openImapConnection(
   const deadline = Date.now() + Math.max(1, connectTimeoutMs)
   const remaining = () => Math.max(1, deadline - Date.now())
 
-  // Reject private/link-local/metadata targets before any TCP/TLS connect.
-  await assertSafeOutboundHost(host)
+  // Reject private/link-local/metadata targets and pin the resolved address.
+  const target = await assertSafeOutboundHost(host)
 
   try {
-    if (security === 'tls') {
-      const conn = await withImapTimeout(
-        Deno.connectTls({ hostname: host, port }),
-        remaining(),
-        'IMAP connect',
-      )
-      const session = new ImapSession(conn, commandTimeoutMs)
-      await withImapTimeout(session.readGreeting(), remaining(), 'IMAP greeting')
-      return session
-    }
-
+    // Always TCP-connect to the pinned address, then startTls with the original
+    // hostname so SNI/cert verification stay correct (closes DNS rebinding).
     const plain = await withImapTimeout(
-      Deno.connect({ hostname: host, port }),
+      Deno.connect({ hostname: target.connectHost, port }),
       remaining(),
       'IMAP connect',
     )
+
+    if (security === 'tls') {
+      const conn = await withImapTimeout(
+        Deno.startTls(plain, { hostname: target.hostname }),
+        remaining(),
+        'IMAP TLS handshake',
+      )
+      const session = new ImapSession(conn, commandTimeoutMs)
+      await withImapTimeout(
+        session.readGreeting(),
+        remaining(),
+        'IMAP greeting',
+      )
+      return session
+    }
+
     const session = new ImapSession(plain, commandTimeoutMs)
     await withImapTimeout(session.readGreeting(), remaining(), 'IMAP greeting')
 
@@ -775,12 +859,15 @@ async function openImapConnection(
     const started = await session.command('STARTTLS')
     if (started.status !== 'OK') {
       session.close()
-      throw new ImapSyncError('imap_tls_failed', `STARTTLS failed: ${started.text}`)
+      throw new ImapSyncError(
+        'imap_tls_failed',
+        `STARTTLS failed: ${started.text}`,
+      )
     }
 
     // Upgrade the same TCP connection. Do not close `session` first (would close plain).
     const tlsConn = await withImapTimeout(
-      Deno.startTls(plain, { hostname: host }),
+      Deno.startTls(plain, { hostname: target.hostname }),
       remaining(),
       'IMAP STARTTLS upgrade',
     )
@@ -820,8 +907,13 @@ function extractUidList(untagged: string[]): number[] {
 }
 
 /** Extract literal body after `BODY[...] {n}\\n`. */
-export function extractBodyLiteral(block: string, sectionPrefix: string): string | null {
-  const idx = block.toUpperCase().indexOf(`BODY[${sectionPrefix.toUpperCase()}`)
+export function extractBodyLiteral(
+  block: string,
+  sectionPrefix: string,
+): string | null {
+  const idx = block.toUpperCase().indexOf(
+    `BODY[${sectionPrefix.toUpperCase()}`,
+  )
   if (idx < 0) return null
   const from = block.slice(idx)
   const lit = from.match(/^BODY\[[^\]]*\](?:<[^>]+>)?\s*\{(\d+)\}\n/i)
@@ -877,7 +969,11 @@ export async function probeImap(options: ImapProbeOptions): Promise<void> {
           `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
         )
         if (login.status !== 'OK') {
-          throw new ImapSyncError('imap_auth_failed', `IMAP LOGIN failed: ${login.text}`, true)
+          throw new ImapSyncError(
+            'imap_auth_failed',
+            `IMAP LOGIN failed: ${login.text}`,
+            true,
+          )
         }
         await session.command('LOGOUT').catch(() => undefined)
       } finally {
@@ -894,7 +990,8 @@ export async function fetchInboundFromImap(
 ): Promise<InboundImapMessage[]> {
   const connectTimeoutMs = options.connectTimeoutMs ?? IMAP_CONNECT_TIMEOUT_MS
   const commandTimeoutMs = options.commandTimeoutMs ?? IMAP_COMMAND_TIMEOUT_MS
-  const overallTimeoutMs = options.overallTimeoutMs ?? IMAP_SYNC_OVERALL_TIMEOUT_MS
+  const overallTimeoutMs = options.overallTimeoutMs ??
+    IMAP_SYNC_OVERALL_TIMEOUT_MS
 
   return await withImapTimeout(
     fetchInboundFromImapInner(options, connectTimeoutMs, commandTimeoutMs),
@@ -922,7 +1019,8 @@ function parseFetchBlockToMessage(
   const references = headers['references']?.trim()?.split(/\s+/).filter(Boolean) ?? []
   const providerMessageId = (messageId && messageId.length > 0 ? messageId : `imap-uid-${uid}`)
     .slice(0, 500)
-  const providerThreadId = (inReplyTo || references[0] || providerMessageId).slice(0, 500)
+  const providerThreadId = (inReplyTo || references[0] || providerMessageId)
+    .slice(0, 500)
   const truncated = new TextEncoder().encode(bodyRaw).byteLength >= maxBodyBytes
   const bodyText = decodeMimeBodyText(bodyRaw).slice(0, maxBodyBytes)
   return {
@@ -956,7 +1054,12 @@ async function fetchInboundFromImapInner(
       `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
     )
     if (login.status !== 'OK') {
-      throw new ImapSyncError('imap_auth_failed', `IMAP LOGIN failed: ${login.text}`, true, 'login')
+      throw new ImapSyncError(
+        'imap_auth_failed',
+        `IMAP LOGIN failed: ${login.text}`,
+        true,
+        'login',
+      )
     }
 
     const selected = await session.command('SELECT INBOX', 'IMAP SELECT')
@@ -970,7 +1073,10 @@ async function fetchInboundFromImapInner(
     }
 
     const since = formatImapSinceDate(options.lookbackDays)
-    const search = await session.command(`UID SEARCH SINCE ${since}`, 'IMAP SEARCH')
+    const search = await session.command(
+      `UID SEARCH SINCE ${since}`,
+      'IMAP SEARCH',
+    )
     if (search.status !== 'OK') {
       throw new ImapSyncError(
         'imap_search_failed',

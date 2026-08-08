@@ -117,16 +117,31 @@ export function buildMimeMessage(options: {
   const html = options.bodyHtml?.trim()
   if (html) {
     const boundary = `crm-bound-${crypto.randomUUID()}`
-    lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`, '')
+    lines.push(
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      '',
+    )
     lines.push(`--${boundary}`)
-    lines.push('Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '')
+    lines.push(
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+    )
     lines.push(text.replace(/\r?\n/g, '\r\n'))
     lines.push(`--${boundary}`)
-    lines.push('Content-Type: text/html; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '')
+    lines.push(
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+    )
     lines.push(html.replace(/\r?\n/g, '\r\n'))
     lines.push(`--${boundary}--`)
   } else {
-    lines.push('Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit', '')
+    lines.push(
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+    )
     lines.push(text.replace(/\r?\n/g, '\r\n'))
   }
 
@@ -169,7 +184,11 @@ class SmtpSession {
 
   /** Read a full SMTP multi-line reply (ends when line is `NNN ` not `NNN-`). */
   async readReply(label = 'SMTP'): Promise<{ code: number; text: string }> {
-    return await withImapTimeout(this.readReplyInner(), this.commandTimeoutMs, label)
+    return await withImapTimeout(
+      this.readReplyInner(),
+      this.commandTimeoutMs,
+      label,
+    )
   }
 
   private async readReplyInner(): Promise<{ code: number; text: string }> {
@@ -179,7 +198,11 @@ class SmtpSession {
       if (nl < 0) {
         const ok = await this.readMore()
         if (!ok) {
-          throw new SmtpSendError('smtp_connection_failed', 'SMTP connection closed', 'read')
+          throw new SmtpSendError(
+            'smtp_connection_failed',
+            'SMTP connection closed',
+            'read',
+          )
         }
         continue
       }
@@ -213,14 +236,22 @@ class SmtpSession {
 
   async writeLine(line: string): Promise<void> {
     const payload = this.encoder.encode(`${line}\r\n`)
-    await withImapTimeout(this.conn.write(payload), this.commandTimeoutMs, 'SMTP write')
+    await withImapTimeout(
+      this.conn.write(payload),
+      this.commandTimeoutMs,
+      'SMTP write',
+    )
   }
 
   async writeRaw(data: string): Promise<void> {
     // Dot-stuff lines that begin with '.'
     const stuffed = data.replace(/^\./gm, '..')
     const payload = this.encoder.encode(stuffed)
-    await withImapTimeout(this.conn.write(payload), this.commandTimeoutMs, 'SMTP DATA write')
+    await withImapTimeout(
+      this.conn.write(payload),
+      this.commandTimeoutMs,
+      'SMTP DATA write',
+    )
   }
 }
 
@@ -242,25 +273,26 @@ async function openSmtpConnection(
   const deadline = Date.now() + Math.max(1, connectTimeoutMs)
   const remaining = () => Math.max(1, deadline - Date.now())
 
-  await assertSafeOutboundHost(host)
+  const target = await assertSafeOutboundHost(host)
 
   try {
+    const plain = await withImapTimeout(
+      Deno.connect({ hostname: target.connectHost, port }),
+      remaining(),
+      'SMTP connect',
+    )
+
     if (security === 'tls') {
       const conn = await withImapTimeout(
-        Deno.connectTls({ hostname: host, port }),
+        Deno.startTls(plain, { hostname: target.hostname }),
         remaining(),
-        'SMTP connect',
+        'SMTP TLS handshake',
       )
       const session = new SmtpSession(conn, commandTimeoutMs)
       await session.expect([220], 'SMTP greeting')
       return session
     }
 
-    const plain = await withImapTimeout(
-      Deno.connect({ hostname: host, port }),
-      remaining(),
-      'SMTP connect',
-    )
     const session = new SmtpSession(plain, commandTimeoutMs)
     await session.expect([220], 'SMTP greeting')
 
@@ -272,7 +304,7 @@ async function openSmtpConnection(
     await session.expect([220], 'SMTP STARTTLS')
 
     const tlsConn = await withImapTimeout(
-      Deno.startTls(plain, { hostname: host }),
+      Deno.startTls(plain, { hostname: target.hostname }),
       remaining(),
       'SMTP STARTTLS upgrade',
     )
@@ -315,10 +347,16 @@ async function smtpAuthLogin(
  * Deliver one message via SMTP. Synthetic `*.example.test` hosts short-circuit
  * without opening a socket (staging/Deno proofs).
  */
-export async function sendSmtpMail(options: SmtpSendOptions): Promise<SmtpSendResult> {
+export async function sendSmtpMail(
+  options: SmtpSendOptions,
+): Promise<SmtpSendResult> {
   const host = options.host.trim()
   if (!host) {
-    throw new SmtpSendError('smtp_host_missing', 'SMTP host is empty', 'connect')
+    throw new SmtpSendError(
+      'smtp_host_missing',
+      'SMTP host is empty',
+      'connect',
+    )
   }
 
   if (isSyntheticSmtpHost(host)) {
