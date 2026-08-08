@@ -1663,6 +1663,67 @@ export interface ApiEmailTemplateListParams {
 	category?: ApiEmailTemplateCategory;
 }
 
+export interface ApiPlaybook {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	description: string | null;
+	graph_json: Record<string, unknown>;
+	is_active: boolean;
+}
+
+export interface ApiPlaybookCreateBody {
+	name: string;
+	description?: string | null;
+	graph_json?: Record<string, unknown>;
+	is_active?: boolean;
+}
+
+export type ApiPlaybookUpdateBody = Partial<ApiPlaybookCreateBody>;
+
+export interface ApiPlaybookListParams {
+	limit?: number;
+	is_active?: boolean;
+}
+
+export type ApiPlaybookRunStatus =
+	| 'scheduled'
+	| 'running'
+	| 'waiting'
+	| 'completed'
+	| 'failed'
+	| 'cancelled'
+	| 'skipped_busy';
+
+export interface ApiPlaybookRun {
+	id: string;
+	org_id: string;
+	playbook_id: string;
+	created_at: string;
+	updated_at: string;
+	status: ApiPlaybookRunStatus;
+	trigger_kind: string;
+	trigger_payload: Record<string, unknown>;
+	root_entity_type: string | null;
+	root_entity_id: string | null;
+	current_node_id: string | null;
+	next_action_at: string | null;
+	playbook_version: number;
+	last_error: string | null;
+}
+
+export interface ApiPlaybookRunCreateBody {
+	root_entity_type?: string | null;
+	root_entity_id?: string | null;
+	trigger_payload?: Record<string, unknown>;
+}
+
 export interface ApiMyEmailMessageListParams {
 	limit?: number;
 }

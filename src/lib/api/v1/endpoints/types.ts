@@ -130,6 +130,12 @@ import type {
 	ApiEmailTemplateCreateBody,
 	ApiEmailTemplateListParams,
 	ApiEmailTemplateUpdateBody,
+	ApiPlaybook,
+	ApiPlaybookCreateBody,
+	ApiPlaybookListParams,
+	ApiPlaybookRun,
+	ApiPlaybookRunCreateBody,
+	ApiPlaybookUpdateBody,
 	ApiEntityEmailType,
 	ApiMyEmailMessageListParams,
 	ApiRecurringInvoiceCreateBody,
@@ -702,6 +708,32 @@ export interface EmailTemplatesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiEmailTemplate>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface PlaybooksEndpoints {
+	list(
+		params?: ApiPlaybookListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiPlaybook[]>>;
+	create(body: ApiPlaybookCreateBody, signal?: AbortSignal): Promise<ApiPlaybook>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiPlaybook>>;
+	update(
+		id: string,
+		body: ApiPlaybookUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiPlaybook>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	listRuns(
+		playbookId: string,
+		params?: { limit?: number },
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiPlaybookRun[]>>;
+	startRun(
+		playbookId: string,
+		body?: ApiPlaybookRunCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiPlaybookRun>;
 }
 
 export interface TimelineEventsEndpoints {

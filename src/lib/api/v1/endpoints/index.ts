@@ -6,6 +6,7 @@ export { createContactsEndpoints } from './contacts.js';
 export { createDocumentsEndpoints } from './documents.js';
 export { createEmailMessagesEndpoints } from './email-messages.js';
 export { createEmailTemplatesEndpoints } from './email-templates.js';
+export { createPlaybooksEndpoints } from './playbooks.js';
 export { createInvoicesEndpoints } from './invoices.js';
 export { createIntegrationsEndpoints } from './integrations.js';
 export { createApiKeysEndpoints } from './api-keys.js';
@@ -36,6 +37,7 @@ export type {
 	DocumentsEndpoints,
 	EmailMessagesEndpoints,
 	EmailTemplatesEndpoints,
+	PlaybooksEndpoints,
 	IntegrationsEndpoints,
 	InvoicesEndpoints,
 	LeadsEndpoints,

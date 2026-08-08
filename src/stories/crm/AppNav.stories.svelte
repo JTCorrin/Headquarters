@@ -33,6 +33,7 @@
 			items: [
 				{ label: 'Email', href: '/email' },
 				{ label: 'Templates', href: '/email/templates' },
+				{ label: 'Playbooks', href: '/playbooks' },
 				{ label: 'Documents', href: '/documents' }
 			]
 		}
