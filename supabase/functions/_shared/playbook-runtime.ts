@@ -14,7 +14,12 @@ export type GraphSnapshot = { nodes: GraphNode[]; edges: GraphEdge[] }
 
 export type TickResult =
   | { kind: 'waiting'; nextNodeId: string; nextActionAt: Date; stepResult: Record<string, unknown> }
-  | { kind: 'advance'; nextNodeId: string | null; terminal: boolean; stepResult: Record<string, unknown> }
+  | {
+    kind: 'advance'
+    nextNodeId: string | null
+    terminal: boolean
+    stepResult: Record<string, unknown>
+  }
   | { kind: 'failed'; error: string }
 
 export function getNode(graph: GraphSnapshot, nodeId: string): GraphNode | undefined {
@@ -25,7 +30,7 @@ export function nextNodeId(graph: GraphSnapshot, currentId: string): string | nu
   const outs = graph.edges
     .filter((e) => e.source === currentId)
     .sort((a, b) =>
-      a.target === b.target ? a.id.localeCompare(b.id) : a.target.localeCompare(b.target),
+      a.target === b.target ? a.id.localeCompare(b.id) : a.target.localeCompare(b.target)
     )
   return outs[0]?.target ?? null
 }
