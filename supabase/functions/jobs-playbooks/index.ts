@@ -205,6 +205,22 @@ Deno.serve(async (req) => {
         .eq('org_id', orgId)
     }
 
+    // Step budget exhausted: re-queue so claim_due can resume (avoid stuck running).
+    if (finalStatus === 'running') {
+      await service
+        .from('playbook_runs')
+        .update({
+          status: 'scheduled',
+          current_node_id: current,
+          next_action_at: new Date().toISOString(),
+          context: ctx.context as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', runId)
+        .eq('org_id', orgId)
+      finalStatus = 'scheduled'
+    }
+
     results.push({ run_id: runId, status: finalStatus })
   }
 

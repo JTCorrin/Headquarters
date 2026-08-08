@@ -78,6 +78,22 @@ export async function scanOutstandingInvoices(
     }
 
     for (const inv of invoices ?? []) {
+      // Once chased successfully (or still in-flight), do not re-fire until
+      // the prior run is failed/cancelled (retry) or the invoice leaves outstanding.
+      const { count, error: priorErr } = await db
+        .from('playbook_runs')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', pb.org_id)
+        .eq('playbook_id', pb.id)
+        .eq('root_entity_type', 'invoice')
+        .eq('root_entity_id', inv.id)
+        .in('status', ['scheduled', 'running', 'waiting', 'completed'])
+      if (priorErr) {
+        console.error('scanOutstandingInvoices prior runs', priorErr)
+        continue
+      }
+      if ((count ?? 0) > 0) continue
+
       const { data: run, error: startErr } = await db.rpc('start_playbook_run', {
         p_org_id: pb.org_id,
         p_playbook_id: pb.id,
