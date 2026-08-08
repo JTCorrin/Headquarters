@@ -18,6 +18,7 @@
 		defaultDataForNodeType,
 		type AddableNodeKind
 	} from '$lib/playbook/playbook-flow.js';
+	import { newPlaybookNodeId } from '$lib/playbook/playbook-id.js';
 	import PlaybookCanvasToolbar from './playbook-canvas-toolbar.svelte';
 	import TriggerNode from './playbook-nodes/trigger-node.svelte';
 	import WaitNode from './playbook-nodes/wait-node.svelte';
@@ -102,7 +103,7 @@
 	}
 
 	function addNode(kind: AddableNodeKind, position?: { x: number; y: number }, sourceId?: string) {
-		const newId = crypto.randomUUID();
+		const newId = newPlaybookNodeId();
 		const pos = position ?? {
 			x: 280 + Math.random() * 80,
 			y: 120 + Math.random() * 80
@@ -137,7 +138,7 @@
 		nodes = [
 			...nodes,
 			{
-				id: crypto.randomUUID(),
+				id: newPlaybookNodeId(),
 				type: 'trigger',
 				position: { x: 120, y: 180 },
 				data: { kind: 'manual.run', config: {} }
