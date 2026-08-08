@@ -1,5 +1,6 @@
 import type { ZodError } from 'zod';
 import { playbookGraphSchema, type PlaybookGraph } from '$lib/schemas/playbook-graph.js';
+import { newPlaybookNodeId } from './playbook-id.js';
 
 export type PlaybookGraphValidationResult =
 	| { ok: true; graph: PlaybookGraph }
@@ -10,7 +11,7 @@ export function createDefaultPlaybookGraph(): PlaybookGraph {
 	return {
 		nodes: [
 			{
-				id: crypto.randomUUID(),
+				id: newPlaybookNodeId(),
 				type: 'trigger',
 				position: { x: 80, y: 120 },
 				data: { kind: 'manual.run', config: {} }
