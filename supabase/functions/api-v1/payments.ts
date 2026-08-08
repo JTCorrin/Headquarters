@@ -610,7 +610,7 @@ async function createPayment(
       payment.direction === 'inbound' &&
       typeof payment.id === 'string'
     ) {
-      await dispatchPlaybookTriggersSafe(db, {
+      await dispatchPlaybookTriggersSafe({
         orgId,
         triggerKind: 'payment.received',
         rootEntityType: 'payment',

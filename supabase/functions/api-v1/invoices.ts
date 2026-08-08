@@ -781,7 +781,7 @@ async function sendInvoiceRoute(
   }
   const envelope = data as IdempotencyEnvelope
   if (envelope.replay !== true) {
-    await dispatchPlaybookTriggersSafe(db, {
+    await dispatchPlaybookTriggersSafe({
       orgId,
       triggerKind: 'invoice.sent',
       rootEntityType: 'invoice',

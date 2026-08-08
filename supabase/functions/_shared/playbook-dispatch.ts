@@ -1,11 +1,21 @@
 /**
  * Phase E: fire playbook runs from domain events (payment / invoice / cron).
  */
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from './database.ts'
 import { uuidFromKey } from './playbook-actions.ts'
 
 type Db = SupabaseClient<Database>
+
+/** Service-role client for dispatch RPCs (not callable by authenticated JWT). */
+export function playbookServiceRoleClient(): Db | null {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) return null
+  return createClient<Database>(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
 
 export type DispatchResult = {
   started: Array<Record<string, unknown>>
@@ -50,9 +60,8 @@ export async function dispatchPlaybookTriggers(
   return asDispatchResult(data)
 }
 
-/** Best-effort: never fail the primary domain write. */
+/** Best-effort: never fail the primary domain write. Uses service_role. */
 export async function dispatchPlaybookTriggersSafe(
-  db: Db,
   input: {
     orgId: string
     triggerKind: string
@@ -62,6 +71,11 @@ export async function dispatchPlaybookTriggersSafe(
   },
 ): Promise<DispatchResult> {
   try {
+    const db = playbookServiceRoleClient()
+    if (!db) {
+      console.error('dispatchPlaybookTriggersSafe: missing service role env')
+      return { started: [], skipped: [{ error: 'SERVICE_UNAVAILABLE' }] }
+    }
     return await dispatchPlaybookTriggers(db, input)
   } catch (err) {
     console.error('dispatchPlaybookTriggersSafe', err)
