@@ -1,6 +1,11 @@
 /**
- * Minimal playbook run interpreter (Phase C): wait / waitUntil / stop + stub advance.
+ * Playbook run interpreter: wait / waitUntil / stop + Phase D side effects.
  */
+import {
+  executeSideEffect,
+  isSideEffectNodeType,
+  type PlaybookActionContext,
+} from './playbook-actions.ts'
 
 export type GraphNode = {
   id: string
@@ -80,9 +85,7 @@ export function waitUntilNextDate(
     let dayOffset = 0
     if (curH > hour || (curH === hour && curM >= minute)) dayOffset = 1
 
-    // Build a UTC instant that corresponds to local y-mo-d hour:minute in tz via iterative probe.
     const guess = new Date(Date.UTC(y, mo - 1, d + dayOffset, hour, minute, 0))
-    // Adjust by difference between desired local and actual local at guess.
     for (let i = 0; i < 3; i++) {
       const local = Object.fromEntries(
         fmt.formatToParts(guess).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]),
@@ -104,11 +107,24 @@ export function waitUntilNextDate(
   }
 }
 
-export function executeNode(
+function advanceResult(
   graph: GraphSnapshot,
   nodeId: string,
-  now = new Date(),
+  stepResult: Record<string, unknown>,
 ): TickResult {
+  const next = nextNodeId(graph, nodeId)
+  if (!next) {
+    return { kind: 'advance', nextNodeId: null, terminal: true, stepResult }
+  }
+  return { kind: 'advance', nextNodeId: next, terminal: false, stepResult }
+}
+
+export async function executeNode(
+  graph: GraphSnapshot,
+  nodeId: string,
+  ctx: PlaybookActionContext | null = null,
+  now = new Date(),
+): Promise<TickResult> {
   const node = getNode(graph, nodeId)
   if (!node) return { kind: 'failed', error: `Node ${nodeId} missing from graph snapshot` }
 
@@ -118,7 +134,6 @@ export function executeNode(
     const ms = waitDurationMs(data)
     if (ms <= 0) return { kind: 'failed', error: 'Invalid wait duration' }
     const next = nextNodeId(graph, nodeId)
-    // After the delay, cron resumes at `next` (or completes if null).
     return {
       kind: 'waiting',
       nextNodeId: next ?? '',
@@ -152,20 +167,24 @@ export function executeNode(
     }
   }
 
-  // Phase C stubs: side-effect nodes advance without doing work yet.
-  const next = nextNodeId(graph, nodeId)
-  if (!next) {
-    return {
-      kind: 'advance',
-      nextNodeId: null,
-      terminal: true,
-      stepResult: { stub: true, node_type: node.type },
+  if (node.type === 'loopRelated') {
+    // Phase E: real fan-out. Advance past the loop node for now.
+    return advanceResult(graph, nodeId, {
+      stub: true,
+      node_type: node.type,
+      note: 'loopRelated execution deferred to Phase E',
+    })
+  }
+
+  if (isSideEffectNodeType(node.type)) {
+    if (!ctx) {
+      return advanceResult(graph, nodeId, { stub: true, node_type: node.type })
     }
+    const effect = await executeSideEffect(node, ctx)
+    if (!effect.ok) return { kind: 'failed', error: effect.error }
+    return advanceResult(graph, nodeId, effect.result)
   }
-  return {
-    kind: 'advance',
-    nextNodeId: next,
-    terminal: false,
-    stepResult: { stub: true, node_type: node.type },
-  }
+
+  // Unknown / trigger nodes: advance.
+  return advanceResult(graph, nodeId, { stub: true, node_type: node.type })
 }

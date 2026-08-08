@@ -1397,6 +1397,24 @@ export type Database = {
         Update: Record<string, never>
         Relationships: []
       }
+      playbook_send_ledger: {
+        Row: {
+          id: string
+          org_id: string
+          run_id: string
+          node_id: string
+          dedupe_key: string
+          created_at: string
+        }
+        Insert: {
+          org_id: string
+          run_id: string
+          node_id: string
+          dedupe_key: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
       memberships: {
         Row: MembershipRow
         Insert: MembershipInsert
@@ -2368,6 +2386,37 @@ export type Database = {
           p_limit?: number
         }
         Returns: PlaybookRunRow[]
+      }
+      create_playbook_timeline_note: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_title: string
+          p_body?: string | null
+          p_payload?: Json
+        }
+        Returns: Json
+      }
+      create_playbook_notification: {
+        Args: {
+          p_org_id: string
+          p_recipient_membership_id: string
+          p_run_id: string
+          p_title: string
+          p_body?: string | null
+          p_payload?: Json
+          p_source_id?: string | null
+        }
+        Returns: string
+      }
+      resolve_playbook_entity_email: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+        }
+        Returns: string | null
       }
       browse_entity_documents: {
         Args: {
