@@ -110,17 +110,20 @@ RECURRING_INVOICES_CRON_SECRET="$(tr -d '[:space:]' <"$RECURRING_SECRET_FILE")"
 
 # Edge secrets load from supabase/functions/.env (CLI default), not supabase/.env.
 # api-v1 defaults to `*` when unset; pin staging origin explicitly.
+# Invitations send via the inviter's personal mailbox SMTP (My settings → Mail).
 mkdir -p supabase/functions
 cat > supabase/functions/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 # Mirror for any tooling that still reads the repo-root supabase/.env.
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 
 log "starting Supabase (migrations apply on first start)"
@@ -168,14 +171,16 @@ API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+APP_BASE_URL=${STAGING_ORIGIN}
 EOF
-log "wrote PUBLIC_SUPABASE_URL + CALENDAR_SYNC_STAGING_STUB + recurring cron secret into supabase/functions/.env"
+log "wrote PUBLIC_SUPABASE_URL + APP_BASE_URL into supabase/functions/.env"
 
 # Edge loads supabase/functions/.env on container create (supabase start), not on a
 # plain restart. CLI names use underscores (supabase_edge_runtime_*) or hyphens.

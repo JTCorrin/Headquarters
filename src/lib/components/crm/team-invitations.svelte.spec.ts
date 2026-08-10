@@ -22,7 +22,7 @@ const invitation: ApiOrganisationInvitation = {
 describe('TeamInvitations', () => {
 	it('validates and submits an invitation', async () => {
 		const onInvite = vi.fn(async () => true);
-		render(TeamInvitations, { onInvite });
+		render(TeamInvitations, { onInvite, outboundReady: true });
 
 		await page.getByTestId('team-invite-submit').click();
 		await expect.element(page.getByTestId('team-invite-error')).toHaveTextContent(/valid email/i);
@@ -34,10 +34,19 @@ describe('TeamInvitations', () => {
 		);
 	});
 
+	it('blocks invites when mailbox SMTP is not configured', async () => {
+		const onInvite = vi.fn(async () => true);
+		render(TeamInvitations, { onInvite, outboundReady: false });
+
+		await expect.element(page.getByTestId('team-invite-mailbox-warning')).toBeVisible();
+		await expect.element(page.getByTestId('team-invite-submit')).toBeDisabled();
+		expect(onInvite).not.toHaveBeenCalled();
+	});
+
 	it('lists pending invitations and confirms revocation', async () => {
 		const onRevoke = vi.fn(async () => true);
 		const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-		render(TeamInvitations, { invitations: [invitation], onRevoke });
+		render(TeamInvitations, { invitations: [invitation], onRevoke, outboundReady: true });
 
 		await expect
 			.element(page.getByTestId(`team-invitation-${invitation.id}`))
