@@ -54,7 +54,10 @@
 </script>
 
 <div class="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center gap-6 p-6">
-	<PageHeader title="Create account" description="Start with a provider or your work email." />
+	<PageHeader
+		title="Create account"
+		description="Sign up with email and password, or use SSO / a provider."
+	/>
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Get started</Card.Title>
@@ -63,7 +66,6 @@
 			>
 		</Card.Header>
 		<Card.Content class="space-y-4">
-			<AuthProviderOptions {next} />
 			<AuthCredentialsForm
 				form={credentialsForm}
 				submitLabel="Sign up"
@@ -72,6 +74,7 @@
 				errorMessage={formError}
 				onValidSubmit={handleSubmit}
 			/>
+			<AuthProviderOptions {next} />
 		</Card.Content>
 		<Card.Footer class="justify-center">
 			<p class="text-sm text-muted-foreground">
