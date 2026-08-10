@@ -64,13 +64,37 @@ log "pnpm $(pnpm --version) / node $(node --version)"
 pnpm install --frozen-lockfile
 
 # Point Auth redirects at the LAN preview URL for this staging box.
-# Keep email confirmations off (config.toml) so email/password signup returns a JWT.
+# Keep email confirmations off so email/password signup returns a JWT for E2E.
+# Use Python (not line-oriented sed): additional_redirect_urls is a multiline array
+# and naive `s|^additional_redirect_urls = .*|...|` corrupts the TOML.
 if [[ -f supabase/config.toml ]]; then
-	sed -i \
-		-e "s|^site_url = .*|site_url = \"${STAGING_ORIGIN}\"|" \
-		-e "s|^additional_redirect_urls = .*|additional_redirect_urls = [\"${STAGING_ORIGIN}\"]|" \
-		-e "s|^api_url = .*|api_url = \"http://${APP_HOST}\"|" \
-		supabase/config.toml
+	STAGING_ORIGIN="${STAGING_ORIGIN}" APP_HOST="${APP_HOST}" python3 - <<'PY'
+from pathlib import Path
+import os
+import re
+
+path = Path("supabase/config.toml")
+text = path.read_text()
+origin = os.environ["STAGING_ORIGIN"].rstrip("/")
+host = os.environ["APP_HOST"]
+redirects = f'additional_redirect_urls = ["{origin}", "{origin}/auth/callback"]'
+
+text = re.sub(r"^site_url = .*", f'site_url = "{origin}"', text, count=1, flags=re.M)
+text = re.sub(r"^api_url = .*", f'api_url = "http://{host}"', text, count=1, flags=re.M)
+text = re.sub(
+	r"^additional_redirect_urls = \[[^\]]*\]",
+	redirects,
+	text,
+	count=1,
+	flags=re.M | re.S,
+)
+# Local config enables email confirmations; staging E2E needs immediate JWTs.
+# Only the email section uses `true` — SMS stays false.
+text = text.replace("enable_confirmations = true", "enable_confirmations = false", 1)
+
+path.write_text(text)
+print(f"patched auth site_url/redirects for {origin}; email confirmations disabled")
+PY
 fi
 
 # Persist cron secrets across deploys (do not regenerate every run).
