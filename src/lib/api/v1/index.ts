@@ -18,6 +18,7 @@ export type {
 	InvoicesEndpoints,
 	LeadsEndpoints,
 	OrganisationConfigEndpoints,
+	OrganisationAccessEndpoints,
 	OrganisationsEndpoints,
 	ProductsEndpoints,
 	ProfilePreferencesEndpoints,

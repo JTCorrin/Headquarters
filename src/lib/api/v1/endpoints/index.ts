@@ -15,6 +15,7 @@ export { createMailboxEndpoints } from './mailbox.js';
 export { createCalendarEndpoints } from './calendar.js';
 export { createNotificationsEndpoints } from './notifications.js';
 export { createOrgMembersEndpoints } from './org-members.js';
+export { createOrganisationAccessEndpoints } from './organisation-access.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
 export { createOrganisationsEndpoints } from './organisations.js';
 export { createPaymentsEndpoints } from './payments.js';
@@ -47,6 +48,7 @@ export type {
 	MeetingsEndpoints,
 	ProjectsEndpoints,
 	OrganisationConfigEndpoints,
+	OrganisationAccessEndpoints,
 	OrganisationsEndpoints,
 	OrgMembersEndpoints,
 	PaymentsEndpoints,
