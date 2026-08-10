@@ -19,6 +19,7 @@
 		currentMembershipId?: string | null;
 		members?: ApiOrganisationManagedMember[];
 		invitations?: ApiOrganisationInvitation[];
+		outboundReady?: boolean | null;
 		viewState?: ResourceViewState;
 		actionError?: string | null;
 		onReload?: () => void;
@@ -49,6 +50,7 @@
 		currentMembershipId = null,
 		members = [],
 		invitations = [],
+		outboundReady = true,
 		viewState = { kind: 'ready' },
 		actionError = null,
 		onReload,
@@ -243,6 +245,7 @@
 					{invitations}
 					actorRole={role === 'owner' ? 'owner' : 'admin'}
 					errorMessage={actionError}
+					{outboundReady}
 					{onInvite}
 					onRevoke={onRevokeInvitation}
 					onResend={onResendInvitation}
