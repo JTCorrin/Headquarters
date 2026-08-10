@@ -164,14 +164,22 @@ async function createInvitation(
         p_invitation_id: invitationId,
       });
     }
+    const detail = emailError instanceof Error
+      ? emailError.message
+      : "unknown";
     console.error("System invitation email failed", {
       request_id: requestId,
-      error: emailError instanceof Error ? emailError.message : "unknown",
+      error: detail,
     });
+    const misconfigured =
+      /is not configured|SYSTEM_SMTP|APP_BASE_URL|SYSTEM_SMTP_SECURITY must be/i
+        .test(detail);
     throw new ApiError(
-      502,
-      "UPSTREAM_ERROR",
-      "Invitation email could not be delivered",
+      misconfigured ? 503 : 502,
+      misconfigured ? "SERVICE_UNAVAILABLE" : "UPSTREAM_ERROR",
+      misconfigured
+        ? "Invitation email is not configured on this environment"
+        : "Invitation email could not be delivered",
     );
   }
 
