@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
+	import { logoutAndRedirect } from '$lib/auth/logout.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import EmailInboxPage from '$lib/components/crm/email-inbox-page.svelte';
 
@@ -13,10 +14,7 @@
 	const initialMessageId = $derived(page.url.searchParams.get('message'));
 
 	async function handleLogout() {
-		await auth.signOut();
-		session.clearSelection();
-		session.setMemberships([]);
-		void goto('/login');
+		await logoutAndRedirect(auth, session);
 	}
 </script>
 

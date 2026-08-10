@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
+	import { logoutAndRedirect } from '$lib/auth/logout.js';
 	import { parseTaskEntityFilter } from '$lib/crm/entity-list-filter.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import TasksPage from '$lib/components/crm/tasks-page.svelte';
@@ -15,10 +16,7 @@
 	const entityFilter = $derived(parseTaskEntityFilter(page.url.searchParams));
 
 	async function handleLogout() {
-		await auth.signOut();
-		session.clearSelection();
-		session.setMemberships([]);
-		void goto('/login');
+		await logoutAndRedirect(auth, session);
 	}
 
 	function clearEntityFilter() {

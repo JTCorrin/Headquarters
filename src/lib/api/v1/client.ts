@@ -16,6 +16,7 @@ import { createMailboxEndpoints } from './endpoints/mailbox.js';
 import { createCalendarEndpoints } from './endpoints/calendar.js';
 import { createNotificationsEndpoints } from './endpoints/notifications.js';
 import { createOrgMembersEndpoints } from './endpoints/org-members.js';
+import { createOrganisationAccessEndpoints } from './endpoints/organisation-access.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createPaymentsEndpoints } from './endpoints/payments.js';
@@ -47,6 +48,7 @@ import type {
 	NotificationsEndpoints,
 	MeetingsEndpoints,
 	OrganisationConfigEndpoints,
+	OrganisationAccessEndpoints,
 	OrganisationsEndpoints,
 	OrgMembersEndpoints,
 	PaymentsEndpoints,
@@ -84,6 +86,7 @@ export interface ApiV1Client {
 	request: ApiRequestFn;
 	organisations: OrganisationsEndpoints;
 	orgMembers: OrgMembersEndpoints;
+	organisationAccess: OrganisationAccessEndpoints;
 	organisationConfig: OrganisationConfigEndpoints;
 	taxRates: TaxRatesEndpoints;
 	profilePreferences: ProfilePreferencesEndpoints;
@@ -260,6 +263,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		request,
 		organisations: createOrganisationsEndpoints(request),
 		orgMembers: createOrgMembersEndpoints(request),
+		organisationAccess: createOrganisationAccessEndpoints(request),
 		organisationConfig: createOrganisationConfigEndpoints(request),
 		taxRates: createTaxRatesEndpoints(request),
 		profilePreferences: createProfilePreferencesEndpoints(request),

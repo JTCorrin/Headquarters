@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	readSelectedOrgId,
 	SELECTED_ORG_STORAGE_KEY,
+	selectedOrgStorageKey,
 	writeSelectedOrgId,
 	type StorageLike
 } from './selected-org.js';
@@ -28,5 +29,15 @@ describe('selected org persistence', () => {
 		expect(storage.getItem(SELECTED_ORG_STORAGE_KEY)).toBe('org-1');
 		writeSelectedOrgId(null, storage);
 		expect(readSelectedOrgId(storage)).toBeNull();
+	});
+
+	it('isolates the selected organisation per authenticated user', () => {
+		const storage = memoryStorage();
+		writeSelectedOrgId('org-a', storage, 'user-a');
+		writeSelectedOrgId('org-b', storage, 'user-b');
+
+		expect(readSelectedOrgId(storage, 'user-a')).toBe('org-a');
+		expect(readSelectedOrgId(storage, 'user-b')).toBe('org-b');
+		expect(storage.getItem(selectedOrgStorageKey('user-a'))).toBe('org-a');
 	});
 });
