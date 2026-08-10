@@ -53,7 +53,6 @@
 			<Card.Description>Use the account you created during signup.</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
-			<AuthProviderOptions {next} />
 			<AuthCredentialsForm
 				form={credentialsForm}
 				submitLabel="Sign in"
@@ -71,6 +70,7 @@
 				</a>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			</div>
+			<AuthProviderOptions {next} />
 		</Card.Content>
 		<Card.Footer class="justify-center">
 			<p class="text-sm text-muted-foreground">
