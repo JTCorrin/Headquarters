@@ -10,11 +10,16 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { getOrgSession } from '$lib/org/index.js';
+	import {
+		isMailboxOutboundReady,
+		MAILBOX_OUTBOUND_REQUIRED_MESSAGE
+	} from '$lib/org/mailbox-outbound.js';
 
 	const api = getApiV1Client();
 	const session = getOrgSession();
 	let invitations = $state<ApiOrganisationInvitation[]>([]);
 	let loading = $state(true);
+	let outboundReady = $state<boolean | null>(null);
 	let errorMessage = $state<string | null>(null);
 
 	function message(error: unknown, fallback: string): string {
@@ -22,14 +27,28 @@
 		return fallback;
 	}
 
-	async function loadInvitations(): Promise<void> {
+	async function loadPage(): Promise<void> {
 		loading = true;
 		errorMessage = null;
+		outboundReady = null;
 		try {
-			const rows = await api.organisationAccess.listInvitations();
-			invitations = rows.filter((row) => !row.accepted_at && !row.revoked_at);
+			const [invitationRows, mailbox] = await Promise.all([
+				api.organisationAccess.listInvitations(),
+				api.mailbox.get().catch((error: unknown) => {
+					if (
+						isApiClientError(error) &&
+						(error.status === 404 || error.code === 'NOT_FOUND')
+					) {
+						return null;
+					}
+					throw error;
+				})
+			]);
+			invitations = invitationRows.filter((row) => !row.accepted_at && !row.revoked_at);
+			outboundReady = isMailboxOutboundReady(mailbox);
 		} catch (error) {
 			errorMessage = message(error, 'Could not load invitations.');
+			outboundReady = false;
 		} finally {
 			loading = false;
 		}
@@ -37,6 +56,10 @@
 
 	async function invite(email: string, role: ApiOrganisationAccessRole): Promise<boolean> {
 		errorMessage = null;
+		if (outboundReady !== true) {
+			errorMessage = MAILBOX_OUTBOUND_REQUIRED_MESSAGE;
+			return false;
+		}
 		try {
 			const created = await api.organisationAccess.invite({ email, role });
 			invitations = [created, ...invitations];
@@ -64,7 +87,7 @@
 			void goto(resolve('/onboarding/create-org'));
 			return;
 		}
-		void loadInvitations();
+		void loadPage();
 	});
 </script>
 
@@ -77,7 +100,8 @@
 		<Card.Header>
 			<Card.Title>Team invitations</Card.Title>
 			<Card.Description
-				>Invite people using the email address they will sign in with.</Card.Description
+				>Invite people using the email address they will sign in with. Invites are sent from your
+				mailbox SMTP.</Card.Description
 			>
 		</Card.Header>
 		<Card.Content>
@@ -86,6 +110,7 @@
 				actorRole="owner"
 				{errorMessage}
 				{loading}
+				{outboundReady}
 				onInvite={invite}
 				onRevoke={revoke}
 			/>

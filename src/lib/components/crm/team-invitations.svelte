@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import type { ApiOrganisationAccessRole, ApiOrganisationInvitation } from '$lib/api/v1/types.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { MAILBOX_OUTBOUND_REQUIRED_MESSAGE } from '$lib/org/mailbox-outbound.js';
 	import StatusBadge from './status-badge.svelte';
 
 	export interface TeamInvitationsProps {
@@ -10,6 +12,8 @@
 		actorRole?: 'owner' | 'admin';
 		errorMessage?: string | null;
 		loading?: boolean;
+		/** null while mailbox status is loading; false blocks invites. */
+		outboundReady?: boolean | null;
 		onInvite?: (
 			email: string,
 			role: ApiOrganisationAccessRole
@@ -23,6 +27,7 @@
 		actorRole = 'owner',
 		errorMessage = null,
 		loading = false,
+		outboundReady = true,
 		onInvite,
 		onRevoke,
 		onResend
@@ -32,6 +37,8 @@
 	let role = $state<ApiOrganisationAccessRole>('member');
 	let busyAction = $state<string | null>(null);
 	let localError = $state<string | null>(null);
+
+	const inviteDisabled = $derived(loading || busyAction !== null || outboundReady !== true);
 
 	const roleOptions = $derived(
 		actorRole === 'owner'
@@ -58,6 +65,10 @@
 		event.preventDefault();
 		const normalizedEmail = email.trim().toLowerCase();
 		localError = null;
+		if (outboundReady !== true) {
+			localError = MAILBOX_OUTBOUND_REQUIRED_MESSAGE;
+			return;
+		}
 		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
 			localError = 'Enter a valid email address.';
 			return;
@@ -98,6 +109,25 @@
 </script>
 
 <div class="space-y-6" data-testid="team-invitations">
+	{#if outboundReady === false}
+		<div
+			class="rounded-3xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+			role="status"
+			data-testid="team-invite-mailbox-warning"
+		>
+			<p class="font-medium text-foreground">Mailbox SMTP required</p>
+			<p class="mt-1 text-muted-foreground">
+				Invitations are sent from your personal mailbox. Configure IMAP/SMTP under
+				<!-- Hash fragment is local; path is resolved. -->
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+				<a class="underline underline-offset-2" href="{resolve('/settings')}#mail"
+					>My settings → Mail</a
+				>
+				before inviting teammates.
+			</p>
+		</div>
+	{/if}
+
 	<form
 		class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
 		onsubmit={submitInvite}
@@ -112,7 +142,7 @@
 				autocomplete="email"
 				placeholder="teammate@example.com"
 				bind:value={email}
-				disabled={loading || busyAction !== null}
+				disabled={inviteDisabled}
 				required
 				data-testid="team-invite-email"
 			/>
@@ -124,7 +154,7 @@
 				name="role"
 				class="h-9 w-full rounded-3xl bg-input/50 px-3 text-sm ring-1 ring-transparent outline-none focus:ring-ring"
 				bind:value={role}
-				disabled={loading || busyAction !== null}
+				disabled={inviteDisabled}
 				data-testid="team-invite-role"
 			>
 				{#each roleOptions as option (option)}
@@ -136,7 +166,7 @@
 			<Button
 				type="submit"
 				class="w-full"
-				disabled={loading || busyAction !== null}
+				disabled={inviteDisabled}
 				data-testid="team-invite-submit"
 			>
 				{busyAction === 'create' ? 'Sending…' : 'Send invite'}
@@ -181,7 +211,7 @@
 									type="button"
 									size="sm"
 									variant="outline"
-									disabled={busyAction !== null}
+									disabled={busyAction !== null || outboundReady !== true}
 									onclick={() => resend(invitation)}
 									data-testid={`team-invitation-resend-${invitation.id}`}
 								>
