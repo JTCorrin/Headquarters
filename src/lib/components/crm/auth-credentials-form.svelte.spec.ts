@@ -31,4 +31,13 @@ describe('AuthCredentialsForm', () => {
 			.element(page.getByTestId('auth-form-error'))
 			.toHaveTextContent('Invalid login credentials');
 	});
+
+	it('shows a display name field for signup', async () => {
+		render(AuthCredentialsFormTestHost, {
+			submitLabel: 'Sign up',
+			showDisplayName: true
+		});
+
+		await expect.element(page.getByTestId('auth-display-name')).toBeVisible();
+	});
 });

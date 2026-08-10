@@ -150,6 +150,22 @@ export type MembershipRow = {
   updated_at: string
 }
 
+export type OrganisationInvitationRow = {
+  id: string
+  org_id: string
+  email: string
+  role: Exclude<MembershipRow['role'], 'owner'>
+  token_hash: string
+  invited_by: string
+  expires_at: string
+  accepted_at: string | null
+  accepted_by: string | null
+  revoked_at: string | null
+  revoked_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 /** Minimal Wave B email message row for Draft response reads (RLS owner/share). */
 export type EmailMessageRow = {
   id: string
@@ -1156,6 +1172,17 @@ type OrganisationInsert =
 type MembershipInsert =
   & Pick<MembershipRow, 'org_id' | 'role' | 'user_id'>
   & Partial<Omit<MembershipRow, 'id' | 'org_id' | 'role' | 'user_id'>>
+type OrganisationInvitationInsert =
+  & Pick<
+    OrganisationInvitationRow,
+    'org_id' | 'email' | 'role' | 'token_hash' | 'invited_by' | 'expires_at'
+  >
+  & Partial<
+    Omit<
+      OrganisationInvitationRow,
+      'id' | 'org_id' | 'email' | 'role' | 'token_hash' | 'invited_by' | 'expires_at'
+    >
+  >
 type ContactInsert =
   & Pick<ContactRow, 'display_name' | 'org_id'>
   & Partial<Omit<ContactRow, 'display_name' | 'id' | 'org_id'>>
@@ -1419,6 +1446,12 @@ export type Database = {
         Row: MembershipRow
         Insert: MembershipInsert
         Update: Partial<MembershipInsert>
+        Relationships: []
+      }
+      organisation_invitations: {
+        Row: OrganisationInvitationRow
+        Insert: OrganisationInvitationInsert
+        Update: Partial<OrganisationInvitationInsert>
         Relationships: []
       }
       contacts: {
@@ -1719,6 +1752,49 @@ export type Database = {
           p_timezone?: string
         }
         Returns: OrganisationRow
+      }
+      list_organisation_invitations: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      create_organisation_invitation: {
+        Args: {
+          p_org_id: string
+          p_email: string
+          p_role: string
+          p_token_hash: string
+          p_expires_at: string
+        }
+        Returns: Json
+      }
+      revoke_organisation_invitation: {
+        Args: { p_org_id: string; p_invitation_id: string }
+        Returns: Json
+      }
+      accept_organisation_invitation: {
+        Args: { p_token_hash: string }
+        Returns: Json
+      }
+      list_organisation_members: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      update_organisation_member: {
+        Args: {
+          p_org_id: string
+          p_membership_id: string
+          p_role?: string | null
+          p_status?: string | null
+        }
+        Returns: Json
+      }
+      remove_organisation_member: {
+        Args: { p_org_id: string; p_membership_id: string }
+        Returns: undefined
+      }
+      transfer_organisation_ownership: {
+        Args: { p_org_id: string; p_target_membership_id: string }
+        Returns: Json
       }
       convert_lead: {
         Args: {

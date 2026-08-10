@@ -40,6 +40,7 @@ export interface OrgSession {
 
 export interface CreateOrgSessionOptions {
 	storage?: StorageLike | null;
+	userId?: string | null;
 	initialOrgId?: string | null;
 	initialMemberships?: OrgMembershipSummary[];
 	initialThemePreference?: ThemePreferenceOption;
@@ -51,7 +52,7 @@ export function createOrgSession(options: CreateOrgSessionOptions = {}): OrgSess
 	let selectedOrgId = $state<string | null>(
 		options.initialOrgId !== undefined
 			? options.initialOrgId
-			: readSelectedOrgId(storage)
+			: readSelectedOrgId(storage, options.userId)
 	);
 	let memberships = $state<OrgMembershipSummary[]>([...(options.initialMemberships ?? [])]);
 	let cacheGeneration = $state(0);
@@ -62,7 +63,7 @@ export function createOrgSession(options: CreateOrgSessionOptions = {}): OrgSess
 	function selectOrg(orgId: string): void {
 		const changed = selectedOrgId !== orgId;
 		selectedOrgId = orgId;
-		writeSelectedOrgId(orgId, storage);
+		writeSelectedOrgId(orgId, storage, options.userId);
 		if (changed) {
 			cacheGeneration += 1;
 			options.onSwitch?.(orgId, cacheGeneration);
@@ -72,7 +73,7 @@ export function createOrgSession(options: CreateOrgSessionOptions = {}): OrgSess
 	function clearSelection(): void {
 		const changed = selectedOrgId !== null;
 		selectedOrgId = null;
-		writeSelectedOrgId(null, storage);
+		writeSelectedOrgId(null, storage, options.userId);
 		if (changed) {
 			cacheGeneration += 1;
 			options.onSwitch?.(null, cacheGeneration);

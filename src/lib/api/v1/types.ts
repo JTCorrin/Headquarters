@@ -211,12 +211,7 @@ export interface ApiProductListParams {
 	status?: ApiProductStatus;
 }
 
-export type ApiProductAdjustReason =
-	| 'opening'
-	| 'adjustment'
-	| 'invoice'
-	| 'return'
-	| 'void';
+export type ApiProductAdjustReason = 'opening' | 'adjustment' | 'invoice' | 'return' | 'void';
 
 export interface ApiProductAdjustStockBody {
 	quantity_delta: number;
@@ -354,10 +349,7 @@ interface ApiQuoteWritableFields {
 export type ApiQuoteCreateBody = ApiQuoteWritableFields & {
 	title: string;
 	lines: ApiQuoteLineInput[];
-} & (
-	| { client_id: string; lead_id?: null }
-	| { lead_id: string; client_id?: null }
-);
+} & ({ client_id: string; lead_id?: null } | { lead_id: string; client_id?: null });
 
 export type ApiQuoteUpdateBody = ApiQuoteWritableFields & {
 	title?: string;
@@ -734,10 +726,7 @@ export type ApiMeetingSummaryStatus = 'none' | 'generating' | 'ready' | 'failed'
 /** M1 resolvable related types. Dictionary also allows `project` (422 until P1). */
 export type ApiMeetingRelatedEntityType = 'client' | 'contact' | 'lead' | 'project';
 export type ApiMeetingAttendeeResponseStatus =
-	| 'needs_action'
-	| 'accepted'
-	| 'declined'
-	| 'tentative';
+	'needs_action' | 'accepted' | 'declined' | 'tentative';
 
 export interface ApiMeetingAttendee {
 	id: string;
@@ -1204,21 +1193,10 @@ export interface ApiTaxRateListParams {
 
 /** Entity types that can host a document workspace. */
 export type ApiDocumentEntityType =
-	| 'client'
-	| 'contact'
-	| 'lead'
-	| 'organisation'
-	| 'meeting'
-	| 'bill';
+	'client' | 'contact' | 'lead' | 'organisation' | 'meeting' | 'bill';
 
 export type ApiDocumentCategory =
-	| 'contract'
-	| 'proposal'
-	| 'invoice'
-	| 'receipt'
-	| 'transcript'
-	| 'recording'
-	| 'other';
+	'contract' | 'proposal' | 'invoice' | 'receipt' | 'transcript' | 'recording' | 'other';
 
 export type ApiDocumentStatus = 'pending_upload' | 'ready' | 'orphan' | 'failed';
 
@@ -1375,6 +1353,67 @@ export interface ApiOrgMember {
 	job_title: string | null;
 }
 
+export type ApiOrganisationAccessRole = 'admin' | 'member' | 'billing' | 'readonly';
+
+export interface ApiOrganisationInvitation {
+	id: string;
+	org_id: string;
+	email: string;
+	role: ApiOrganisationAccessRole;
+	invited_by: string;
+	expires_at: string;
+	accepted_at: string | null;
+	accepted_by: string | null;
+	revoked_at: string | null;
+	revoked_by: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface ApiOrganisationInvitationCreateBody {
+	email: string;
+	role: ApiOrganisationAccessRole;
+	expires_at?: string;
+}
+
+export interface ApiOrganisationInvitationAcceptBody {
+	token: string;
+}
+
+export interface ApiOrganisationInvitationAcceptResult {
+	organisation_id: string;
+	membership_id: string;
+	role: ApiOrganisationAccessRole;
+	status: 'active';
+	joined_at: string;
+}
+
+export interface ApiOrganisationManagedMember {
+	id: string;
+	org_id: string;
+	user_id: string;
+	display_name: string;
+	email: string;
+	role: MembershipRole;
+	status: 'active' | 'suspended';
+	job_title: string | null;
+	joined_at: string;
+	suspended_at: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface ApiOrganisationMemberPatch {
+	role?: ApiOrganisationAccessRole;
+	status?: 'active' | 'suspended';
+}
+
+export interface ApiOrganisationOwnershipTransferResult {
+	previous_owner_membership_id: string;
+	owner_membership_id: string;
+	owner_user_id: string;
+}
+
 /**
  * Personal notifications (bell) — Notif-BE `/api/v1/me/notifications*`.
  * Kinds: `email.received`, `timeline.mention`.
@@ -1417,12 +1456,7 @@ export interface ApiNotificationMarkReadBody {
 export type ApiCalendarProvider = 'google' | 'caldav';
 
 export type ApiCalendarConnectionStatus =
-	| 'disconnected'
-	| 'pending'
-	| 'active'
-	| 'disabled'
-	| 'error'
-	| string;
+	'disconnected' | 'pending' | 'active' | 'disabled' | 'error' | string;
 
 export interface ApiCalendarConnectionConfig {
 	/** Connected account email / CalDAV username when known. */
@@ -1553,10 +1587,7 @@ export interface ApiAiModelUpdateBody {
 }
 
 export type ApiAiPromptKey =
-	| 'email_reply'
-	| 'meeting_summary'
-	| 'meeting_task_proposals'
-	| 'invoice_chase';
+	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase';
 
 export type ApiAiPromptsMap = Record<ApiAiPromptKey, string>;
 
@@ -1619,11 +1650,7 @@ export interface ApiEmailMessage {
 }
 
 export type ApiEmailTemplateCategory =
-	| 'transactional'
-	| 'campaign'
-	| 'chase'
-	| 'onboarding'
-	| 'other';
+	'transactional' | 'campaign' | 'chase' | 'onboarding' | 'other';
 
 export type ApiEmailTemplateStatus = 'draft' | 'active' | 'archived';
 
@@ -1749,24 +1776,10 @@ export interface ApiEmailMessageReplyBody {
 }
 
 /** Entity types supported by `GET/POST …/timeline-events`. */
-export type ApiTimelineEntityType =
-	| 'contact'
-	| 'lead'
-	| 'client'
-	| 'quote'
-	| 'invoice'
-	| 'bill';
+export type ApiTimelineEntityType = 'contact' | 'lead' | 'client' | 'quote' | 'invoice' | 'bill';
 
 export type ApiTimelineEventKind =
-	| 'note'
-	| 'email'
-	| 'call'
-	| 'payment'
-	| 'document'
-	| 'status'
-	| 'meeting'
-	| 'task'
-	| 'conversion';
+	'note' | 'email' | 'call' | 'payment' | 'document' | 'status' | 'meeting' | 'task' | 'conversion';
 
 export type ApiTimelineActorType = 'user' | 'agent' | 'system' | 'integration';
 
@@ -1858,12 +1871,7 @@ export interface ApiAiSuggestion {
 	prompt_version?: string | null;
 }
 
-export type ApiRecurringInvoiceStatus =
-	| 'draft'
-	| 'active'
-	| 'paused'
-	| 'completed'
-	| 'cancelled';
+export type ApiRecurringInvoiceStatus = 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
 
 export type ApiRecurringInvoiceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
@@ -2229,4 +2237,3 @@ export interface ApiAuditEventListParams {
 	action?: string;
 	actor_id?: string;
 }
-

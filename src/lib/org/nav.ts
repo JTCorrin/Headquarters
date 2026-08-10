@@ -4,13 +4,11 @@ import {
 	canAccessApiKeys,
 	canAccessAuditLog,
 	canAccessOrgConfigRoutes,
-	canAccessPersonalConfig
+	canAccessPersonalConfig,
+	canManageOrganisationAccess
 } from '$lib/schemas/organisation.js';
 
-export function appNavGroups(
-	activeLabel?: string,
-	role: MembershipRole = 'owner'
-): AppNavGroup[] {
+export function appNavGroups(activeLabel?: string, role: MembershipRole = 'owner'): AppNavGroup[] {
 	const mark = (label: string) => (activeLabel ? label === activeLabel : false);
 	const organisationItems: AppNavGroup['items'] = [];
 
@@ -32,6 +30,13 @@ export function appNavGroups(
 			label: 'Audit log',
 			href: '/org/audit-log',
 			active: mark('Audit log')
+		});
+	}
+	if (canManageOrganisationAccess(role)) {
+		organisationItems.push({
+			label: 'Team',
+			href: '/org/team',
+			active: mark('Team')
 		});
 	}
 	if (canAccessPersonalConfig(role)) {
