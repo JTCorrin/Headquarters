@@ -1,19 +1,26 @@
 /** Routes reachable without a Supabase session when auth is enabled. */
-export const AUTH_PUBLIC_PATHS = new Set(['/login', '/signup']);
-
-/** Onboarding routes for signed-in users with zero memberships. */
-export const AUTH_ONBOARDING_PATHS = new Set([
-	'/onboarding/create-org',
-	'/onboarding/invite-team',
-	'/onboarding/connect'
+export const AUTH_PUBLIC_PATHS = new Set([
+	'/login',
+	'/signup',
+	'/forgot-password',
+	'/check-email',
+	'/auth/callback',
+	'/invite/accept'
 ]);
 
+/** Onboarding routes for signed-in users with zero memberships. */
+export const AUTH_ONBOARDING_PATHS = new Set(['/onboarding/create-org']);
+
 export function isAuthPublicPath(pathname: string): boolean {
-	return AUTH_PUBLIC_PATHS.has(pathname);
+	return (
+		AUTH_PUBLIC_PATHS.has(pathname) ||
+		pathname === '/update-password' ||
+		pathname.startsWith('/auth/')
+	);
 }
 
 export function isOnboardingPath(pathname: string): boolean {
-	return AUTH_ONBOARDING_PATHS.has(pathname) || pathname.startsWith('/onboarding/');
+	return AUTH_ONBOARDING_PATHS.has(pathname);
 }
 
 /**

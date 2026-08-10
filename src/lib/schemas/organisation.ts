@@ -1,12 +1,6 @@
 import { z } from 'zod';
 
-export const membershipRoles = [
-	'owner',
-	'admin',
-	'member',
-	'billing',
-	'readonly'
-] as const;
+export const membershipRoles = ['owner', 'admin', 'member', 'billing', 'readonly'] as const;
 
 export type MembershipRole = (typeof membershipRoles)[number];
 
@@ -198,6 +192,11 @@ export function canAccessAuditLog(role: MembershipRole): boolean {
  * Nav matrix §8.6 create/revoke Owner-only is a known product nit; BE allows Admin.
  */
 export function canAccessApiKeys(role: MembershipRole): boolean {
+	return role === 'owner' || role === 'admin';
+}
+
+/** Team membership and invitation management — Owner + Admin. */
+export function canManageOrganisationAccess(role: MembershipRole): boolean {
 	return role === 'owner' || role === 'admin';
 }
 

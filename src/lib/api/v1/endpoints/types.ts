@@ -39,6 +39,13 @@ import type {
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
 	ApiOrganisationMembership,
+	ApiOrganisationInvitation,
+	ApiOrganisationInvitationAcceptBody,
+	ApiOrganisationInvitationAcceptResult,
+	ApiOrganisationInvitationCreateBody,
+	ApiOrganisationManagedMember,
+	ApiOrganisationMemberPatch,
+	ApiOrganisationOwnershipTransferResult,
 	ApiProfilePreferences,
 	ApiProfilePreferencesPatch,
 	ApiInvoice,
@@ -159,11 +166,38 @@ import type {
 
 export interface OrganisationsEndpoints {
 	list(signal?: AbortSignal): Promise<ApiOrganisationMembership[]>;
-	create(body: ApiOrganisationCreateBody, signal?: AbortSignal): Promise<ApiOrganisationCreateResult>;
+	create(
+		body: ApiOrganisationCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationCreateResult>;
 }
 
 export interface OrgMembersEndpoints {
 	list(signal?: AbortSignal): Promise<ApiOrgMember[]>;
+}
+
+export interface OrganisationAccessEndpoints {
+	listInvitations(signal?: AbortSignal): Promise<ApiOrganisationInvitation[]>;
+	invite(
+		body: ApiOrganisationInvitationCreateBody,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationInvitation>;
+	revokeInvitation(id: string, signal?: AbortSignal): Promise<ApiOrganisationInvitation>;
+	acceptInvitation(
+		body: ApiOrganisationInvitationAcceptBody,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationInvitationAcceptResult>;
+	listMembers(signal?: AbortSignal): Promise<ApiOrganisationManagedMember[]>;
+	updateMember(
+		id: string,
+		body: ApiOrganisationMemberPatch,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationManagedMember>;
+	removeMember(id: string, signal?: AbortSignal): Promise<void>;
+	transferOwnership(
+		id: string,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationOwnershipTransferResult>;
 }
 
 export interface OrganisationConfigEndpoints {
@@ -201,10 +235,7 @@ export interface ProductCategoriesEndpoints {
 }
 
 export interface ProductsEndpoints {
-	list(
-		params?: ApiProductListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiProduct[]>>;
+	list(params?: ApiProductListParams, signal?: AbortSignal): Promise<ApiResult<ApiProduct[]>>;
 	create(body: ApiProductCreateBody, signal?: AbortSignal): Promise<ApiProduct>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiProduct>>;
 	update(
@@ -222,10 +253,7 @@ export interface ProductsEndpoints {
 }
 
 export interface QuotesEndpoints {
-	list(
-		params?: ApiQuoteListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiQuote[]>>;
+	list(params?: ApiQuoteListParams, signal?: AbortSignal): Promise<ApiResult<ApiQuote[]>>;
 	create(body: ApiQuoteCreateBody, signal?: AbortSignal): Promise<ApiQuoteDocument>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiQuoteDocument>>;
 	update(
@@ -241,16 +269,10 @@ export interface QuotesEndpoints {
 }
 
 export interface InvoicesEndpoints {
-	list(
-		params?: ApiInvoiceListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiInvoice[]>>;
+	list(params?: ApiInvoiceListParams, signal?: AbortSignal): Promise<ApiResult<ApiInvoice[]>>;
 	create(body: ApiInvoiceCreateBody, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
 	/** Primary conversion contract — copies accepted-quote snapshots into a draft invoice. */
-	createFromQuote(
-		body: ApiInvoiceFromQuoteBody,
-		signal?: AbortSignal
-	): Promise<ApiInvoiceDocument>;
+	createFromQuote(body: ApiInvoiceFromQuoteBody, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiInvoiceDocument>>;
 	update(
 		id: string,
@@ -269,10 +291,7 @@ export interface InvoicesEndpoints {
 }
 
 export interface VendorsEndpoints {
-	list(
-		params?: ApiVendorListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiVendor[]>>;
+	list(params?: ApiVendorListParams, signal?: AbortSignal): Promise<ApiResult<ApiVendor[]>>;
 	create(body: ApiVendorCreateBody, signal?: AbortSignal): Promise<ApiVendor>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiVendor>>;
 	update(
@@ -284,10 +303,7 @@ export interface VendorsEndpoints {
 }
 
 export interface BillsEndpoints {
-	list(
-		params?: ApiBillListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiBill[]>>;
+	list(params?: ApiBillListParams, signal?: AbortSignal): Promise<ApiResult<ApiBill[]>>;
 	create(body: ApiBillCreateBody, signal?: AbortSignal): Promise<ApiBillDocument>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiBillDocument>>;
 	update(
@@ -307,10 +323,7 @@ export interface BillsEndpoints {
 }
 
 export interface ContactsEndpoints {
-	list(
-		params?: ApiContactListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiContact[]>>;
+	list(params?: ApiContactListParams, signal?: AbortSignal): Promise<ApiResult<ApiContact[]>>;
 	create(body: ApiContactCreateBody, signal?: AbortSignal): Promise<ApiContact>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiContact>>;
 	update(
@@ -323,10 +336,7 @@ export interface ContactsEndpoints {
 }
 
 export interface ClientsEndpoints {
-	list(
-		params?: ApiClientListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiClient[]>>;
+	list(params?: ApiClientListParams, signal?: AbortSignal): Promise<ApiResult<ApiClient[]>>;
 	create(body: ApiClientCreateBody, signal?: AbortSignal): Promise<ApiClient>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiClient>>;
 	update(
@@ -388,11 +398,7 @@ export interface MeetingsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiMeetingDocument>;
 	/** Stub-capable summary generation; returns meeting + proposals when ready (M2). */
-	generateSummary(
-		id: string,
-		version: number,
-		signal?: AbortSignal
-	): Promise<ApiMeetingDocument>;
+	generateSummary(id: string, version: number, signal?: AbortSignal): Promise<ApiMeetingDocument>;
 	acceptTaskProposal(
 		meetingId: string,
 		proposalId: string,
@@ -487,26 +493,10 @@ export interface RecurringInvoiceSchedulesEndpoints {
 		runId: string,
 		signal?: AbortSignal
 	): Promise<ApiResult<ApiRecurringInvoiceRunDocument>>;
-	activate(
-		id: string,
-		version: number,
-		signal?: AbortSignal
-	): Promise<ApiRecurringInvoiceDocument>;
-	pause(
-		id: string,
-		version: number,
-		signal?: AbortSignal
-	): Promise<ApiRecurringInvoiceDocument>;
-	resume(
-		id: string,
-		version: number,
-		signal?: AbortSignal
-	): Promise<ApiRecurringInvoiceDocument>;
-	cancel(
-		id: string,
-		version: number,
-		signal?: AbortSignal
-	): Promise<ApiRecurringInvoiceDocument>;
+	activate(id: string, version: number, signal?: AbortSignal): Promise<ApiRecurringInvoiceDocument>;
+	pause(id: string, version: number, signal?: AbortSignal): Promise<ApiRecurringInvoiceDocument>;
+	resume(id: string, version: number, signal?: AbortSignal): Promise<ApiRecurringInvoiceDocument>;
+	cancel(id: string, version: number, signal?: AbortSignal): Promise<ApiRecurringInvoiceDocument>;
 	runNow(
 		id: string,
 		version: number,
@@ -515,10 +505,7 @@ export interface RecurringInvoiceSchedulesEndpoints {
 }
 
 export interface PaymentsEndpoints {
-	list(
-		params?: ApiPaymentListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiPayment[]>>;
+	list(params?: ApiPaymentListParams, signal?: AbortSignal): Promise<ApiResult<ApiPayment[]>>;
 	create(body: ApiPaymentCreateBody, signal?: AbortSignal): Promise<ApiPaymentDocument>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiPaymentDocument>>;
 	allocate(
@@ -588,11 +575,7 @@ export interface DocumentsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiDocumentLinkResult>;
 	delete(documentId: string, version: number, signal?: AbortSignal): Promise<void>;
-	restore(
-		documentId: string,
-		version: number,
-		signal?: AbortSignal
-	): Promise<ApiDocumentResult>;
+	restore(documentId: string, version: number, signal?: AbortSignal): Promise<ApiDocumentResult>;
 }
 
 export interface MailboxEndpoints {
@@ -610,15 +593,9 @@ export interface CalendarEndpoints {
 		options?: { provider?: ApiCalendarProvider }
 	): Promise<ApiCalendarConnection>;
 	put(body: ApiCalendarCaldavPutBody, signal?: AbortSignal): Promise<ApiCalendarConnection>;
-	test(
-		body?: { password?: string },
-		signal?: AbortSignal
-	): Promise<ApiCalendarTestResult>;
+	test(body?: { password?: string }, signal?: AbortSignal): Promise<ApiCalendarTestResult>;
 	startOAuth(signal?: AbortSignal): Promise<ApiCalendarOAuthStart>;
-	disconnect(options?: {
-		provider?: ApiCalendarProvider;
-		signal?: AbortSignal;
-	}): Promise<void>;
+	disconnect(options?: { provider?: ApiCalendarProvider; signal?: AbortSignal }): Promise<void>;
 }
 
 /** Personal notifications bell — `/api/v1/me/notifications*`. */
@@ -656,12 +633,8 @@ export interface ApiKeysEndpoints {
 	revoke(id: string, signal?: AbortSignal): Promise<ApiOrgApiKey>;
 }
 
-
 export interface EmailMessagesEndpoints {
-	listMine(
-		params?: ApiMyEmailMessageListParams,
-		signal?: AbortSignal
-	): Promise<ApiEmailMessage[]>;
+	listMine(params?: ApiMyEmailMessageListParams, signal?: AbortSignal): Promise<ApiEmailMessage[]>;
 	listForEntity(
 		entityType: ApiEntityEmailType,
 		entityId: string,
@@ -678,10 +651,7 @@ export interface EmailMessagesEndpoints {
 		body: ApiEmailMessageReplyBody,
 		signal?: AbortSignal
 	): Promise<ApiEmailMessage>;
-	generateDraft(
-		body: ApiAiSuggestionGenerateBody,
-		signal?: AbortSignal
-	): Promise<ApiAiSuggestion>;
+	generateDraft(body: ApiAiSuggestionGenerateBody, signal?: AbortSignal): Promise<ApiAiSuggestion>;
 	generateInvoiceChase(
 		body: ApiAiInvoiceChaseGenerateBody,
 		signal?: AbortSignal
@@ -757,8 +727,5 @@ export interface TimelineEventsEndpoints {
 }
 
 export interface AuditEventsEndpoints {
-	list(
-		params?: ApiAuditEventListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiAuditEvent[]>>;
+	list(params?: ApiAuditEventListParams, signal?: AbortSignal): Promise<ApiResult<ApiAuditEvent[]>>;
 }

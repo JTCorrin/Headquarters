@@ -63,6 +63,15 @@ export default defineConfig({
 	],
 	test: {
 		expect: { requireAssertions: true },
+		coverage: {
+			provider: 'v8',
+			thresholds: {
+				statements: 60,
+				branches: 40,
+				functions: 55,
+				lines: 60
+			}
+		},
 		// Keep Vitest projects from overlapping browser Vite servers / optimizeDeps caches.
 		fileParallelism: false,
 		projects: [

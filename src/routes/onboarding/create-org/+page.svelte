@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { get } from 'svelte/store';
 	import { tick } from 'svelte';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
-	import { getAuthSession, postAuthDestination } from '$lib/auth/index.js';
+	import { getAuthSession } from '$lib/auth/index.js';
+	import { logoutAndRedirect } from '$lib/auth/logout.js';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import { membershipFromCreateResult, toOrganisationCreateBody } from '$lib/api/v1/mappers.js';
@@ -44,9 +46,7 @@
 	async function handleCreate(): Promise<boolean> {
 		createError = null;
 		try {
-			const result = await api.organisations.create(
-				toOrganisationCreateBody(get(createForm.form))
-			);
+			const result = await api.organisations.create(toOrganisationCreateBody(get(createForm.form)));
 			const membership = membershipFromCreateResult(result);
 			orgSession.setMemberships([membership]);
 			orgSession.selectOrg(membership.org_id);
@@ -54,12 +54,7 @@
 			// root layout guard (empty memberships → bounce back to create-org) and
 			// Superforms enhance can drop an un-awaited navigation entirely.
 			await tick();
-			await goto(
-				postAuthDestination({
-					membershipCount: orgSession.memberships.length,
-					selectedOrgId: orgSession.selectedOrgId
-				})
-			);
+			await goto(resolve('/onboarding/invite-team'));
 			return true;
 		} catch (error) {
 			if (isApiClientError(error)) {
@@ -72,10 +67,8 @@
 	}
 
 	async function handleLogout() {
-		await auth.signOut();
-		orgSession.clearSelection();
-		orgSession.setMemberships([]);
-		void goto('/login');
+		const error = await logoutAndRedirect(auth, orgSession);
+		if (error) createError = error;
 	}
 </script>
 
@@ -101,11 +94,11 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Organisation details</Card.Title>
-			<Card.Description>You can invite teammates later.</Card.Description>
+			<Card.Description>Next, you can invite teammates to this workspace.</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
 			{#if createError}
-				<p class="text-destructive text-sm" role="alert" data-testid="onboarding-create-error">
+				<p class="text-sm text-destructive" role="alert" data-testid="onboarding-create-error">
 					{createError}
 				</p>
 			{/if}

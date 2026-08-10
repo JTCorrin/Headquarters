@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
+	import { logoutAndRedirect } from '$lib/auth/logout.js';
 	import { looksLikeVendorId } from '$lib/crm/entity-list-filter.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import BillsPage from '$lib/components/crm/bills-page.svelte';
@@ -18,10 +19,7 @@
 	);
 
 	async function handleLogout() {
-		await auth.signOut();
-		session.clearSelection();
-		session.setMemberships([]);
-		void goto('/login');
+		await logoutAndRedirect(auth, session);
 	}
 
 	function setVendorFilter(next: string | null) {
