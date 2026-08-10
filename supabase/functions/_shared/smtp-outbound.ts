@@ -32,6 +32,8 @@ export type SmtpSendOptions = {
   inReplyTo?: string | null
   references?: string | null
   messageId: string
+  /** Trusted infrastructure only; never set for user-supplied mailbox hosts. */
+  allowPrivateHost?: boolean
   connectTimeoutMs?: number
   commandTimeoutMs?: number
 }
@@ -261,6 +263,7 @@ export type OpenSmtpFn = (
   security: SmtpSecurity,
   connectTimeoutMs: number,
   commandTimeoutMs: number,
+  allowPrivateHost?: boolean,
 ) => Promise<SmtpSession>
 
 async function openSmtpConnection(
@@ -269,11 +272,15 @@ async function openSmtpConnection(
   security: SmtpSecurity,
   connectTimeoutMs: number,
   commandTimeoutMs: number,
+  allowPrivateHost = false,
 ): Promise<SmtpSession> {
   const deadline = Date.now() + Math.max(1, connectTimeoutMs)
   const remaining = () => Math.max(1, deadline - Date.now())
 
-  const target = await assertSafeOutboundHost(host)
+	// Trusted system mail may target private infra (e.g. Mailpit). User mailboxes never set this.
+	const target = allowPrivateHost
+		? { hostname: host.trim(), connectHost: host.trim() }
+		: await assertSafeOutboundHost(host)
 
   try {
     const plain = await withImapTimeout(
@@ -371,12 +378,22 @@ export async function sendSmtpMail(
     options.security,
     connectTimeoutMs,
     commandTimeoutMs,
+    options.allowPrivateHost,
   )
 
   try {
     await session.writeLine('EHLO crm.local')
     await session.expect([250], 'SMTP EHLO')
-    await smtpAuthLogin(session, options.username, options.password)
+    if (options.username || options.password) {
+      if (!options.username || !options.password) {
+        throw new SmtpSendError(
+          'smtp_auth_incomplete',
+          'SMTP username and password must both be configured',
+          'auth',
+        )
+      }
+      await smtpAuthLogin(session, options.username, options.password)
+    }
 
     await session.writeLine(`MAIL FROM:<${options.from}>`)
     await session.expect([250], 'SMTP MAIL FROM')

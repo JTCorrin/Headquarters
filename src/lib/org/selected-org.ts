@@ -1,5 +1,9 @@
 export const SELECTED_ORG_STORAGE_KEY = 'hq.selected-org-id';
 
+export function selectedOrgStorageKey(userId?: string | null): string {
+	return userId ? `${SELECTED_ORG_STORAGE_KEY}:${userId}` : SELECTED_ORG_STORAGE_KEY;
+}
+
 export interface StorageLike {
 	getItem(key: string): string | null;
 	setItem(key: string, value: string): void;
@@ -7,11 +11,12 @@ export interface StorageLike {
 }
 
 export function readSelectedOrgId(
-	storage: StorageLike | null | undefined = defaultStorage()
+	storage: StorageLike | null | undefined = defaultStorage(),
+	userId?: string | null
 ): string | null {
 	if (!storage) return null;
 	try {
-		const value = storage.getItem(SELECTED_ORG_STORAGE_KEY);
+		const value = storage.getItem(selectedOrgStorageKey(userId));
 		return value && value.trim() ? value.trim() : null;
 	} catch {
 		return null;
@@ -20,15 +25,17 @@ export function readSelectedOrgId(
 
 export function writeSelectedOrgId(
 	orgId: string | null,
-	storage: StorageLike | null | undefined = defaultStorage()
+	storage: StorageLike | null | undefined = defaultStorage(),
+	userId?: string | null
 ): void {
 	if (!storage) return;
 	try {
+		const key = selectedOrgStorageKey(userId);
 		if (!orgId) {
-			storage.removeItem(SELECTED_ORG_STORAGE_KEY);
+			storage.removeItem(key);
 			return;
 		}
-		storage.setItem(SELECTED_ORG_STORAGE_KEY, orgId);
+		storage.setItem(key, orgId);
 	} catch {
 		// Persistence is best-effort (private mode / quota).
 	}

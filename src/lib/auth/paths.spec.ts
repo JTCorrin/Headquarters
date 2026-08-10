@@ -9,9 +9,12 @@ import {
 describe('auth paths', () => {
 	it('recognises public and onboarding paths', () => {
 		expect(isAuthPublicPath('/login')).toBe(true);
+		expect(isAuthPublicPath('/auth/callback')).toBe(true);
+		expect(isAuthPublicPath('/invite/accept')).toBe(true);
+		expect(isAuthPublicPath('/forgot-password')).toBe(true);
 		expect(isAuthPublicPath('/org/config')).toBe(false);
 		expect(isOnboardingPath('/onboarding/create-org')).toBe(true);
-		expect(isOnboardingPath('/onboarding/invite-team')).toBe(true);
+		expect(isOnboardingPath('/onboarding/invite-team')).toBe(false);
 	});
 
 	it('requires selected org for org-scoped app routes', () => {
@@ -56,18 +59,14 @@ describe('auth paths', () => {
 		expect(postAuthDestination({ membershipCount: 0, selectedOrgId: null })).toBe(
 			'/onboarding/create-org'
 		);
-		expect(postAuthDestination({ membershipCount: 1, selectedOrgId: null })).toBe(
-			'/select-org'
-		);
+		expect(postAuthDestination({ membershipCount: 1, selectedOrgId: null })).toBe('/select-org');
 		expect(
 			postAuthDestination({
 				membershipCount: 1,
 				selectedOrgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 			})
 		).toBe('/');
-		expect(postAuthDestination({ membershipCount: 2, selectedOrgId: null })).toBe(
-			'/select-org'
-		);
+		expect(postAuthDestination({ membershipCount: 2, selectedOrgId: null })).toBe('/select-org');
 		expect(
 			postAuthDestination({
 				membershipCount: 2,
