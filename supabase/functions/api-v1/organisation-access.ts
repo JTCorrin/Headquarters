@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../_shared/database.ts";
-import { sendSystemInvitationEmail } from "../_shared/system-email.ts";
+import {
+  parseSmtpSecurity,
+  resolveAppBaseUrl,
+  sendMailboxInvitationEmail,
+} from "../_shared/system-email.ts";
 import { sha256Hex } from "./api-keys.ts";
 import { ApiError, jsonBody, jsonResponse, parseUuid } from "./http.ts";
 
@@ -16,6 +21,109 @@ const INVITATION_ROLES = new Set<InvitationRole>([
   "readonly",
 ]);
 const MEMBER_STATUSES = new Set(["active", "suspended"]);
+
+const MAILBOX_REQUIRED_MESSAGE =
+  "Configure your personal mailbox SMTP under My settings → Mail before sending invitations.";
+
+function serviceRoleClient(): SupabaseClient<Database> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) {
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "Service credentials are unavailable",
+    );
+  }
+  return createClient<Database>(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+async function requireInviterMailboxSmtp(
+  db: DatabaseClient,
+  orgId: string,
+): Promise<{
+  mailboxId: string;
+  host: string;
+  port: number;
+  security: ReturnType<typeof parseSmtpSecurity>;
+  username: string;
+  password: string;
+  from: string;
+}> {
+  const { data: mailbox, error } = await db.rpc("get_mailbox_account", {
+    p_org_id: orgId,
+  });
+  if (error) {
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "Could not load mailbox settings",
+    );
+  }
+  const row = mailbox as Record<string, unknown> | null;
+  if (
+    !row ||
+    row.credentials_configured !== true ||
+    typeof row.id !== "string" ||
+    typeof row.smtp_host !== "string" ||
+    !String(row.smtp_host).trim() ||
+    typeof row.email_address !== "string" ||
+    !String(row.email_address).trim()
+  ) {
+    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
+      mailbox: "Personal mailbox SMTP is required",
+    });
+  }
+  const port = Number(row.smtp_port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
+      smtp_port: "Mailbox SMTP port is incomplete",
+    });
+  }
+
+  let security: ReturnType<typeof parseSmtpSecurity>;
+  try {
+    security = parseSmtpSecurity(row.smtp_security);
+  } catch {
+    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
+      smtp_security: "Mailbox SMTP security is incomplete",
+    });
+  }
+
+  const service = serviceRoleClient();
+  const { data: creds, error: credError } = await service.rpc(
+    "read_mailbox_sync_credentials",
+    { p_mailbox_id: row.id },
+  );
+  if (credError) {
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "Could not read mailbox credentials",
+    );
+  }
+  const credentialRow = creds as Record<string, unknown> | null;
+  const password = typeof credentialRow?.password === "string"
+    ? credentialRow.password
+    : "";
+  if (!password) {
+    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
+      mailbox: "Mailbox password is required",
+    });
+  }
+
+  return {
+    mailboxId: row.id,
+    host: String(row.smtp_host).trim(),
+    port,
+    security,
+    username: String(credentialRow?.username ?? row.username ?? ""),
+    password,
+    from: String(row.email_address).trim(),
+  };
+}
 
 function databaseError(
   error: { code?: string; message?: string },
@@ -128,6 +236,18 @@ async function createInvitation(
   requestId: string,
 ): Promise<Response> {
   const input = invitationInput(await jsonBody(req));
+  const mailbox = await requireInviterMailboxSmtp(db, orgId);
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(req);
+  } catch {
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "APP_BASE_URL is not configured for invitation links",
+    );
+  }
+
   const token = randomInvitationToken();
   const tokenHash = await sha256Hex(token);
   const { data, error } = await db.rpc("create_organisation_invitation", {
@@ -148,14 +268,18 @@ async function createInvitation(
       .single(),
   ]);
   try {
-    await sendSystemInvitationEmail({
-      to: input.email,
-      organisationName: organisation?.name ?? "your organisation",
-      inviterName: profile?.display_name ?? "An administrator",
-      role: input.role,
-      token,
-      expiresAt: input.expires_at,
-    });
+    await sendMailboxInvitationEmail(
+      {
+        to: input.email,
+        organisationName: organisation?.name ?? "your organisation",
+        inviterName: profile?.display_name ?? "An administrator",
+        role: input.role,
+        token,
+        expiresAt: input.expires_at,
+      },
+      mailbox,
+      appBaseUrl,
+    );
   } catch (emailError) {
     const invitationId = (data as { id?: string } | null)?.id;
     if (invitationId) {
@@ -167,19 +291,15 @@ async function createInvitation(
     const detail = emailError instanceof Error
       ? emailError.message
       : "unknown";
-    console.error("System invitation email failed", {
+    console.error("Mailbox invitation email failed", {
       request_id: requestId,
+      mailbox_id: mailbox.mailboxId,
       error: detail,
     });
-    const misconfigured =
-      /is not configured|SYSTEM_SMTP|APP_BASE_URL|SYSTEM_SMTP_SECURITY must be/i
-        .test(detail);
     throw new ApiError(
-      misconfigured ? 503 : 502,
-      misconfigured ? "SERVICE_UNAVAILABLE" : "UPSTREAM_ERROR",
-      misconfigured
-        ? "Invitation email is not configured on this environment"
-        : "Invitation email could not be delivered",
+      502,
+      "UPSTREAM_ERROR",
+      "Invitation email could not be delivered via your mailbox SMTP",
     );
   }
 

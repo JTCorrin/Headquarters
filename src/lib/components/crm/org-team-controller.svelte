@@ -10,6 +10,10 @@
 		ApiOrganisationMemberPatch
 	} from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
+	import {
+		isMailboxOutboundReady,
+		MAILBOX_OUTBOUND_REQUIRED_MESSAGE
+	} from '$lib/org/mailbox-outbound.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { canManageOrganisationAccess, type MembershipRole } from '$lib/schemas/organisation.js';
 	import AppShell from './app-shell.svelte';
@@ -27,6 +31,7 @@
 
 	let members = $state<ApiOrganisationManagedMember[]>([]);
 	let invitations = $state<ApiOrganisationInvitation[]>([]);
+	let outboundReady = $state<boolean | null>(null);
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let actionError = $state<string | null>(null);
 
@@ -78,13 +83,23 @@
 				};
 				return;
 			}
-			const [memberRows, invitationRows] = await Promise.all([
+			const [memberRows, invitationRows, mailbox] = await Promise.all([
 				api.organisationAccess.listMembers(),
-				api.organisationAccess.listInvitations()
+				api.organisationAccess.listInvitations(),
+				api.mailbox.get().catch((error: unknown) => {
+					if (
+						isApiClientError(error) &&
+						(error.status === 404 || error.code === 'NOT_FOUND')
+					) {
+						return null;
+					}
+					throw error;
+				})
 			]);
 			if (orgId !== session.selectedOrgId || generation !== session.cacheGeneration) return;
 			members = memberRows;
 			invitations = pending(invitationRows);
+			outboundReady = isMailboxOutboundReady(mailbox);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (orgId !== session.selectedOrgId || generation !== session.cacheGeneration) return;
@@ -97,6 +112,10 @@
 
 	async function invite(email: string, inviteRole: ApiOrganisationAccessRole): Promise<boolean> {
 		actionError = null;
+		if (outboundReady !== true) {
+			actionError = MAILBOX_OUTBOUND_REQUIRED_MESSAGE;
+			return false;
+		}
 		try {
 			const created = await api.organisationAccess.invite({ email, role: inviteRole });
 			invitations = [created, ...invitations.filter((row) => row.id !== created.id)];
@@ -121,6 +140,10 @@
 
 	async function resendInvitation(invitation: ApiOrganisationInvitation): Promise<boolean> {
 		actionError = null;
+		if (outboundReady !== true) {
+			actionError = MAILBOX_OUTBOUND_REQUIRED_MESSAGE;
+			return false;
+		}
 		try {
 			await api.organisationAccess.revokeInvitation(invitation.id);
 			const created = await api.organisationAccess.invite({
@@ -192,6 +215,7 @@
 	function switchOrg(orgId: string): void {
 		members = [];
 		invitations = [];
+		outboundReady = null;
 		session.selectOrg(orgId);
 		void loadAll();
 	}
@@ -216,6 +240,7 @@
 				{currentMembershipId}
 				{members}
 				{invitations}
+				{outboundReady}
 				{viewState}
 				{actionError}
 				onReload={loadAll}
