@@ -13,55 +13,29 @@ export type SystemInvitationEmail = {
   expiresAt: string;
 };
 
-function requiredEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) throw new Error(`${name} is not configured`);
-  return value;
-}
-
-function optionalEnv(name: string): string {
-  return Deno.env.get(name)?.trim() ?? "";
-}
-
-function systemSmtpConfig(): {
+export type MailboxSmtpSender = {
+  mailboxId: string;
   host: string;
   port: number;
   security: SmtpSecurity;
   username: string;
   password: string;
   from: string;
-  appBaseUrl: string;
-} {
-  const security =
-    (Deno.env.get("SYSTEM_SMTP_SECURITY") ?? "starttls") as SmtpSecurity;
-  if (!["tls", "starttls", "none"].includes(security)) {
-    throw new Error("SYSTEM_SMTP_SECURITY must be tls, starttls, or none");
+};
+
+export function resolveAppBaseUrl(req: Request): string {
+  const fromEnv = Deno.env.get("APP_BASE_URL")?.trim();
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  const origin = req.headers.get("origin")?.trim();
+  if (origin && /^https?:\/\//i.test(origin)) {
+    return origin.replace(/\/+$/, "");
   }
-  const port = Number(
-    Deno.env.get("SYSTEM_SMTP_PORT") ?? (security === "tls" ? "465" : "587"),
-  );
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("SYSTEM_SMTP_PORT is invalid");
-  }
-  return {
-    host: requiredEnv("SYSTEM_SMTP_HOST"),
-    port,
-    security,
-    username: optionalEnv("SYSTEM_SMTP_USERNAME"),
-    password: optionalEnv("SYSTEM_SMTP_PASSWORD"),
-    from: requiredEnv("SYSTEM_SMTP_FROM"),
-    appBaseUrl: requiredEnv("APP_BASE_URL").replace(/\/+$/, ""),
-  };
+  throw new Error("APP_BASE_URL is not configured");
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        character
-      ]!,
-  );
+export function parseSmtpSecurity(raw: unknown): SmtpSecurity {
+  if (raw === "tls" || raw === "starttls" || raw === "none") return raw;
+  throw new Error("Mailbox SMTP security is invalid");
 }
 
 export function invitationEmailContent(
@@ -97,23 +71,34 @@ export function invitationEmailContent(
   return { subject, bodyText, bodyHtml, acceptUrl };
 }
 
-export async function sendSystemInvitationEmail(
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        character
+      ]!,
+  );
+}
+
+/** Send an invitation using the inviter's personal mailbox SMTP (never platform SYSTEM_SMTP). */
+export async function sendMailboxInvitationEmail(
   input: SystemInvitationEmail,
+  mailbox: MailboxSmtpSender,
+  appBaseUrl: string,
 ): Promise<void> {
-  const config = systemSmtpConfig();
-  const content = invitationEmailContent(input, config.appBaseUrl);
+  const content = invitationEmailContent(input, appBaseUrl);
   await sendSmtpMail({
-    host: config.host,
-    port: config.port,
-    security: config.security,
-    username: config.username,
-    password: config.password,
-    from: config.from,
+    host: mailbox.host,
+    port: mailbox.port,
+    security: mailbox.security,
+    username: mailbox.username,
+    password: mailbox.password,
+    from: mailbox.from,
     to: input.to,
     subject: content.subject,
     bodyText: content.bodyText,
     bodyHtml: content.bodyHtml,
-    messageId: generateOutboundMessageId(config.from),
-    allowPrivateHost: true,
+    messageId: generateOutboundMessageId(mailbox.from),
   });
 }
