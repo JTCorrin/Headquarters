@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   frontend:
-    name: Vitest, SvelteKit build, Storybook
+    name: Vitest, coverage, E2E, build, and static checks
     if: forgejo.event_name == 'workflow_dispatch' || forgejo.event.pull_request.head.repo.full_name == forgejo.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -52,15 +52,20 @@ jobs:
           PUBLIC_API_BASE_URL: ''
         run: |
           # Serialize Vitest projects so client + storybook browser servers cannot race
-          # Vite/Rolldown optimizeDeps on a cold CI cache. All three projects = full 65-file suite.
-          pnpm exec vitest run --project server
-          pnpm exec vitest run --project client
+          # Vite/Rolldown optimizeDeps on a cold CI cache.
+          pnpm exec vitest run --coverage --project server
+          pnpm exec vitest run --coverage --project client
           pnpm exec vitest run --project storybook
 
       - name: Production SvelteKit build (no PUBLIC_API_BASE_URL)
         env:
           PUBLIC_API_BASE_URL: ''
         run: pnpm build
+
+      - name: Playwright end-to-end tests
+        env:
+          PUBLIC_API_BASE_URL: ''
+        run: pnpm exec playwright test
 
       - name: Storybook build (no PUBLIC_API_BASE_URL)
         env:

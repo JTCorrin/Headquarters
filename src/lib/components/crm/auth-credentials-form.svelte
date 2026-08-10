@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { fromAction } from 'svelte/attachments';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { AuthCredentialsData } from '$lib/schemas/auth.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -11,6 +12,7 @@
 		form: SuperForm<AuthCredentialsData>;
 		submitLabel: string;
 		errorMessage?: string | null;
+		showDisplayName?: boolean;
 		/** HTML autocomplete for the password field. */
 		passwordAutocomplete?: 'current-password' | 'new-password';
 		class?: string;
@@ -21,6 +23,7 @@
 		form,
 		submitLabel,
 		errorMessage = null,
+		showDisplayName = false,
 		passwordAutocomplete = 'current-password',
 		class: className,
 		onValidSubmit
@@ -34,13 +37,7 @@
 	let pendingSubmit = $state(false);
 	let submitLock = false;
 	const busy = $derived($submitting || pendingSubmit);
-</script>
-
-<form
-	method="POST"
-	class={cn('space-y-4', className)}
-	data-testid="auth-credentials-form"
-	use:enhance={{
+	const enhancedForm = fromAction(enhance, () => ({
 		async onUpdate({ form: validated }) {
 			if (!validated.valid) return;
 			if (submitLock) return false;
@@ -55,12 +52,38 @@
 				pendingSubmit = false;
 			}
 		}
-	}}
+	}));
+</script>
+
+<form
+	method="POST"
+	class={cn('space-y-4', className)}
+	data-testid="auth-credentials-form"
+	{@attach enhancedForm}
 >
 	{#if errorMessage}
-		<p class="text-destructive text-sm" role="alert" data-testid="auth-form-error">
+		<p class="text-sm text-destructive" role="alert" data-testid="auth-form-error">
 			{errorMessage}
 		</p>
+	{/if}
+
+	{#if showDisplayName}
+		<div class="space-y-2">
+			<Label for="auth-display-name">Display name</Label>
+			<Input
+				id="auth-display-name"
+				name="displayName"
+				type="text"
+				autocomplete="name"
+				required
+				bind:value={$formData.displayName}
+				aria-invalid={!!$errors.displayName}
+				data-testid="auth-display-name"
+			/>
+			{#if $errors.displayName}
+				<p class="text-xs text-destructive">{$errors.displayName}</p>
+			{/if}
+		</div>
 	{/if}
 
 	<div class="space-y-2">
@@ -74,7 +97,7 @@
 			aria-invalid={!!$errors.email}
 			data-testid="auth-email"
 		/>
-		{#if $errors.email}<p class="text-destructive text-xs">{$errors.email}</p>{/if}
+		{#if $errors.email}<p class="text-xs text-destructive">{$errors.email}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -88,7 +111,7 @@
 			aria-invalid={!!$errors.password}
 			data-testid="auth-password"
 		/>
-		{#if $errors.password}<p class="text-destructive text-xs">{$errors.password}</p>{/if}
+		{#if $errors.password}<p class="text-xs text-destructive">{$errors.password}</p>{/if}
 	</div>
 
 	<Button type="submit" class="w-full" disabled={busy} data-testid="auth-submit">
