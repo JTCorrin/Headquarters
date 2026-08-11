@@ -16,6 +16,7 @@
 	let formError = $state<string | null>(null);
 	const next = $derived(safeNextPath(page.url.searchParams.get('next')));
 	const nextQuery = $derived(next === '/' ? '' : `?next=${encodeURIComponent(next)}`);
+	const invitedLogin = $derived(next.startsWith('/invite/accept'));
 	const callbackError = $derived(page.url.searchParams.get('error'));
 	const displayedError = $derived(formError ?? callbackError);
 
@@ -46,11 +47,20 @@
 </script>
 
 <div class="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center gap-6 p-6">
-	<PageHeader title="Sign in" description="Email and password for Headquarters." />
+	<PageHeader
+		title="Sign in"
+		description={invitedLogin
+			? 'Sign in with the email that received the invitation, then you’ll return to accept it.'
+			: 'Email and password for Headquarters.'}
+	/>
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Welcome back</Card.Title>
-			<Card.Description>Use the account you created during signup.</Card.Description>
+			<Card.Title>{invitedLogin ? 'Continue to your invitation' : 'Welcome back'}</Card.Title>
+			<Card.Description>
+				{invitedLogin
+					? 'Use the exact verified email the invite was sent to.'
+					: 'Use the account you created during signup.'}
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
 			<AuthCredentialsForm
