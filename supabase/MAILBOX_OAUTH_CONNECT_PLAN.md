@@ -1,6 +1,6 @@
 # Mailbox OAuth for Outlook and Gmail
 
-**Status:** Planned (not implemented)  
+**Status:** Implemented on `dev`  
 **Branch target:** `dev`
 
 ## Overview
