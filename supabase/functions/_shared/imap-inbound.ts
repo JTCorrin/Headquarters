@@ -4,6 +4,8 @@
  * Connect / command / overall deadlines map to error code `timeout` (not imap_connection_failed).
  */
 
+import { buildXoauth2SaslString } from './mailbox-oauth.ts'
+
 export type ImapSecurity = 'tls' | 'starttls' | 'none'
 
 /** Defaults — Edge sync/probe should finish or fail honestly before platform kill. */
@@ -18,12 +20,19 @@ export type ImapTimeoutOptions = {
   overallTimeoutMs?: number
 }
 
+export type ImapAuth =
+  | { type: 'password'; username: string; password: string }
+  | { type: 'xoauth2'; username: string; accessToken: string }
+
 export type ImapFetchOptions = {
   host: string
   port: number
   security: ImapSecurity
-  username: string
-  password: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  username?: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  password?: string
+  auth?: ImapAuth
   lookbackDays: number
   maxMessages: number
   maxBodyBytes: number
@@ -33,8 +42,11 @@ export type ImapProbeOptions = {
   host: string
   port: number
   security: ImapSecurity
-  username: string
-  password: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  username?: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  password?: string
+  auth?: ImapAuth
 } & ImapTimeoutOptions
 
 export type InboundImapMessage = {
@@ -654,6 +666,54 @@ function quoteImapString(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
+function resolveImapAuth(
+  options: { auth?: ImapAuth; username?: string; password?: string },
+): ImapAuth {
+  if (options.auth) return options.auth
+  const username = options.username?.trim() ?? ''
+  const password = options.password ?? ''
+  if (!username || !password) {
+    throw new ImapSyncError(
+      'credentials_missing',
+      'IMAP username and password are required',
+      true,
+      'login',
+    )
+  }
+  return { type: 'password', username, password }
+}
+
+async function imapAuthenticate(
+  session: { command: (cmd: string, label?: string) => Promise<{ status: string; text: string }> },
+  auth: ImapAuth,
+): Promise<void> {
+  if (auth.type === 'password') {
+    const login = await session.command(
+      `LOGIN ${quoteImapString(auth.username)} ${quoteImapString(auth.password)}`,
+    )
+    if (login.status !== 'OK') {
+      throw new ImapSyncError(
+        'imap_auth_failed',
+        `IMAP LOGIN failed: ${login.text}`,
+        true,
+        'login',
+      )
+    }
+    return
+  }
+
+  const sasl = buildXoauth2SaslString(auth.username, auth.accessToken)
+  const login = await session.command(`AUTHENTICATE XOAUTH2 ${sasl}`)
+  if (login.status !== 'OK') {
+    throw new ImapSyncError(
+      'imap_auth_failed',
+      `IMAP XOAUTH2 failed: ${login.text}`,
+      true,
+      'login',
+    )
+  }
+}
+
 export type ImapByteConn = {
   read(p: Uint8Array): Promise<number | null>
   write(p: Uint8Array): Promise<number>
@@ -947,13 +1007,14 @@ function splitFetchBlocks(untagged: string[]): string[] {
 }
 
 /**
- * Live IMAP probe: connect + LOGIN + LOGOUT.
+ * Live IMAP probe: connect + LOGIN/XOAUTH2 + LOGOUT.
  * Throws ImapSyncError (`timeout` / `imap_auth_failed` / `imap_connection_failed` / `imap_tls_failed`).
  */
 export async function probeImap(options: ImapProbeOptions): Promise<void> {
   const connectTimeoutMs = options.connectTimeoutMs ?? IMAP_CONNECT_TIMEOUT_MS
   const commandTimeoutMs = options.commandTimeoutMs ?? IMAP_COMMAND_TIMEOUT_MS
   const overallTimeoutMs = options.overallTimeoutMs ?? IMAP_PROBE_TIMEOUT_MS
+  const auth = resolveImapAuth(options)
 
   await withImapTimeout(
     (async () => {
@@ -965,16 +1026,7 @@ export async function probeImap(options: ImapProbeOptions): Promise<void> {
         commandTimeoutMs,
       )
       try {
-        const login = await session.command(
-          `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
-        )
-        if (login.status !== 'OK') {
-          throw new ImapSyncError(
-            'imap_auth_failed',
-            `IMAP LOGIN failed: ${login.text}`,
-            true,
-          )
-        }
+        await imapAuthenticate(session, auth)
         await session.command('LOGOUT').catch(() => undefined)
       } finally {
         session.close()
@@ -1042,6 +1094,7 @@ async function fetchInboundFromImapInner(
   connectTimeoutMs: number,
   commandTimeoutMs: number,
 ): Promise<InboundImapMessage[]> {
+  const auth = resolveImapAuth(options)
   const session = await openImapConnectionImpl(
     options.host,
     options.port,
@@ -1050,17 +1103,7 @@ async function fetchInboundFromImapInner(
     commandTimeoutMs,
   )
   try {
-    const login = await session.command(
-      `LOGIN ${quoteImapString(options.username)} ${quoteImapString(options.password)}`,
-    )
-    if (login.status !== 'OK') {
-      throw new ImapSyncError(
-        'imap_auth_failed',
-        `IMAP LOGIN failed: ${login.text}`,
-        true,
-        'login',
-      )
-    }
+    await imapAuthenticate(session, auth)
 
     const selected = await session.command('SELECT INBOX', 'IMAP SELECT')
     if (selected.status !== 'OK') {
