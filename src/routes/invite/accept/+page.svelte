@@ -26,6 +26,7 @@
 	let logoutError = $state<string | null>(null);
 	const acceptanceError = $derived(form?.error ?? data.error);
 	const initialAcceptance = untrack(() => form?.acceptance);
+	const authNextQuery = $derived(`?next=${encodeURIComponent(data.nextPath)}`);
 
 	async function finishAcceptance(organisationId: string): Promise<void> {
 		if (refreshing && acceptedOrganisationId === organisationId) return;
@@ -52,11 +53,9 @@
 	async function useDifferentAccount(): Promise<void> {
 		logoutError = null;
 		const next = `${page.url.pathname}${page.url.search}`;
-		logoutError = await logoutAndRedirect(
-			auth,
-			orgSession,
-			resolve(`/login?next=${encodeURIComponent(next)}`)
-		);
+		// Return to this invite page so the guest landing explains signup vs sign-in.
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		logoutError = await logoutAndRedirect(auth, orgSession, next);
 	}
 
 	onMount(() => {
@@ -65,87 +64,132 @@
 </script>
 
 <div class="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center gap-6 p-6">
-	<PageHeader
-		title="Join organisation"
-		description="Accept your invitation using the exact verified email address it was sent to."
-	/>
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>
-				{acceptedOrganisationId
-					? 'Invitation accepted'
-					: acceptanceError
-						? 'Could not accept invitation'
-						: 'Ready to join'}
-			</Card.Title>
-			<Card.Description>
-				{#if refreshing}
-					Refreshing your organisations…
-				{:else if data.userEmail}
-					Signed in as {data.userEmail}
-				{:else}
-					Check the invitation link and account you used.
-				{/if}
-			</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-4">
-			{#if logoutError}
-				<p class="text-sm text-destructive" role="alert">{logoutError}</p>
-			{/if}
-			{#if refreshError && acceptedOrganisationId}
-				<p class="text-sm text-destructive" role="alert">{refreshError}</p>
-				<Button
-					type="button"
-					onclick={() => {
-						if (acceptedOrganisationId) void finishAcceptance(acceptedOrganisationId);
-					}}
-				>
-					Retry refresh
-				</Button>
-			{:else if acceptanceError}
-				<p class="text-sm text-destructive" role="alert" data-testid="invite-accept-error">
-					{acceptanceError.message}
-				</p>
-				{#if acceptanceError.status === 403}
-					<p class="text-sm text-muted-foreground">
-						Sign out and use the exact email address that received the invitation. The invitation
-						token has not been consumed.
+	{#if data.needsAuth}
+		<PageHeader
+			title="You're invited"
+			description="Create a Headquarters account with the email that received this invitation, or sign in if you already have one."
+		/>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>Join with your invited email</Card.Title>
+				<Card.Description>
+					After you sign up or sign in, you'll return here to accept the invitation. Use the exact
+					address the invite was sent to.
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				{#if acceptanceError}
+					<p class="text-sm text-destructive" role="alert" data-testid="invite-accept-error">
+						{acceptanceError.message}
 					</p>
-					<Button type="button" onclick={useDifferentAccount}>Use a different account</Button>
-				{:else}
-					<Button href="/login" variant="outline">Return to sign in</Button>
 				{/if}
-			{:else if acceptedOrganisationId}
-				<p class="text-sm text-muted-foreground">Taking you to the accepted organisation…</p>
-			{:else}
-				<p class="text-sm text-muted-foreground">
-					Continue only if you recognise this invitation and want to join the organisation.
-				</p>
-				<form
-					method="POST"
-					use:enhance={() => {
-						accepting = true;
-						return async ({ result, update }) => {
-							accepting = false;
-							const acceptance =
-								result.type === 'success' ? (result.data as ActionData)?.acceptance : null;
-							if (acceptance) {
-								await finishAcceptance(acceptance.organisation_id);
-								return;
-							}
-							await update({ reset: false, invalidateAll: false });
-						};
-					}}
-				>
+				{#if data.hasToken}
+					<!-- Dynamic next query is sanitized invite path+token from the server. -->
+					<!-- eslint-disable svelte/no-navigation-without-resolve -->
 					<Button
-						type="submit"
-						disabled={accepting || refreshing}
-						data-testid="invite-accept-submit"
+						class="w-full"
+						href={`${resolve('/signup')}${authNextQuery}`}
+						data-testid="invite-goto-signup"
 					>
-						{accepting ? 'Accepting…' : 'Accept invitation'}
+						Create account
 					</Button>
-				</form>
-			{/if}
-		</Card.Content>
-	</Card.Root>
+					<Button
+						class="w-full"
+						variant="outline"
+						href={`${resolve('/login')}${authNextQuery}`}
+						data-testid="invite-goto-login"
+					>
+						Sign in
+					</Button>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
+				{:else}
+					<Button href={resolve('/login')} variant="outline">Return to sign in</Button>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{:else}
+		<PageHeader
+			title="Join organisation"
+			description="Accept your invitation using the exact verified email address it was sent to."
+		/>
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>
+					{acceptedOrganisationId
+						? 'Invitation accepted'
+						: acceptanceError
+							? 'Could not accept invitation'
+							: 'Ready to join'}
+				</Card.Title>
+				<Card.Description>
+					{#if refreshing}
+						Refreshing your organisations…
+					{:else if data.userEmail}
+						Signed in as {data.userEmail}
+					{:else}
+						Check the invitation link and account you used.
+					{/if}
+				</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-4">
+				{#if logoutError}
+					<p class="text-sm text-destructive" role="alert">{logoutError}</p>
+				{/if}
+				{#if refreshError && acceptedOrganisationId}
+					<p class="text-sm text-destructive" role="alert">{refreshError}</p>
+					<Button
+						type="button"
+						onclick={() => {
+							if (acceptedOrganisationId) void finishAcceptance(acceptedOrganisationId);
+						}}
+					>
+						Retry refresh
+					</Button>
+				{:else if acceptanceError}
+					<p class="text-sm text-destructive" role="alert" data-testid="invite-accept-error">
+						{acceptanceError.message}
+					</p>
+					{#if acceptanceError.status === 403}
+						<p class="text-sm text-muted-foreground">
+							Sign out and use the exact email address that received the invitation. The invitation
+							token has not been consumed.
+						</p>
+						<Button type="button" onclick={useDifferentAccount}>Use a different account</Button>
+					{:else}
+						<Button href={resolve('/login')} variant="outline">Return to sign in</Button>
+					{/if}
+				{:else if acceptedOrganisationId}
+					<p class="text-sm text-muted-foreground">Taking you to the accepted organisation…</p>
+				{:else}
+					<p class="text-sm text-muted-foreground">
+						Continue only if you recognise this invitation and want to join the organisation.
+					</p>
+					<form
+						method="POST"
+						use:enhance={() => {
+							accepting = true;
+							return async ({ result, update }) => {
+								accepting = false;
+								const acceptance =
+									result.type === 'success' ? (result.data as ActionData)?.acceptance : null;
+								if (acceptance) {
+									await finishAcceptance(acceptance.organisation_id);
+									return;
+								}
+								await update({ reset: false, invalidateAll: false });
+							};
+						}}
+					>
+						<Button
+							type="submit"
+							disabled={accepting || refreshing}
+							data-testid="invite-accept-submit"
+						>
+							{accepting ? 'Accepting…' : 'Accept invitation'}
+						</Button>
+					</form>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	{/if}
 </div>
