@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type {
 	ApiEnvelope,
 	ApiErrorBody,
@@ -8,15 +8,30 @@ import type { Actions, PageServerLoad } from './$types.js';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const token = url.searchParams.get('token')?.trim() ?? '';
-	const next = `${url.pathname}${url.search}`;
+	const nextPath = `${url.pathname}${url.search}`;
 	const { session, user } = await locals.getValidatedSession();
 
 	if (!session || !user) {
-		redirect(303, `/login?next=${encodeURIComponent(next)}`);
+		return {
+			needsAuth: true as const,
+			hasToken: Boolean(token),
+			nextPath,
+			error: token
+				? null
+				: {
+						status: 422,
+						code: 'VALIDATION_ERROR',
+						message: 'This invitation link is missing its token.'
+					},
+			userEmail: null
+		};
 	}
 
 	if (!token) {
 		return {
+			needsAuth: false as const,
+			hasToken: false,
+			nextPath,
 			error: {
 				status: 422,
 				code: 'VALIDATION_ERROR',
@@ -27,6 +42,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 
 	return {
+		needsAuth: false as const,
+		hasToken: true,
+		nextPath,
 		error: null,
 		userEmail: user.email ?? null
 	};
