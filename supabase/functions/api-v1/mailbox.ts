@@ -8,6 +8,16 @@ import {
   isSyntheticImapHost,
   probeImap,
 } from '../_shared/imap-inbound.ts'
+import { resolveMailboxAuth } from '../_shared/mailbox-credentials.ts'
+import {
+  buildMailboxAuthUrl,
+  exchangeMailboxAuthCode,
+  isMailboxOAuthStubMode,
+  mailboxPresetHosts,
+  type MailboxOAuthProvider,
+  randomOAuthState,
+  serializeMailboxTokenBlob,
+} from '../_shared/mailbox-oauth.ts'
 import { ApiError, jsonBody, jsonResponse, parseLimit } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
@@ -81,6 +91,9 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
   }
   if (error.code === 'P0002' || message.includes('not found')) {
     return new ApiError(404, 'NOT_FOUND', 'Mailbox not found')
+  }
+  if (error.code === 'P0001' || message.includes('oauth state expired')) {
+    return new ApiError(400, 'BAD_REQUEST', 'OAuth state expired — start connect again')
   }
   if (error.code === '22023' || message.includes('password is required')) {
     return new ApiError(422, 'VALIDATION_ERROR', error.message ?? 'Mailbox validation failed')
@@ -234,10 +247,37 @@ function assertNoSecretEcho(payload: unknown): void {
   if (
     /"secret_ref"\s*:/.test(text) ||
     /"password"\s*:/.test(text) ||
-    /"api_key"\s*:/.test(text)
+    /"api_key"\s*:/.test(text) ||
+    /"token_blob"\s*:/.test(text) ||
+    /"access_token"\s*:/.test(text) ||
+    /"refresh_token"\s*:/.test(text)
   ) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Mailbox response contained a forbidden secret field')
   }
+}
+
+function parseOAuthProvider(raw: string | null): MailboxOAuthProvider {
+  const value = (raw ?? '').trim().toLowerCase()
+  if (value === 'microsoft' || value === 'outlook') return 'microsoft'
+  if (value === 'google' || value === 'gmail') return 'google'
+  throw new ApiError(422, 'VALIDATION_ERROR', 'provider must be microsoft or google', {
+    provider: 'Must be microsoft or google',
+  })
+}
+
+function validateOAuthCallbackParams(input: {
+  code: string | null
+  state: string | null
+}): { code: string; state: string } {
+  const fields: Record<string, string> = {}
+  const code = input.code?.trim() ?? ''
+  const state = input.state?.trim() ?? ''
+  if (!code) fields.code = 'Required'
+  if (!state || state.length < 16) fields.state = 'Must be at least 16 characters'
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'OAuth callback validation failed', fields)
+  }
+  return { code, state }
 }
 
 async function getMailbox(
@@ -298,7 +338,7 @@ async function testMailbox(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  // Live IMAP probe (connect + LOGIN + LOGOUT). Never log body / password.
+  // Live IMAP probe (LOGIN or XOAUTH2). Never log body / password / tokens.
   let password: string | null = null
   if (req.headers.get('content-type')?.includes('application/json')) {
     const raw = await req.text()
@@ -327,7 +367,7 @@ async function testMailbox(
       {
         data: mailboxTestFailure(
           'credentials_missing',
-          'Mailbox credentials are missing — save a password, then try Test again.',
+          'Mailbox credentials are missing — connect your account or save a password, then try Test again.',
         ),
       },
       200,
@@ -360,6 +400,7 @@ async function testMailbox(
   const security: ImapSecurity = securityRaw === 'starttls' || securityRaw === 'none'
     ? securityRaw
     : 'tls'
+  const authMode = row.auth_mode === 'oauth' ? 'oauth' : 'password'
 
   // Staging / unit synthetic hosts: credentials-present is enough (no network).
   if (isSyntheticImapHost(imapHost)) {
@@ -376,44 +417,83 @@ async function testMailbox(
     )
   }
 
-  let probePassword = password
-  if (!probePassword) {
-    const service = serviceRoleClient()
-    const { data: creds, error: credError } = await service.rpc('read_mailbox_sync_credentials', {
-      p_mailbox_id: String(row.id),
-    })
-    if (credError) throw databaseError(credError, requestId)
-    const credRow = creds as Record<string, unknown> | null
-    probePassword = typeof credRow?.password === 'string' ? credRow.password : null
-  }
-
-  if (!probePassword) {
-    return jsonResponse(
-      {
-        data: mailboxTestFailure(
-          'credentials_missing',
-          'Mailbox credentials are missing — save a password, then try Test again.',
-        ),
-      },
-      200,
-      requestId,
-    )
-  }
-
-  try {
-    await imapProbeFn({
+  let probeOptions: ImapProbeOptions
+  if (password) {
+    probeOptions = {
       host: imapHost,
       port: imapPort,
       security,
-      username,
-      password: probePassword,
-    })
+      auth: { type: 'password', username, password },
+    }
+  } else if (authMode === 'oauth') {
+    try {
+      const service = serviceRoleClient()
+      const resolved = await resolveMailboxAuth(service, String(row.id))
+      if (!resolved) {
+        return jsonResponse(
+          {
+            data: mailboxTestFailure(
+              'credentials_missing',
+              'Mailbox OAuth credentials are missing — reconnect your account, then try Test again.',
+            ),
+          },
+          200,
+          requestId,
+        )
+      }
+      probeOptions = {
+        host: imapHost,
+        port: imapPort,
+        security,
+        auth: resolved.imapAuth,
+      }
+    } catch (err) {
+      console.error('Mailbox OAuth resolve failed during test', {
+        request_id: requestId,
+        message: err instanceof Error ? err.message : 'unknown',
+      })
+      return jsonResponse(
+        {
+          data: mailboxTestFailure(
+            'imap_auth_failed',
+            'Sign-in failed — reconnect your Microsoft or Google account.',
+          ),
+        },
+        200,
+        requestId,
+      )
+    }
+  } else {
+    const service = serviceRoleClient()
+    const resolved = await resolveMailboxAuth(service, String(row.id))
+    if (!resolved || resolved.imapAuth.type !== 'password') {
+      return jsonResponse(
+        {
+          data: mailboxTestFailure(
+            'credentials_missing',
+            'Mailbox credentials are missing — save a password, then try Test again.',
+          ),
+        },
+        200,
+        requestId,
+      )
+    }
+    probeOptions = {
+      host: imapHost,
+      port: imapPort,
+      security,
+      auth: resolved.imapAuth,
+    }
+  }
+
+  try {
+    await imapProbeFn(probeOptions)
     return jsonResponse(
       {
         data: {
           ok: true,
           error_code: null,
-          message: 'IMAP login succeeded.',
+          message: authMode === 'oauth' ? 'IMAP OAuth login succeeded.' : 'IMAP login succeeded.',
         },
       },
       200,
@@ -423,8 +503,9 @@ async function testMailbox(
     if (probeError instanceof ImapSyncError) {
       const messages: Record<string, string> = {
         timeout: 'Mail server timed out — check host, port, security, and network path.',
-        imap_auth_failed:
-          'Sign-in failed — check the email address and password (or app password).',
+        imap_auth_failed: authMode === 'oauth'
+          ? 'Sign-in failed — reconnect your Microsoft or Google account.'
+          : 'Sign-in failed — check the email address and password (or app password).',
         imap_tls_failed:
           'Secure connection failed — try a different security setting (SSL / STARTTLS).',
         imap_connection_failed:
@@ -455,6 +536,134 @@ async function testMailbox(
       requestId,
     )
   }
+}
+
+async function oauthStart(
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+  req: Request,
+): Promise<Response> {
+  const url = new URL(req.url)
+  const provider = parseOAuthProvider(url.searchParams.get('provider'))
+  const state = randomOAuthState()
+  const { error } = await db.rpc('create_mailbox_oauth_state', {
+    p_org_id: orgId,
+    p_state: state,
+    p_provider: provider,
+    p_ttl_seconds: 600,
+  })
+  if (error) throw databaseError(error, requestId)
+
+  if (isMailboxOAuthStubMode()) {
+    const callback = new URL(
+      `${url.origin}${url.pathname.replace(/\/oauth\/start$/, '/oauth/callback')}`,
+    )
+    const configured = provider === 'microsoft'
+      ? Deno.env.get('MICROSOFT_MAILBOX_REDIRECT_URI')?.trim()
+      : Deno.env.get('GOOGLE_MAILBOX_REDIRECT_URI')?.trim()
+    const redirectBase = configured && configured.length > 0 ? configured : callback.toString()
+    const stubUrl = new URL(redirectBase)
+    stubUrl.searchParams.set('code', 'stub')
+    stubUrl.searchParams.set('state', state)
+    stubUrl.searchParams.set('provider', provider)
+    return jsonResponse({ data: { url: stubUrl.toString(), state, provider } }, 200, requestId)
+  }
+
+  try {
+    const authorizeUrl = buildMailboxAuthUrl({ provider, state })
+    return jsonResponse(
+      { data: { url: authorizeUrl, state, provider } },
+      200,
+      requestId,
+    )
+  } catch (err) {
+    console.error('Mailbox OAuth start failed', {
+      request_id: requestId,
+      provider,
+      message: err instanceof Error ? err.message : 'unknown',
+    })
+    throw new ApiError(
+      503,
+      'INTERNAL_ERROR',
+      `${provider === 'microsoft' ? 'Microsoft' : 'Google'} mailbox OAuth is not configured on this environment`,
+    )
+  }
+}
+
+async function oauthCallback(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const url = new URL(req.url)
+  let code: string | null = url.searchParams.get('code')
+  let state: string | null = url.searchParams.get('state')
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json() as Record<string, unknown>
+      if (typeof body.code === 'string') code = body.code
+      if (typeof body.state === 'string') state = body.state
+    } catch {
+      // keep query params
+    }
+  }
+  const params = validateOAuthCallbackParams({ code, state })
+
+  const { data: consumed, error: consumeError } = await db.rpc('consume_mailbox_oauth_state', {
+    p_org_id: orgId,
+    p_state: params.state,
+  })
+  if (consumeError) throw databaseError(consumeError, requestId)
+  const providerRaw = (consumed as { provider?: string } | null)?.provider ?? null
+  const provider = parseOAuthProvider(providerRaw)
+
+  let tokenBlob: string
+  let accountEmail: string
+  if (isMailboxOAuthStubMode() && params.code === 'stub') {
+    accountEmail = provider === 'microsoft'
+      ? 'mailbox-stub@outlook.example.test'
+      : 'mailbox-stub@gmail.example.test'
+    tokenBlob = serializeMailboxTokenBlob({
+      stub: true,
+      refresh_token: 'stub-refresh',
+      access_token: 'stub-access',
+      account_email: accountEmail,
+    })
+  } else {
+    try {
+      const exchanged = await exchangeMailboxAuthCode(provider, params.code)
+      tokenBlob = serializeMailboxTokenBlob(exchanged)
+      accountEmail = exchanged.account_email
+    } catch (err) {
+      console.error('Mailbox OAuth exchange failed', {
+        request_id: requestId,
+        provider,
+        message: err instanceof Error ? err.message : 'unknown',
+      })
+      throw new ApiError(502, 'INTERNAL_ERROR', 'Mailbox OAuth token exchange failed')
+    }
+  }
+
+  const hosts = mailboxPresetHosts(provider)
+  const { data, error } = await db.rpc('upsert_mailbox_account_oauth', {
+    p_org_id: orgId,
+    p_provider: provider,
+    p_token_blob: tokenBlob,
+    p_email_address: accountEmail,
+    p_from_name: null,
+    p_imap_host: hosts.imap_host,
+    p_imap_port: hosts.imap_port,
+    p_imap_security: hosts.imap_security,
+    p_smtp_host: hosts.smtp_host,
+    p_smtp_port: hosts.smtp_port,
+    p_smtp_security: hosts.smtp_security,
+    p_username: accountEmail,
+  })
+  if (error) throw databaseError(error, requestId)
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
 }
 
 export async function listMyEmailMessages(
@@ -572,6 +781,24 @@ export function handleMailbox(
   if (path === '/api/v1/me/mailbox/test') {
     if (req.method === 'POST') return testMailbox(req, db, orgId, requestId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for mailbox test')
+  }
+
+  if (path === '/api/v1/me/mailbox/oauth/start') {
+    if (req.method !== 'GET') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for mailbox OAuth start')
+    }
+    return oauthStart(db, orgId, requestId, req)
+  }
+
+  if (path === '/api/v1/me/mailbox/oauth/callback') {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for mailbox OAuth callback',
+      )
+    }
+    return oauthCallback(req, db, orgId, requestId)
   }
 
   throw new ApiError(404, 'NOT_FOUND', 'Route not found')

@@ -1,6 +1,7 @@
 import {
   generateOutboundMessageId,
   sendSmtpMail,
+  type SmtpAuth,
   type SmtpSecurity,
 } from "./smtp-outbound.ts";
 
@@ -18,8 +19,7 @@ export type MailboxSmtpSender = {
   host: string;
   port: number;
   security: SmtpSecurity;
-  username: string;
-  password: string;
+  auth: SmtpAuth;
   from: string;
 };
 
@@ -92,8 +92,7 @@ export async function sendMailboxInvitationEmail(
     host: mailbox.host,
     port: mailbox.port,
     security: mailbox.security,
-    username: mailbox.username,
-    password: mailbox.password,
+    auth: mailbox.auth,
     from: mailbox.from,
     to: input.to,
     subject: content.subject,
