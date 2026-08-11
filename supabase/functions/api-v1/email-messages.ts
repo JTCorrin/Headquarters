@@ -10,6 +10,7 @@ import {
   isSyntheticImapHost,
   safeMailboxSyncFailureMessage,
 } from '../_shared/imap-inbound.ts'
+import { resolveMailboxAuth } from '../_shared/mailbox-credentials.ts'
 import {
   generateOutboundMessageId,
   isSyntheticSmtpHost,
@@ -270,28 +271,21 @@ async function replyEmailMessage(
 
   try {
     const service = serviceRoleClient()
-    const { data: creds, error: credError } = await service.rpc('read_mailbox_sync_credentials', {
-      p_mailbox_id: mailboxId,
-    })
-    if (credError) throw credError
-    const row = creds as Record<string, unknown> | null
-    const password = typeof row?.password === 'string' ? row.password : null
-    const username = String(row?.username ?? mailbox.username ?? '')
-    if (!password) {
+    const resolved = await resolveMailboxAuth(service, mailboxId)
+    if (!resolved) {
       await abortReplyClaim(db, orgId, keyHash)
       throw new ApiError(422, 'VALIDATION_ERROR', 'Mailbox credentials are not configured', {
-        mailbox: 'Password required to send mail',
+        mailbox: 'Connect your mailbox or save a password to send mail',
       })
     }
 
-    const security = parseSmtpSecurity(row?.smtp_security ?? mailbox.smtp_security)
+    const security = parseSmtpSecurity(resolved.row.smtp_security ?? mailbox.smtp_security)
     smtpReached = true
     await smtpMailSender({
       host: smtpHost,
       port: smtpPort,
       security,
-      username,
-      password,
+      auth: resolved.smtpAuth,
       from: fromAddress,
       to: toAddress,
       subject,
@@ -506,17 +500,11 @@ export async function runMailboxSyncCycle(
       }
       ingested = await ingestInboundMessages(service, orgId, mailboxId, synthetic)
     } else {
-      const { data: creds, error: credError } = await service.rpc(
-        'read_mailbox_sync_credentials',
-        { p_mailbox_id: mailboxId },
-      )
-      if (credError) throw credError
-      const row = creds as Record<string, unknown> | null
-      const password = typeof row?.password === 'string' ? row.password : null
-      if (!password) {
+      const resolved = await resolveMailboxAuth(service, mailboxId)
+      if (!resolved) {
         errorCode = 'credentials_missing'
       } else {
-        const securityRaw = String(row?.imap_security ?? 'tls')
+        const securityRaw = String(resolved.row.imap_security ?? 'tls')
         const security: ImapSecurity = securityRaw === 'starttls' || securityRaw === 'none'
           ? securityRaw
           : 'tls'
@@ -524,8 +512,7 @@ export async function runMailboxSyncCycle(
           host: imapHost,
           port: Number(claimed.imap_port ?? 993),
           security,
-          username: String(row?.username ?? claimed.username ?? ''),
-          password,
+          auth: resolved.imapAuth,
           lookbackDays,
           maxMessages,
           maxBodyBytes: maxBody,

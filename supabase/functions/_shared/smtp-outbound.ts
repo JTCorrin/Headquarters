@@ -4,6 +4,7 @@
  */
 
 import { assertSafeOutboundHost, isSyntheticImapHost, withImapTimeout } from './imap-inbound.ts'
+import { buildXoauth2SaslString } from './mailbox-oauth.ts'
 
 export type SmtpSecurity = 'tls' | 'starttls' | 'none'
 
@@ -18,12 +19,19 @@ export class SmtpSendError extends Error {
   }
 }
 
+export type SmtpAuth =
+  | { type: 'password'; username: string; password: string }
+  | { type: 'xoauth2'; username: string; accessToken: string }
+
 export type SmtpSendOptions = {
   host: string
   port: number
   security: SmtpSecurity
-  username: string
-  password: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  username?: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  password?: string
+  auth?: SmtpAuth
   from: string
   to: string
   subject: string
@@ -350,6 +358,31 @@ async function smtpAuthLogin(
   await session.expect([235], 'SMTP AUTH password')
 }
 
+async function smtpAuthXoauth2(
+  session: SmtpSession,
+  username: string,
+  accessToken: string,
+): Promise<void> {
+  const sasl = buildXoauth2SaslString(username, accessToken)
+  await session.writeLine(`AUTH XOAUTH2 ${sasl}`)
+  await session.expect([235], 'SMTP AUTH XOAUTH2')
+}
+
+function resolveSmtpAuth(options: SmtpSendOptions): SmtpAuth | null {
+  if (options.auth) return options.auth
+  if (options.username || options.password) {
+    if (!options.username || !options.password) {
+      throw new SmtpSendError(
+        'smtp_auth_incomplete',
+        'SMTP username and password must both be configured',
+        'auth',
+      )
+    }
+    return { type: 'password', username: options.username, password: options.password }
+  }
+  return null
+}
+
 /**
  * Deliver one message via SMTP. Synthetic `*.example.test` hosts short-circuit
  * without opening a socket (staging/Deno proofs).
@@ -384,15 +417,11 @@ export async function sendSmtpMail(
   try {
     await session.writeLine('EHLO crm.local')
     await session.expect([250], 'SMTP EHLO')
-    if (options.username || options.password) {
-      if (!options.username || !options.password) {
-        throw new SmtpSendError(
-          'smtp_auth_incomplete',
-          'SMTP username and password must both be configured',
-          'auth',
-        )
-      }
-      await smtpAuthLogin(session, options.username, options.password)
+    const auth = resolveSmtpAuth(options)
+    if (auth?.type === 'password') {
+      await smtpAuthLogin(session, auth.username, auth.password)
+    } else if (auth?.type === 'xoauth2') {
+      await smtpAuthXoauth2(session, auth.username, auth.accessToken)
     }
 
     await session.writeLine(`MAIL FROM:<${options.from}>`)

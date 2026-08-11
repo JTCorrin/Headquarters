@@ -38,6 +38,20 @@ Generate database types after a successful reset:
 supabase gen types typescript --local > src/lib/types/database.generated.ts
 ```
 
+## Personal mailbox OAuth
+
+Outlook / Microsoft 365 and Gmail connect via OAuth in **My settings → Mail**.
+See [`MAILBOX_OAUTH_CONNECT_PLAN.md`](./MAILBOX_OAUTH_CONNECT_PLAN.md).
+
+Edge secrets (separate from Supabase Auth social login and calendar OAuth):
+
+- `MICROSOFT_MAILBOX_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI`
+- `GOOGLE_MAILBOX_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI`
+- `MAILBOX_OAUTH_STAGING_STUB` (optional; stub code exchange for CI)
+
+Redirect URIs must match the app route `/settings/mailbox-oauth/callback`.
+Azure app needs delegated `IMAP.AccessAsUser.All` + `SMTP.Send`; Google needs
+`https://mail.google.com/` scope.
 The Edge Function currently carries a bootstrap subset in `functions/_shared/database.ts`. Replace
 that subset with generated types in the first Docker-capable follow-up and verify generation in CI.
 

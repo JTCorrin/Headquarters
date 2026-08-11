@@ -113,6 +113,8 @@ import type {
 	ApiOrgMember,
 	ApiUserNotification,
 	ApiMailboxAccount,
+	ApiMailboxOAuthProvider,
+	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
@@ -584,6 +586,14 @@ export interface MailboxEndpoints {
 	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
 	sync(signal?: AbortSignal): Promise<ApiMailboxSyncResult>;
 	disconnect(signal?: AbortSignal): Promise<void>;
+	startOAuth(
+		provider: ApiMailboxOAuthProvider,
+		signal?: AbortSignal
+	): Promise<ApiMailboxOAuthStart>;
+	completeOAuth(
+		body: { code: string; state: string },
+		signal?: AbortSignal
+	): Promise<ApiMailboxAccount>;
 }
 
 /** Personal calendar (Google OAuth + CalDAV credentials) — never echoes secrets. */

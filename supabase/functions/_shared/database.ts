@@ -1039,6 +1039,8 @@ export type MailboxAccountRow = {
   sync_lease_until: string | null
   sync_lease_holder: string | null
   consecutive_auth_failures: number
+  auth_mode: 'password' | 'oauth'
+  oauth_provider: 'microsoft' | 'google' | null
 }
 
 /** Public SELECT shape — secret_ref intentionally omitted. */
@@ -2717,6 +2719,40 @@ export type Database = {
           p_password?: string | null
         }
         Returns: Json
+      }
+      upsert_mailbox_account_oauth: {
+        Args: {
+          p_org_id: string
+          p_provider: string
+          p_token_blob: string
+          p_email_address: string
+          p_from_name?: string | null
+          p_imap_host?: string | null
+          p_imap_port?: number | null
+          p_imap_security?: string | null
+          p_smtp_host?: string | null
+          p_smtp_port?: number | null
+          p_smtp_security?: string | null
+          p_username?: string | null
+        }
+        Returns: Json
+      }
+      create_mailbox_oauth_state: {
+        Args: {
+          p_org_id: string
+          p_state: string
+          p_provider: string
+          p_ttl_seconds?: number
+        }
+        Returns: undefined
+      }
+      consume_mailbox_oauth_state: {
+        Args: { p_org_id: string; p_state: string }
+        Returns: Json
+      }
+      update_mailbox_oauth_token_blob: {
+        Args: { p_mailbox_id: string; p_token_blob: string }
+        Returns: undefined
       }
       disconnect_mailbox_account: {
         Args: { p_org_id: string }
