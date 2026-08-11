@@ -1099,6 +1099,11 @@ export function toMailboxAccountResource(
 		smtp_security: account.smtp_security,
 		credentials_configured: account.credentials_configured,
 		status: account.status,
+		auth_mode: account.auth_mode === 'oauth' ? 'oauth' : 'password',
+		oauth_provider:
+			account.oauth_provider === 'microsoft' || account.oauth_provider === 'google'
+				? account.oauth_provider
+				: null,
 		last_checked_at: account.last_checked_at,
 		last_error_code: account.last_error_code
 	};

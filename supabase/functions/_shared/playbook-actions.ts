@@ -3,6 +3,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from './database.ts'
+import { resolveMailboxAuth } from './mailbox-credentials.ts'
 import { generateOutboundMessageId, sendSmtpMail, type SmtpSecurity } from './smtp-outbound.ts'
 import type { GraphNode } from './playbook-runtime.ts'
 
@@ -238,17 +239,14 @@ async function executeEmailSend(
     return { ok: true, result: { skipped: true, reason: 'duplicate_send', dedupe_key: dedupeKey } }
   }
 
-  const { data: creds, error: credError } = await ctx.db.rpc('read_mailbox_sync_credentials', {
-    p_mailbox_id: mailboxId,
-  })
-  if (credError) return { ok: false, error: credError.message }
-  const c = asRecord(creds)
-  const host = String(c.smtp_host ?? '')
-  const port = Number(c.smtp_port)
-  const security = String(c.smtp_security ?? 'tls') as SmtpSecurity
-  const username = String(c.username ?? '')
-  const password = typeof c.password === 'string' ? c.password : ''
-  const from = String(c.email_address ?? '')
+  const resolved = await resolveMailboxAuth(ctx.db, mailboxId)
+  if (!resolved) {
+    return { ok: false, error: 'Mailbox credentials are not configured' }
+  }
+  const host = resolved.row.smtp_host
+  const port = resolved.row.smtp_port
+  const security = (resolved.row.smtp_security ?? 'tls') as SmtpSecurity
+  const from = resolved.email_address || resolved.row.email_address
   if (!host || !Number.isFinite(port) || !from) {
     return { ok: false, error: 'Mailbox SMTP configuration incomplete' }
   }
@@ -259,8 +257,7 @@ async function executeEmailSend(
       host,
       port,
       security,
-      username,
-      password,
+      auth: resolved.smtpAuth,
       from,
       to: toEmail,
       subject: template.subject,

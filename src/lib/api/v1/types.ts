@@ -1519,8 +1519,18 @@ export interface ApiMailboxAccount {
 	smtp_security: 'tls' | 'starttls' | 'none';
 	credentials_configured: boolean;
 	status: 'disconnected' | 'configured' | 'ok' | 'error' | 'auth_failed';
+	auth_mode?: 'password' | 'oauth';
+	oauth_provider?: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+}
+
+export type ApiMailboxOAuthProvider = 'microsoft' | 'google';
+
+export interface ApiMailboxOAuthStart {
+	url: string;
+	state: string;
+	provider: ApiMailboxOAuthProvider;
 }
 
 export interface ApiMailboxPutBody {

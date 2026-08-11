@@ -79,6 +79,7 @@
 	let caldavConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
 	let calendarConnectError = $state<string | null>(null);
 	let caldavConnectError = $state<string | null>(null);
+	let mailboxOAuthError = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -416,6 +417,28 @@
 		}
 	}
 
+	async function onConnectMailboxOAuth(provider: 'microsoft' | 'google') {
+		const epoch = captureEpoch();
+		mailboxOAuthError = null;
+		try {
+			const start = await api.mailbox.startOAuth(provider);
+			if (isStale(epoch)) return false;
+			const redirectUrl = start?.url?.trim() ?? '';
+			if (!redirectUrl) {
+				mailboxOAuthError = 'Mailbox OAuth start did not return a redirect URL.';
+				return false;
+			}
+			if (browser) {
+				window.location.assign(redirectUrl);
+			}
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			mailboxOAuthError = userMessage(error, 'Could not start mailbox connect.');
+			return false;
+		}
+	}
+
 	async function onConnectCalendar() {
 		const epoch = captureEpoch();
 		calendarConnectError = null;
@@ -618,6 +641,8 @@
 				{onTestMailbox}
 				{onSyncMailbox}
 				{onDisconnectMailbox}
+				{onConnectMailboxOAuth}
+				{mailboxOAuthError}
 				{onConnectCalendar}
 				{onDisconnectCalendar}
 				{onSaveCaldav}
