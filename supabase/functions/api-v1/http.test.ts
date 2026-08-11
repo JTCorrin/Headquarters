@@ -48,6 +48,7 @@ import {
   validateAiConnectBody,
   validateAiModelBody,
 } from './integrations.ts'
+import { isMailboxOAuthStubMode } from '../_shared/mailbox-oauth.ts'
 import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
@@ -1417,6 +1418,8 @@ Deno.test('google calendar stub client and auth url helpers', async () => {
   assertEquals(parseTokenBlob('raw-refresh').refresh_token, 'raw-refresh')
   assertEquals(isCalendarSyncStubMode(() => '1'), true)
   assertEquals(isCalendarSyncStubMode(() => undefined), false)
+  assertEquals(isMailboxOAuthStubMode(() => 'yes'), true)
+  assertEquals(isMailboxOAuthStubMode(() => ''), false)
 })
 
 Deno.test('caldav upsert validation requires url username provider', () => {

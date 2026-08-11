@@ -58,6 +58,10 @@
 			| void
 			| Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
+		onConnectMailboxOAuth?: (
+			provider: 'microsoft' | 'google'
+		) => boolean | void | Promise<boolean | void>;
+		mailboxOAuthError?: string | null;
 		onConnectCalendar?: () => boolean | void | Promise<boolean | void>;
 		onDisconnectCalendar?: () => boolean | void | Promise<boolean | void>;
 		onSaveCaldav?: () => boolean | void | Promise<boolean | void>;
@@ -98,6 +102,8 @@
 		onTestMailbox,
 		onSyncMailbox,
 		onDisconnectMailbox,
+		onConnectMailboxOAuth,
+		mailboxOAuthError = null,
 		onConnectCalendar,
 		onDisconnectCalendar,
 		onSaveCaldav,
@@ -191,7 +197,9 @@
 								<ProfileMailboxForm
 									form={mailboxForm}
 									account={mailboxAccount}
+									oauthError={mailboxOAuthError}
 									onValidSubmit={onSaveMailbox}
+									onConnectOAuth={onConnectMailboxOAuth}
 									onTest={onTestMailbox}
 									onSync={onSyncMailbox}
 									onDisconnect={onDisconnectMailbox}

@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../_shared/database.ts";
+import { resolveMailboxAuth } from "../_shared/mailbox-credentials.ts";
 import {
   parseSmtpSecurity,
   resolveAppBaseUrl,
   sendMailboxInvitationEmail,
+  type MailboxSmtpSender,
 } from "../_shared/system-email.ts";
 import { sha256Hex } from "./api-keys.ts";
 import { ApiError, jsonBody, jsonResponse, parseUuid } from "./http.ts";
@@ -43,15 +45,7 @@ function serviceRoleClient(): SupabaseClient<Database> {
 async function requireInviterMailboxSmtp(
   db: DatabaseClient,
   orgId: string,
-): Promise<{
-  mailboxId: string;
-  host: string;
-  port: number;
-  security: ReturnType<typeof parseSmtpSecurity>;
-  username: string;
-  password: string;
-  from: string;
-}> {
+): Promise<MailboxSmtpSender> {
   const { data: mailbox, error } = await db.rpc("get_mailbox_account", {
     p_org_id: orgId,
   });
@@ -93,24 +87,19 @@ async function requireInviterMailboxSmtp(
   }
 
   const service = serviceRoleClient();
-  const { data: creds, error: credError } = await service.rpc(
-    "read_mailbox_sync_credentials",
-    { p_mailbox_id: row.id },
-  );
-  if (credError) {
+  let resolved;
+  try {
+    resolved = await resolveMailboxAuth(service, row.id);
+  } catch {
     throw new ApiError(
       500,
       "INTERNAL_ERROR",
       "Could not read mailbox credentials",
     );
   }
-  const credentialRow = creds as Record<string, unknown> | null;
-  const password = typeof credentialRow?.password === "string"
-    ? credentialRow.password
-    : "";
-  if (!password) {
+  if (!resolved) {
     throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
-      mailbox: "Mailbox password is required",
+      mailbox: "Mailbox credentials are required",
     });
   }
 
@@ -119,8 +108,7 @@ async function requireInviterMailboxSmtp(
     host: String(row.smtp_host).trim(),
     port,
     security,
-    username: String(credentialRow?.username ?? row.username ?? ""),
-    password,
+    auth: resolved.smtpAuth,
     from: String(row.email_address).trim(),
   };
 }

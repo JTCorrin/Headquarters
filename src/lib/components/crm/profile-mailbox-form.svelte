@@ -23,7 +23,11 @@
 		account?: MailboxAccountResource | null;
 		submitLabel?: string;
 		class?: string;
+		oauthError?: string | null;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onConnectOAuth?: (
+			provider: 'microsoft' | 'google'
+		) => boolean | void | Promise<boolean | void>;
 		onTest?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onSync?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnect?: () => boolean | void | Promise<boolean | void>;
@@ -34,7 +38,9 @@
 		account = null,
 		submitLabel = 'Save mailbox',
 		class: className,
+		oauthError = null,
 		onValidSubmit,
+		onConnectOAuth,
 		onTest,
 		onSync,
 		onDisconnect
@@ -49,11 +55,17 @@
 	let pendingTest = $state(false);
 	let pendingSync = $state(false);
 	let pendingDisconnect = $state(false);
+	let pendingOAuth = $state(false);
 	let testFeedback = $state<MailboxTestFeedback | null>(null);
 	let syncFeedback = $state<MailboxTestFeedback | null>(null);
 	let submitLock = false;
 	const busy = $derived(
-		$submitting || pendingSubmit || pendingTest || pendingSync || pendingDisconnect
+		$submitting ||
+			pendingSubmit ||
+			pendingTest ||
+			pendingSync ||
+			pendingDisconnect ||
+			pendingOAuth
 	);
 
 	const presetLabels: Record<MailboxPreset, string> = {
@@ -71,6 +83,26 @@
 	const presetLabel = $derived(presetLabels[$formData.preset] ?? 'Preset');
 	const imapSecurityLabel = $derived(securityLabels[$formData.imapSecurity] ?? 'Security');
 	const smtpSecurityLabel = $derived(securityLabels[$formData.smtpSecurity] ?? 'Security');
+
+	const oauthPreset = $derived(
+		$formData.preset === 'outlook' || $formData.preset === 'gmail' ? $formData.preset : null
+	);
+	const oauthProvider = $derived<'microsoft' | 'google' | null>(
+		oauthPreset === 'outlook' ? 'microsoft' : oauthPreset === 'gmail' ? 'google' : null
+	);
+	const oauthConnected = $derived(
+		Boolean(
+			account?.credentials_configured &&
+				account.auth_mode === 'oauth' &&
+				((oauthProvider === 'microsoft' && account.oauth_provider === 'microsoft') ||
+					(oauthProvider === 'google' && account.oauth_provider === 'google') ||
+					(!oauthProvider && account.oauth_provider))
+		)
+	);
+	const showPasswordForm = $derived($formData.preset === 'custom');
+	const connectLabel = $derived(
+		oauthProvider === 'microsoft' ? 'Connect with Microsoft' : 'Connect with Google'
+	);
 
 	let lastAppliedPreset = $state<MailboxPreset | null>(null);
 
@@ -122,6 +154,16 @@
 			pendingDisconnect = false;
 		}
 	}
+
+	async function handleConnectOAuth() {
+		if (pendingOAuth || !onConnectOAuth || !oauthProvider) return;
+		pendingOAuth = true;
+		try {
+			await onConnectOAuth(oauthProvider);
+		} finally {
+			pendingOAuth = false;
+		}
+	}
 </script>
 
 <form
@@ -153,14 +195,21 @@
 		<p class="text-foreground font-medium">Personal mailbox</p>
 		<p class="text-muted-foreground mt-1">
 			Connect your own IMAP/SMTP so contact, lead, and client Email tabs can show mail to and from
-			this address. This is separate from organisation Email sending (quotes, invoices, campaigns)
-			under Org → Integrations.
+			this address. Outlook and Gmail use one-click OAuth. Custom providers still use a password or
+			app password. This is separate from organisation Email sending under Org → Integrations.
 		</p>
 	</div>
 
-	{#if account?.credentials_configured}
+	{#if account?.credentials_configured && account.auth_mode === 'password'}
 		<p class="text-muted-foreground text-xs" data-testid="mailbox-credentials-saved">
 			Password saved — leave blank to keep it, or enter a new one to replace.
+		</p>
+	{/if}
+
+	{#if account?.credentials_configured && account.auth_mode === 'oauth'}
+		<p class="text-muted-foreground text-xs" data-testid="mailbox-oauth-connected">
+			Connected via {account.oauth_provider === 'microsoft' ? 'Microsoft' : 'Google'} as
+			{account.email_address}.
 		</p>
 	{/if}
 
@@ -193,133 +242,160 @@
 		</Select.Root>
 	</div>
 
-	<div class="grid gap-4 sm:grid-cols-2">
-		<div class="space-y-2 sm:col-span-2">
-			<Label for="mailbox-email">Email address</Label>
-			<Input
-				id="mailbox-email"
-				name="emailAddress"
-				type="email"
-				bind:value={$formData.emailAddress}
-				disabled={busy}
-				data-testid="mailbox-email"
-			/>
-			{#if $errors.emailAddress}
-				<p class="text-destructive text-xs">{$errors.emailAddress}</p>
-			{/if}
-		</div>
-		<div class="space-y-2">
-			<Label for="mailbox-username">Username</Label>
-			<Input
-				id="mailbox-username"
-				name="username"
-				bind:value={$formData.username}
-				disabled={busy}
-				placeholder="Usually the same as email"
-				data-testid="mailbox-username"
-			/>
-		</div>
-		<div class="space-y-2">
-			<Label for="mailbox-password">Password / app password</Label>
-			<Input
-				id="mailbox-password"
-				name="password"
-				type="password"
-				autocomplete="new-password"
-				bind:value={$formData.password}
-				disabled={busy}
-				placeholder={account?.credentials_configured ? '••••••••' : 'App password'}
-				data-testid="mailbox-password"
-			/>
-			<p class="text-muted-foreground text-xs">Write-only — never shown after save.</p>
-		</div>
-		<div class="space-y-2 sm:col-span-2">
-			<Label for="mailbox-from-name">From name</Label>
-			<Input
-				id="mailbox-from-name"
-				name="fromName"
-				bind:value={$formData.fromName}
-				disabled={busy}
-				data-testid="mailbox-from-name"
-			/>
-		</div>
-	</div>
+	{#if oauthProvider}
+		{#if oauthError}
+			<p class="text-destructive text-sm" role="alert" data-testid="mailbox-oauth-error">
+				{oauthError}
+			</p>
+		{/if}
 
-	<div class="grid gap-4 sm:grid-cols-3">
-		<div class="space-y-2 sm:col-span-2">
-			<Label for="mailbox-imap-host">IMAP host</Label>
-			<Input
-				id="mailbox-imap-host"
-				name="imapHost"
-				bind:value={$formData.imapHost}
-				disabled={busy}
-				data-testid="mailbox-imap-host"
-			/>
-		</div>
-		<div class="space-y-2">
-			<Label for="mailbox-imap-port">IMAP port</Label>
-			<Input
-				id="mailbox-imap-port"
-				name="imapPort"
-				bind:value={$formData.imapPort}
-				disabled={busy}
-				data-testid="mailbox-imap-port"
-			/>
-		</div>
-		<div class="space-y-2 sm:col-span-3">
-			<Label for="mailbox-imap-security">IMAP security</Label>
-			<Select.Root type="single" bind:value={$formData.imapSecurity} disabled={busy}>
-				<Select.Trigger id="mailbox-imap-security" class="w-full" disabled={busy}>
-					{imapSecurityLabel}
-				</Select.Trigger>
-				<Select.Content>
-					{#each mailboxSecurityOptions as option (option)}
-						<Select.Item value={option} label={securityLabels[option]}
-							>{securityLabels[option]}</Select.Item
-						>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
-	</div>
+		{#if !oauthConnected}
+			<div class="flex flex-wrap gap-2">
+				<Button
+					type="button"
+					disabled={busy || !onConnectOAuth}
+					onclick={handleConnectOAuth}
+					data-testid="mailbox-oauth-connect"
+				>
+					{pendingOAuth ? 'Redirecting…' : connectLabel}
+				</Button>
+			</div>
+			<p class="text-muted-foreground text-xs">
+				You’ll sign in with {oauthProvider === 'microsoft' ? 'Microsoft' : 'Google'} and return here.
+				IMAP must be enabled in your provider account settings.
+			</p>
+		{/if}
+	{/if}
 
-	<div class="grid gap-4 sm:grid-cols-3">
-		<div class="space-y-2 sm:col-span-2">
-			<Label for="mailbox-smtp-host">SMTP host</Label>
-			<Input
-				id="mailbox-smtp-host"
-				name="smtpHost"
-				bind:value={$formData.smtpHost}
-				disabled={busy}
-				data-testid="mailbox-smtp-host"
-			/>
+	{#if showPasswordForm}
+		<div class="grid gap-4 sm:grid-cols-2">
+			<div class="space-y-2 sm:col-span-2">
+				<Label for="mailbox-email">Email address</Label>
+				<Input
+					id="mailbox-email"
+					name="emailAddress"
+					type="email"
+					bind:value={$formData.emailAddress}
+					disabled={busy}
+					data-testid="mailbox-email"
+				/>
+				{#if $errors.emailAddress}
+					<p class="text-destructive text-xs">{$errors.emailAddress}</p>
+				{/if}
+			</div>
+			<div class="space-y-2">
+				<Label for="mailbox-username">Username</Label>
+				<Input
+					id="mailbox-username"
+					name="username"
+					bind:value={$formData.username}
+					disabled={busy}
+					placeholder="Usually the same as email"
+					data-testid="mailbox-username"
+				/>
+			</div>
+			<div class="space-y-2">
+				<Label for="mailbox-password">Password / app password</Label>
+				<Input
+					id="mailbox-password"
+					name="password"
+					type="password"
+					autocomplete="new-password"
+					bind:value={$formData.password}
+					disabled={busy}
+					placeholder={account?.credentials_configured ? '••••••••' : 'App password'}
+					data-testid="mailbox-password"
+				/>
+				<p class="text-muted-foreground text-xs">Write-only — never shown after save.</p>
+			</div>
+			<div class="space-y-2 sm:col-span-2">
+				<Label for="mailbox-from-name">From name</Label>
+				<Input
+					id="mailbox-from-name"
+					name="fromName"
+					bind:value={$formData.fromName}
+					disabled={busy}
+					data-testid="mailbox-from-name"
+				/>
+			</div>
 		</div>
-		<div class="space-y-2">
-			<Label for="mailbox-smtp-port">SMTP port</Label>
-			<Input
-				id="mailbox-smtp-port"
-				name="smtpPort"
-				bind:value={$formData.smtpPort}
-				disabled={busy}
-				data-testid="mailbox-smtp-port"
-			/>
+
+		<div class="grid gap-4 sm:grid-cols-3">
+			<div class="space-y-2 sm:col-span-2">
+				<Label for="mailbox-imap-host">IMAP host</Label>
+				<Input
+					id="mailbox-imap-host"
+					name="imapHost"
+					bind:value={$formData.imapHost}
+					disabled={busy}
+					data-testid="mailbox-imap-host"
+				/>
+			</div>
+			<div class="space-y-2">
+				<Label for="mailbox-imap-port">IMAP port</Label>
+				<Input
+					id="mailbox-imap-port"
+					name="imapPort"
+					bind:value={$formData.imapPort}
+					disabled={busy}
+					data-testid="mailbox-imap-port"
+				/>
+			</div>
+			<div class="space-y-2 sm:col-span-3">
+				<Label for="mailbox-imap-security">IMAP security</Label>
+				<Select.Root type="single" bind:value={$formData.imapSecurity} disabled={busy}>
+					<Select.Trigger id="mailbox-imap-security" class="w-full" disabled={busy}>
+						{imapSecurityLabel}
+					</Select.Trigger>
+					<Select.Content>
+						{#each mailboxSecurityOptions as option (option)}
+							<Select.Item value={option} label={securityLabels[option]}
+								>{securityLabels[option]}</Select.Item
+							>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</div>
 		</div>
-		<div class="space-y-2 sm:col-span-3">
-			<Label for="mailbox-smtp-security">SMTP security</Label>
-			<Select.Root type="single" bind:value={$formData.smtpSecurity} disabled={busy}>
-				<Select.Trigger id="mailbox-smtp-security" class="w-full" disabled={busy}>
-					{smtpSecurityLabel}
-				</Select.Trigger>
-				<Select.Content>
-					{#each mailboxSecurityOptions as option (option)}
-						<Select.Item value={option} label={securityLabels[option]}
-							>{securityLabels[option]}</Select.Item
-						>
-					{/each}
-				</Select.Content>
-			</Select.Root>
+
+		<div class="grid gap-4 sm:grid-cols-3">
+			<div class="space-y-2 sm:col-span-2">
+				<Label for="mailbox-smtp-host">SMTP host</Label>
+				<Input
+					id="mailbox-smtp-host"
+					name="smtpHost"
+					bind:value={$formData.smtpHost}
+					disabled={busy}
+					data-testid="mailbox-smtp-host"
+				/>
+			</div>
+			<div class="space-y-2">
+				<Label for="mailbox-smtp-port">SMTP port</Label>
+				<Input
+					id="mailbox-smtp-port"
+					name="smtpPort"
+					bind:value={$formData.smtpPort}
+					disabled={busy}
+					data-testid="mailbox-smtp-port"
+				/>
+			</div>
+			<div class="space-y-2 sm:col-span-3">
+				<Label for="mailbox-smtp-security">SMTP security</Label>
+				<Select.Root type="single" bind:value={$formData.smtpSecurity} disabled={busy}>
+					<Select.Trigger id="mailbox-smtp-security" class="w-full" disabled={busy}>
+						{smtpSecurityLabel}
+					</Select.Trigger>
+					<Select.Content>
+						{#each mailboxSecurityOptions as option (option)}
+							<Select.Item value={option} label={securityLabels[option]}
+								>{securityLabels[option]}</Select.Item
+							>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	{#if testFeedback}
 		<p
@@ -385,8 +461,10 @@
 				{pendingTest ? 'Testing…' : 'Test connection'}
 			</Button>
 		{/if}
-		<Button type="submit" disabled={busy} data-testid="mailbox-submit">
-			{pendingSubmit || $submitting ? 'Saving…' : submitLabel}
-		</Button>
+		{#if showPasswordForm}
+			<Button type="submit" disabled={busy} data-testid="mailbox-submit">
+				{pendingSubmit || $submitting ? 'Saving…' : submitLabel}
+			</Button>
+		{/if}
 	</div>
 </form>
