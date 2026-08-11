@@ -16,6 +16,7 @@
 	let formError = $state<string | null>(null);
 	const next = $derived(safeNextPath(page.url.searchParams.get('next')));
 	const nextQuery = $derived(next === '/' ? '' : `?next=${encodeURIComponent(next)}`);
+	const invitedSignup = $derived(next.startsWith('/invite/accept'));
 
 	const credentialsForm = superForm(
 		defaults({ displayName: '', email: '', password: '' }, zod4(authSignUpSchema)),
@@ -56,14 +57,18 @@
 <div class="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center gap-6 p-6">
 	<PageHeader
 		title="Create account"
-		description="Sign up with email and password, or use SSO / a provider."
+		description={invitedSignup
+			? 'Use the email address that received the invitation, then you’ll return to accept it.'
+			: 'Sign up with email and password, or use SSO / a provider.'}
 	/>
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Get started</Card.Title>
-			<Card.Description
-				>Create your Headquarters login, then set up an organisation.</Card.Description
-			>
+			<Card.Title>{invitedSignup ? 'Join with your invited email' : 'Get started'}</Card.Title>
+			<Card.Description>
+				{invitedSignup
+					? 'After your account is ready, we’ll take you back to the invitation.'
+					: 'Create your Headquarters login, then set up an organisation.'}
+			</Card.Description>
 		</Card.Header>
 		<Card.Content class="space-y-4">
 			<AuthCredentialsForm

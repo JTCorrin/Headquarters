@@ -5,19 +5,36 @@ const url = new URL('https://example.test/invite/accept?token=crm_inv_test');
 const session = { access_token: 'access-token' };
 const user = { id: 'user-id', email: 'invited@example.com' };
 
-function locals() {
+function locals(authenticated = true) {
 	return {
-		getValidatedSession: vi.fn(async () => ({ session, user }))
+		getValidatedSession: vi.fn(async () =>
+			authenticated ? { session, user } : { session: null, user: null }
+		)
 	};
 }
 
 describe('/invite/accept server flow', () => {
-	it('does not consume the invitation during GET load', async () => {
+	it('shows a guest landing instead of forcing login when signed out', async () => {
 		const fetch = vi.fn();
-		const result = await load({ fetch, locals: locals(), url } as never);
+		const result = await load({ fetch, locals: locals(false), url } as never);
 
 		expect(fetch).not.toHaveBeenCalled();
 		expect(result).toMatchObject({
+			needsAuth: true,
+			hasToken: true,
+			nextPath: '/invite/accept?token=crm_inv_test',
+			error: null,
+			userEmail: null
+		});
+	});
+
+	it('does not consume the invitation during GET load when signed in', async () => {
+		const fetch = vi.fn();
+		const result = await load({ fetch, locals: locals(true), url } as never);
+
+		expect(fetch).not.toHaveBeenCalled();
+		expect(result).toMatchObject({
+			needsAuth: false,
 			error: null,
 			userEmail: 'invited@example.com'
 		});
@@ -36,7 +53,7 @@ describe('/invite/accept server flow', () => {
 			})
 		);
 
-		const result = await actions.default({ fetch, locals: locals(), url } as never);
+		const result = await actions.default({ fetch, locals: locals(true), url } as never);
 
 		expect(fetch).toHaveBeenCalledWith(
 			'/api/v1/invitations/accept',
