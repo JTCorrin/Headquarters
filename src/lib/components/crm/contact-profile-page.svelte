@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
+	import type { ContactFormData } from '$lib/schemas/contact.js';
 	import type { DocumentFormData } from '$lib/schemas/document.js';
+	import type { LeadClientOption } from '$lib/schemas/lead.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import ProfileHeader from './profile-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
@@ -14,6 +16,7 @@
 	} from './entity-email-inbox.svelte';
 	import DocumentWorkspaceApiHost from './document-workspace-api-host.svelte';
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
+	import ContactFormDrawer from './contact-form-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
@@ -44,9 +47,13 @@
 		documents?: EntityDocument[];
 		documentForm?: SuperForm<DocumentFormData>;
 		documentDrawerOpen?: boolean;
+		contactForm?: SuperForm<ContactFormData>;
+		clientOptions?: LeadClientOption[];
+		editDrawerOpen?: boolean;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
+		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
@@ -86,8 +93,12 @@
 		documents = $bindable<EntityDocument[]>([]),
 		documentForm,
 		documentDrawerOpen = $bindable(false),
+		contactForm,
+		clientOptions = [],
+		editDrawerOpen = $bindable(false),
 		showNav = true,
 		class: className,
+		onValidSubmit,
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
@@ -121,7 +132,23 @@
 					{#snippet actions()}
 						<Button variant="outline" size="sm">Email</Button>
 						<Button variant="outline" size="sm">Add note</Button>
-						<Button size="sm">Edit</Button>
+						{#if contactForm}
+							<ContactFormDrawer
+								bind:open={editDrawerOpen}
+								form={contactForm}
+								{clientOptions}
+								title="Edit contact"
+								description="Update this contact. Save uses If-Match versioning."
+								submitLabel="Save contact"
+								{onValidSubmit}
+							>
+								{#snippet trigger()}
+									<Button type="button" size="sm" data-testid="contact-edit">Edit</Button>
+								{/snippet}
+							</ContactFormDrawer>
+						{:else}
+							<Button size="sm" data-testid="contact-edit">Edit</Button>
+						{/if}
 					{/snippet}
 				</ProfileHeader>
 			</div>
