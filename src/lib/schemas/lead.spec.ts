@@ -6,6 +6,7 @@ describe('leadFormSchema', () => {
 		const parsed = leadFormSchema.safeParse({
 			name: 'Contoso expansion',
 			companyName: 'Contoso',
+			primaryEmail: 'ava@contoso.test',
 			clientId: '',
 			stage: 'proposal',
 			valueAmount: '18000',
@@ -17,6 +18,19 @@ describe('leadFormSchema', () => {
 			notes: ''
 		});
 		expect(parsed.success).toBe(true);
+	});
+
+	it('rejects invalid primaryEmail', () => {
+		const parsed = leadFormSchema.safeParse({
+			name: 'Bad email',
+			stage: 'new',
+			currency: 'GBP',
+			primaryEmail: 'not-an-email'
+		});
+		expect(parsed.success).toBe(false);
+		if (!parsed.success) {
+			expect(parsed.error.issues.some((i) => i.path.includes('primaryEmail'))).toBe(true);
+		}
 	});
 
 	it('requires lostReason when stage is lost', () => {

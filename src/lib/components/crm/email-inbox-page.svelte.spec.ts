@@ -60,6 +60,10 @@ describe('EmailInboxPage integration', () => {
 					}
 				}),
 				'GET /api/v1/integrations': async () => ({ body: { data: [] } }),
+				'GET /api/v1/clients': async () => ({ body: { data: [], meta: {} } }),
+				'GET /api/v1/organisation/configuration': async () => ({
+					body: { data: { default_currency: 'GBP' } }
+				}),
 				'GET /api/v1/me/email-messages': async (request) => {
 					seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
 					seenPaths.push(new URL(request.url).pathname);
@@ -100,5 +104,10 @@ describe('EmailInboxPage integration', () => {
 			.toBeInTheDocument();
 		expect(seenPaths).toContain('/api/v1/me/email-messages');
 		expect(seenOrgHeaders).toContain(ORG_A);
+
+		await page.getByTestId('email-create-lead').click();
+		await expect.element(page.getByTestId('lead-form')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Name')).toHaveValue('Client');
+		await expect.element(page.getByTestId('lead-email')).toHaveValue('client@example.com');
 	});
 });
