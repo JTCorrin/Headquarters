@@ -88,6 +88,7 @@
 	const emptyLeadForm = (currency = 'GBP'): LeadFormData => ({
 		name: '',
 		companyName: '',
+		primaryEmail: '',
 		clientId: '',
 		stage: 'new',
 		valueAmount: '',

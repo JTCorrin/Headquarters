@@ -1009,6 +1009,7 @@ export function toLeadResource(lead: ApiLead): LeadResource {
 		version: lead.version,
 		name: lead.name,
 		company_name: lead.company_name,
+		primary_email: lead.primary_email,
 		stage: lead.stage,
 		value_cents: lead.value_cents,
 		currency: lead.currency,
@@ -1032,6 +1033,7 @@ export function toLeadFormData(lead: ApiLead): LeadFormData {
 	return {
 		name: lead.name,
 		companyName: lead.company_name ?? '',
+		primaryEmail: lead.primary_email ?? '',
 		clientId: lead.client_id ?? '',
 		stage,
 		valueAmount: centsToAmountString(lead.value_cents),
@@ -1057,6 +1059,7 @@ export function toLeadCreateBody(data: LeadFormData): ApiLeadCreateBody {
 	return {
 		name: data.name.trim(),
 		company_name: emptyToNull(data.companyName),
+		primary_email: emptyToNull(data.primaryEmail),
 		client_id: emptyToNull(data.clientId),
 		stage: data.stage,
 		value_cents: valueCents,
@@ -1428,10 +1431,13 @@ export function toTaskUpdateBody(data: TaskFormData): ApiTaskUpdateBody {
 
 export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
 	const occurred = row.direction === 'outbound' ? row.sent_at : row.received_at;
+	const fromName = row.from_name?.trim() || null;
 	return {
 		id: row.id,
 		direction: row.direction === 'outbound' ? 'out' : 'in',
-		from: row.from_name?.trim() || row.from_address,
+		from: fromName || row.from_address,
+		fromAddress: row.from_address,
+		fromName,
 		to: firstAddress(row.to_addresses),
 		subject: row.subject || '(no subject)',
 		preview: row.preview_text || row.body_text?.slice(0, 160) || '',

@@ -164,4 +164,40 @@ describe('EntityEmailInbox', () => {
 			.toHaveValue('Still here');
 		await expect.element(page.getByTestId('email-send')).toHaveTextContent('Send');
 	});
+
+	it('shows Create lead for inbound messages when enabled', async () => {
+		let created: { fromAddress: string; fromName: string | null } | null = null;
+		render(EntityEmailInbox, {
+			messages: sampleEmailMessages,
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			canCreateLead: true,
+			onCreateLead: (payload) => {
+				created = {
+					fromAddress: payload.fromAddress,
+					fromName: payload.fromName
+				};
+			}
+		});
+
+		await expect.element(page.getByTestId('email-create-lead')).toBeInTheDocument();
+		await page.getByTestId('email-create-lead').click();
+		expect(created).toEqual({
+			fromAddress: 'ava@northwind.com',
+			fromName: 'Ava Chen'
+		});
+	});
+
+	it('hides Create lead when canCreateLead is false', async () => {
+		render(EntityEmailInbox, {
+			messages: sampleEmailMessages,
+			mailboxConnected: true,
+			role: 'owner',
+			canCreateLead: false
+		});
+
+		await expect.element(page.getByTestId('email-create-lead')).not.toBeInTheDocument();
+	});
 });
