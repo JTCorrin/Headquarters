@@ -221,6 +221,7 @@
 											fields={[
 												{ label: 'Name', value: lead.name },
 												{ label: 'Company', value: lead.company_name ?? '—' },
+												{ label: 'Email', value: lead.primary_email ?? '—' },
 												{
 													label: 'Value',
 													value:
