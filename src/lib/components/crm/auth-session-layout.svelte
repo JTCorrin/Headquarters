@@ -13,6 +13,7 @@
 		createSupabaseBrowserClient,
 		isAuthPublicPath,
 		isOnboardingPath,
+		membershipRefreshMode,
 		postAuthDestination,
 		readPublicSupabaseConfig,
 		requiresSelectedOrg,
@@ -98,7 +99,14 @@
 	$effect(() => {
 		if (!auth.enabled || !auth.ready) return;
 		const token = auth.accessToken;
-		if (!token) {
+		const mode = membershipRefreshMode({
+			previousToken: lastTokenForMemberships,
+			nextToken: token,
+			membershipsReady,
+			authEvent: auth.lastAuthEvent
+		});
+
+		if (mode === 'clear') {
 			membershipsReady = true;
 			lastTokenForMemberships = null;
 			orgSession.setMemberships([]);
@@ -106,9 +114,16 @@
 			applyResolvedTheme('org_default', 'system');
 			return;
 		}
-		if (token === lastTokenForMemberships) return;
-		membershipsReady = false;
-		void refreshMemberships(token);
+		if (mode === 'skip') return;
+		// Tab-focus JWT refresh: keep the shell mounted; API client already reads the new token.
+		if (mode === 'adopt-token') {
+			lastTokenForMemberships = token;
+			return;
+		}
+		if (mode === 'blocking') {
+			membershipsReady = false;
+		}
+		void refreshMemberships(token!);
 	});
 
 	// Apply organisation / personal theme to <html class="dark">.
