@@ -1,5 +1,11 @@
 import { getContext, setContext } from 'svelte';
-import type { Provider, Session, SupabaseClient, User } from '@supabase/supabase-js';
+import type {
+	AuthChangeEvent,
+	Provider,
+	Session,
+	SupabaseClient,
+	User
+} from '@supabase/supabase-js';
 
 const AUTH_SESSION_CONTEXT = Symbol('hq.auth-session');
 
@@ -9,6 +15,8 @@ export interface AuthSession {
 	readonly session: Session | null;
 	readonly user: User | null;
 	readonly accessToken: string | null;
+	/** Latest Supabase auth event (`TOKEN_REFRESHED`, `SIGNED_IN`, …). */
+	readonly lastAuthEvent: AuthChangeEvent | null;
 	signUp(
 		email: string,
 		password: string,
@@ -30,6 +38,23 @@ export interface CreateAuthSessionOptions {
 	initialSession?: Session | null;
 }
 
+/**
+ * Decide how the workspace shell should react when the access token changes.
+ * `TOKEN_REFRESHED` must not unmount UI — browsers refresh JWTs on tab focus.
+ */
+export function membershipRefreshMode(input: {
+	previousToken: string | null;
+	nextToken: string | null;
+	membershipsReady: boolean;
+	authEvent: AuthChangeEvent | null;
+}): 'clear' | 'skip' | 'adopt-token' | 'quiet' | 'blocking' {
+	if (!input.nextToken) return 'clear';
+	if (input.nextToken === input.previousToken) return 'skip';
+	if (input.authEvent === 'TOKEN_REFRESHED' && input.membershipsReady) return 'adopt-token';
+	if (input.membershipsReady && input.previousToken !== null) return 'quiet';
+	return 'blocking';
+}
+
 function authErrorMessage(error: { message?: string } | null, fallback: string): string {
 	return error?.message?.trim() || fallback;
 }
@@ -38,13 +63,15 @@ export function createAuthSession(options: CreateAuthSessionOptions): AuthSessio
 	const client = options.client;
 	let ready = $state(!client || options.initialSession !== undefined);
 	let session = $state<Session | null>(options.initialSession ?? null);
+	let lastAuthEvent = $state<AuthChangeEvent | null>(null);
 
 	if (client) {
 		void client.auth.getSession().then(({ data }) => {
 			session = data.session;
 			ready = true;
 		});
-		client.auth.onAuthStateChange((_event, next) => {
+		client.auth.onAuthStateChange((event, next) => {
+			lastAuthEvent = event;
 			session = next;
 			ready = true;
 		});
@@ -65,6 +92,9 @@ export function createAuthSession(options: CreateAuthSessionOptions): AuthSessio
 		},
 		get accessToken() {
 			return session?.access_token ?? null;
+		},
+		get lastAuthEvent() {
+			return lastAuthEvent;
 		},
 		async signUp(email, password, signUpOptions) {
 			if (!client) {
