@@ -270,6 +270,7 @@ Deno.test('lead create validation defaults stage and currency', () => {
       {
         name: '  Acme Opportunity  ',
         company_name: 'Acme Ltd',
+        primary_email: 'acme@example.test',
         value_cents: 125000,
       },
       false,
@@ -277,6 +278,7 @@ Deno.test('lead create validation defaults stage and currency', () => {
     {
       name: 'Acme Opportunity',
       company_name: 'Acme Ltd',
+      primary_email: 'acme@example.test',
       value_cents: 125000,
       stage: 'new',
       currency: 'GBP',
@@ -290,6 +292,17 @@ Deno.test('lead create validation defaults stage and currency', () => {
       { defaultCurrency: 'USD' },
     ).currency,
     'USD',
+  )
+})
+
+Deno.test('lead validation rejects invalid primary_email', () => {
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Bad email', primary_email: 'not-an-email' },
+        false,
+      ),
+    ApiError,
   )
 })
 

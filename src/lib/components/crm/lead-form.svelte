@@ -111,6 +111,20 @@
 	</div>
 
 	<div class="space-y-2">
+		<Label for="lead-email">Email</Label>
+		<Input
+			id="lead-email"
+			name="primaryEmail"
+			type="email"
+			bind:value={$formData.primaryEmail}
+			placeholder="alex@contoso.com"
+			aria-invalid={!!$errors.primaryEmail}
+			data-testid="lead-email"
+		/>
+		{#if $errors.primaryEmail}<p class="text-destructive text-xs">{$errors.primaryEmail}</p>{/if}
+	</div>
+
+	<div class="space-y-2">
 		<Label for="client-picker">Client</Label>
 		<input type="hidden" name="clientId" value={$formData.clientId ?? ''} />
 		<ClientPicker
