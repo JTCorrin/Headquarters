@@ -30,6 +30,11 @@ export type OrganisationRow = {
   website_url: string | null
   tax_identifier: string | null
   registration_number: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  region: string | null
+  postal_code: string | null
   default_currency: string
   timezone: string
   locale: string

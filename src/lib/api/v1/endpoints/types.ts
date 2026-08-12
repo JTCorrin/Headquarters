@@ -34,8 +34,12 @@ import type {
 	ApiDocumentResult,
 	ApiDocumentUploadIntentBody,
 	ApiDocumentUploadIntentResult,
+	ApiOrganisationBranding,
 	ApiOrganisationConfiguration,
 	ApiOrganisationConfigurationPatch,
+	ApiOrganisationLogoFinalizeBody,
+	ApiOrganisationLogoUploadIntent,
+	ApiOrganisationLogoUploadIntentBody,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
 	ApiOrganisationMembership,
@@ -209,6 +213,17 @@ export interface OrganisationConfigEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiOrganisationConfiguration>;
+	getBranding(signal?: AbortSignal): Promise<ApiOrganisationBranding>;
+	createLogoUploadIntent(
+		body: ApiOrganisationLogoUploadIntentBody,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationLogoUploadIntent>;
+	finalizeLogo(
+		body: ApiOrganisationLogoFinalizeBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationConfiguration>;
+	deleteLogo(version: number, signal?: AbortSignal): Promise<ApiOrganisationConfiguration>;
 }
 
 export interface TaxRatesEndpoints {
