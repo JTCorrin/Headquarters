@@ -33,6 +33,7 @@
 			{
 				name: lead?.name ?? '',
 				companyName: lead?.company_name ?? '',
+				primaryEmail: lead?.primary_email ?? '',
 				clientId: lead?.client_id ?? '',
 				stage: lead?.stage === 'won' ? 'proposal' : (lead?.stage ?? 'new'),
 				valueAmount: centsToAmountString(lead?.value_cents),

@@ -26,6 +26,15 @@ export const leadFormSchema = z
 	.object({
 		name: z.string().trim().min(1, 'Name is required').max(200),
 		companyName: z.string().max(200).optional().or(z.literal('')),
+		primaryEmail: z
+			.string()
+			.max(320)
+			.optional()
+			.or(z.literal(''))
+			.refine(
+				(v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+				'Must be a valid email address'
+			),
 		clientId: z.string().uuid().optional().or(z.literal('')),
 		stage: z.enum(leadWritableStages),
 		/** Decimal major units for display — converted to/from cents at the API boundary. */
@@ -79,6 +88,7 @@ export interface LeadResource {
 	version: number;
 	name: string;
 	company_name?: string | null;
+	primary_email?: string | null;
 	stage: (typeof leadStages)[number];
 	value_cents?: number | null;
 	currency: string;

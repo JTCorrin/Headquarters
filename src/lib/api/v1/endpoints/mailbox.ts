@@ -1,6 +1,8 @@
 import type { ApiRequestFn } from '../request.js';
 import type {
 	ApiMailboxAccount,
+	ApiMailboxOAuthProvider,
+	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult
@@ -47,6 +49,25 @@ export function createMailboxEndpoints(request: ApiRequestFn): MailboxEndpoints 
 				orgScoped: true,
 				signal
 			});
+		},
+		startOAuth: async (provider: ApiMailboxOAuthProvider, signal) => {
+			const { data } = await request<ApiMailboxOAuthStart>(
+				`/api/v1/me/mailbox/oauth/start?provider=${encodeURIComponent(provider)}`,
+				{
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
+		},
+		completeOAuth: async (body, signal) => {
+			const { data } = await request<ApiMailboxAccount>('/api/v1/me/mailbox/oauth/callback', {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
 		}
 	};
 }

@@ -48,6 +48,7 @@ import {
   validateAiConnectBody,
   validateAiModelBody,
 } from './integrations.ts'
+import { isMailboxOAuthStubMode } from '../_shared/mailbox-oauth.ts'
 import { validateMailboxBody, validateMailboxTestBody } from './mailbox.ts'
 import { resolveLeadCurrency, validateLeadBody } from './leads.ts'
 import { hashIdempotencyRequest, parseIdempotencyKey } from './idempotency.ts'
@@ -102,6 +103,7 @@ import {
 } from './payments.ts'
 import { validateEmailTemplateBody } from './email-templates.ts'
 import {
+  validateLogoUploadIntentBody,
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
 } from './organisations.ts'
@@ -269,6 +271,7 @@ Deno.test('lead create validation defaults stage and currency', () => {
       {
         name: '  Acme Opportunity  ',
         company_name: 'Acme Ltd',
+        primary_email: 'acme@example.test',
         value_cents: 125000,
       },
       false,
@@ -276,6 +279,7 @@ Deno.test('lead create validation defaults stage and currency', () => {
     {
       name: 'Acme Opportunity',
       company_name: 'Acme Ltd',
+      primary_email: 'acme@example.test',
       value_cents: 125000,
       stage: 'new',
       currency: 'GBP',
@@ -289,6 +293,17 @@ Deno.test('lead create validation defaults stage and currency', () => {
       { defaultCurrency: 'USD' },
     ).currency,
     'USD',
+  )
+})
+
+Deno.test('lead validation rejects invalid primary_email', () => {
+  assertThrows(
+    () =>
+      validateLeadBody(
+        { name: 'Bad email', primary_email: 'not-an-email' },
+        false,
+      ),
+    ApiError,
   )
 })
 
@@ -625,12 +640,36 @@ Deno.test('organisation create and configuration validation', () => {
     validateOrganisationConfigurationBody({ theme_default: 'dark', default_currency: 'USD' }),
     { theme_default: 'dark', default_currency: 'USD' },
   )
+  assertEquals(
+    validateOrganisationConfigurationBody({
+      address_line1: ' 12 Harbour Rd ',
+      city: 'London',
+      postal_code: 'E1 6AN',
+    }),
+    {
+      address_line1: '12 Harbour Rd',
+      city: 'London',
+      postal_code: 'E1 6AN',
+    },
+  )
   assertThrows(
     () => validateOrganisationConfigurationBody({ theme_default: 'neon' }),
     ApiError,
   )
   assertThrows(
     () => validateOrganisationConfigurationBody({ org_id: 'x' }),
+    ApiError,
+  )
+  assertEquals(
+    validateLogoUploadIntentBody({ mime_type: 'image/png', size_bytes: 1024 }),
+    { mime_type: 'image/png', size_bytes: 1024 },
+  )
+  assertThrows(
+    () => validateLogoUploadIntentBody({ mime_type: 'image/gif', size_bytes: 1024 }),
+    ApiError,
+  )
+  assertThrows(
+    () => validateLogoUploadIntentBody({ mime_type: 'image/png', size_bytes: 3_000_000 }),
     ApiError,
   )
 })
@@ -1417,6 +1456,8 @@ Deno.test('google calendar stub client and auth url helpers', async () => {
   assertEquals(parseTokenBlob('raw-refresh').refresh_token, 'raw-refresh')
   assertEquals(isCalendarSyncStubMode(() => '1'), true)
   assertEquals(isCalendarSyncStubMode(() => undefined), false)
+  assertEquals(isMailboxOAuthStubMode(() => 'yes'), true)
+  assertEquals(isMailboxOAuthStubMode(() => ''), false)
 })
 
 Deno.test('caldav upsert validation requires url username provider', () => {
