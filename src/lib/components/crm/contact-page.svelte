@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError } from '$lib/api/v1/errors.js';
 	import {
@@ -6,6 +9,8 @@
 		roleFromMemberships,
 		contactLifecycleLabel,
 		membershipFromCreateResult,
+		toContactFormData,
+		toContactUpdateBody,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
@@ -21,6 +26,8 @@
 	} from '$lib/crm/entity-timeline.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
+	import { contactFormSchema, type ContactFormData } from '$lib/schemas/contact.js';
+	import type { LeadClientOption } from '$lib/schemas/lead.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -58,6 +65,26 @@
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let editDrawerOpen = $state(false);
+	let clientOptions = $state<LeadClientOption[]>([]);
+
+	const emptyContactForm = (): ContactFormData => ({
+		name: '',
+		email: '',
+		phone: '',
+		company: '',
+		title: '',
+		status: 'active',
+		clientId: ''
+	});
+
+	const contactForm = superForm(defaults(emptyContactForm(), zod4(contactFormSchema)), {
+		validators: zod4(contactFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -94,6 +121,10 @@
 			if (error.isNetworkError) return 'Network error — check your connection and retry.';
 			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
 			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Contact not found.';
+			if (error.isValidationError) {
+				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
+				return error.message;
+			}
 			return error.message || fallback;
 		}
 		return fallback;
@@ -138,6 +169,8 @@
 		emailTab = emptyEntityEmailTabState();
 		timelineEvents = [];
 		sharingId = null;
+		clientOptions = [];
+		editDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
 
@@ -160,10 +193,21 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const result = await api.contacts.get(contactId);
+			const [result, clientsListed] = await Promise.all([
+				api.contacts.get(contactId),
+				api.clients.list({ limit: 100 })
+			]);
 			if (isStale(epoch)) return;
 
 			contact = result.data;
+			contactForm.form.set(toContactFormData(result.data, result.data.client_id));
+			clientOptions = clientsListed.data
+				.filter((c) => c.status !== 'archived')
+				.map((c) => ({
+					id: c.id,
+					name: c.name,
+					defaultCurrency: c.default_currency
+				}));
 			viewState = { kind: 'ready' };
 
 			const [tab, timeline] = await Promise.all([
@@ -190,6 +234,32 @@
 				kind: 'validation',
 				message: userMessage(error, 'Could not load contact.')
 			};
+		}
+	}
+
+	async function onSaveContact(): Promise<boolean> {
+		if (!contact) return false;
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.contacts.update(
+				contact.id,
+				toContactUpdateBody(get(contactForm.form)),
+				contact.version
+			);
+			if (isStale(epoch)) return false;
+			contact = updated;
+			contactForm.form.set(toContactFormData(updated, updated.client_id));
+			editDrawerOpen = false;
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not save contact — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
 		}
 	}
 
@@ -285,11 +355,16 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if !contact}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
-				{:else if contact}
+				{:else}
+					{#if viewState.kind === 'validation'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<ContactProfilePage
 						{orgName}
 						{navGroups}
@@ -301,6 +376,9 @@
 							: (contact.job_title ?? undefined)}
 						{contactFields}
 						{companyFields}
+						{contactForm}
+						{clientOptions}
+						bind:editDrawerOpen
 						bind:timelineEvents
 						emailMessages={emailTab.messages}
 						emailEmptyState={emailTab.emptyState}
@@ -312,6 +390,7 @@
 						documentsApi={api}
 						documentsEntityId={contact.id}
 						documentsReloadKey={session.cacheGeneration}
+						onValidSubmit={onSaveContact}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
