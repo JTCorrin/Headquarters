@@ -35,6 +35,7 @@ describe('mailbox schema', () => {
 	it('applies outlook host defaults from preset', () => {
 		const next = applyMailboxPreset(emptyMailboxFormData('custom'), 'outlook');
 		expect(next.imapHost).toBe('outlook.office365.com');
+		expect(next.smtpHost).toBe('smtp-mail.outlook.com');
 		expect(next.smtpPort).toBe('587');
 		expect(next.smtpSecurity).toBe('starttls');
 	});

@@ -22,6 +22,7 @@ function sampleLead(overrides: Record<string, unknown> = {}) {
 		version: 1,
 		name: 'Contoso expansion',
 		company_name: 'Contoso',
+		primary_email: null,
 		contact_id: null,
 		client_id: null,
 		stage: 'new',

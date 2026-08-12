@@ -34,8 +34,12 @@ import type {
 	ApiDocumentResult,
 	ApiDocumentUploadIntentBody,
 	ApiDocumentUploadIntentResult,
+	ApiOrganisationBranding,
 	ApiOrganisationConfiguration,
 	ApiOrganisationConfigurationPatch,
+	ApiOrganisationLogoFinalizeBody,
+	ApiOrganisationLogoUploadIntent,
+	ApiOrganisationLogoUploadIntentBody,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
 	ApiOrganisationMembership,
@@ -113,6 +117,8 @@ import type {
 	ApiOrgMember,
 	ApiUserNotification,
 	ApiMailboxAccount,
+	ApiMailboxOAuthProvider,
+	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
@@ -207,6 +213,17 @@ export interface OrganisationConfigEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiOrganisationConfiguration>;
+	getBranding(signal?: AbortSignal): Promise<ApiOrganisationBranding>;
+	createLogoUploadIntent(
+		body: ApiOrganisationLogoUploadIntentBody,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationLogoUploadIntent>;
+	finalizeLogo(
+		body: ApiOrganisationLogoFinalizeBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationConfiguration>;
+	deleteLogo(version: number, signal?: AbortSignal): Promise<ApiOrganisationConfiguration>;
 }
 
 export interface TaxRatesEndpoints {
@@ -584,6 +601,14 @@ export interface MailboxEndpoints {
 	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
 	sync(signal?: AbortSignal): Promise<ApiMailboxSyncResult>;
 	disconnect(signal?: AbortSignal): Promise<void>;
+	startOAuth(
+		provider: ApiMailboxOAuthProvider,
+		signal?: AbortSignal
+	): Promise<ApiMailboxOAuthStart>;
+	completeOAuth(
+		body: { code: string; state: string },
+		signal?: AbortSignal
+	): Promise<ApiMailboxAccount>;
 }
 
 /** Personal calendar (Google OAuth + CalDAV credentials) — never echoes secrets. */

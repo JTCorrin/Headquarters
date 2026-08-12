@@ -29,6 +29,9 @@ import {
 	toLeadCard,
 	toLeadCreateBody,
 	toLeadFormData,
+	toOrganisationBrandingResource,
+	toOrganisationConfigFormData,
+	toOrganisationConfigPatch,
 	toOrganisationCreateBody,
 	toOrgMembershipSummary,
 	toPaymentCreateBody,
@@ -97,6 +100,77 @@ describe('api mappers', () => {
 		expect(themePreferenceToApi('dark')).toBe('dark');
 		expect(themePreferenceFromApi(null)).toBe('org_default');
 		expect(themePreferenceFromApi('light')).toBe('light');
+	});
+
+	it('maps organisation config including letterhead fields', () => {
+		const config = {
+			id: 'org-1',
+			name: 'Corrin Data',
+			legal_name: 'Corrin Data Ltd',
+			slug: 'corrin-data',
+			logo_path: 'org/org-1/branding/logo.png',
+			logo_url: 'https://example.test/logo.png',
+			billing_email: 'billing@corrin.test',
+			phone: '+44 20 0000 0000',
+			website_url: 'https://corrin.test',
+			tax_identifier: 'GB123',
+			registration_number: '09876543',
+			address_line1: '12 Harbour Rd',
+			address_line2: null,
+			city: 'London',
+			region: null,
+			postal_code: 'E1 6AN',
+			default_currency: 'GBP' as const,
+			timezone: 'Europe/London',
+			locale: 'en-GB',
+			country_code: 'GB',
+			theme_default: 'system' as const,
+			settings: {},
+			version: 4,
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			deleted_at: null
+		};
+		expect(toOrganisationConfigFormData(config)).toMatchObject({
+			name: 'Corrin Data',
+			legalName: 'Corrin Data Ltd',
+			addressLine1: '12 Harbour Rd',
+			city: 'London',
+			postalCode: 'E1 6AN',
+			country: 'GB',
+			currency: 'GBP'
+		});
+		expect(
+			toOrganisationConfigPatch({
+				name: 'Corrin Data',
+				legalName: 'Corrin Data Ltd',
+				phone: '',
+				billingEmail: ' Billing@Corrin.test ',
+				websiteUrl: '',
+				taxIdentifier: '',
+				registrationNumber: '',
+				addressLine1: '12 Harbour Rd',
+				addressLine2: '',
+				city: 'London',
+				region: '',
+				postalCode: 'E1 6AN',
+				country: 'GB',
+				timezone: 'Europe/London',
+				currency: 'GBP',
+				locale: 'en-GB',
+				themeDefault: 'system'
+			})
+		).toMatchObject({
+			billing_email: 'billing@corrin.test',
+			address_line1: '12 Harbour Rd',
+			phone: null,
+			city: 'London'
+		});
+		expect(toOrganisationBrandingResource(config)).toMatchObject({
+			legal_name: 'Corrin Data Ltd',
+			logo_url: 'https://example.test/logo.png',
+			postal_code: 'E1 6AN'
+		});
 	});
 
 	it('maps discovery rows to switcher summaries', () => {
@@ -677,6 +751,7 @@ describe('api mappers', () => {
 			version: 2,
 			name: 'Contoso expansion',
 			company_name: 'Contoso',
+			primary_email: 'ava@contoso.test',
 			contact_id: null,
 			client_id: null,
 			stage: 'qualified',
@@ -704,6 +779,7 @@ describe('api mappers', () => {
 		});
 		expect(toLeadFormData(sampleLead)).toMatchObject({
 			name: 'Contoso expansion',
+			primaryEmail: 'ava@contoso.test',
 			stage: 'qualified',
 			valueAmount: '2500',
 			currency: 'GBP',
@@ -713,6 +789,7 @@ describe('api mappers', () => {
 			toLeadCreateBody({
 				name: '  Northwind pilot  ',
 				companyName: '',
+				primaryEmail: 'pilot@northwind.test',
 				clientId: '',
 				stage: 'new',
 				valueAmount: '10',
@@ -726,6 +803,7 @@ describe('api mappers', () => {
 		).toEqual({
 			name: 'Northwind pilot',
 			company_name: null,
+			primary_email: 'pilot@northwind.test',
 			client_id: null,
 			stage: 'new',
 			value_cents: 1000,

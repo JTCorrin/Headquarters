@@ -22,6 +22,8 @@
 
 	export interface QuoteDetailPageProps {
 		orgName: string;
+		orgLogoDataUrl?: string;
+		orgAddressLines?: string[];
 		navGroups: AppNavGroup[];
 		title: string;
 		status: string;
@@ -63,6 +65,8 @@
 
 	let {
 		orgName,
+		orgLogoDataUrl,
+		orgAddressLines = [],
 		navGroups,
 		title,
 		status = 'Draft',
@@ -105,6 +109,8 @@
 		buildMoneyDocumentDef({
 			kind: 'quote',
 			orgName,
+			orgLogoDataUrl,
+			orgAddressLines,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
 			attentionLine,

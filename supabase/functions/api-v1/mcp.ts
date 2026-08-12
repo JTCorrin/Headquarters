@@ -238,6 +238,7 @@ const TOOLS: ToolDef[] = [
       properties: {
         name: { type: 'string' },
         company_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
         contact_id: { type: ['string', 'null'], format: 'uuid' },
         client_id: { type: ['string', 'null'], format: 'uuid' },
         stage: {
@@ -270,6 +271,7 @@ const TOOLS: ToolDef[] = [
         version: { type: 'integer', minimum: 1 },
         name: { type: 'string' },
         company_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
         contact_id: { type: ['string', 'null'], format: 'uuid' },
         client_id: { type: ['string', 'null'], format: 'uuid' },
         stage: {

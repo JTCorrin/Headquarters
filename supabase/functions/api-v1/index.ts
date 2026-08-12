@@ -36,7 +36,12 @@ import {
   acceptInvitation,
   handleOrganisationAccess,
 } from './organisation-access.ts'
-import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
+import {
+  handleOrganisationBranding,
+  handleOrganisationConfiguration,
+  handleOrganisationLogo,
+  handleOrganisations,
+} from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
 import { handleProfilePreferences } from './profile-preferences.ts'
@@ -326,6 +331,25 @@ async function routeOrgScoped(
 
   if (path === "/api/v1/organisation/configuration") {
     return await handleOrganisationConfiguration(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    );
+  }
+
+  if (path === "/api/v1/organisation/branding") {
+    return await handleOrganisationBranding(req, db, path, orgId, requestId);
+  }
+
+  if (
+    path === "/api/v1/organisation/logo" ||
+    path === "/api/v1/organisation/logo/upload-intent" ||
+    path === "/api/v1/organisation/logo/finalize"
+  ) {
+    return await handleOrganisationLogo(
       req,
       db,
       path,
