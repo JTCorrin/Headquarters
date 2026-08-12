@@ -34,6 +34,8 @@
 
 	export interface BillDetailPageProps {
 		orgName: string;
+		orgLogoDataUrl?: string;
+		orgAddressLines?: string[];
 		navGroups: AppNavGroup[];
 		title: string;
 		status: string;
@@ -90,6 +92,8 @@
 
 	let {
 		orgName,
+		orgLogoDataUrl,
+		orgAddressLines = [],
 		navGroups,
 		title,
 		status = 'Received',
@@ -146,6 +150,8 @@
 		buildMoneyDocumentDef({
 			kind: 'bill',
 			orgName,
+			orgLogoDataUrl,
+			orgAddressLines,
 			partyLabel: 'Vendor',
 			partyName: formData.current.vendorName,
 			documentNumber: formData.current.number || title.split('·')[0]?.trim() || 'Bill',

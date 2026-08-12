@@ -89,6 +89,25 @@ export type OrganisationCreateSchema = typeof organisationCreateSchema;
 export type OrganisationCreateData = z.infer<typeof organisationCreateSchema>;
 
 export const organisationConfigSchema = z.object({
+	name: requiredDisplayName(200),
+	legalName: z.string().max(500),
+	phone: z.string().max(500),
+	billingEmail: z
+		.string()
+		.max(320)
+		.refine((value) => {
+			const trimmed = value.trim();
+			return trimmed === '' || trimmed.includes('@');
+		}, 'Must be a valid email'),
+	websiteUrl: z.string().max(500),
+	taxIdentifier: z.string().max(500),
+	registrationNumber: z.string().max(500),
+	addressLine1: z.string().max(200),
+	addressLine2: z.string().max(200),
+	city: z.string().max(120),
+	region: z.string().max(120),
+	postalCode: z.string().max(32),
+	country: countryCode,
 	timezone: ianaTimezone,
 	currency: currencyCode,
 	locale: localeTag,
@@ -152,11 +171,45 @@ export interface OrganisationConfigResource {
 	version: number;
 	name: string;
 	slug: string;
+	legal_name: string | null;
+	logo_path: string | null;
+	logo_url: string | null;
+	billing_email: string | null;
+	phone: string | null;
+	website_url: string | null;
+	tax_identifier: string | null;
+	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
 	timezone: string;
 	default_currency: string;
 	locale: string;
 	country_code: string;
 	theme_default: ThemeOption;
+}
+
+/** Letterhead branding for money documents (any org member). */
+export interface OrganisationBrandingResource {
+	id: string;
+	version: number;
+	name: string;
+	legal_name: string | null;
+	logo_path: string | null;
+	logo_url: string | null;
+	billing_email: string | null;
+	phone: string | null;
+	website_url: string | null;
+	tax_identifier: string | null;
+	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
+	country_code: string;
 }
 
 export interface TaxRateResource {

@@ -16,11 +16,17 @@ function orgConfig(version = 2, currency = 'GBP') {
 		legal_name: null,
 		slug: 'corrin-data',
 		logo_path: null,
+		logo_url: null,
 		billing_email: null,
 		phone: null,
 		website_url: null,
 		tax_identifier: null,
 		registration_number: null,
+		address_line1: null,
+		address_line2: null,
+		city: null,
+		region: null,
+		postal_code: null,
 		default_currency: currency,
 		timezone: 'Europe/London',
 		locale: 'en-GB',
@@ -223,6 +229,8 @@ describe('OrgConfigPage integration', () => {
 
 		render(OrgConfigPage, { api, session });
 		await expect.element(page.getByTestId('organisation-config-form')).toBeInTheDocument();
+		await expect.element(page.getByTestId('org-company-details-section')).toBeInTheDocument();
+		await expect.element(page.getByLabelText('Address line 1')).toBeInTheDocument();
 		await page.getByTestId('organisation-config-submit').click();
 		await expect.element(page.getByText(/412/i)).toBeInTheDocument();
 	});

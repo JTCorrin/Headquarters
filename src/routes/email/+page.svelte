@@ -28,5 +28,8 @@
 	onSwitchNavigate={() => {
 		// Stay on email; page reloads via cacheGeneration.
 	}}
+	onLeadCreated={(leadId) => {
+		void goto(`/leads/${leadId}`);
+	}}
 	onLogout={handleLogout}
 />
