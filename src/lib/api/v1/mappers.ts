@@ -13,6 +13,7 @@ import {
 import { amountStringToCents, centsToAmountString } from '$lib/money.js';
 import type {
 	MembershipRole,
+	OrganisationBrandingResource,
 	OrganisationConfigData,
 	OrganisationConfigResource,
 	OrganisationCreateData,
@@ -96,6 +97,7 @@ import type {
 	ApiCalendarConnection,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
+	ApiOrganisationBranding,
 	ApiOrganisationConfiguration,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
@@ -217,6 +219,19 @@ export function toOrganisationConfigResource(
 		version: config.version,
 		name: config.name,
 		slug: config.slug,
+		legal_name: config.legal_name,
+		logo_path: config.logo_path,
+		logo_url: config.logo_url ?? null,
+		billing_email: config.billing_email,
+		phone: config.phone,
+		website_url: config.website_url,
+		tax_identifier: config.tax_identifier,
+		registration_number: config.registration_number,
+		address_line1: config.address_line1 ?? null,
+		address_line2: config.address_line2 ?? null,
+		city: config.city ?? null,
+		region: config.region ?? null,
+		postal_code: config.postal_code ?? null,
 		timezone: config.timezone,
 		default_currency: config.default_currency,
 		locale: config.locale,
@@ -229,6 +244,19 @@ export function toOrganisationConfigFormData(
 	config: ApiOrganisationConfiguration
 ): OrganisationConfigData {
 	return {
+		name: config.name,
+		legalName: config.legal_name ?? '',
+		phone: config.phone ?? '',
+		billingEmail: config.billing_email ?? '',
+		websiteUrl: config.website_url ?? '',
+		taxIdentifier: config.tax_identifier ?? '',
+		registrationNumber: config.registration_number ?? '',
+		addressLine1: config.address_line1 ?? '',
+		addressLine2: config.address_line2 ?? '',
+		city: config.city ?? '',
+		region: config.region ?? '',
+		postalCode: config.postal_code ?? '',
+		country: config.country_code,
 		timezone: config.timezone,
 		currency: config.default_currency,
 		locale: config.locale,
@@ -237,11 +265,49 @@ export function toOrganisationConfigFormData(
 }
 
 export function toOrganisationConfigPatch(data: OrganisationConfigData) {
+	const emptyToNull = (value: string) => (value.trim() ? value.trim() : null);
 	return {
+		name: data.name.trim(),
+		legal_name: emptyToNull(data.legalName),
+		phone: emptyToNull(data.phone),
+		billing_email: emptyToNull(data.billingEmail)?.toLowerCase() ?? null,
+		website_url: emptyToNull(data.websiteUrl),
+		tax_identifier: emptyToNull(data.taxIdentifier),
+		registration_number: emptyToNull(data.registrationNumber),
+		address_line1: emptyToNull(data.addressLine1),
+		address_line2: emptyToNull(data.addressLine2),
+		city: emptyToNull(data.city),
+		region: emptyToNull(data.region),
+		postal_code: emptyToNull(data.postalCode),
+		country_code: data.country,
 		timezone: data.timezone,
 		default_currency: data.currency,
 		locale: data.locale,
 		theme_default: data.themeDefault
+	};
+}
+
+export function toOrganisationBrandingResource(
+	branding: ApiOrganisationBranding
+): OrganisationBrandingResource {
+	return {
+		id: branding.id,
+		version: branding.version,
+		name: branding.name,
+		legal_name: branding.legal_name,
+		logo_path: branding.logo_path,
+		logo_url: branding.logo_url,
+		billing_email: branding.billing_email,
+		phone: branding.phone,
+		website_url: branding.website_url,
+		tax_identifier: branding.tax_identifier,
+		registration_number: branding.registration_number,
+		address_line1: branding.address_line1,
+		address_line2: branding.address_line2,
+		city: branding.city,
+		region: branding.region,
+		postal_code: branding.postal_code,
+		country_code: branding.country_code
 	};
 }
 

@@ -14,6 +14,10 @@ export interface MoneyDocumentTotals {
 export interface MoneyDocumentInput {
 	kind: MoneyDocumentKind;
 	orgName: string;
+	/** Data URL for pdfmake image embedding. */
+	orgLogoDataUrl?: string;
+	/** Preformatted letterhead lines (name, address, contact, tax). */
+	orgAddressLines?: string[];
 	partyLabel: string;
 	partyName: string;
 	/** Optional Attn line under the party name (billing + other recipients). */
@@ -61,6 +65,8 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 	const {
 		kind,
 		orgName,
+		orgLogoDataUrl,
+		orgAddressLines = [],
 		partyLabel,
 		partyName,
 		attentionLine,
@@ -107,21 +113,42 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 		]);
 	}
 
-	return {
+	const leftBrand: Content[] = orgLogoDataUrl
+		? [{ image: 'orgLogo', width: 120, margin: [0, 0, 0, 4] }]
+		: [{ text: orgName, style: 'org' }];
+
+	const rightAddress: Content[] =
+		orgAddressLines.length > 0
+			? orgAddressLines.map((line, index) => ({
+					text: line,
+					style: index === 0 ? 'org' : 'addressLine',
+					alignment: 'right' as const,
+					margin: index === 0 ? ([0, 0, 0, 2] as [number, number, number, number]) : undefined
+				}))
+			: [{ text: orgName, style: 'org', alignment: 'right' }];
+
+	const doc: TDocumentDefinitions = {
 		pageSize: 'A4',
 		pageMargins: [48, 48, 48, 56],
 		content: [
 			{
 				columns: [
-					[
-						{ text: orgName, style: 'org' },
-						{ text: KIND_LABEL[kind], style: 'docKind', margin: [0, 8, 0, 0] }
-					],
+					{ width: '*', stack: leftBrand },
+					{
+						width: 'auto',
+						alignment: 'right',
+						stack: rightAddress
+					}
+				]
+			},
+			{
+				columns: [
+					[{ text: KIND_LABEL[kind], style: 'docKind', margin: [0, 16, 0, 0] }],
 					{
 						width: 'auto',
 						alignment: 'right',
 						stack: [
-							{ text: documentNumber || '—', style: 'docNumber' },
+							{ text: documentNumber || '—', style: 'docNumber', margin: [0, 16, 0, 0] },
 							{ text: status.toUpperCase(), style: 'status', margin: [0, 4, 0, 0] }
 						]
 					}
@@ -249,6 +276,7 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 		],
 		styles: {
 			org: { fontSize: 12, bold: true, color: '#18181b' },
+			addressLine: { fontSize: 9, color: '#52525b' },
 			docKind: { fontSize: 22, bold: true, color: '#18181b', characterSpacing: 1 },
 			docNumber: { fontSize: 12, bold: true, color: '#18181b' },
 			status: { fontSize: 9, color: '#71717a', bold: true, characterSpacing: 0.5 },
@@ -267,6 +295,12 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 			color: '#27272a'
 		}
 	};
+
+	if (orgLogoDataUrl) {
+		doc.images = { orgLogo: orgLogoDataUrl };
+	}
+
+	return doc;
 }
 
 export function moneyDocumentFilename(input: MoneyDocumentInput): string {

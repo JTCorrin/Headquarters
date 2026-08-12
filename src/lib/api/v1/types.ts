@@ -64,11 +64,18 @@ export interface ApiOrganisationConfiguration {
 	legal_name: string | null;
 	slug: string;
 	logo_path: string | null;
+	/** Short-lived signed URL when logo_path is set. */
+	logo_url?: string | null;
 	billing_email: string | null;
 	phone: string | null;
 	website_url: string | null;
 	tax_identifier: string | null;
 	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
@@ -90,6 +97,11 @@ export type ApiOrganisationConfigurationPatch = Partial<{
 	website_url: string | null;
 	tax_identifier: string | null;
 	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
@@ -97,6 +109,48 @@ export type ApiOrganisationConfigurationPatch = Partial<{
 	theme_default: ThemeOption;
 	settings: unknown;
 }>;
+
+/** Letterhead fields readable by any active org member (quotes/invoices PDF). */
+export interface ApiOrganisationBranding {
+	id: string;
+	name: string;
+	legal_name: string | null;
+	slug: string;
+	logo_path: string | null;
+	logo_url: string | null;
+	billing_email: string | null;
+	phone: string | null;
+	website_url: string | null;
+	tax_identifier: string | null;
+	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
+	country_code: string;
+	version: number;
+}
+
+export interface ApiOrganisationLogoUploadIntentBody {
+	mime_type: string;
+	size_bytes: number;
+}
+
+export interface ApiOrganisationLogoUploadIntent {
+	bucket: string;
+	path: string;
+	upload: {
+		signed_url: string;
+		token: string;
+		path: string;
+		expires_in: number;
+	};
+}
+
+export interface ApiOrganisationLogoFinalizeBody {
+	path: string;
+}
 
 export interface ApiTaxRate {
 	id: string;
