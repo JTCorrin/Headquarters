@@ -36,11 +36,17 @@ const sampleConfig = {
 	legal_name: null,
 	slug: 'corrin-data',
 	logo_path: null,
+	logo_url: null,
 	billing_email: null,
 	phone: null,
 	website_url: null,
 	tax_identifier: null,
 	registration_number: null,
+	address_line1: null,
+	address_line2: null,
+	city: null,
+	region: null,
+	postal_code: null,
 	default_currency: 'GBP',
 	timezone: 'Europe/London',
 	locale: 'en-GB',
@@ -145,6 +151,43 @@ describe('createApiV1Client', () => {
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
 		const config = await client.organisationConfig.get();
 		expect(config.version).toBe(3);
+	});
+
+	it('loads organisation branding for letterhead', async () => {
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisation/branding': async (request) => {
+				expect(request.headers.get('x-org-id')).toBe(ORG_A);
+				return {
+					body: {
+						data: {
+							id: ORG_A,
+							name: 'Corrin Data',
+							legal_name: 'Corrin Data Ltd',
+							slug: 'corrin-data',
+							logo_path: null,
+							logo_url: null,
+							billing_email: null,
+							phone: null,
+							website_url: null,
+							tax_identifier: null,
+							registration_number: null,
+							address_line1: '12 Harbour Rd',
+							address_line2: null,
+							city: 'London',
+							region: null,
+							postal_code: 'E1 6AN',
+							country_code: 'GB',
+							version: 3
+						}
+					}
+				};
+			}
+		});
+
+		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const branding = await client.organisationConfig.getBranding();
+		expect(branding.address_line1).toBe('12 Harbour Rd');
+		expect(branding.legal_name).toBe('Corrin Data Ltd');
 	});
 
 	it('throws ORG_CONTEXT_REQUIRED when org id is missing', async () => {

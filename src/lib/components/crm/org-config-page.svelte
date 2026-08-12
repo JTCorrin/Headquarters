@@ -54,12 +54,26 @@
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let logoBusy = $state(false);
 	let taxDrawerOpen = $state(false);
 	let editingTaxRateId = $state<string | null>(null);
 
 	const configForm = superForm(
 		defaults(
 			{
+				name: '',
+				legalName: '',
+				phone: '',
+				billingEmail: '',
+				websiteUrl: '',
+				taxIdentifier: '',
+				registrationNumber: '',
+				addressLine1: '',
+				addressLine2: '',
+				city: '',
+				region: '',
+				postalCode: '',
+				country: 'GB',
 				timezone: 'UTC',
 				currency: 'GBP',
 				locale: 'en-GB',
@@ -273,6 +287,112 @@
 		}
 	}
 
+	async function onUploadLogo(file: File) {
+		if (!configuration) return;
+		const epoch = captureEpoch();
+		const allowed = new Set(['image/png', 'image/jpeg', 'image/webp']);
+		if (!allowed.has(file.type)) {
+			viewState = {
+				kind: 'validation',
+				message: 'Logo must be a PNG, JPEG, or WebP image.'
+			};
+			return;
+		}
+		if (file.size > 2_097_152) {
+			viewState = {
+				kind: 'validation',
+				message: 'Logo must be 2 MB or smaller.'
+			};
+			return;
+		}
+
+		logoBusy = true;
+		try {
+			const intent = await api.organisationConfig.createLogoUploadIntent({
+				mime_type: file.type,
+				size_bytes: file.size
+			});
+			if (isStale(epoch)) return;
+
+			const uploadResponse = await fetch(intent.upload.signed_url, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': file.type,
+					'x-upsert': 'true'
+				},
+				body: file
+			});
+			if (!uploadResponse.ok) {
+				throw new Error('Logo upload failed');
+			}
+			if (isStale(epoch)) return;
+
+			const updated = await api.organisationConfig.finalizeLogo(
+				{ path: intent.path },
+				configuration.version
+			);
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			configuration = toOrganisationConfigResource(updated);
+			configForm.form.set(toOrganisationConfigFormData(updated));
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Configuration is out of date.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not upload logo.')
+			};
+		} finally {
+			logoBusy = false;
+		}
+	}
+
+	async function onRemoveLogo() {
+		if (!configuration) return;
+		const epoch = captureEpoch();
+		logoBusy = true;
+		try {
+			const updated = await api.organisationConfig.deleteLogo(configuration.version);
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			configuration = toOrganisationConfigResource(updated);
+			configForm.form.set(toOrganisationConfigFormData(updated));
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Configuration is out of date.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not remove logo.')
+			};
+		} finally {
+			logoBusy = false;
+		}
+	}
+
 
 
 
@@ -440,8 +560,11 @@
 					bind:taxDrawerOpen
 					{editingTaxRateId}
 					{viewState}
+					{logoBusy}
 					onReload={loadAll}
 					{onSaveConfig}
+					{onUploadLogo}
+					{onRemoveLogo}
 					{onSaveTaxRate}
 					{onSetDefaultTaxRate}
 					{onArchiveTaxRate}

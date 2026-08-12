@@ -103,6 +103,7 @@ import {
 } from './payments.ts'
 import { validateEmailTemplateBody } from './email-templates.ts'
 import {
+  validateLogoUploadIntentBody,
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
 } from './organisations.ts'
@@ -639,12 +640,36 @@ Deno.test('organisation create and configuration validation', () => {
     validateOrganisationConfigurationBody({ theme_default: 'dark', default_currency: 'USD' }),
     { theme_default: 'dark', default_currency: 'USD' },
   )
+  assertEquals(
+    validateOrganisationConfigurationBody({
+      address_line1: ' 12 Harbour Rd ',
+      city: 'London',
+      postal_code: 'E1 6AN',
+    }),
+    {
+      address_line1: '12 Harbour Rd',
+      city: 'London',
+      postal_code: 'E1 6AN',
+    },
+  )
   assertThrows(
     () => validateOrganisationConfigurationBody({ theme_default: 'neon' }),
     ApiError,
   )
   assertThrows(
     () => validateOrganisationConfigurationBody({ org_id: 'x' }),
+    ApiError,
+  )
+  assertEquals(
+    validateLogoUploadIntentBody({ mime_type: 'image/png', size_bytes: 1024 }),
+    { mime_type: 'image/png', size_bytes: 1024 },
+  )
+  assertThrows(
+    () => validateLogoUploadIntentBody({ mime_type: 'image/gif', size_bytes: 1024 }),
+    ApiError,
+  )
+  assertThrows(
+    () => validateLogoUploadIntentBody({ mime_type: 'image/png', size_bytes: 3_000_000 }),
     ApiError,
   )
 })
