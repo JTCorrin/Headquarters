@@ -677,6 +677,7 @@ describe('api mappers', () => {
 			version: 2,
 			name: 'Contoso expansion',
 			company_name: 'Contoso',
+			primary_email: 'ava@contoso.test',
 			contact_id: null,
 			client_id: null,
 			stage: 'qualified',
@@ -704,6 +705,7 @@ describe('api mappers', () => {
 		});
 		expect(toLeadFormData(sampleLead)).toMatchObject({
 			name: 'Contoso expansion',
+			primaryEmail: 'ava@contoso.test',
 			stage: 'qualified',
 			valueAmount: '2500',
 			currency: 'GBP',
@@ -713,6 +715,7 @@ describe('api mappers', () => {
 			toLeadCreateBody({
 				name: '  Northwind pilot  ',
 				companyName: '',
+				primaryEmail: 'pilot@northwind.test',
 				clientId: '',
 				stage: 'new',
 				valueAmount: '10',
@@ -726,6 +729,7 @@ describe('api mappers', () => {
 		).toEqual({
 			name: 'Northwind pilot',
 			company_name: null,
+			primary_email: 'pilot@northwind.test',
 			client_id: null,
 			stage: 'new',
 			value_cents: 1000,

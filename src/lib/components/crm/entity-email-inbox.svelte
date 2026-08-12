@@ -12,6 +12,10 @@
 		id: string;
 		direction: 'in' | 'out';
 		from: string;
+		/** Raw sender address (always present for inbound). */
+		fromAddress: string;
+		/** Display name when the provider supplied one. */
+		fromName?: string | null;
 		to: string;
 		subject: string;
 		preview: string;
@@ -48,9 +52,17 @@
 		/** When true, show Add to timeline on the reading pane. */
 		canAddToTimeline?: boolean;
 		sharingId?: string | null;
+		/** When true, show Create lead on inbound messages (personal inbox). */
+		canCreateLead?: boolean;
 		class?: string;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
+		onCreateLead?: (payload: {
+			messageId: string;
+			fromAddress: string;
+			fromName: string | null;
+			subject: string;
+		}) => void;
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: DraftTone;
@@ -77,9 +89,11 @@
 		draftDelayMs = 700,
 		canAddToTimeline = true,
 		sharingId = null,
+		canCreateLead = false,
 		class: className,
 		onSendReply,
 		onAddToTimeline,
+		onCreateLead,
 		onDraftResponse,
 		onUseSuggestion,
 		onDiscardSuggestion
@@ -174,6 +188,16 @@
 		draftError = null;
 		sendError = null;
 		sending = false;
+	}
+
+	function createLeadFromSelected() {
+		if (!selected || selected.direction !== 'in' || !onCreateLead) return;
+		onCreateLead({
+			messageId: selected.id,
+			fromAddress: selected.fromAddress,
+			fromName: selected.fromName?.trim() || null,
+			subject: selected.subject
+		});
 	}
 
 	/** Storybook-only fallback when `onDraftResponse` is omitted. Live pages always wire the API. */
@@ -350,6 +374,16 @@
 									data-testid="email-add-to-timeline"
 								>
 									{sharingId === selected.id ? 'Adding…' : 'Add to timeline'}
+								</Button>
+							{/if}
+							{#if canCreateLead && onCreateLead && selected.direction === 'in'}
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={createLeadFromSelected}
+									data-testid="email-create-lead"
+								>
+									Create lead
 								</Button>
 							{/if}
 							<Button variant="outline" size="sm" onclick={startReply}>Reply</Button>
