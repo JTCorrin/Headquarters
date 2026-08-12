@@ -41,8 +41,11 @@
 		editingTaxRateId?: string | null;
 		viewState?: ResourceViewState;
 		class?: string;
+		logoBusy?: boolean;
 		onReload?: () => void;
 		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
+		onUploadLogo?: (file: File) => void | Promise<void>;
+		onRemoveLogo?: () => void | Promise<void>;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
 		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
@@ -74,8 +77,11 @@
 		editingTaxRateId = null,
 		viewState = { kind: 'ready' },
 		class: className,
+		logoBusy = false,
 		onReload,
 		onSaveConfig,
+		onUploadLogo,
+		onRemoveLogo,
 		onSavePreferences,
 		onSaveMailbox,
 		onTestMailbox,
@@ -141,9 +147,9 @@
 			{#if showContent && configuration}
 				<section class="space-y-4" data-testid="org-defaults-section">
 					<div>
-						<h2 class="text-lg font-semibold tracking-tight">Organisation defaults</h2>
+						<h2 class="text-lg font-semibold tracking-tight">Organisation</h2>
 						<p class="text-muted-foreground text-sm">
-							Timezone, currency, locale, and the org theme default.
+							Company letterhead for quotes and invoices, plus org defaults.
 							{#if !canEdit}
 								Read-only for your role.
 							{/if}
@@ -152,6 +158,10 @@
 					<OrganisationConfigForm
 						form={configForm}
 						readonly={!canEdit}
+						logoUrl={configuration.logo_url}
+						{logoBusy}
+						{onUploadLogo}
+						{onRemoveLogo}
 						onValidSubmit={onSaveConfig}
 					/>
 				</section>

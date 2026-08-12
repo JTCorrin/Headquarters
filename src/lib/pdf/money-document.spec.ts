@@ -88,4 +88,46 @@ describe('buildMoneyDocumentDef', () => {
 		expect(content).toContain('£20.00');
 		expect(content).toContain('£120.00');
 	});
+
+	it('places logo left and address right when branding is provided', () => {
+		const def = buildMoneyDocumentDef({
+			kind: 'invoice',
+			orgName: 'Corrin',
+			orgLogoDataUrl: 'data:image/png;base64,aaa',
+			orgAddressLines: ['Corrin Data Ltd', '12 Harbour Rd', 'London, E1 6AN'],
+			partyLabel: 'Bill to',
+			partyName: 'Northwind',
+			documentNumber: 'INV-0003',
+			currency: 'GBP',
+			status: 'draft',
+			lines: []
+		});
+
+		const content = JSON.stringify(def.content);
+		expect(def.images).toEqual({ orgLogo: 'data:image/png;base64,aaa' });
+		expect(content).toContain('orgLogo');
+		expect(content).toContain('Corrin Data Ltd');
+		expect(content).toContain('12 Harbour Rd');
+		expect(content).toContain('INVOICE');
+		expect(content).toContain('INV-0003');
+	});
+
+	it('falls back to org name text when logo is missing', () => {
+		const def = buildMoneyDocumentDef({
+			kind: 'quote',
+			orgName: 'Corrin Data',
+			orgAddressLines: [],
+			partyLabel: 'Bill to',
+			partyName: 'Northwind',
+			documentNumber: 'Q-0002',
+			currency: 'GBP',
+			status: 'draft',
+			lines: []
+		});
+
+		const content = JSON.stringify(def.content);
+		expect(def.images).toBeUndefined();
+		expect(content).toContain('Corrin Data');
+		expect(content).toContain('QUOTE');
+	});
 });

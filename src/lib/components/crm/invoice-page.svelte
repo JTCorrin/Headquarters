@@ -13,6 +13,7 @@
 		toInvoiceFormData,
 		toInvoiceLineInput,
 		toInvoiceUpdateBody,
+		toOrganisationBrandingResource,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toPaymentCreateBody,
@@ -24,6 +25,7 @@
 		loadEntityTimeline
 	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
+	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
@@ -82,6 +84,8 @@
 	let timelineEvents = $state<TimelineEvent[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
+	let orgLogoDataUrl = $state<string | undefined>(undefined);
+	let orgAddressLines = $state<string[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -270,6 +274,8 @@
 		contactOptions = [];
 		products = [];
 		savedFingerprint = '';
+		orgLogoDataUrl = undefined;
+		orgAddressLines = [];
 		paymentDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
@@ -341,17 +347,22 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, contacts, catalog, rates] = await Promise.all([
+			const [result, clients, contacts, catalog, rates, branding] = await Promise.all([
 				api.invoices.get(invoiceId),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
 				api.products.list({ limit: 100, status: 'active' }),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.organisationConfig.getBranding()
 			]);
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
 			applyDocument(result.data);
+			const brandingResource = toOrganisationBrandingResource(branding);
+			orgAddressLines = formatOrgLetterheadLines(brandingResource);
+			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
+			if (isStale(epoch)) return;
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
 			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
 			lineForm.form.set(emptyLineForm());
@@ -762,6 +773,8 @@
 				{:else if invoice}
 					<InvoiceDetailPage
 						{orgName}
+						{orgLogoDataUrl}
+						{orgAddressLines}
 						{navGroups}
 						title={invoice.number}
 						status={invoiceStatusLabel(invoice.status)}
