@@ -152,3 +152,12 @@ using (
     )
   )
 );
+
+-- Column-level UPDATE grants from multi_org_configuration do not cover new columns.
+grant update (
+  address_line1,
+  address_line2,
+  city,
+  region,
+  postal_code
+) on table public.organisations to authenticated;
