@@ -10,6 +10,7 @@
 		membershipFromCreateResult,
 		quoteStatusLabel,
 		toCatalogProductOption,
+		toOrganisationBrandingResource,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toQuoteFormData,
@@ -22,6 +23,7 @@
 		loadEntityTimeline
 	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
+	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
@@ -73,6 +75,8 @@
 	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let timelineEvents = $state<TimelineEvent[]>([]);
+	let orgLogoDataUrl = $state<string | undefined>(undefined);
+	let orgAddressLines = $state<string[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -192,6 +196,8 @@
 		clientOptions = [];
 		contactOptions = [];
 		products = [];
+		orgLogoDataUrl = undefined;
+		orgAddressLines = [];
 		viewState = { kind: 'loading' };
 	}
 
@@ -234,17 +240,22 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, contacts, catalog, rates] = await Promise.all([
+			const [result, clients, contacts, catalog, rates, branding] = await Promise.all([
 				api.quotes.get(quoteId),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
 				api.products.list({ limit: 100, status: 'active' }),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.organisationConfig.getBranding()
 			]);
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
 			applyDocument(result.data);
+			const brandingResource = toOrganisationBrandingResource(branding);
+			orgAddressLines = formatOrgLetterheadLines(brandingResource);
+			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
+			if (isStale(epoch)) return;
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
 			const options: QuoteContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
@@ -537,6 +548,8 @@
 				{:else if quote}
 					<QuoteDetailPage
 						{orgName}
+						{orgLogoDataUrl}
+						{orgAddressLines}
 						{navGroups}
 						title="{quote.number} · {quote.title}"
 						status={quoteStatusLabel(quote.status)}

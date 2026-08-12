@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
-import { createMockFetch } from '$lib/api/v1/mock-fetch.js';
+import { createMockFetch, type MockHandler } from '$lib/api/v1/mock-fetch.js';
 import { createOrgSession } from '$lib/org/session.svelte.js';
 import BillPage from './bill-page.svelte';
 
@@ -11,6 +11,38 @@ const VENDOR_ID = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
 const PRODUCT_ID = 'dddddddd-dddd-4eee-8fff-000000000001';
 const BILL_ID = 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb';
 const LINE_ID = 'eeeeeeee-eeee-4fff-8000-111111111111';
+
+function sampleBranding() {
+	return {
+		id: ORG_A,
+		name: 'Corrin Data',
+		legal_name: null,
+		slug: 'corrin-data',
+		logo_path: null,
+		logo_url: null,
+		billing_email: null,
+		phone: null,
+		website_url: null,
+		tax_identifier: null,
+		registration_number: null,
+		address_line1: null,
+		address_line2: null,
+		city: null,
+		region: null,
+		postal_code: null,
+		country_code: 'GB',
+		version: 1
+	};
+}
+
+function pageFetch(handlers: Record<string, MockHandler>) {
+	return createMockFetch({
+		'GET /api/v1/organisation/branding': async () => ({
+			body: { data: sampleBranding() }
+		}),
+		...handlers
+	});
+}
 
 function sampleVendor() {
 	return {
@@ -155,7 +187,7 @@ function sampleTaxedProduct() {
 
 describe('BillPage detail flows', () => {
 	it('loads taxed catalog products without crashing', async () => {
-		const fetchMock = createMockFetch({
+		const fetchMock = pageFetch({
 			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
 				body: { data: sampleBill() }
 			}),
@@ -203,7 +235,7 @@ describe('BillPage detail flows', () => {
 	it('preserves product_id, discount, and tax on line replacement saves', async () => {
 		let patchBody: unknown;
 
-		const fetchMock = createMockFetch({
+		const fetchMock = pageFetch({
 			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
 				body: { data: sampleBill() }
 			}),
@@ -260,7 +292,7 @@ describe('BillPage detail flows', () => {
 	it('disables Receive while dirty', async () => {
 		let receiveCalled = false;
 
-		const fetchMock = createMockFetch({
+		const fetchMock = pageFetch({
 			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
 				body: { data: sampleBill() }
 			}),
@@ -307,7 +339,7 @@ describe('BillPage detail flows', () => {
 	it('surfaces ETag conflict on void', async () => {
 		const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Duplicate');
 
-		const fetchMock = createMockFetch({
+		const fetchMock = pageFetch({
 			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
 				body: { data: sampleBill({ version: 3, status: 'received' }) }
 			}),
@@ -356,7 +388,7 @@ describe('BillPage detail flows', () => {
 		let patchBody: unknown;
 		const putCalls: string[] = [];
 
-		const fetchMock = createMockFetch({
+		const fetchMock = pageFetch({
 			[`GET /api/v1/bills/${BILL_ID}`]: async () => ({
 				body: { data: sampleBill() }
 			}),

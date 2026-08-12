@@ -1,17 +1,31 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json, MembershipRow, OrganisationRow } from '../_shared/database.ts'
 import { ApiError, etag, jsonBody, jsonResponse, parseVersion } from './http.ts'
+import { rewriteStorageSignedUrl } from './documents.ts'
 
 type DatabaseClient = SupabaseClient<Database>
 type Theme = 'system' | 'light' | 'dark'
 
 const THEMES = new Set<Theme>(['system', 'light', 'dark'])
 
+const ORG_ASSETS_BUCKET = 'org-assets'
+const LOGO_MAX_BYTES = 2_097_152
+const SIGNED_UPLOAD_SECONDS = 3600
+const SIGNED_DOWNLOAD_SECONDS = 300
+const LOGO_MIME_TO_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+}
+
 const ORG_SUMMARY =
   'id,name,legal_name,slug,logo_path,default_currency,timezone,locale,country_code,theme_default,version,created_at,updated_at,deleted_at'
 
 const ORG_CONFIG =
-  'id,name,legal_name,slug,logo_path,billing_email,phone,website_url,tax_identifier,registration_number,default_currency,timezone,locale,country_code,theme_default,settings,version,created_at,updated_at,deleted_at'
+  'id,name,legal_name,slug,logo_path,billing_email,phone,website_url,tax_identifier,registration_number,address_line1,address_line2,city,region,postal_code,default_currency,timezone,locale,country_code,theme_default,settings,version,created_at,updated_at,deleted_at'
+
+const ORG_BRANDING =
+  'id,name,legal_name,slug,logo_path,billing_email,phone,website_url,tax_identifier,registration_number,address_line1,address_line2,city,region,postal_code,country_code,version'
 
 function isValidTimezone(value: string): boolean {
   // V8's supportedValuesOf('timeZone') often omits the literal "UTC"
@@ -30,6 +44,67 @@ function isValidTimezone(value: string): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+function serviceRoleClient(): SupabaseClient {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!url || !key) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Storage service credentials are unavailable',
+    )
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function assertOwner(role: MembershipRow['role']): void {
+  if (role !== 'owner') {
+    throw new ApiError(403, 'FORBIDDEN', 'Only owners can manage organisation branding')
+  }
+}
+
+function nullableTrimmedString(
+  value: unknown,
+  key: string,
+  max: number,
+  fields: Record<string, string>,
+): string | null | undefined {
+  if (value === undefined) return undefined
+  if (value !== null && typeof value !== 'string') {
+    fields[key] = 'Must be a string or null'
+    return undefined
+  }
+  if (typeof value === 'string' && value.trim().length > max) {
+    fields[key] = `Must not exceed ${max} characters`
+    return undefined
+  }
+  return typeof value === 'string' ? value.trim() || null : null
+}
+
+async function signedLogoUrl(logoPath: string | null): Promise<string | null> {
+  if (!logoPath) return null
+  const admin = serviceRoleClient()
+  const { data, error } = await admin.storage
+    .from(ORG_ASSETS_BUCKET)
+    .createSignedUrl(logoPath, SIGNED_DOWNLOAD_SECONDS)
+  if (error || !data?.signedUrl) {
+    console.error('Signed logo URL failed', { message: error?.message })
+    return null
+  }
+  return rewriteStorageSignedUrl(data.signedUrl)
+}
+
+async function withLogoUrl<T extends { logo_path: string | null }>(
+  row: T,
+): Promise<T & { logo_url: string | null }> {
+  return {
+    ...row,
+    logo_url: await signedLogoUrl(row.logo_path),
   }
 }
 
@@ -126,6 +201,11 @@ export function validateOrganisationConfigurationBody(
   website_url: string | null
   tax_identifier: string | null
   registration_number: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  region: string | null
+  postal_code: string | null
   default_currency: string
   timezone: string
   locale: string
@@ -143,6 +223,11 @@ export function validateOrganisationConfigurationBody(
     'website_url',
     'tax_identifier',
     'registration_number',
+    'address_line1',
+    'address_line2',
+    'city',
+    'region',
+    'postal_code',
     'default_currency',
     'timezone',
     'locale',
@@ -187,6 +272,20 @@ export function validateOrganisationConfigurationBody(
       } else {
         output[key] = typeof value === 'string' ? value.trim() || null : null
       }
+    }
+  }
+
+  const addressFields: Array<[string, number]> = [
+    ['address_line1', 200],
+    ['address_line2', 200],
+    ['city', 120],
+    ['region', 120],
+    ['postal_code', 32],
+  ]
+  for (const [key, max] of addressFields) {
+    if (key in body) {
+      const parsed = nullableTrimmedString(body[key], key, max, fields)
+      if (parsed !== undefined && !fields[key]) output[key] = parsed
     }
   }
 
@@ -267,6 +366,37 @@ export function validateOrganisationConfigurationBody(
   }
 
   return output as ReturnType<typeof validateOrganisationConfigurationBody>
+}
+
+export function validateLogoUploadIntentBody(
+  body: Record<string, unknown>,
+): { mime_type: string; size_bytes: number } {
+  const fields: Record<string, string> = {}
+  const writable = new Set(['mime_type', 'size_bytes'])
+  for (const key of Object.keys(body)) {
+    if (!writable.has(key)) fields[key] = 'Unknown field'
+  }
+
+  const mime = body.mime_type
+  if (typeof mime !== 'string' || !LOGO_MIME_TO_EXT[mime]) {
+    fields.mime_type = 'Must be image/png, image/jpeg, or image/webp'
+  }
+
+  const size = body.size_bytes
+  if (typeof size !== 'number' || !Number.isInteger(size) || size <= 0) {
+    fields.size_bytes = 'Must be a positive integer'
+  } else if (size > LOGO_MAX_BYTES) {
+    fields.size_bytes = `Must not exceed ${LOGO_MAX_BYTES} bytes`
+  }
+
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Logo upload intent validation failed', fields)
+  }
+
+  return {
+    mime_type: mime as string,
+    size_bytes: size as number,
+  }
 }
 
 function databaseError(error: { code?: string; message?: string }, requestId: string): ApiError {
@@ -412,7 +542,26 @@ export async function getOrganisationConfiguration(
 
   if (error) throw databaseError(error, requestId)
   if (!data) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
-  return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
+  const payload = await withLogoUrl(data)
+  return jsonResponse({ data: payload }, 200, requestId, { etag: etag(data.version) })
+}
+
+export async function getOrganisationBranding(
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const { data, error } = await db
+    .from('organisations')
+    .select(ORG_BRANDING)
+    .eq('id', orgId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error) throw databaseError(error, requestId)
+  if (!data) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
+  const payload = await withLogoUrl(data)
+  return jsonResponse({ data: payload }, 200, requestId, { etag: etag(data.version) })
 }
 
 export async function patchOrganisationConfiguration(
@@ -449,7 +598,164 @@ export async function patchOrganisationConfiguration(
   if (!data) {
     throw new ApiError(412, 'PRECONDITION_FAILED', 'Organisation version does not match If-Match')
   }
-  return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
+  const response = await withLogoUrl(data)
+  return jsonResponse({ data: response }, 200, requestId, { etag: etag(data.version) })
+}
+
+export async function createLogoUploadIntent(
+  req: Request,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const body = validateLogoUploadIntentBody(await jsonBody(req))
+  const ext = LOGO_MIME_TO_EXT[body.mime_type]
+  const path = `org/${orgId}/branding/logo.${ext}`
+
+  const admin = serviceRoleClient()
+  // Replace any existing object at this path so createSignedUploadUrl succeeds.
+  await admin.storage.from(ORG_ASSETS_BUCKET).remove([path])
+  const { data: signed, error: signError } = await admin.storage
+    .from(ORG_ASSETS_BUCKET)
+    .createSignedUploadUrl(path)
+
+  if (signError || !signed) {
+    console.error('Signed logo upload URL failed', {
+      request_id: requestId,
+      message: signError?.message,
+    })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not create signed upload URL')
+  }
+
+  return jsonResponse(
+    {
+      data: {
+        bucket: ORG_ASSETS_BUCKET,
+        path,
+        upload: {
+          signed_url: rewriteStorageSignedUrl(signed.signedUrl),
+          token: signed.token,
+          path: signed.path,
+          expires_in: SIGNED_UPLOAD_SECONDS,
+        },
+      },
+    },
+    201,
+    requestId,
+  )
+}
+
+export async function finalizeLogoUpload(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const body = (await jsonBody(req).catch(() => ({}))) as Record<string, unknown>
+  const path = body.path
+  if (typeof path !== 'string' || !path.startsWith(`org/${orgId}/branding/logo.`)) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Logo path is invalid', {
+      path: 'Must be an org branding logo path for this organisation',
+    })
+  }
+
+  const { data: current, error: currentError } = await db
+    .from('organisations')
+    .select('id,version,logo_path')
+    .eq('id', orgId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (currentError) throw databaseError(currentError, requestId)
+  if (!current) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
+  if (current.version !== version) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Organisation version does not match If-Match')
+  }
+
+  const admin = serviceRoleClient()
+  const { data: listed, error: listError } = await admin.storage
+    .from(ORG_ASSETS_BUCKET)
+    .list(`org/${orgId}/branding`, { search: path.split('/').pop() })
+  if (listError) {
+    console.error('Logo object lookup failed', {
+      request_id: requestId,
+      message: listError.message,
+    })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not verify uploaded logo')
+  }
+  const fileName = path.split('/').pop()
+  const found = (listed ?? []).some((item) => item.name === fileName)
+  if (!found) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Uploaded logo object was not found', {
+      path: 'Upload the file before finalizing',
+    })
+  }
+
+  const previousPath = current.logo_path
+  const { data, error } = await db
+    .from('organisations')
+    .update({ logo_path: path } as Database['public']['Tables']['organisations']['Update'])
+    .eq('id', orgId)
+    .eq('version', version)
+    .is('deleted_at', null)
+    .select(ORG_CONFIG)
+    .maybeSingle()
+
+  if (error) throw databaseError(error, requestId)
+  if (!data) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Organisation version does not match If-Match')
+  }
+
+  if (previousPath && previousPath !== path) {
+    await admin.storage.from(ORG_ASSETS_BUCKET).remove([previousPath])
+  }
+
+  const response = await withLogoUrl(data)
+  return jsonResponse({ data: response }, 200, requestId, { etag: etag(data.version) })
+}
+
+export async function deleteOrganisationLogo(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const { data: current, error: currentError } = await db
+    .from('organisations')
+    .select('id,version,logo_path')
+    .eq('id', orgId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (currentError) throw databaseError(currentError, requestId)
+  if (!current) throw new ApiError(404, 'NOT_FOUND', 'Organisation not found')
+  if (current.version !== version) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Organisation version does not match If-Match')
+  }
+
+  const previousPath = current.logo_path
+  const { data, error } = await db
+    .from('organisations')
+    .update({ logo_path: null } as Database['public']['Tables']['organisations']['Update'])
+    .eq('id', orgId)
+    .eq('version', version)
+    .is('deleted_at', null)
+    .select(ORG_CONFIG)
+    .maybeSingle()
+
+  if (error) throw databaseError(error, requestId)
+  if (!data) {
+    throw new ApiError(412, 'PRECONDITION_FAILED', 'Organisation version does not match If-Match')
+  }
+
+  if (previousPath) {
+    const admin = serviceRoleClient()
+    await admin.storage.from(ORG_ASSETS_BUCKET).remove([previousPath])
+  }
+
+  const response = await withLogoUrl(data)
+  return jsonResponse({ data: response }, 200, requestId, { etag: etag(data.version) })
 }
 
 export function handleOrganisations(
@@ -495,6 +801,47 @@ export function handleOrganisationConfiguration(
     return patchOrganisationConfiguration(req, db, orgId, requestId)
   }
   throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for organisation configuration')
+}
+
+export function handleOrganisationBranding(
+  req: Request,
+  db: DatabaseClient,
+  path: string,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  if (path !== '/api/v1/organisation/branding') {
+    throw new ApiError(404, 'NOT_FOUND', 'Route not found')
+  }
+  if (req.method === 'GET') {
+    return getOrganisationBranding(db, orgId, requestId)
+  }
+  throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for organisation branding')
+}
+
+export function handleOrganisationLogo(
+  req: Request,
+  db: DatabaseClient,
+  path: string,
+  orgId: string,
+  role: MembershipRow['role'],
+  requestId: string,
+): Promise<Response> {
+  assertOwner(role)
+
+  if (path === '/api/v1/organisation/logo/upload-intent') {
+    if (req.method === 'POST') return createLogoUploadIntent(req, orgId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for logo upload intent')
+  }
+  if (path === '/api/v1/organisation/logo/finalize') {
+    if (req.method === 'POST') return finalizeLogoUpload(req, db, orgId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for logo finalize')
+  }
+  if (path === '/api/v1/organisation/logo') {
+    if (req.method === 'DELETE') return deleteOrganisationLogo(req, db, orgId, requestId)
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for organisation logo')
+  }
+  throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 }
 
 export type { OrganisationRow, Theme }
