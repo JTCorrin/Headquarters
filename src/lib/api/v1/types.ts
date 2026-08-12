@@ -1079,6 +1079,7 @@ export interface ApiLead {
 	version: number;
 	name: string;
 	company_name: string | null;
+	primary_email: string | null;
 	contact_id: string | null;
 	client_id: string | null;
 	stage: ApiLeadStage;
@@ -1100,6 +1101,7 @@ export interface ApiLead {
 export interface ApiLeadCreateBody {
 	name: string;
 	company_name?: string | null;
+	primary_email?: string | null;
 	contact_id?: string | null;
 	client_id?: string | null;
 	stage?: ApiLeadWritableStage;

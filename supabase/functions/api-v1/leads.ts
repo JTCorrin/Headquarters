@@ -11,11 +11,12 @@ import {
 } from './http.ts'
 
 const LEAD_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,company_name,contact_id,client_id,stage,value_cents,currency,probability_percent,source,owner_membership_id,expected_close_on,lost_reason,won_at,lost_at,converted_at,position,notes,metadata'
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,company_name,primary_email,contact_id,client_id,stage,value_cents,currency,probability_percent,source,owner_membership_id,expected_close_on,lost_reason,won_at,lost_at,converted_at,position,notes,metadata'
 
 const WRITABLE_FIELDS = new Set([
   'name',
   'company_name',
+  'primary_email',
   'contact_id',
   'client_id',
   'stage',
@@ -33,6 +34,7 @@ const WRITABLE_FIELDS = new Set([
 
 const NULLABLE_TEXT_FIELDS = [
   'company_name',
+  'primary_email',
   'source',
   'lost_reason',
   'notes',
@@ -40,6 +42,7 @@ const NULLABLE_TEXT_FIELDS = [
 
 const TEXT_LIMITS: Record<(typeof NULLABLE_TEXT_FIELDS)[number], number> = {
   company_name: 200,
+  primary_email: 320,
   source: 120,
   lost_reason: 2000,
   notes: 20_000,
@@ -53,6 +56,7 @@ type LeadStage = LeadRow['stage']
 type LeadWritable = {
   name?: string
   company_name?: string | null
+  primary_email?: string | null
   contact_id?: string | null
   client_id?: string | null
   stage?: LeadStage
@@ -144,6 +148,12 @@ export function validateLeadBody(
       fields[field] = `Must not exceed ${TEXT_LIMITS[field]} characters`
     } else {
       output[field] = typeof value === 'string' ? value.trim() || null : null
+    }
+  }
+
+  if ('primary_email' in output && typeof output.primary_email === 'string') {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(output.primary_email)) {
+      fields.primary_email = 'Must be a valid email address'
     }
   }
 
