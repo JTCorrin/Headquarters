@@ -24,6 +24,8 @@ export interface ApiOrganisationSummary {
 	name: string;
 	slug: string;
 	logo_path: string | null;
+	/** Short-lived signed URL when logo_path is set. */
+	logo_url?: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
