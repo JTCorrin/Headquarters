@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProjectFormData } from '$lib/schemas/project.js';
+	import {
+		INTERNAL_PROJECT_CLIENT_ID,
+		INTERNAL_PROJECT_LABEL,
+		type ProjectFormData
+	} from '$lib/schemas/project.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -52,8 +56,13 @@
 	const statusLabel = $derived(
 		statusOptions.find((o) => o.value === $formData.status)?.label ?? 'Status'
 	);
+	const attachmentOptions = $derived([
+		{ id: INTERNAL_PROJECT_CLIENT_ID, name: INTERNAL_PROJECT_LABEL },
+		...clients
+	]);
 	const clientLabel = $derived(
-		clients.find((c) => c.id === $formData.clientId)?.name ?? 'Select client'
+		attachmentOptions.find((c) => c.id === $formData.clientId)?.name ??
+			'Select Internal or a client'
 	);
 </script>
 
@@ -91,13 +100,13 @@
 	</div>
 
 	<div class="space-y-2">
-		<Label for="project-client">Client</Label>
+		<Label for="project-client">Attach to</Label>
 		<Select.Root type="single" bind:value={$formData.clientId} name="clientId">
 			<Select.Trigger id="project-client" class="w-full" aria-invalid={!!$errors.clientId}>
 				{clientLabel}
 			</Select.Trigger>
 			<Select.Content>
-				{#each clients as client (client.id)}
+				{#each attachmentOptions as client (client.id)}
 					<Select.Item value={client.id} label={client.name}>{client.name}</Select.Item>
 				{/each}
 			</Select.Content>

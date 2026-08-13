@@ -82,5 +82,7 @@ describe('createOrgSession', () => {
 		expect(session.themePreference).toBe('dark');
 		session.patchOrgThemeDefault('org-a', 'dark');
 		expect(session.memberships[0]?.theme_default).toBe('dark');
+		session.patchOrgLogoUrl('org-a', 'https://example.test/logo.png');
+		expect(session.memberships[0]?.logo_url).toBe('https://example.test/logo.png');
 	});
 });

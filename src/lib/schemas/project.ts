@@ -13,9 +13,31 @@ export const projectFormStatuses = [
 ] as const;
 export type ProjectFormStatus = (typeof projectFormStatuses)[number];
 
+/** Form/select sentinel for a project that is not attached to a client. */
+export const INTERNAL_PROJECT_CLIENT_ID = 'internal';
+export const INTERNAL_PROJECT_LABEL = 'Internal';
+
+export function isInternalProjectClientId(clientId: string | null | undefined): boolean {
+	return !clientId || clientId === INTERNAL_PROJECT_CLIENT_ID;
+}
+
+export function projectClientDisplayName(project: {
+	client_id: string | null;
+	client_label?: string | null;
+}): string {
+	if (!project.client_id) return INTERNAL_PROJECT_LABEL;
+	return project.client_label?.trim() || 'Client';
+}
+
 export const projectFormSchema = z.object({
 	name: z.string().min(1, 'Name is required').max(200),
-	clientId: z.string().uuid('Client is required'),
+	clientId: z
+		.string()
+		.min(1, 'Select Internal or a client')
+		.refine(
+			(value) => value === INTERNAL_PROJECT_CLIENT_ID || z.uuid().safeParse(value).success,
+			'Select Internal or a client'
+		),
 	description: z.string().max(2000).optional().or(z.literal('')),
 	status: z.enum(projectFormStatuses)
 });

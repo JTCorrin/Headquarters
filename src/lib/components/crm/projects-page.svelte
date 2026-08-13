@@ -122,9 +122,7 @@
 	}
 
 	function resetCreateForm() {
-		const next = emptyProjectFormData();
-		if (clients[0]) next.clientId = clients[0].id;
-		projectForm.form.set(next);
+		projectForm.form.set(emptyProjectFormData());
 	}
 
 	async function loadAll() {
@@ -156,13 +154,9 @@
 				.filter((p) => p.status !== 'archived')
 				.map(toProjectListItem);
 			clients = clientRows.data.map((c) => ({ id: c.id, name: c.name }));
-			const currentForm = get(projectForm.form);
-			if (!currentForm.clientId && clients[0]) {
-				projectForm.form.set({ ...currentForm, clientId: clients[0].id });
-			}
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No projects yet — create one attached to a client.' }
+					? { kind: 'empty', message: 'No projects yet — create an internal project or attach one to a client.' }
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
