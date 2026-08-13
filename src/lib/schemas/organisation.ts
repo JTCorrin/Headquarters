@@ -225,7 +225,11 @@ export interface ProfilePreferencesResource {
 	theme_preference: ThemeOption | null;
 }
 
-/** Org Config / Integrations routes and mutate — Owner only (Wave B locked #5). */
+/**
+ * Org Config / Integrations settings routes — Owner only (Wave B locked #5).
+ * GET `/organisation/configuration` is readable by any active membership
+ * (currency/timezone/locale for Leads and other CRM pages).
+ */
 export function canAccessOrgConfigRoutes(role: MembershipRole): boolean {
 	return role === 'owner';
 }
@@ -251,6 +255,11 @@ export function canAccessApiKeys(role: MembershipRole): boolean {
 /** Team membership and invitation management — Owner + Admin. */
 export function canManageOrganisationAccess(role: MembershipRole): boolean {
 	return role === 'owner' || role === 'admin';
+}
+
+/** CRM record writes (contacts, leads, clients, templates, …) — not billing/readonly. */
+export function canMutateCrmRecords(role: MembershipRole): boolean {
+	return role === 'owner' || role === 'admin' || role === 'member';
 }
 
 /**
