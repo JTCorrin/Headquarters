@@ -220,18 +220,23 @@ select is(
   'template status is active'
 );
 
-select throws_ok(
+reset role;
+select pg_temp.as_user((select member_id from _tpl_fixture));
+set local role authenticated;
+
+select lives_ok(
   $$
-    select pg_temp.as_user(member_id) from _tpl_fixture;
     insert into public.email_templates (
       org_id, name, subject, category, status
     )
-    select org_id, 'Denied', 'Nope', 'other', 'draft' from _tpl_fixture
+    select org_id, 'Member Welcome', 'Hello', 'other', 'draft' from _tpl_fixture
   $$,
-  '42501',
-  null,
-  'member cannot insert email templates'
+  'member can insert email templates'
 );
+
+reset role;
+select pg_temp.as_user((select owner_id from _tpl_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$

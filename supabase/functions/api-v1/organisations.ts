@@ -785,9 +785,6 @@ export function handleOrganisationConfiguration(
     throw new ApiError(404, 'NOT_FOUND', 'Route not found')
   }
   if (req.method === 'GET') {
-    if (role !== 'owner') {
-      throw new ApiError(403, 'FORBIDDEN', 'Only owners can access organisation configuration')
-    }
     return getOrganisationConfiguration(db, orgId, requestId)
   }
   if (req.method === 'PATCH') {

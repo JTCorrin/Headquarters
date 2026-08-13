@@ -31,7 +31,11 @@
 		lineItemFormSchema,
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import {
 		quoteFormSchema,
 		type QuoteClientOption,
@@ -52,6 +56,7 @@
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onConverted?: (invoiceId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -63,6 +68,7 @@
 		onMissingOrg,
 		onSwitchNavigate,
 		onConverted,
+		onDeleted,
 		onLogout,
 		class: className
 	}: QuotePageProps = $props();
@@ -469,6 +475,26 @@
 		await runLifecycle('accept', canAccept, 'Could not accept quote — try again.');
 	}
 
+	async function onDelete() {
+		if (!quote || !canSend || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this draft quote? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			await api.quotes.delete(quote.id, quote.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete quote — try again.')
+			};
+		} finally {
+			actionPending = false;
+		}
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'quote', quoteId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
@@ -541,11 +567,16 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if viewState.kind !== 'ready' && !quote}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{:else if quote}
+					{#if viewState.kind === 'validation' || viewState.kind === 'conflict'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<QuoteDetailPage
 						{orgName}
 						{orgLogoDataUrl}
@@ -581,6 +612,7 @@
 						onReject={onReject}
 						onAccept={onAccept}
 						onConvert={onConvert}
+						onDelete={canSend && canMutateCrmRecords(role) ? onDelete : undefined}
 						{onTimelineAdd}
 						showNav={false}
 						class="min-h-0 flex-1"

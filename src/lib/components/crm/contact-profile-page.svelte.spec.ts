@@ -34,4 +34,20 @@ describe('ContactProfilePage tabs', () => {
 		await expect.element(page.getByText('Edit contact')).toBeInTheDocument();
 		await expect.element(page.getByLabelText('Name')).toHaveValue('Ava Chen');
 	});
+
+	it('shows Delete when onDelete is provided', async () => {
+		render(ContactProfilePage, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Contacts'),
+			breadcrumb: 'Contacts / Ava Chen',
+			title: 'Ava Chen',
+			status: 'Active',
+			contactFields: [{ label: 'Email', value: 'ava@northwind.com' }],
+			companyFields: [{ label: 'Company', value: 'Northwind' }],
+			showNav: false,
+			onDelete: () => undefined
+		});
+
+		await expect.element(page.getByTestId('contact-delete')).toBeInTheDocument();
+	});
 });
