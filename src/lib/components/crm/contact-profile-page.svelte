@@ -54,6 +54,7 @@
 		showNav?: boolean;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
@@ -99,6 +100,7 @@
 		showNav = true,
 		class: className,
 		onValidSubmit,
+		onDelete,
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
@@ -148,6 +150,17 @@
 							</ContactFormDrawer>
 						{:else}
 							<Button size="sm" data-testid="contact-edit">Edit</Button>
+						{/if}
+						{#if onDelete}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								data-testid="contact-delete"
+								onclick={() => onDelete?.()}
+							>
+								Delete
+							</Button>
 						{/if}
 					{/snippet}
 				</ProfileHeader>

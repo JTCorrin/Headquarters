@@ -4,6 +4,7 @@ import {
 	canAccessAuditLog,
 	canAccessOrgConfigRoutes,
 	canAccessPersonalConfig,
+	canMutateCrmRecords,
 	canMutateOrgConfig,
 	isIanaTimezone,
 	organisationConfigSchema,
@@ -159,6 +160,11 @@ describe('organisation schemas', () => {
 		expect(canAccessPersonalConfig('member')).toBe(true);
 		expect(canAccessPersonalConfig('readonly')).toBe(true);
 		expect(canAccessPersonalConfig('billing')).toBe(false);
+		expect(canMutateCrmRecords('owner')).toBe(true);
+		expect(canMutateCrmRecords('admin')).toBe(true);
+		expect(canMutateCrmRecords('member')).toBe(true);
+		expect(canMutateCrmRecords('readonly')).toBe(false);
+		expect(canMutateCrmRecords('billing')).toBe(false);
 	});
 
 	it('accepts org config and theme preference enums', () => {

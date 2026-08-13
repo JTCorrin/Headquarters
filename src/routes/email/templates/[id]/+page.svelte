@@ -36,6 +36,9 @@
 		onBack={() => {
 			void goto('/email/templates');
 		}}
+		onDeleted={() => {
+			void goto('/email/templates');
+		}}
 		onLogout={handleLogout}
 	/>
 {/if}

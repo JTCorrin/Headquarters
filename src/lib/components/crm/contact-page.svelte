@@ -28,7 +28,11 @@
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { contactFormSchema, type ContactFormData } from '$lib/schemas/contact.js';
 	import type { LeadClientOption } from '$lib/schemas/lead.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -43,6 +47,7 @@
 		contactId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -53,6 +58,7 @@
 		contactId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onDeleted,
 		onLogout,
 		class: className
 	}: ContactPageProps = $props();
@@ -263,6 +269,23 @@
 		}
 	}
 
+	async function onDelete() {
+		if (!contact || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this contact? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.contacts.delete(contact.id, contact.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete contact — try again.')
+			};
+		}
+	}
+
 	async function onAddToTimeline(payload: { messageId: string }) {
 		sharingId = payload.messageId;
 		try {
@@ -391,6 +414,7 @@
 						documentsEntityId={contact.id}
 						documentsReloadKey={session.cacheGeneration}
 						onValidSubmit={onSaveContact}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}

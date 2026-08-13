@@ -19,7 +19,11 @@
 		emailTemplateFormSchema,
 		type EmailTemplateFormData
 	} from '$lib/schemas/email-template.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import EmailTemplateEditorPage from './email-template-editor-page.svelte';
@@ -34,6 +38,7 @@
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
 		onSaved?: (id: string) => void;
+		onDeleted?: () => void;
 		onBack?: () => void;
 		class?: string;
 	}
@@ -46,6 +51,7 @@
 		onSwitchNavigate,
 		onLogout,
 		onSaved,
+		onDeleted,
 		onBack,
 		class: className
 	}: EmailTemplatePageProps = $props();
@@ -236,6 +242,23 @@
 		}
 	}
 
+	async function onDelete() {
+		if (isNew || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this template? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.emailTemplates.delete(templateId, version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete template — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -298,6 +321,7 @@
 						{viewState}
 						onReload={loadAll}
 						onValidSubmit={onSaveTemplate}
+						onDelete={!isNew && canMutateCrmRecords(role) ? onDelete : undefined}
 						{onBack}
 						showNav={false}
 						class="min-h-0 flex-1"

@@ -72,6 +72,7 @@
 		class?: string;
 		onReload?: () => void;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
@@ -124,6 +125,7 @@
 		class: className,
 		onReload,
 		onValidSubmit,
+		onDelete,
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
@@ -216,6 +218,17 @@
 							</ClientFormDrawer>
 						{:else}
 							<Button size="sm">Edit</Button>
+						{/if}
+						{#if onDelete}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								data-testid="client-delete"
+								onclick={() => onDelete?.()}
+							>
+								Delete
+							</Button>
 						{/if}
 					{/snippet}
 				</ProfileHeader>

@@ -38,7 +38,11 @@
 		type LeadFormData,
 		type LeadResource
 	} from '$lib/schemas/lead.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { LeadConvertResult } from './lead-detail-page.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -55,6 +59,7 @@
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onOpenClient?: (clientId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -66,6 +71,7 @@
 		onMissingOrg,
 		onSwitchNavigate,
 		onOpenClient,
+		onDeleted,
 		onLogout,
 		class: className
 	}: LeadPageProps = $props();
@@ -379,6 +385,23 @@
 		}
 	}
 
+	async function onDelete() {
+		if (!lead || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this lead? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.leads.delete(lead.id, lead.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete lead — try again.')
+			};
+		}
+	}
+
 	async function onCreateClientFromLead(): Promise<boolean> {
 		const epoch = captureEpoch();
 		try {
@@ -492,6 +515,7 @@
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						{onSave}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						{onConvert}
 						{onOpenClient}
 						onCreateClient={() => {

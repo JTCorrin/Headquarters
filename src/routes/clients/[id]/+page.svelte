@@ -28,6 +28,9 @@
 		onSwitchNavigate={() => {
 			void goto('/clients');
 		}}
+		onDeleted={() => {
+			void goto('/clients');
+		}}
 		onLogout={handleLogout}
 	/>
 {/if}

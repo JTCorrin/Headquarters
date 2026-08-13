@@ -31,6 +31,9 @@
 		onConverted={(invoiceId) => {
 			void goto(`/invoices/${invoiceId}`);
 		}}
+		onDeleted={() => {
+			void goto('/quotes');
+		}}
 		onLogout={handleLogout}
 	/>
 {/if}
