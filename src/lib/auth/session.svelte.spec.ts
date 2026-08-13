@@ -1,6 +1,6 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it, vi } from 'vitest';
-import { createAuthSession } from './session.svelte.js';
+import { createAuthSession, membershipRefreshMode } from './session.svelte.js';
 
 function mockClient() {
 	const auth = {
@@ -21,6 +21,63 @@ function mockClient() {
 		client: { auth } as unknown as SupabaseClient
 	};
 }
+
+describe('membershipRefreshMode', () => {
+	it('keeps the workspace mounted across TOKEN_REFRESHED', () => {
+		expect(
+			membershipRefreshMode({
+				previousToken: 'old-jwt',
+				nextToken: 'new-jwt',
+				membershipsReady: true,
+				authEvent: 'TOKEN_REFRESHED'
+			})
+		).toBe('adopt-token');
+	});
+
+	it('blocks the shell only for the first memberships load', () => {
+		expect(
+			membershipRefreshMode({
+				previousToken: null,
+				nextToken: 'jwt',
+				membershipsReady: false,
+				authEvent: 'SIGNED_IN'
+			})
+		).toBe('blocking');
+	});
+
+	it('refreshes quietly when already ready and the event is not a token refresh', () => {
+		expect(
+			membershipRefreshMode({
+				previousToken: 'old-jwt',
+				nextToken: 'new-jwt',
+				membershipsReady: true,
+				authEvent: 'USER_UPDATED'
+			})
+		).toBe('quiet');
+	});
+
+	it('clears memberships when signed out', () => {
+		expect(
+			membershipRefreshMode({
+				previousToken: 'jwt',
+				nextToken: null,
+				membershipsReady: true,
+				authEvent: 'SIGNED_OUT'
+			})
+		).toBe('clear');
+	});
+
+	it('skips when the token is unchanged', () => {
+		expect(
+			membershipRefreshMode({
+				previousToken: 'same-jwt',
+				nextToken: 'same-jwt',
+				membershipsReady: true,
+				authEvent: 'TOKEN_REFRESHED'
+			})
+		).toBe('skip');
+	});
+});
 
 describe('auth session', () => {
 	it('reports confirmation-required signup and forwards profile metadata', async () => {
@@ -74,5 +131,22 @@ describe('auth session', () => {
 		expect(session.accessToken).toBe('validated-token');
 		expect(session.user?.id).toBe('user-1');
 		expect(session.ready).toBe(true);
+	});
+
+	it('records auth change events including TOKEN_REFRESHED', () => {
+		const { auth, client } = mockClient();
+		const session = createAuthSession({ client, initialSession: null });
+		const listener = auth.onAuthStateChange.mock.calls[0]?.[0] as (
+			event: string,
+			next: Session | null
+		) => void;
+
+		listener('TOKEN_REFRESHED', {
+			access_token: 'refreshed',
+			user: { id: 'user-1' }
+		} as Session);
+
+		expect(session.lastAuthEvent).toBe('TOKEN_REFRESHED');
+		expect(session.accessToken).toBe('refreshed');
 	});
 });

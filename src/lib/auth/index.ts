@@ -1,6 +1,7 @@
 export {
 	createAuthSession,
 	getAuthSession,
+	membershipRefreshMode,
 	setAuthSession,
 	type AuthSession,
 	type CreateAuthSessionOptions
