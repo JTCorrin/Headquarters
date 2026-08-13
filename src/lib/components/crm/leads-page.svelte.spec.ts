@@ -79,7 +79,7 @@ const orgConfigBody = {
 	deleted_at: null
 };
 
-function sessionForOrg() {
+function sessionForOrg(role: 'owner' | 'admin' | 'member' | 'readonly' = 'owner') {
 	return createOrgSession({
 		storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
 		initialOrgId: ORG_A,
@@ -89,7 +89,7 @@ function sessionForOrg() {
 				org_name: 'Corrin Data',
 				org_slug: 'corrin-data',
 				logo_url: null,
-				role: 'owner',
+				role,
 				theme_default: 'system'
 			}
 		]
@@ -231,6 +231,28 @@ describe('LeadsPage integration', () => {
 			.toHaveTextContent(/restored|match|conflict|could not move/i);
 		await expect
 			.element(page.getByLabelText('Bravo deal', { exact: true }))
+			.toBeInTheDocument();
+	});
+
+	it('loads the board for an invited member using org default currency', async () => {
+		const session = sessionForOrg('member');
+		const fetchMock = createMockFetch({
+			'GET /api/v1/leads': async () => ({
+				body: { data: [sampleLead()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/organisation/configuration': async () => ({
+				body: { data: orgConfigBody }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(LeadsPage, { api, session });
+
+		await expect
+			.element(page.getByLabelText('Contoso expansion', { exact: true }))
 			.toBeInTheDocument();
 	});
 

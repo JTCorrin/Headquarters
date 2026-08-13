@@ -31,6 +31,9 @@
 		onOpenClient={(clientId) => {
 			void goto(`/clients/${clientId}`);
 		}}
+		onDeleted={() => {
+			void goto('/leads');
+		}}
 		onLogout={handleLogout}
 	/>
 {/if}

@@ -30,7 +30,11 @@
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { MoneySummaryItem } from './money-summary.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -46,6 +50,7 @@
 		clientId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -56,6 +61,7 @@
 		clientId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onDeleted,
 		onLogout,
 		class: className
 	}: ClientPageProps = $props();
@@ -324,6 +330,23 @@
 		}
 	}
 
+	async function onDelete() {
+		if (!client || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this client? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.clients.delete(client.id, client.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete client — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -372,11 +395,16 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if viewState.kind !== 'ready' && !client}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{:else if client}
+					{#if viewState.kind === 'validation' || viewState.kind === 'conflict'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<ClientProfilePage
 						{orgName}
 						{navGroups}
@@ -410,6 +438,7 @@
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						onValidSubmit={onSaveClient}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						onReload={loadAll}
 						showNav={false}
 						class="min-h-0 flex-1"
