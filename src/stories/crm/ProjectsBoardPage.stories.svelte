@@ -70,6 +70,17 @@
 			stage: 'done',
 			version: 1,
 			position: 0
+		},
+		{
+			id: 'p6',
+			name: 'Ops handbook',
+			clientId: 'internal',
+			clientName: 'Internal',
+			owner: 'Joe',
+			cardCount: 4,
+			stage: 'planning',
+			version: 1,
+			position: 1
 		}
 	];
 </script>

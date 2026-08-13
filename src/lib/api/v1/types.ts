@@ -24,6 +24,8 @@ export interface ApiOrganisationSummary {
 	name: string;
 	slug: string;
 	logo_path: string | null;
+	/** Short-lived signed URL when logo_path is set. */
+	logo_url?: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
@@ -992,7 +994,7 @@ export interface ApiProject {
 	updated_by: string | null;
 	deleted_at: string | null;
 	version: number;
-	client_id: string;
+	client_id: string | null;
 	name: string;
 	description: string | null;
 	status: ApiProjectStatus;
@@ -1020,7 +1022,7 @@ export interface ApiProjectListParams {
 }
 
 export interface ApiProjectCreateBody {
-	client_id: string;
+	client_id?: string | null;
 	name: string;
 	description?: string | null;
 	status?: ApiProjectStatus;
@@ -1031,7 +1033,7 @@ export interface ApiProjectCreateBody {
 }
 
 export type ApiProjectUpdateBody = Partial<Omit<ApiProjectCreateBody, 'client_id'>> & {
-	client_id?: string;
+	client_id?: string | null;
 	status?: ApiProjectStatus;
 	position?: number;
 };

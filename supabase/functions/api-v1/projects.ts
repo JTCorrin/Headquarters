@@ -26,6 +26,7 @@ const CARD_SELECT =
   'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,project_id,column_id,title,description,assignee_membership_id,task_id,due_at,position,completed_at'
 
 const PROJECT_WRITABLE = new Set([
+  'client_id',
   'name',
   'description',
   'status',
@@ -35,6 +36,8 @@ const PROJECT_WRITABLE = new Set([
   'completed_at',
   'position',
 ])
+
+const INTERNAL_CLIENT_LABEL = 'Internal'
 
 const COLUMN_WRITABLE = new Set(['name', 'key', 'position', 'wip_limit'])
 const COLUMN_PATCH_WRITABLE = new Set(['name', 'position', 'wip_limit'])
@@ -62,7 +65,7 @@ type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 type ProjectStatus = ProjectRow['status']
 
 type ProjectWritable = {
-  client_id?: string
+  client_id?: string | null
   name?: string
   description?: string | null
   status?: ProjectStatus
@@ -73,7 +76,7 @@ type ProjectWritable = {
   position?: number
 }
 
-type ProjectCreate = ProjectWritable & { client_id: string; name: string }
+type ProjectCreate = ProjectWritable & { name: string }
 type ProjectUpdate = ProjectWritable
 
 type ColumnCreate = {
@@ -208,21 +211,20 @@ export function validateProjectBody(
   const output: ProjectUpdate = {}
 
   for (const key of Object.keys(body)) {
-    if (!partial && key === 'client_id') continue
-    if (!PROJECT_WRITABLE.has(key) && !(!partial && key === 'client_id')) {
-      if (key !== 'client_id') fields[key] = 'Field is not writable'
+    if (!PROJECT_WRITABLE.has(key)) {
+      fields[key] = 'Field is not writable'
     }
   }
 
   if (!partial || 'client_id' in body) {
     const value = body.client_id
-    if (typeof value !== 'string') {
-      fields.client_id = 'Must be a UUID'
+    if (value === null || value === undefined) {
+      output.client_id = null
     } else {
       try {
-        output.client_id = parseUuid(value, 'client_id')
+        output.client_id = parseUuid(typeof value === 'string' ? value : null, 'client_id')
       } catch {
-        fields.client_id = 'Must be a UUID'
+        fields.client_id = 'Must be a UUID or null'
       }
     }
   }
@@ -540,8 +542,9 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
 async function resolveClientLabel(
   db: DatabaseProject,
   orgId: string,
-  clientId: string,
+  clientId: string | null,
 ): Promise<string | null> {
+  if (!clientId) return INTERNAL_CLIENT_LABEL
   const { data } = await db
     .from('clients')
     .select('name')
@@ -550,6 +553,26 @@ async function resolveClientLabel(
     .is('deleted_at', null)
     .maybeSingle()
   return data?.name ?? null
+}
+
+async function resolveClientLabels(
+  db: DatabaseProject,
+  orgId: string,
+  clientIds: Array<string | null>,
+): Promise<Map<string, string>> {
+  const unique = [...new Set(clientIds.filter((id): id is string => Boolean(id)))]
+  const labels = new Map<string, string>()
+  if (unique.length === 0) return labels
+  const { data } = await db
+    .from('clients')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .in('id', unique)
+    .is('deleted_at', null)
+  for (const row of data ?? []) {
+    if (row.name) labels.set(row.id, row.name)
+  }
+  return labels
 }
 
 async function findProject(
@@ -698,10 +721,20 @@ async function listProjects(
   const hasNextPage = projects.length > limit
   const page = hasNextPage ? projects.slice(0, limit) : projects
   const last = page.at(-1)
+  const labels = await resolveClientLabels(
+    db,
+    orgId,
+    page.map((project) => project.client_id),
+  )
 
   return jsonResponse(
     {
-      data: page,
+      data: page.map((project) => ({
+        ...project,
+        client_label: project.client_id
+          ? (labels.get(project.client_id) ?? null)
+          : INTERNAL_CLIENT_LABEL,
+      })),
       meta: {
         next_cursor: hasNextPage && last
           ? encodeCursor({ created_at: last.created_at, id: last.id })
