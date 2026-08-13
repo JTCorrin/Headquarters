@@ -24,6 +24,7 @@
 		class?: string;
 		onReload?: () => void;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void;
 		onBack?: () => void;
 	}
 
@@ -44,6 +45,7 @@
 		class: className,
 		onReload,
 		onValidSubmit,
+		onDelete,
 		onBack
 	}: EmailTemplateEditorPageProps = $props();
 
@@ -85,6 +87,17 @@
 					{#snippet actions()}
 						{#if onBack}
 							<Button type="button" variant="outline" size="sm" onclick={onBack}>Back</Button>
+						{/if}
+						{#if onDelete}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								data-testid="email-template-delete"
+								onclick={() => onDelete?.()}
+							>
+								Delete
+							</Button>
 						{/if}
 					{/snippet}
 				</PageHeader>

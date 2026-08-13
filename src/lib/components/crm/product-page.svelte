@@ -23,7 +23,11 @@
 		type ProductFormData,
 		type ProductTaxRateOption
 	} from '$lib/schemas/product.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -37,6 +41,7 @@
 		productId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -47,6 +52,7 @@
 		productId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onDeleted,
 		onLogout,
 		class: className
 	}: ProductPageProps = $props();
@@ -271,6 +277,23 @@
 		}
 	}
 
+	async function onDelete() {
+		if (!product || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this product? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.products.delete(product.id, product.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete product — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -319,11 +342,16 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if viewState.kind !== 'ready' && !product}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{:else if product}
+					{#if viewState.kind === 'validation' || viewState.kind === 'conflict'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<ProductDetailPage
 						{orgName}
 						{navGroups}
@@ -339,6 +367,7 @@
 							productForm.form.set(toProductFormData(product!));
 							editOpen = true;
 						}}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 					/>
 					<ProductFormDrawer
 						bind:open={editOpen}

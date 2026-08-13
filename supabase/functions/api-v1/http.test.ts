@@ -103,6 +103,7 @@ import {
 } from './payments.ts'
 import { validateEmailTemplateBody } from './email-templates.ts'
 import {
+  handleOrganisationConfiguration,
   validateLogoUploadIntentBody,
   validateOrganisationConfigurationBody,
   validateOrganisationCreateBody,
@@ -672,6 +673,88 @@ Deno.test('organisation create and configuration validation', () => {
     () => validateLogoUploadIntentBody({ mime_type: 'image/png', size_bytes: 3_000_000 }),
     ApiError,
   )
+})
+
+Deno.test('organisation configuration GET is allowed for every membership role', async () => {
+  const orgId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+  const row = {
+    id: orgId,
+    name: 'Corrin Data',
+    legal_name: null,
+    slug: 'corrin-data',
+    logo_path: null,
+    billing_email: null,
+    phone: null,
+    website_url: null,
+    tax_identifier: null,
+    registration_number: null,
+    address_line1: null,
+    address_line2: null,
+    city: null,
+    region: null,
+    postal_code: null,
+    default_currency: 'GBP',
+    timezone: 'UTC',
+    locale: 'en-GB',
+    country_code: 'GB',
+    theme_default: 'system',
+    settings: {},
+    version: 1,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    deleted_at: null,
+  }
+  const db = {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                is() {
+                  return {
+                    maybeSingle: () => Promise.resolve({ data: row, error: null }),
+                  }
+                },
+              }
+            },
+          }
+        },
+      }
+    },
+  }
+  for (const role of ['owner', 'admin', 'member', 'readonly', 'billing'] as const) {
+    const response = await handleOrganisationConfiguration(
+      new Request('https://example.test/api/v1/organisation/configuration'),
+      db as never,
+      '/api/v1/organisation/configuration',
+      orgId,
+      role,
+      'req-config-get',
+    )
+    assertEquals(response.status, 200)
+  }
+})
+
+Deno.test('organisation configuration PATCH stays owner-only', () => {
+  const req = new Request('https://example.test/api/v1/organisation/configuration', {
+    method: 'PATCH',
+  })
+  for (const role of ['admin', 'member', 'readonly', 'billing'] as const) {
+    assertThrows(
+      () =>
+        handleOrganisationConfiguration(
+          req,
+          {} as never,
+          '/api/v1/organisation/configuration',
+          'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+          role,
+          'req-config-patch',
+        ),
+      ApiError,
+      'Only owners can update organisation configuration',
+    )
+  }
 })
 
 Deno.test('quote create validation defaults currency and rejects calculated fields', () => {

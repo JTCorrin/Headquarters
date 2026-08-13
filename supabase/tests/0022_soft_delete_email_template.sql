@@ -236,7 +236,7 @@ from recreated;
 select pg_temp.as_user((select member_id from _tpl_del_fixture));
 set local role authenticated;
 
-select throws_ok(
+select lives_ok(
   $$
     select public.soft_delete_email_template(
       (select template_id from _tpl_del_fixture),
@@ -244,9 +244,7 @@ select throws_ok(
       (select template_version from _tpl_del_fixture)
     )
   $$,
-  '42501',
-  null,
-  'members cannot soft-delete email templates'
+  'members can soft-delete email templates'
 );
 
 reset role;

@@ -59,6 +59,7 @@
 		showNav?: boolean;
 		class?: string;
 		onSave?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void;
 		onConvert?: () => void;
 		onOpenClient?: (clientId: string) => void;
 		onCreateClient?: () => void;
@@ -102,6 +103,7 @@
 		showNav = true,
 		class: className,
 		onSave,
+		onDelete,
 		onConvert,
 		onOpenClient,
 		onCreateClient,
@@ -167,6 +169,17 @@
 								onclick={() => lead?.client_id && onOpenClient?.(lead.client_id)}
 							>
 								Open client
+							</Button>
+						{/if}
+						{#if onDelete}
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								data-testid="lead-delete"
+								onclick={() => onDelete?.()}
+							>
+								Delete
 							</Button>
 						{/if}
 					{/snippet}

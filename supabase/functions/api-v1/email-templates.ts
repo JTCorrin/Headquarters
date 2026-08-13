@@ -210,7 +210,7 @@ export function handleEmailTemplates(
   if (role === 'billing') {
     throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access email templates')
   }
-  const canMutate = role === 'owner' || role === 'admin'
+  const canMutate = role === 'owner' || role === 'admin' || role === 'member'
 
   if (path === '/api/v1/email-templates') {
     if (req.method === 'GET') {
@@ -246,7 +246,7 @@ export function handleEmailTemplates(
     }
     if (req.method === 'POST') {
       if (!canMutate) {
-        throw new ApiError(403, 'FORBIDDEN', 'Only owners and admins can manage email templates')
+        throw new ApiError(403, 'FORBIDDEN', 'This membership cannot manage email templates')
       }
       return (async () => {
         const payload = validateEmailTemplateBody(await jsonBody(req), false)
@@ -284,7 +284,7 @@ export function handleEmailTemplates(
 
   if (req.method === 'PATCH') {
     if (!canMutate) {
-      throw new ApiError(403, 'FORBIDDEN', 'Only owners and admins can manage email templates')
+      throw new ApiError(403, 'FORBIDDEN', 'This membership cannot manage email templates')
     }
     return (async () => {
       const version = parseVersion(req)
@@ -320,7 +320,7 @@ export function handleEmailTemplates(
 
   if (req.method === 'DELETE') {
     if (!canMutate) {
-      throw new ApiError(403, 'FORBIDDEN', 'Only owners and admins can manage email templates')
+      throw new ApiError(403, 'FORBIDDEN', 'This membership cannot manage email templates')
     }
     return (async () => {
       const version = parseVersion(req)

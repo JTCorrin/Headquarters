@@ -53,6 +53,7 @@
 		onReject?: () => void | Promise<void>;
 		onAccept?: () => void | Promise<void>;
 		onConvert?: () => void | Promise<void>;
+		onDelete?: () => void | Promise<void>;
 		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		clientOptions?: import('$lib/schemas/quote.js').QuoteClientOption[];
@@ -90,6 +91,7 @@
 		onReject,
 		onAccept,
 		onConvert,
+		onDelete,
 		onSaveQuote,
 		onTimelineAdd,
 		clientOptions = [],
@@ -220,6 +222,18 @@
 							data-testid="quote-convert-disabled"
 						>
 							Convert to invoice
+						</Button>
+					{/if}
+					{#if onDelete}
+						<Button
+							size="sm"
+							type="button"
+							variant="outline"
+							disabled={actionPending}
+							data-testid="quote-delete"
+							onclick={() => void onDelete?.()}
+						>
+							Delete draft
 						</Button>
 					{/if}
 				{/snippet}

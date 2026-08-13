@@ -31,6 +31,7 @@
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		onEdit?: () => void;
+		onDelete?: () => void;
 		class?: string;
 	}
 
@@ -47,6 +48,7 @@
 		stats = [],
 		showNav = true,
 		onEdit,
+		onDelete,
 		class: className
 	}: ProductDetailPageProps = $props();
 </script>
@@ -72,6 +74,17 @@
 			>
 				{#snippet actions()}
 					<Button size="sm" type="button" onclick={() => onEdit?.()}>Edit</Button>
+					{#if onDelete}
+						<Button
+							size="sm"
+							type="button"
+							variant="outline"
+							data-testid="product-delete"
+							onclick={() => onDelete?.()}
+						>
+							Delete
+						</Button>
+					{/if}
 				{/snippet}
 			</PageHeader>
 
