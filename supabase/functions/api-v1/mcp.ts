@@ -427,11 +427,11 @@ const TOOLS: ToolDef[] = [
   {
     name: 'create_project',
     description:
-      'Create a project with default board columns (same validation as POST /api/v1/projects).',
+      'Create a project with default board columns (same validation as POST /api/v1/projects). Omit client_id or pass null for an internal project.',
     inputSchema: {
       type: 'object',
       properties: {
-        client_id: { type: 'string', format: 'uuid' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
         name: { type: 'string' },
         description: { type: ['string', 'null'] },
         status: {
@@ -444,19 +444,20 @@ const TOOLS: ToolDef[] = [
         completed_at: { type: ['string', 'null'] },
         position: { type: 'number' },
       },
-      required: ['client_id', 'name'],
+      required: ['name'],
       additionalProperties: false,
     },
   },
   {
     name: 'update_project',
     description:
-      'Update a project (same validation as PATCH /api/v1/projects/{id}). Requires version for If-Match.',
+      'Update a project (same validation as PATCH /api/v1/projects/{id}). Requires version for If-Match. Pass client_id null to mark the project internal.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', format: 'uuid' },
         version: { type: 'integer', minimum: 1 },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
         name: { type: 'string' },
         description: { type: ['string', 'null'] },
         status: {
