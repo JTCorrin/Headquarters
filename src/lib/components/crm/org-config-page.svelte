@@ -164,6 +164,12 @@
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
 	}
 
+	function syncSessionBranding(config: OrganisationConfigResource) {
+		if (!session.selectedOrgId) return;
+		session.patchOrgThemeDefault(session.selectedOrgId, config.theme_default);
+		session.patchOrgLogoUrl(session.selectedOrgId, config.logo_url);
+	}
+
 	function resetOrgScopedState() {
 		configuration = null;
 		taxRates = [];
@@ -211,9 +217,7 @@
 			configuration = toOrganisationConfigResource(config);
 			taxRates = rates.map(toTaxRateResource);
 			configForm.form.set(toOrganisationConfigFormData(config));
-			if (session.selectedOrgId) {
-				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
-			}
+			syncSessionBranding(configuration);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -252,9 +256,7 @@
 			}
 			configuration = toOrganisationConfigResource(updated);
 			configForm.form.set(toOrganisationConfigFormData(updated));
-			if (session.selectedOrgId) {
-				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
-			}
+			syncSessionBranding(configuration);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -337,6 +339,7 @@
 			}
 			configuration = toOrganisationConfigResource(updated);
 			configForm.form.set(toOrganisationConfigFormData(updated));
+			syncSessionBranding(configuration);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -371,6 +374,7 @@
 			}
 			configuration = toOrganisationConfigResource(updated);
 			configForm.form.set(toOrganisationConfigFormData(updated));
+			syncSessionBranding(configuration);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {

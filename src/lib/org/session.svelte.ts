@@ -31,6 +31,8 @@ export interface OrgSession {
 	setThemePreference(preference: ThemePreferenceOption): void;
 	/** Patch `theme_default` on a membership after org config save. */
 	patchOrgThemeDefault(orgId: string, themeDefault: ThemeOption): void;
+	/** Patch `logo_url` on a membership after logo upload or removal. */
+	patchOrgLogoUrl(orgId: string, logoUrl: string | null): void;
 	/** Persist selection and bump cache generation when the org changes. */
 	selectOrg(orgId: string): void;
 	clearSelection(): void;
@@ -108,6 +110,13 @@ export function createOrgSession(options: CreateOrgSessionOptions = {}): OrgSess
 			if (!current || current.theme_default === themeDefault) return;
 			memberships = memberships.map((m) =>
 				m.org_id === orgId ? { ...m, theme_default: themeDefault } : m
+			);
+		},
+		patchOrgLogoUrl(orgId, logoUrl) {
+			const current = memberships.find((m) => m.org_id === orgId);
+			if (!current || current.logo_url === logoUrl) return;
+			memberships = memberships.map((m) =>
+				m.org_id === orgId ? { ...m, logo_url: logoUrl } : m
 			);
 		},
 		selectOrg,

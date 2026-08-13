@@ -2,6 +2,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import StatusBadge from './status-badge.svelte';
+	import OrgLogoMark from './org-logo-mark.svelte';
 	import {
 		roleLabel,
 		type OrgMembershipSummary
@@ -31,13 +32,6 @@
 	const current = $derived(
 		memberships.find((m) => m.org_id === currentOrgId) ?? memberships[0] ?? null
 	);
-
-	function initials(name: string): string {
-		const parts = name.trim().split(/\s+/).filter(Boolean);
-		if (parts.length === 0) return '?';
-		if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-		return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
-	}
 </script>
 
 <div class={cn('space-y-2', className)} data-testid="org-switcher">
@@ -54,20 +48,7 @@
 					data-testid="org-switcher-trigger"
 					aria-label="Organisation switcher"
 				>
-					{#if current?.logo_url}
-						<img
-							src={current.logo_url}
-							alt=""
-							class="size-6 shrink-0 rounded-md object-cover"
-						/>
-					{:else}
-						<span
-							class="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold"
-							aria-hidden="true"
-						>
-							{initials(current?.org_name ?? 'Org')}
-						</span>
-					{/if}
+					<OrgLogoMark name={current?.org_name ?? 'Org'} logoUrl={current?.logo_url} />
 					<span class="truncate font-medium">{current?.org_name ?? 'Select organisation'}</span>
 					{#if current}
 						<span class="text-muted-foreground hidden shrink-0 sm:inline">
@@ -90,20 +71,7 @@
 						onclick={() => onSwitchOrg?.(membership.org_id)}
 						data-testid={`org-switch-${membership.org_id}`}
 					>
-						{#if membership.logo_url}
-							<img
-								src={membership.logo_url}
-								alt=""
-								class="size-6 shrink-0 rounded-md object-cover"
-							/>
-						{:else}
-							<span
-								class="bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold"
-								aria-hidden="true"
-							>
-								{initials(membership.org_name)}
-							</span>
-						{/if}
+						<OrgLogoMark name={membership.org_name} logoUrl={membership.logo_url} />
 						<span class="min-w-0 flex-1 truncate">{membership.org_name}</span>
 						<StatusBadge status={roleLabel(membership.role)} class="shrink-0" />
 					</DropdownMenu.Item>
