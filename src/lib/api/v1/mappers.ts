@@ -158,12 +158,16 @@ import type {
 	MeetingFormData,
 	MeetingListItem
 } from '$lib/schemas/meeting.js';
-import type {
-	ProjectCardFormData,
-	ProjectFormData,
-	ProjectListItem
+import {
+	INTERNAL_PROJECT_CLIENT_ID,
+	isInternalProjectClientId,
+	projectBoardStatuses,
+	projectClientDisplayName,
+	projectFormStatuses,
+	type ProjectCardFormData,
+	type ProjectFormData,
+	type ProjectListItem
 } from '$lib/schemas/project.js';
-import { projectBoardStatuses, projectFormStatuses } from '$lib/schemas/project.js';
 import type { InfoCardField } from '$lib/components/crm/info-card.svelte';
 import type { DashboardMeeting } from '$lib/components/crm/dashboard-page.svelte';
 import type { EntityProject } from '$lib/components/crm/entity-projects.svelte';
@@ -2391,7 +2395,7 @@ export function projectStatusLabel(status: ApiProjectStatus): string {
 export function emptyProjectFormData(): ProjectFormData {
 	return {
 		name: '',
-		clientId: '',
+		clientId: INTERNAL_PROJECT_CLIENT_ID,
 		description: '',
 		status: 'planning'
 	};
@@ -2405,15 +2409,20 @@ export function toProjectFormData(project: ApiProject): ProjectFormData {
 		: 'planning';
 	return {
 		name: project.name,
-		clientId: project.client_id,
+		clientId: project.client_id ?? INTERNAL_PROJECT_CLIENT_ID,
 		description: project.description ?? '',
 		status
 	};
 }
 
+function projectClientIdToApi(clientId: string): string | null {
+	const trimmed = clientId.trim();
+	return isInternalProjectClientId(trimmed) ? null : trimmed;
+}
+
 export function toProjectCreateBody(data: ProjectFormData): ApiProjectCreateBody {
 	return {
-		client_id: data.clientId.trim(),
+		client_id: projectClientIdToApi(data.clientId),
 		name: data.name.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
 		status: data.status === 'archived' ? 'planning' : data.status
@@ -2422,7 +2431,7 @@ export function toProjectCreateBody(data: ProjectFormData): ApiProjectCreateBody
 
 export function toProjectUpdateBody(data: ProjectFormData): ApiProjectUpdateBody {
 	return {
-		client_id: data.clientId.trim(),
+		client_id: projectClientIdToApi(data.clientId),
 		name: data.name.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
 		status: data.status
@@ -2469,8 +2478,8 @@ export function toProjectListItem(project: ApiProject): ProjectListItem {
 	return {
 		id: project.id,
 		name: project.name,
-		clientId: project.client_id,
-		clientName: project.client_label?.trim() || 'Client',
+		clientId: project.client_id ?? INTERNAL_PROJECT_CLIENT_ID,
+		clientName: projectClientDisplayName(project),
 		cardCount,
 		stage: status,
 		version: project.version,
