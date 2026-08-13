@@ -13,11 +13,13 @@ export async function signupViaUi(page: Page, env: E2EEnv): Promise<E2ESession> 
 	const password = env.userPassword ?? 'E2eProofPass123!';
 
 	await page.goto('/signup');
+	await page.getByTestId('auth-display-name').fill('E2E User');
 	await page.getByTestId('auth-email').fill(email);
 	await page.getByTestId('auth-password').fill(password);
 	await page.getByTestId('auth-submit').click();
 
 	// New users land on create-org (0 memberships) or home if a seeded user already has orgs.
+	// Email confirmation must be off on staging (`enable_confirmations = false`) so signup returns a session.
 	await expect(page).toHaveURL(/\/(onboarding\/create-org|select-org|$)/, { timeout: 30_000 });
 	return { email, password };
 }
