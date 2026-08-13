@@ -38,7 +38,11 @@ import {
 	toPaymentListItem,
 	paymentStatusLabel,
 	toQuoteCreateBody,
-	toQuoteListItem
+	toQuoteListItem,
+	emptyProjectFormData,
+	toProjectCreateBody,
+	toProjectFormData,
+	toProjectListItem
 } from './mappers.js';
 import type {
 	ApiClient,
@@ -953,6 +957,78 @@ describe('api mappers', () => {
 					amount_cents: 4200
 				}
 			]
+		});
+	});
+
+	it('maps internal projects to a null client_id and Internal label', () => {
+		expect(toProjectCreateBody(emptyProjectFormData())).toMatchObject({
+			client_id: null,
+			name: ''
+		});
+		expect(
+			toProjectCreateBody({
+				name: 'Ops handbook',
+				clientId: 'internal',
+				description: '',
+				status: 'planning'
+			})
+		).toEqual({
+			client_id: null,
+			name: 'Ops handbook',
+			description: null,
+			status: 'planning'
+		});
+		expect(
+			toProjectFormData({
+				id: '11111111-2222-4333-8444-555555555555',
+				org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+				created_at: '2026-01-01T00:00:00Z',
+				updated_at: '2026-01-01T00:00:00Z',
+				created_by: null,
+				updated_by: null,
+				deleted_at: null,
+				version: 1,
+				client_id: null,
+				name: 'Ops handbook',
+				description: null,
+				status: 'planning',
+				owner_membership_id: null,
+				starts_on: null,
+				due_on: null,
+				completed_at: null,
+				position: 0,
+				client_label: 'Internal'
+			})
+		).toMatchObject({
+			name: 'Ops handbook',
+			clientId: 'internal',
+			status: 'planning'
+		});
+		expect(
+			toProjectListItem({
+				id: '11111111-2222-4333-8444-555555555555',
+				org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+				created_at: '2026-01-01T00:00:00Z',
+				updated_at: '2026-01-01T00:00:00Z',
+				created_by: null,
+				updated_by: null,
+				deleted_at: null,
+				version: 1,
+				client_id: null,
+				name: 'Ops handbook',
+				description: null,
+				status: 'planning',
+				owner_membership_id: null,
+				starts_on: null,
+				due_on: null,
+				completed_at: null,
+				position: 0,
+				client_label: 'Internal'
+			})
+		).toMatchObject({
+			clientId: 'internal',
+			clientName: 'Internal',
+			name: 'Ops handbook'
 		});
 	});
 });

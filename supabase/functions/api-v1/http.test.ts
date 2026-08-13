@@ -1152,11 +1152,14 @@ Deno.test('meeting create validation accepts structured attendees and project re
   assertEquals(patched.attendees?.length, 1)
 })
 
-Deno.test('project create validation requires client_id and accepts status enum', () => {
+Deno.test('project create validation allows null client_id for internal projects', () => {
   assertThrows(
-    () => validateProjectBody({ name: 'Rollout' }, false),
+    () => validateProjectBody({ name: 'Rollout', client_id: 'not-a-uuid' }, false),
     ApiError,
   )
+  const internal = validateProjectBody({ name: 'Ops handbook' }, false)
+  assertEquals(internal.client_id, null)
+  assertEquals(internal.name, 'Ops handbook')
   const created = validateProjectBody(
     {
       client_id: '11111111-1111-4111-8111-111111111111',
@@ -1183,6 +1186,8 @@ Deno.test('project create validation requires client_id and accepts status enum'
   const patched = validateProjectBody({ status: 'done', position: 42.5 }, true)
   assertEquals(patched.status, 'done')
   assertEquals(patched.position, 42.5)
+  const cleared = validateProjectBody({ client_id: null }, true)
+  assertEquals(cleared.client_id, null)
 })
 
 Deno.test('project card validation requires title on create', () => {
