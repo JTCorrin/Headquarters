@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProjectFormData } from '$lib/schemas/project.js';
+	import {
+		INTERNAL_PROJECT_CLIENT_ID,
+		INTERNAL_PROJECT_LABEL,
+		type ProjectFormData
+	} from '$lib/schemas/project.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProjectsBoard, {
@@ -42,6 +46,10 @@
 		onValidSubmit
 	}: ProjectsBoardPageProps = $props();
 
+	const filterOptions = $derived([
+		{ id: INTERNAL_PROJECT_CLIENT_ID, name: INTERNAL_PROJECT_LABEL },
+		...clients
+	]);
 	const filtered = $derived(
 		clientFilter === 'all'
 			? projects
@@ -75,7 +83,7 @@
 
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="text-muted-foreground text-xs font-medium tracking-wide uppercase"
-					>Client</span
+					>Attach to</span
 				>
 				<button
 					type="button"
@@ -89,7 +97,7 @@
 				>
 					All
 				</button>
-				{#each clients as client (client.id)}
+				{#each filterOptions as client (client.id)}
 					<button
 						type="button"
 						class={cn(

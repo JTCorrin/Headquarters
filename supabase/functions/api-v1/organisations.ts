@@ -11,7 +11,8 @@ const THEMES = new Set<Theme>(['system', 'light', 'dark'])
 const ORG_ASSETS_BUCKET = 'org-assets'
 const LOGO_MAX_BYTES = 2_097_152
 const SIGNED_UPLOAD_SECONDS = 3600
-const SIGNED_DOWNLOAD_SECONDS = 300
+/** Logos live in persistent chrome (org switcher); keep URLs valid for a workday. */
+const SIGNED_DOWNLOAD_SECONDS = 60 * 60 * 24
 const LOGO_MIME_TO_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
@@ -105,6 +106,33 @@ async function withLogoUrl<T extends { logo_path: string | null }>(
   return {
     ...row,
     logo_url: await signedLogoUrl(row.logo_path),
+  }
+}
+
+async function organisationDiscoveryPayload(organisation: {
+  id: string
+  name: string
+  slug: string
+  logo_path: string | null
+  default_currency: string
+  timezone: string
+  locale: string
+  country_code: string
+  theme_default: Theme
+  version?: number
+}) {
+  return {
+    id: organisation.id,
+    name: organisation.name,
+    slug: organisation.slug,
+    logo_path: organisation.logo_path,
+    logo_url: await signedLogoUrl(organisation.logo_path),
+    default_currency: organisation.default_currency,
+    timezone: organisation.timezone,
+    locale: organisation.locale,
+    country_code: organisation.country_code,
+    theme_default: organisation.theme_default,
+    ...(organisation.version !== undefined ? { version: organisation.version } : {}),
   }
 }
 
@@ -439,31 +467,23 @@ export async function listOrganisations(
   if (orgError) throw databaseError(orgError, requestId)
 
   const byId = new Map((orgs ?? []).map((org) => [org.id, org]))
-  const data = rows
-    .map((membership) => {
-      const organisation = byId.get(membership.org_id)
-      if (!organisation) return null
-      return {
-        membership: {
-          id: membership.id,
-          role: membership.role,
-          status: membership.status,
-          joined_at: membership.joined_at,
-        },
-        organisation: {
-          id: organisation.id,
-          name: organisation.name,
-          slug: organisation.slug,
-          logo_path: organisation.logo_path,
-          default_currency: organisation.default_currency,
-          timezone: organisation.timezone,
-          locale: organisation.locale,
-          country_code: organisation.country_code,
-          theme_default: organisation.theme_default,
-        },
-      }
-    })
-    .filter((row) => row !== null)
+  const data = (
+    await Promise.all(
+      rows.map(async (membership) => {
+        const organisation = byId.get(membership.org_id)
+        if (!organisation) return null
+        return {
+          membership: {
+            id: membership.id,
+            role: membership.role,
+            status: membership.status,
+            joined_at: membership.joined_at,
+          },
+          organisation: await organisationDiscoveryPayload(organisation),
+        }
+      }),
+    )
+  ).filter((row) => row !== null)
 
   return jsonResponse({ data }, 200, requestId)
 }
@@ -504,18 +524,7 @@ export async function createOrganisation(
   return jsonResponse(
     {
       data: {
-        organisation: {
-          id: organisation.id,
-          name: organisation.name,
-          slug: organisation.slug,
-          logo_path: organisation.logo_path,
-          default_currency: organisation.default_currency,
-          timezone: organisation.timezone,
-          locale: organisation.locale,
-          country_code: organisation.country_code,
-          theme_default: organisation.theme_default,
-          version: organisation.version,
-        },
+        organisation: await organisationDiscoveryPayload(organisation),
         membership,
       },
     },

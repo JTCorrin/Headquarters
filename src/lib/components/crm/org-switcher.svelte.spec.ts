@@ -10,6 +10,7 @@ const memberships: OrgMembershipSummary[] = [
 		org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
 		org_name: 'Corrin Data',
 		org_slug: 'corrin-data',
+		logo_url: 'https://example.test/corrin-logo.png',
 		role: 'owner',
 		theme_default: 'system'
 	},
@@ -51,6 +52,17 @@ describe('OrgSwitcher', () => {
 		await page.getByTestId('org-switcher-trigger').click();
 		await page.getByTestId('org-switcher-create').click();
 		await vi.waitFor(() => expect(onCreateOrg).toHaveBeenCalled());
+	});
+
+	it('renders the organisation logo from a signed URL, not a storage path', async () => {
+		render(OrgSwitcher, {
+			currentOrgId: memberships[0]!.org_id,
+			memberships
+		});
+
+		const logo = page.getByTestId('org-switcher-trigger').getByTestId('org-logo-image');
+		await expect.element(logo).toBeInTheDocument();
+		await expect.element(logo).toHaveAttribute('src', 'https://example.test/corrin-logo.png');
 	});
 
 	it('keeps the create drawer open when create fails', async () => {

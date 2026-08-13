@@ -27,7 +27,8 @@
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import {
 		projectCardFormSchema,
-		projectFormSchema
+		projectFormSchema,
+		projectClientDisplayName
 	} from '$lib/schemas/project.js';
 	import type { ProjectCardBoardMove, ProjectWorkCard } from './project-workspace-board.svelte';
 	import type { ProjectClientOption } from './project-form.svelte';
@@ -102,8 +103,10 @@
 	const navGroups = $derived(appNavGroups('Projects', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const projectName = $derived(project?.name ?? 'Project');
-	const clientName = $derived(project?.client_label?.trim() || 'Client');
-	const clientHref = $derived(project ? `/clients/${project.client_id}` : undefined);
+	const clientName = $derived(project ? projectClientDisplayName(project) : 'Client');
+	const clientHref = $derived(
+		project?.client_id ? `/clients/${project.client_id}` : undefined
+	);
 	const status = $derived(project ? projectStatusLabel(project.status) : 'Planning');
 	const columns = $derived(project ? workspaceColumnsFromProject(project) : []);
 
@@ -527,7 +530,7 @@
 						showTrigger={false}
 						allowArchived={true}
 						title="Edit project"
-						description="Update name, status (including archive), or client attachment. Uses If-Match."
+						description="Update name, status (including archive), or whether this is internal or attached to a client. Uses If-Match."
 						submitLabel="Save changes"
 						onValidSubmit={onValidEdit}
 					/>
