@@ -181,7 +181,7 @@ export function toOrgMembershipSummary(
 		org_id: row.organisation.id,
 		org_name: row.organisation.name,
 		org_slug: row.organisation.slug,
-		logo_url: row.organisation.logo_path,
+		logo_url: row.organisation.logo_url ?? null,
 		role: row.membership.role,
 		membership_id: row.membership.id,
 		theme_default: row.organisation.theme_default ?? 'system'
@@ -195,7 +195,7 @@ export function membershipFromCreateResult(
 		org_id: result.organisation.id,
 		org_name: result.organisation.name,
 		org_slug: result.organisation.slug,
-		logo_url: result.organisation.logo_path,
+		logo_url: result.organisation.logo_url ?? null,
 		role: result.membership.role,
 		membership_id: result.membership.id,
 		theme_default: result.organisation.theme_default ?? 'system'

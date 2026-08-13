@@ -190,7 +190,8 @@ describe('api mappers', () => {
 					id: 'org-1',
 					name: 'Acme',
 					slug: 'acme',
-					logo_path: '/logo.png',
+					logo_path: 'org/org-1/branding/logo.png',
+					logo_url: 'https://example.test/logo.png',
 					default_currency: 'USD',
 					timezone: 'UTC',
 					locale: 'en-US',
@@ -202,11 +203,32 @@ describe('api mappers', () => {
 			org_id: 'org-1',
 			org_name: 'Acme',
 			org_slug: 'acme',
-			logo_url: '/logo.png',
+			logo_url: 'https://example.test/logo.png',
 			role: 'admin',
 			membership_id: 'm1',
 			theme_default: 'light'
 		});
+		expect(
+			toOrgMembershipSummary({
+				membership: {
+					id: 'm2',
+					role: 'member',
+					status: 'active',
+					joined_at: null
+				},
+				organisation: {
+					id: 'org-2',
+					name: 'Beta',
+					slug: 'beta',
+					logo_path: 'org/org-2/branding/logo.png',
+					default_currency: 'GBP',
+					timezone: 'UTC',
+					locale: 'en-GB',
+					country_code: 'GB',
+					theme_default: 'system'
+				}
+			}).logo_url
+		).toBeNull();
 	});
 
 	it('maps contacts between API and form/list shapes', () => {
