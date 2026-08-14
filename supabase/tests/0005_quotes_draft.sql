@@ -1,6 +1,6 @@
 begin;
 
-select plan(49);
+select plan(55);
 
 select has_table('public', 'quotes', 'quotes table exists');
 select has_table('public', 'quote_lines', 'quote_lines table exists');
@@ -974,6 +974,133 @@ do $$ begin perform set_config('app.allow_quote_totals', 'off', true); end $$;
 
 select pg_temp.as_user((select owner_id from _quotes_fixture));
 set local role authenticated;
+
+-- Omitted tax_rate_percent inherits the org default (same as CRM UI blank lines).
+select lives_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      jsonb_build_object('discount_cents', 0),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'Omit tax free-text',
+          'quantity', 1,
+          'unit_price_cents', 10000,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save accepts free-text lines that omit tax_rate_percent'
+);
+
+update _quotes_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _quotes_fixture.quote_id;
+
+select ok(
+  (
+    select tax_rate_percent = 20
+      and tax_cents = 2000
+      and total_cents = 12000
+    from public.quote_lines
+    where quote_id = (select quote_id from _quotes_fixture)
+  ),
+  'omitted free-text tax inherits org default rate'
+);
+
+select lives_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      jsonb_build_object('discount_cents', 0),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'Explicit zero tax',
+          'quantity', 1,
+          'unit_price_cents', 10000,
+          'tax_rate_percent', 0,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save accepts free-text lines with explicit zero tax'
+);
+
+update _quotes_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _quotes_fixture.quote_id;
+
+select ok(
+  (
+    select tax_rate_percent = 0
+      and tax_cents = 0
+      and total_cents = 10000
+    from public.quote_lines
+    where quote_id = (select quote_id from _quotes_fixture)
+  ),
+  'explicit tax_rate_percent 0 stays zero-rated (not org default)'
+);
+
+reset role;
+
+with created_untaxed as (
+  insert into public.products (
+    org_id, sku, name, product_type, unit_price_cents, currency,
+    tax_rate_id, track_stock, status
+  )
+  select
+    org_id, 'NO-TAX', 'Untaxed service', 'service', 10000, 'GBP',
+    null, false, 'active'
+  from _quotes_fixture
+  returning id
+)
+update _quotes_fixture set product_id = created_untaxed.id from created_untaxed;
+
+select pg_temp.as_user((select owner_id from _quotes_fixture));
+set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.save_quote_draft(
+      (select quote_id from _quotes_fixture),
+      (select org_id from _quotes_fixture),
+      (select quote_version from _quotes_fixture),
+      jsonb_build_object('discount_cents', 0),
+      jsonb_build_array(
+        jsonb_build_object(
+          'product_id', (select product_id from _quotes_fixture),
+          'quantity', 1,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save accepts product lines without a catalog tax rate'
+);
+
+update _quotes_fixture
+set quote_version = quotes.version
+from public.quotes
+where quotes.id = _quotes_fixture.quote_id;
+
+select ok(
+  (
+    select tax_rate_percent = 20
+      and tax_cents = 2000
+      and total_cents = 12000
+    from public.quote_lines
+    where quote_id = (select quote_id from _quotes_fixture)
+  ),
+  'product without tax_rate_id inherits org default when tax omitted'
+);
 
 -- Soft-delete must still work after the linked client is removed.
 reset role;
