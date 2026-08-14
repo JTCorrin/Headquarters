@@ -163,6 +163,15 @@ printf '%s' "$list_json" | jq -e '
 	and index("create_payment") != null
 	and index("allocate_payment") != null
 	and index("reverse_payment") != null
+	and index("list_products") != null
+	and index("get_product") != null
+	and index("create_product") != null
+	and index("update_product") != null
+	and index("adjust_product_stock") != null
+	and index("list_product_categories") != null
+	and index("get_product_category") != null
+	and index("create_product_category") != null
+	and index("update_product_category") != null
 ' >/dev/null || die "tools/list missing Wave A/B/C tools: ${list_json}"
 
 log "MCP tools/call create_task without assignee (expect error)"
