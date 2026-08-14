@@ -534,6 +534,8 @@ interface ApiInvoiceWritableFields {
 export type ApiInvoiceCreateBody = ApiInvoiceWritableFields & {
 	client_id: string;
 	lines: ApiInvoiceLineInput[];
+	/** Optional document number on create (migration); otherwise auto-allocated. */
+	number?: string;
 };
 
 export type ApiInvoiceUpdateBody = ApiInvoiceWritableFields & {
@@ -547,6 +549,11 @@ export interface ApiInvoiceFromQuoteBody {
 
 export interface ApiInvoiceVoidBody {
 	void_reason: string;
+}
+
+export interface ApiInvoiceSendBody {
+	/** Optional ISO timestamptz override for migration. */
+	sent_at?: string;
 }
 
 export interface ApiInvoiceListParams {
@@ -1606,6 +1613,49 @@ export interface ApiMailboxPutBody {
 }
 
 export interface ApiMailboxTestResult {
+	ok: boolean;
+	error_code?: string | null;
+	message?: string | null;
+}
+
+export interface ApiOrgInvoiceEmailAccount {
+	id: string;
+	org_id: string;
+	from_address: string;
+	from_name: string | null;
+	reply_to: string | null;
+	smtp_host: string;
+	smtp_port: number;
+	smtp_security: 'tls' | 'starttls' | 'none';
+	username: string;
+	status: 'pending' | 'active' | 'error' | 'disabled';
+	subject_template: string;
+	body_template: string;
+	credentials_configured: boolean;
+	credentials_updated_at: string | null;
+	last_tested_at: string | null;
+	last_error_code: string | null;
+	last_error_message: string | null;
+	version: number;
+	created_at?: string;
+	updated_at?: string;
+}
+
+export interface ApiOrgInvoiceEmailPutBody {
+	from_address: string;
+	from_name?: string | null;
+	reply_to?: string | null;
+	smtp_host: string;
+	smtp_port: number;
+	smtp_security: 'tls' | 'starttls' | 'none';
+	username: string;
+	/** Omit or empty to keep the existing secret. */
+	password?: string | null;
+	subject_template?: string | null;
+	body_template?: string | null;
+}
+
+export interface ApiOrgInvoiceEmailTestResult {
 	ok: boolean;
 	error_code?: string | null;
 	message?: string | null;

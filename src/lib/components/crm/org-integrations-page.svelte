@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import type { SuperForm } from 'sveltekit-superforms';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
 	import { roleLabel } from '$lib/schemas/organisation.js';
 	import {
@@ -14,6 +16,11 @@
 		type AiPromptKey,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
+	import type {
+		OrgInvoiceEmailAccountResource,
+		OrgInvoiceEmailFormData,
+		OrgInvoiceEmailTestFeedback
+	} from '$lib/schemas/org-invoice-email.js';
 	import AppNav, { type AppNavGroup } from './app-nav.svelte';
 	import PageHeader from './page-header.svelte';
 	import ResourceStateBanner, {
@@ -21,6 +28,7 @@
 	} from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import AiProviderConnectDrawer from './ai-provider-connect-drawer.svelte';
+	import OrgInvoiceEmailForm from './org-invoice-email-form.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -41,6 +49,8 @@
 		promptDefaults?: AiPromptsFormState;
 		promptsBusy?: boolean;
 		promptsError?: string | null;
+		invoiceEmailAccount?: OrgInvoiceEmailAccountResource | null;
+		invoiceEmailForm?: SuperForm<OrgInvoiceEmailFormData> | null;
 		viewState?: ResourceViewState;
 		connectError?: string | null;
 		class?: string;
@@ -50,6 +60,13 @@
 		onDisconnect?: (provider: AiProvider) => boolean | void | Promise<boolean | void>;
 		onSelectModel?: (provider: AiProvider, model: string) => boolean | void | Promise<boolean | void>;
 		onSavePrompts?: (prompts: AiPromptsFormState) => boolean | void | Promise<boolean | void>;
+		onInvoiceEmailSubmit?: () => boolean | void | Promise<boolean | void>;
+		onInvoiceEmailTest?: () =>
+			| OrgInvoiceEmailTestFeedback
+			| false
+			| void
+			| Promise<OrgInvoiceEmailTestFeedback | false | void>;
+		onInvoiceEmailDisconnect?: () => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -64,6 +81,8 @@
 		promptDefaults = { ...DEFAULT_AI_PROMPTS },
 		promptsBusy = false,
 		promptsError = null,
+		invoiceEmailAccount = null,
+		invoiceEmailForm = null,
 		viewState = { kind: 'ready' },
 		connectError = null,
 		class: className,
@@ -72,7 +91,10 @@
 		onConnect,
 		onDisconnect,
 		onSelectModel,
-		onSavePrompts
+		onSavePrompts,
+		onInvoiceEmailSubmit,
+		onInvoiceEmailTest,
+		onInvoiceEmailDisconnect
 	}: OrgIntegrationsPageProps = $props();
 
 	const canEdit = $derived(canMutateIntegrations(role));
@@ -343,13 +365,57 @@
 					</div>
 				</section>
 
-				<section class="space-y-2" data-testid="email-sending-plane-note">
-					<h2 class="text-lg font-semibold tracking-tight">Email sending</h2>
-					<p class="text-muted-foreground text-sm">
-						Organisation quote / invoice / campaign SMTP is a separate plane and lands later.
-						Personal mailbox IMAP/SMTP is under <a class="underline underline-offset-2" href="/settings#mail">My settings → Mail</a>.
-						Personal calendar connect (Google or CalDAV) is under <a class="underline underline-offset-2" href="/settings#calendar">My settings → Calendar</a>.
-					</p>
+				<section class="space-y-4" data-testid="org-invoice-email-section">
+					<div>
+						<h2 class="text-lg font-semibold tracking-tight">Invoice email</h2>
+						<p class="text-muted-foreground text-sm">
+							Organisation SMTP used for recurring invoice auto-send. Your personal mailbox stays
+							under
+							<a class="underline underline-offset-2" href="{resolve('/settings')}#mail"
+								>My settings → Mail</a
+							>.
+							{#if !canEdit}
+								Read-only for your role.
+							{/if}
+						</p>
+					</div>
+
+					{#if canEdit && invoiceEmailForm}
+						<OrgInvoiceEmailForm
+							form={invoiceEmailForm}
+							account={invoiceEmailAccount}
+							{canEdit}
+							onValidSubmit={onInvoiceEmailSubmit}
+							onTest={onInvoiceEmailTest}
+							onDisconnect={onInvoiceEmailDisconnect}
+						/>
+					{:else if invoiceEmailAccount}
+						<div
+							class="space-y-1 rounded-3xl border px-4 py-3"
+							data-testid="org-invoice-email-readonly"
+						>
+							<p class="font-medium">{invoiceEmailAccount.from_address}</p>
+							<p class="text-muted-foreground text-sm">
+								Status: {invoiceEmailAccount.status}
+								{#if invoiceEmailAccount.credentials_configured}
+									· credentials configured
+								{/if}
+								{#if invoiceEmailAccount.last_tested_at}
+									· last tested {invoiceEmailAccount.last_tested_at}
+								{/if}
+							</p>
+							{#if invoiceEmailAccount.last_error_message || invoiceEmailAccount.last_error_code}
+								<p class="text-destructive text-sm">
+									{invoiceEmailAccount.last_error_message ??
+										invoiceEmailAccount.last_error_code}
+								</p>
+							{/if}
+						</div>
+					{:else}
+						<p class="text-muted-foreground text-sm" data-testid="org-invoice-email-not-configured">
+							Not configured
+						</p>
+					{/if}
 				</section>
 			{/if}
 		</div>
