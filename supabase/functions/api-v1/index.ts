@@ -726,7 +726,16 @@ async function routeOrgScoped(
 
   if (path === "/api/v1/payments" || path.startsWith("/api/v1/payments/")) {
     assertCanAccessPayments(membership.role, req.method);
-    return await handlePayments(req, db, path, orgId, requestId);
+    return await handlePayments(
+      req,
+      db,
+      path,
+      orgId,
+      requestId,
+      actorType === "api_key" && req.method === "POST"
+        ? requireUserId(userId)
+        : null,
+    );
   }
 
   if (path === "/api/v1/timeline-events") {
