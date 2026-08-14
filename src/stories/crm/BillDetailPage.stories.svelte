@@ -91,7 +91,7 @@
 	}
 
 	const lineData = defaults(
-		{ productId: '', description: '', qty: '1', unitPrice: '' },
+		{ productId: '', description: '', qty: '1', unitPrice: '', discountPercent: '0' },
 		zod4(lineItemFormSchema)
 	);
 

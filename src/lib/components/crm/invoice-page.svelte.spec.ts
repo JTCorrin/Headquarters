@@ -211,10 +211,12 @@ describe('InvoicePage detail flows', () => {
 
 		await expect.element(page.getByRole('heading', { name: 'INV-0001' })).toBeInTheDocument();
 		await page.getByLabelText('PO number').fill('PO-42');
+		await page.getByTestId('invoice-discount').fill('15.00');
 		await page.getByTestId('invoice-form').getByRole('button', { name: 'Save details' }).click();
 
 		await expect.poll(() => patchBody).toMatchObject({
 			purchase_order_number: 'PO-42',
+			discount_cents: 1500,
 			lines: [
 				{
 					product_id: PRODUCT_ID,
@@ -344,6 +346,7 @@ describe('InvoicePage detail flows', () => {
 		await page.getByRole('button', { name: 'Add line item' }).first().click();
 		await page.getByLabelText('Description').fill('Extra line');
 		await page.getByLabelText('Unit price').fill('5.00');
+		await page.getByTestId('line-discount').fill('10');
 		await page.getByTestId('line-item-form').getByRole('button', { name: 'Add line' }).click();
 
 		await expect.poll(() => patchBody).toMatchObject({
@@ -355,7 +358,10 @@ describe('InvoicePage detail flows', () => {
 					discount_percent: 5,
 					tax_rate_percent: 20
 				}),
-				expect.objectContaining({ description: 'Extra line' })
+				expect.objectContaining({
+					description: 'Extra line',
+					discount_percent: 10
+				})
 			])
 		});
 	});

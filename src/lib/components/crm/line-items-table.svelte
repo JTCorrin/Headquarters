@@ -125,7 +125,17 @@
 			{#each rows as row (row.id)}
 				<Table.Row>
 					<Table.Cell class="text-muted-foreground text-xs">{row.productSku ?? '—'}</Table.Cell>
-					<Table.Cell class="font-medium">{row.description}</Table.Cell>
+					<Table.Cell class="font-medium">
+						{row.description}
+						{#if row.discountPercent != null && row.discountPercent > 0}
+							<span
+								class="text-muted-foreground ms-1 text-xs font-normal tabular-nums"
+								data-testid="line-discount-badge"
+							>
+								· −{row.discountPercent}%
+							</span>
+						{/if}
+					</Table.Cell>
 					<Table.Cell class="text-end tabular-nums">{row.qty}</Table.Cell>
 					<Table.Cell class="text-end tabular-nums">{row.unitPrice}</Table.Cell>
 					<Table.Cell class="text-end tabular-nums">{row.total}</Table.Cell>
