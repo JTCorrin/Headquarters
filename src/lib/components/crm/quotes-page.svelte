@@ -68,6 +68,7 @@
 				clientName: '',
 				title: '',
 				currency: 'GBP' as const,
+				discount: '',
 				status: 'draft' as const,
 				recipients: []
 			},
@@ -214,6 +215,7 @@
 				clientName: firstClient?.name ?? '',
 				title: '',
 				currency: 'GBP',
+				discount: '',
 				status: 'draft',
 				recipients: []
 			});

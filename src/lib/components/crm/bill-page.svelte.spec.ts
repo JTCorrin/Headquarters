@@ -228,8 +228,9 @@ describe('BillPage detail flows', () => {
 
 		await expect.element(page.getByRole('heading', { name: 'BILL-0001' })).toBeInTheDocument();
 		await expect
-			.element(page.getByRole('cell', { name: 'Monthly hosting', exact: true }))
+			.element(page.getByRole('cell', { name: 'Monthly hosting · −5%', exact: true }))
 			.toBeInTheDocument();
+		await expect.element(page.getByTestId('line-discount-badge')).toHaveTextContent('· −5%');
 	});
 
 	it('preserves product_id, discount, and tax on line replacement saves', async () => {

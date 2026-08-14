@@ -16,6 +16,7 @@ import {
 	toInvoiceCreateBody,
 	toInvoiceFormData,
 	toInvoiceLineInput,
+	toInvoiceUpdateBody,
 	lineItemRowsToInvoiceLineInputs,
 	lineItemRowsToQuoteLineInputs,
 	recipientsFromDocument,
@@ -38,7 +39,9 @@ import {
 	toPaymentListItem,
 	paymentStatusLabel,
 	toQuoteCreateBody,
+	toQuoteFormData,
 	toQuoteListItem,
+	toQuoteUpdateBody,
 	emptyProjectFormData,
 	toProjectCreateBody,
 	toProjectFormData,
@@ -320,6 +323,7 @@ describe('api mappers', () => {
 				clientName: 'Northwind',
 				title: '  Pilot quote  ',
 				currency: 'GBP',
+				discount: '10.50',
 				status: 'draft',
 				recipients: []
 			})
@@ -327,10 +331,23 @@ describe('api mappers', () => {
 			title: 'Pilot quote',
 			client_id: sampleQuote.client_id,
 			currency: 'GBP',
+			discount_cents: 1050,
 			contact_id: null,
 			recipients: [],
 			lines: []
 		});
+		expect(toQuoteFormData({ ...sampleQuote, discount_cents: 250 }).discount).toBe('2.5');
+		expect(
+			toQuoteUpdateBody({
+				clientId: sampleQuote.client_id!,
+				clientName: 'Northwind',
+				title: 'Pilot quote',
+				currency: 'GBP',
+				discount: '',
+				status: 'draft',
+				recipients: []
+			}).discount_cents
+		).toBe(0);
 	});
 
 	it('maps invoices between API and form/list shapes with decimal lines', () => {
@@ -391,6 +408,7 @@ describe('api mappers', () => {
 				issueOn: '2026-03-01',
 				dueOn: '2026-04-01',
 				purchaseOrderNumber: ' PO-9 ',
+				discount: '5',
 				status: 'draft',
 				quoteId: ''
 			})
@@ -402,8 +420,24 @@ describe('api mappers', () => {
 			issue_on: '2026-03-01',
 			due_on: '2026-04-01',
 			purchase_order_number: 'PO-9',
+			discount_cents: 500,
 			lines: []
 		});
+		expect(toInvoiceFormData({ ...sampleInvoice, discount_cents: 1250 }).discount).toBe('12.5');
+		expect(
+			toInvoiceUpdateBody({
+				clientId: sampleInvoice.client_id,
+				clientName: 'Northwind',
+				recipients: [],
+				currency: 'GBP',
+				issueOn: '2026-03-01',
+				dueOn: '2026-04-01',
+				purchaseOrderNumber: '',
+				discount: '',
+				status: 'draft',
+				quoteId: ''
+			}).discount_cents
+		).toBe(0);
 		const contactA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 		const contactB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 		expect(
@@ -447,6 +481,7 @@ describe('api mappers', () => {
 				issueOn: '2026-03-01',
 				dueOn: '2026-04-01',
 				purchaseOrderNumber: '',
+				discount: '',
 				status: 'draft',
 				quoteId: '',
 				recipients: [
@@ -465,6 +500,7 @@ describe('api mappers', () => {
 			issue_on: '2026-03-01',
 			due_on: '2026-04-01',
 			purchase_order_number: null,
+			discount_cents: 0,
 			lines: []
 		});
 		expect(
@@ -473,6 +509,7 @@ describe('api mappers', () => {
 				description: 'Consulting',
 				qty: '1.5',
 				unitPrice: '12.50',
+				discountPercent: '',
 				taxRatePercent: '20'
 			})
 		).toEqual({
@@ -480,6 +517,7 @@ describe('api mappers', () => {
 			description: 'Consulting',
 			quantity: 1.5,
 			unit_price_cents: 1250,
+			discount_percent: 0,
 			tax_rate_percent: 20
 		});
 		expect(
@@ -510,6 +548,7 @@ describe('api mappers', () => {
 				description: 'Catalog line',
 				qty: '3',
 				unitPrice: '12.00',
+				discountPercent: '10',
 				taxRatePercent: '20'
 			})
 		).toEqual({
@@ -517,6 +556,7 @@ describe('api mappers', () => {
 			description: 'Catalog line',
 			quantity: 3,
 			unit_price_cents: 1200,
+			discount_percent: 10,
 			tax_rate_percent: 20
 		});
 		expect(
