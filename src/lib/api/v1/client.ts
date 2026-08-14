@@ -18,6 +18,7 @@ import { createNotificationsEndpoints } from './endpoints/notifications.js';
 import { createOrgMembersEndpoints } from './endpoints/org-members.js';
 import { createOrganisationAccessEndpoints } from './endpoints/organisation-access.js';
 import { createOrganisationConfigEndpoints } from './endpoints/organisation-config.js';
+import { createOrgInvoiceEmailEndpoints } from './endpoints/org-invoice-email.js';
 import { createOrganisationsEndpoints } from './endpoints/organisations.js';
 import { createPaymentsEndpoints } from './endpoints/payments.js';
 import { createProfilePreferencesEndpoints } from './endpoints/profile-preferences.js';
@@ -48,6 +49,7 @@ import type {
 	NotificationsEndpoints,
 	MeetingsEndpoints,
 	OrganisationConfigEndpoints,
+	OrgInvoiceEmailEndpoints,
 	OrganisationAccessEndpoints,
 	OrganisationsEndpoints,
 	OrgMembersEndpoints,
@@ -88,6 +90,7 @@ export interface ApiV1Client {
 	orgMembers: OrgMembersEndpoints;
 	organisationAccess: OrganisationAccessEndpoints;
 	organisationConfig: OrganisationConfigEndpoints;
+	orgInvoiceEmail: OrgInvoiceEmailEndpoints;
 	taxRates: TaxRatesEndpoints;
 	profilePreferences: ProfilePreferencesEndpoints;
 	mailbox: MailboxEndpoints;
@@ -265,6 +268,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		orgMembers: createOrgMembersEndpoints(request),
 		organisationAccess: createOrganisationAccessEndpoints(request),
 		organisationConfig: createOrganisationConfigEndpoints(request),
+		orgInvoiceEmail: createOrgInvoiceEmailEndpoints(request),
 		taxRates: createTaxRatesEndpoints(request),
 		profilePreferences: createProfilePreferencesEndpoints(request),
 		mailbox: createMailboxEndpoints(request),

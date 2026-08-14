@@ -174,6 +174,18 @@ export function createRecurringInvoiceSchedulesEndpoints(
 				}
 			);
 			return data;
+		},
+		retryDelivery: async (scheduleId, runId, signal) => {
+			const { data } = await request<ApiRecurringInvoiceRun>(
+				`/api/v1/recurring-invoice-schedules/${scheduleId}/runs/${runId}/retry-delivery`,
+				{
+					method: 'POST',
+					body: {},
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
 		}
 	};
 }

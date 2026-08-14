@@ -101,6 +101,59 @@ Deno.test('sendSmtpMail short-circuits synthetic hosts without opening sockets',
   }
 })
 
+Deno.test('buildMimeMessage attaches PDF as multipart/mixed base64', () => {
+  const pdf = new TextEncoder().encode('%PDF-1.4 test')
+  const mime = buildMimeMessage({
+    from: 'billing@example.test',
+    to: 'client@example.test',
+    subject: 'Invoice INV-1',
+    bodyText: 'Please see attached.',
+    messageId: '<crm-outbound-inv@example.test>',
+    date: new Date('2026-08-14T12:00:00Z'),
+    attachments: [
+      {
+        filename: 'invoice-INV-1.pdf',
+        contentType: 'application/pdf',
+        bytes: pdf,
+      },
+    ],
+  })
+  assertEquals(mime.includes('multipart/mixed'), true)
+  assertEquals(mime.includes('Content-Disposition: attachment; filename="invoice-INV-1.pdf"'), true)
+  assertEquals(mime.includes('Content-Transfer-Encoding: base64'), true)
+  assertEquals(mime.includes('Please see attached.'), true)
+})
+
+Deno.test('sendSmtpMail with attachment still short-circuits synthetic hosts', async () => {
+  setOpenSmtpConnectionForTests(() => {
+    throw new Error('should not open SMTP for synthetic host')
+  })
+  try {
+    const result = await sendSmtpMail({
+      host: 'smtp.example.test',
+      port: 465,
+      security: 'tls',
+      username: 'billing@example.test',
+      password: 'secret',
+      from: 'billing@example.test',
+      to: 'client@example.test',
+      subject: 'Invoice',
+      bodyText: 'attached',
+      messageId: '<crm-outbound-attach@example.test>',
+      attachments: [
+        {
+          filename: 'invoice.pdf',
+          contentType: 'application/pdf',
+          bytes: new Uint8Array([1, 2, 3]),
+        },
+      ],
+    })
+    assertEquals(result.synthetic, true)
+  } finally {
+    setOpenSmtpConnectionForTests(null)
+  }
+})
+
 Deno.test('sendSmtpMail rejects empty host', async () => {
   await assertRejects(
     () =>
