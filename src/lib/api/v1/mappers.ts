@@ -1846,11 +1846,12 @@ export function toRecurringInvoiceRunListItem(
 		id: run.id,
 		scheduledFor: formatNextRunAt(run.scheduled_for),
 		trigger: run.trigger.replace('_', ' '),
-		status: run.status.replace(/_/g, ' '),
+		status: run.status,
 		periodStart: run.period_start,
 		periodEnd: run.period_end,
 		invoiceId: linked?.id ?? run.invoice_id ?? null,
-		invoiceNumber: linked?.number ?? run.invoice_number ?? null
+		invoiceNumber: linked?.number ?? run.invoice_number ?? null,
+		errorMessage: run.error_message
 	};
 }
 

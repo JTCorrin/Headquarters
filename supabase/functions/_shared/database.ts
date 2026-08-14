@@ -1058,6 +1058,32 @@ export type MailboxAccountRow = {
   oauth_provider: "microsoft" | "google" | null;
 };
 
+export type OrgInvoiceEmailAccountRow = {
+  id: string;
+  org_id: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  deleted_at: string | null;
+  version: number;
+  from_address: string;
+  from_name: string | null;
+  reply_to: string | null;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_security: "tls" | "starttls" | "none";
+  username: string;
+  secret_ref: string | null;
+  status: "pending" | "active" | "error" | "disabled";
+  subject_template: string;
+  body_template: string;
+  last_tested_at: string | null;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  credentials_updated_at: string | null;
+};
+
 /** Public SELECT shape — secret_ref intentionally omitted. */
 export type CalendarConnectionRow = {
   id: string;
@@ -1795,6 +1821,12 @@ export type Database = {
         Row: MailboxAccountRow;
         Insert: Partial<MailboxAccountRow>;
         Update: Partial<MailboxAccountRow>;
+        Relationships: [];
+      };
+      org_invoice_email_accounts: {
+        Row: OrgInvoiceEmailAccountRow;
+        Insert: Partial<OrgInvoiceEmailAccountRow>;
+        Update: Partial<OrgInvoiceEmailAccountRow>;
         Relationships: [];
       };
       calendar_connections: {
@@ -2858,6 +2890,73 @@ export type Database = {
       };
       read_ai_integration_credentials: {
         Args: { p_org_id: string; p_provider: string };
+        Returns: Json;
+      };
+      get_org_invoice_email_account: {
+        Args: { p_org_id: string };
+        Returns: Json;
+      };
+      upsert_org_invoice_email_account: {
+        Args: {
+          p_org_id: string;
+          p_from_address: string;
+          p_from_name: string | null;
+          p_reply_to: string | null;
+          p_smtp_host: string;
+          p_smtp_port: number;
+          p_smtp_security: string;
+          p_username: string;
+          p_password?: string | null;
+          p_subject_template?: string | null;
+          p_body_template?: string | null;
+        };
+        Returns: Json;
+      };
+      disconnect_org_invoice_email_account: {
+        Args: { p_org_id: string };
+        Returns: undefined;
+      };
+      mark_org_invoice_email_test_result: {
+        Args: {
+          p_org_id: string;
+          p_ok: boolean;
+          p_error_code?: string | null;
+          p_error_message?: string | null;
+        };
+        Returns: Json;
+      };
+      read_org_invoice_email_credentials: {
+        Args: { p_org_id: string };
+        Returns: Json;
+      };
+      org_invoice_email_is_configured: {
+        Args: { p_org_id: string };
+        Returns: boolean;
+      };
+      claim_recurring_invoice_deliveries: {
+        Args: { p_limit?: number; p_claimed_by?: string | null };
+        Returns: Json;
+      };
+      complete_recurring_invoice_delivery: {
+        Args: { p_run_id: string; p_org_id: string };
+        Returns: Json;
+      };
+      fail_recurring_invoice_delivery: {
+        Args: {
+          p_run_id: string;
+          p_org_id: string;
+          p_error_code: string;
+          p_error_message: string;
+          p_retry_seconds?: number;
+        };
+        Returns: Json;
+      };
+      retry_recurring_invoice_delivery: {
+        Args: { p_run_id: string; p_org_id: string };
+        Returns: Json;
+      };
+      process_due_recurring_schedules: {
+        Args: { p_limit?: number; p_claimed_by?: string | null };
         Returns: Json;
       };
       get_email_message_ai_context: {
