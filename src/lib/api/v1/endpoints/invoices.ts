@@ -6,6 +6,7 @@ import type {
 	ApiInvoiceDocument,
 	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
+	ApiInvoiceSendBody,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody
 } from '../types.js';
@@ -67,10 +68,10 @@ export function createInvoicesEndpoints(request: ApiRequestFn): InvoicesEndpoint
 				signal
 			});
 		},
-		send: async (id, version, signal) => {
+		send: async (id, version, body: ApiInvoiceSendBody = {}, signal) => {
 			const { data } = await request<ApiInvoiceDocument>(`/api/v1/invoices/${id}/send`, {
 				method: 'POST',
-				body: {},
+				body,
 				orgScoped: true,
 				ifMatchVersion: version,
 				headers: { 'Idempotency-Key': newIdempotencyKey('inv-send') },

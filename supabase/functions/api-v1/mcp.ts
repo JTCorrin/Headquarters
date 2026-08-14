@@ -6,6 +6,7 @@ import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
 import { handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
 import { handleMeetings } from './meetings.ts'
+import { handlePayments } from './payments.ts'
 import { handleProjects } from './projects.ts'
 import { handleQuotes } from './quotes.ts'
 import { handleTasks } from './tasks.ts'
@@ -634,7 +635,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'create_quote',
     description:
-      'Create a draft quote (same validation as POST /api/v1/quotes). Drafts only — no send/reject/accept.',
+      'Create a draft quote (same validation as POST /api/v1/quotes). Use send_quote / accept_quote / reject_quote for lifecycle transitions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -714,6 +715,49 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: 'send_quote',
+    description:
+      'Mark a draft quote as sent (POST /api/v1/quotes/{id}/send). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'accept_quote',
+    description:
+      'Accept a sent quote (POST /api/v1/quotes/{id}/accept). Requires version for If-Match. Optional idempotency_key for safe retries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'reject_quote',
+    description:
+      'Reject a sent quote (POST /api/v1/quotes/{id}/reject). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'list_invoices',
     description: 'List invoices in the organisation pinned to the API key.',
     inputSchema: {
@@ -743,11 +787,12 @@ const TOOLS: ToolDef[] = [
   {
     name: 'create_invoice',
     description:
-      'Create a draft invoice (same validation as POST /api/v1/invoices). Drafts only — no send/void/from-quote.',
+      'Create a draft invoice (same validation as POST /api/v1/invoices). Optional number for migration; otherwise auto-allocated. Use send_invoice / void_invoice / create_invoice_from_quote for lifecycle transitions.',
     inputSchema: {
       type: 'object',
       properties: {
         client_id: { type: 'string', format: 'uuid' },
+        number: { type: 'string', minLength: 1, maxLength: 64 },
         contact_id: { type: ['string', 'null'], format: 'uuid' },
         owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
         currency: { type: 'string' },
@@ -817,6 +862,175 @@ const TOOLS: ToolDef[] = [
         },
       },
       required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'send_invoice',
+    description:
+      'Mark a draft invoice as sent (POST /api/v1/invoices/{id}/send). Requires version for If-Match. Optional sent_at (ISO timestamptz) for migration; optional idempotency_key for safe retries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        sent_at: { type: 'string' },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'void_invoice',
+    description:
+      'Void an invoice (POST /api/v1/invoices/{id}/void). Requires version for If-Match and void_reason. Optional idempotency_key for safe retries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        void_reason: { type: 'string', minLength: 1, maxLength: 2000 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'version', 'void_reason'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_invoice_from_quote',
+    description:
+      'Create an invoice from an accepted quote (POST /api/v1/invoices/from-quote).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        quote_id: { type: 'string', format: 'uuid' },
+      },
+      required: ['quote_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_payments',
+    description: 'List payments in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        direction: { type: 'string', enum: ['inbound', 'outbound'] },
+        status: {
+          type: 'string',
+          enum: [
+            'pending',
+            'completed',
+            'unallocated',
+            'part_allocated',
+            'allocated',
+            'refunded',
+            'reversed',
+            'failed',
+          ],
+        },
+        client_id: { type: 'string', format: 'uuid' },
+        vendor_id: { type: 'string', format: 'uuid' },
+        invoice_id: { type: 'string', format: 'uuid' },
+        bill_id: { type: 'string', format: 'uuid' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_payment',
+    description: 'Get a payment document by id (header + allocations).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_payment',
+    description:
+      'Create a payment (POST /api/v1/payments). Optional allocations at create. Optional idempotency_key for safe retries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        direction: { type: 'string', enum: ['inbound', 'outbound'] },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        vendor_id: { type: ['string', 'null'], format: 'uuid' },
+        amount_cents: { type: 'integer', minimum: 1 },
+        currency: { type: 'string' },
+        method: {
+          type: 'string',
+          enum: ['bank', 'card', 'cash', 'stripe', 'other'],
+        },
+        occurred_on: { type: 'string' },
+        reference: { type: ['string', 'null'] },
+        provider: { type: 'string' },
+        provider_payment_id: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+        allocations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              invoice_id: { type: 'string', format: 'uuid' },
+              bill_id: { type: 'string', format: 'uuid' },
+              amount_cents: { type: 'integer', minimum: 1 },
+            },
+            additionalProperties: false,
+          },
+        },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['direction', 'amount_cents', 'currency', 'method'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'allocate_payment',
+    description:
+      'Allocate a payment to invoices/bills (POST /api/v1/payments/{id}/allocate). Requires version for If-Match. Optional idempotency_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        allocations: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              invoice_id: { type: 'string', format: 'uuid' },
+              bill_id: { type: 'string', format: 'uuid' },
+              amount_cents: { type: 'integer', minimum: 1 },
+            },
+            additionalProperties: false,
+          },
+        },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'version', 'allocations'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'reverse_payment',
+    description:
+      'Reverse a payment (POST /api/v1/payments/{id}/reverse). Requires version for If-Match and reason. Optional idempotency_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        reason: { type: 'string', minLength: 1, maxLength: 2000 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'version', 'reason'],
       additionalProperties: false,
     },
   },
@@ -903,6 +1117,15 @@ function requireVersion(args: Record<string, unknown>): number {
     })
   }
   return version
+}
+
+/** Prefer caller-supplied key for retries; otherwise mint one (matches web client). */
+function resolveIdempotencyKey(args: Record<string, unknown>): string {
+  const provided = args.idempotency_key
+  if (typeof provided === 'string' && provided.trim()) {
+    return provided.trim()
+  }
+  return crypto.randomUUID()
 }
 
 function optionalQuery(args: Record<string, unknown>, keys: string[]): string {
@@ -1000,6 +1223,15 @@ function assertCanAccessInvoices(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify invoices')
+  }
+}
+
+function assertCanAccessPayments(role: MembershipRole, method: string): void {
+  if (role === 'billing' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members can only read payments')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify payments')
   }
 }
 
@@ -1565,6 +1797,58 @@ async function callTool(
       )
       return await toolResultFromHttp(response)
     }
+    case 'send_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/quotes/${id}/send`
+      const response = await handleQuotes(
+        syntheticRequest('POST', path, {}, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'accept_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/quotes/${id}/accept`
+      const response = await handleQuotes(
+        syntheticRequest('POST', path, {}, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'reject_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/quotes/${id}/reject`
+      const response = await handleQuotes(
+        syntheticRequest('POST', path, {}, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
     case 'list_invoices': {
       assertCanAccessInvoices(membership.role, 'GET')
       const path = `/api/v1/invoices${
@@ -1623,6 +1907,156 @@ async function callTool(
         orgId,
         requestId,
         actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'send_invoice': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/invoices/${id}/send`
+      const body: Record<string, unknown> = {}
+      if (typeof args.sent_at === 'string') body.sent_at = args.sent_at
+      const response = await handleInvoices(
+        syntheticRequest('POST', path, body, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'void_invoice': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const voidReason = requireString(args, 'void_reason')
+      const path = `/api/v1/invoices/${id}/void`
+      const response = await handleInvoices(
+        syntheticRequest(
+          'POST',
+          path,
+          { void_reason: voidReason },
+          {
+            'if-match': `"${version}"`,
+            'idempotency-key': resolveIdempotencyKey(args),
+          },
+        ),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_invoice_from_quote': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const quoteId = parseUuid(requireString(args, 'quote_id'), 'quote_id')
+      const response = await handleInvoices(
+        syntheticRequest('POST', '/api/v1/invoices/from-quote', {
+          quote_id: quoteId,
+        }),
+        db,
+        '/api/v1/invoices/from-quote',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_payments': {
+      assertCanAccessPayments(membership.role, 'GET')
+      const path = `/api/v1/payments${
+        optionalQuery(args, [
+          'limit',
+          'cursor',
+          'direction',
+          'status',
+          'client_id',
+          'vendor_id',
+          'invoice_id',
+          'bill_id',
+        ])
+      }`
+      const response = await handlePayments(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/payments',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_payment': {
+      assertCanAccessPayments(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/payments/${id}`
+      const response = await handlePayments(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_payment': {
+      assertCanAccessPayments(membership.role, 'POST')
+      const { idempotency_key: _ik, ...body } = args
+      const response = await handlePayments(
+        syntheticRequest('POST', '/api/v1/payments', body, {
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        '/api/v1/payments',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'allocate_payment': {
+      assertCanAccessPayments(membership.role, 'POST')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, idempotency_key: _ik, ...body } = args
+      const path = `/api/v1/payments/${id}/allocate`
+      const response = await handlePayments(
+        syntheticRequest('POST', path, body, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'reverse_payment': {
+      assertCanAccessPayments(membership.role, 'POST')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const reason = requireString(args, 'reason')
+      const path = `/api/v1/payments/${id}/reverse`
+      const response = await handlePayments(
+        syntheticRequest(
+          'POST',
+          path,
+          { reason },
+          {
+            'if-match': `"${version}"`,
+            'idempotency-key': resolveIdempotencyKey(args),
+          },
+        ),
+        db,
+        path,
+        orgId,
+        requestId,
       )
       return await toolResultFromHttp(response)
     }

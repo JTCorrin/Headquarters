@@ -534,6 +534,8 @@ interface ApiInvoiceWritableFields {
 export type ApiInvoiceCreateBody = ApiInvoiceWritableFields & {
 	client_id: string;
 	lines: ApiInvoiceLineInput[];
+	/** Optional document number on create (migration); otherwise auto-allocated. */
+	number?: string;
 };
 
 export type ApiInvoiceUpdateBody = ApiInvoiceWritableFields & {
@@ -547,6 +549,11 @@ export interface ApiInvoiceFromQuoteBody {
 
 export interface ApiInvoiceVoidBody {
 	void_reason: string;
+}
+
+export interface ApiInvoiceSendBody {
+	/** Optional ISO timestamptz override for migration. */
+	sent_at?: string;
 }
 
 export interface ApiInvoiceListParams {
