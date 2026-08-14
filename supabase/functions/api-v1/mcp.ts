@@ -637,7 +637,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'create_quote',
     description:
-      'Create a draft quote (same validation as POST /api/v1/quotes). Use send_quote / accept_quote / reject_quote for lifecycle transitions.',
+      'Create a draft quote (same validation as POST /api/v1/quotes). Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated. Use send_quote / accept_quote / reject_quote for lifecycle transitions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -663,7 +663,11 @@ const TOOLS: ToolDef[] = [
               quantity: { type: 'number' },
               unit_price_cents: { type: 'integer' },
               discount_percent: { type: 'number' },
-              tax_rate_percent: { type: 'number' },
+              tax_rate_percent: {
+                type: 'number',
+                description:
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
+              },
               position: { type: 'number' },
             },
             additionalProperties: false,
@@ -677,7 +681,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'update_quote',
     description:
-      'Update a draft quote (same validation as PATCH /api/v1/quotes/{id}). Requires version for If-Match. Drafts only.',
+      'Update a draft quote (same validation as PATCH /api/v1/quotes/{id}). Requires version for If-Match. Drafts only. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -705,7 +709,11 @@ const TOOLS: ToolDef[] = [
               quantity: { type: 'number' },
               unit_price_cents: { type: 'integer' },
               discount_percent: { type: 'number' },
-              tax_rate_percent: { type: 'number' },
+              tax_rate_percent: {
+                type: 'number',
+                description:
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
+              },
               position: { type: 'number' },
             },
             additionalProperties: false,
@@ -789,7 +797,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'create_invoice',
     description:
-      'Create a draft invoice (same validation as POST /api/v1/invoices). Optional number for migration; otherwise auto-allocated. Use send_invoice / void_invoice / create_invoice_from_quote for lifecycle transitions.',
+      'Create a draft invoice (same validation as POST /api/v1/invoices). Optional number for migration; otherwise auto-allocated. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated. Use send_invoice / void_invoice / create_invoice_from_quote for lifecycle transitions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -815,7 +823,11 @@ const TOOLS: ToolDef[] = [
               quantity: { type: 'number' },
               unit_price_cents: { type: 'integer' },
               discount_percent: { type: 'number' },
-              tax_rate_percent: { type: 'number' },
+              tax_rate_percent: {
+                type: 'number',
+                description:
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
+              },
               position: { type: 'number' },
             },
             additionalProperties: false,
@@ -829,7 +841,7 @@ const TOOLS: ToolDef[] = [
   {
     name: 'update_invoice',
     description:
-      'Update a draft invoice (same validation as PATCH /api/v1/invoices/{id}). Requires version for If-Match. Drafts only.',
+      'Update a draft invoice (same validation as PATCH /api/v1/invoices/{id}). Requires version for If-Match. Drafts only. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -856,7 +868,11 @@ const TOOLS: ToolDef[] = [
               quantity: { type: 'number' },
               unit_price_cents: { type: 'integer' },
               discount_percent: { type: 'number' },
-              tax_rate_percent: { type: 'number' },
+              tax_rate_percent: {
+                type: 'number',
+                description:
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
+              },
               position: { type: 'number' },
             },
             additionalProperties: false,

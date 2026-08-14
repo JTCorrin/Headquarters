@@ -241,6 +241,7 @@ function validateLine(body: Record<string, unknown>, index: number): RecurringLi
     }
   }
 
+  // When omitted, RPC inherits product tax then org default (explicit 0 stays zero-rated).
   let taxRate: number | undefined
   if ('tax_rate_percent' in body) {
     const value = body.tax_rate_percent
