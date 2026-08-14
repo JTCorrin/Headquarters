@@ -1,11 +1,5 @@
--- Org dashboard money summary: KPIs, AR aging, monthly cash/booked, quote
--- pipeline, and chase lists. Money sums use the organisation default currency.
-
-create index if not exists invoices_org_open_due_on_idx
-  on public.invoices (org_id, due_on)
-  where deleted_at is null
-    and status in ('sent', 'partial')
-    and balance_due_cents > 0;
+-- Fix dashboard_money_summary: payments has no deleted_at column (was 500ing in prod).
+-- Also exclude reversing correction rows via reverses_payment_id.
 
 create or replace function public.dashboard_money_summary(p_org_id uuid)
 returns jsonb
