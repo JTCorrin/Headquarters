@@ -798,6 +798,7 @@ async function sendInvoiceRoute(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
   const rawKey = parseIdempotencyKey(req)
@@ -825,6 +826,7 @@ async function sendInvoiceRoute(
     p_request_hash: requestHash,
     p_route: route,
     ...(sendBody.sent_at !== undefined ? { p_sent_at: sendBody.sent_at } : {}),
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -832,7 +834,8 @@ async function sendInvoiceRoute(
     throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice send returned an unexpected payload')
   }
   const envelope = data as IdempotencyEnvelope
-  if (envelope.replay !== true) {
+  // API-key path: status-only send (no client email). Skip playbooks to avoid outbound mail.
+  if (envelope.replay !== true && !actorUserId) {
     await dispatchPlaybookTriggersSafe({
       orgId,
       triggerKind: 'invoice.sent',
@@ -850,6 +853,7 @@ async function voidInvoiceRoute(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
   const voidReason = validateVoidBody(await jsonBody(req))
@@ -869,6 +873,7 @@ async function voidInvoiceRoute(
     p_idempotency_key_hash: keyHash,
     p_request_hash: requestHash,
     p_route: route,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -951,12 +956,16 @@ export function handleInvoices(
   const action = itemMatch[2]
 
   if (action === 'send') {
-    if (req.method === 'POST') return sendInvoiceRoute(req, db, orgId, invoiceId, requestId)
+    if (req.method === 'POST') {
+      return sendInvoiceRoute(req, db, orgId, invoiceId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice send')
   }
 
   if (action === 'void') {
-    if (req.method === 'POST') return voidInvoiceRoute(req, db, orgId, invoiceId, requestId)
+    if (req.method === 'POST') {
+      return voidInvoiceRoute(req, db, orgId, invoiceId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice void')
   }
 

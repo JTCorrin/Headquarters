@@ -7,6 +7,8 @@ import { handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
 import { handleMeetings } from './meetings.ts'
 import { handlePayments } from './payments.ts'
+import { handleProductCategories } from './product-categories.ts'
+import { handleProducts } from './products.ts'
 import { handleProjects } from './projects.ts'
 import { handleQuotes } from './quotes.ts'
 import { handleTasks } from './tasks.ts'
@@ -1034,6 +1036,157 @@ const TOOLS: ToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_products',
+    description: 'List products in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'archived'] },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_product',
+    description: 'Get a product by id.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_product',
+    description: 'Create a product (same validation as POST /api/v1/products).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sku: { type: 'string', minLength: 1, maxLength: 64 },
+        name: { type: 'string', minLength: 1, maxLength: 160 },
+        unit_price_cents: { type: 'integer', minimum: 0 },
+        description: { type: ['string', 'null'] },
+        category_id: { type: ['string', 'null'], format: 'uuid' },
+        product_type: { type: 'string', enum: ['product', 'service'] },
+        unit_name: { type: ['string', 'null'] },
+        cost_price_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
+        tax_rate_id: { type: ['string', 'null'], format: 'uuid' },
+        track_stock: { type: 'boolean' },
+        low_stock_at: { type: ['number', 'null'] },
+        status: { type: 'string', enum: ['active', 'archived'] },
+        metadata: { type: 'object' },
+      },
+      required: ['sku', 'name', 'unit_price_cents'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_product',
+    description:
+      'Update a product (same validation as PATCH /api/v1/products/{id}). Requires version for If-Match. Stock is not writable — use adjust_product_stock.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        sku: { type: 'string', minLength: 1, maxLength: 64 },
+        name: { type: 'string', minLength: 1, maxLength: 160 },
+        unit_price_cents: { type: 'integer', minimum: 0 },
+        description: { type: ['string', 'null'] },
+        category_id: { type: ['string', 'null'], format: 'uuid' },
+        product_type: { type: 'string', enum: ['product', 'service'] },
+        unit_name: { type: ['string', 'null'] },
+        cost_price_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
+        tax_rate_id: { type: ['string', 'null'], format: 'uuid' },
+        track_stock: { type: 'boolean' },
+        low_stock_at: { type: ['number', 'null'] },
+        status: { type: 'string', enum: ['active', 'archived'] },
+        metadata: { type: 'object' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'adjust_product_stock',
+    description:
+      'Adjust product stock (POST /api/v1/products/{id}/adjust-stock). Optional idempotency_key for safe retries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        quantity_delta: { type: 'number' },
+        reason: {
+          type: 'string',
+          enum: ['opening', 'adjustment', 'invoice', 'return', 'void'],
+        },
+        note: { type: ['string', 'null'] },
+        occurred_at: { type: 'string' },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'quantity_delta'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_product_categories',
+    description: 'List product categories in the organisation pinned to the API key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_product_category',
+    description: 'Get a product category by id.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_product_category',
+    description:
+      'Create a product category (same validation as POST /api/v1/product-categories).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 120 },
+        description: { type: ['string', 'null'] },
+        position: { type: 'integer' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_product_category',
+    description:
+      'Update a product category (same validation as PATCH /api/v1/product-categories/{id}). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string', minLength: 1, maxLength: 120 },
+        description: { type: ['string', 'null'] },
+        position: { type: 'integer' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 export function listMcpTools(): ToolDef[] {
@@ -1232,6 +1385,16 @@ function assertCanAccessPayments(role: MembershipRole, method: string): void {
   }
   if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify payments')
+  }
+}
+
+function assertCanAccessCatalog(role: MembershipRole, method: string): void {
+  if ((role === 'billing' || role === 'readonly') && method !== 'GET') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'This membership cannot modify the product catalog',
+    )
   }
 }
 
@@ -2053,6 +2216,142 @@ async function callTool(
             'idempotency-key': resolveIdempotencyKey(args),
           },
         ),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_products': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const path = `/api/v1/products${
+        optionalQuery(args, ['limit', 'cursor', 'status'])
+      }`
+      const response = await handleProducts(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/products',
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_product': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/products/${id}`
+      const response = await handleProducts(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_product': {
+      assertCanAccessCatalog(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const response = await handleProducts(
+        syntheticRequest('POST', '/api/v1/products', args),
+        db,
+        '/api/v1/products',
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_product': {
+      assertCanAccessCatalog(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/products/${id}`
+      const response = await handleProducts(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'adjust_product_stock': {
+      assertCanAccessCatalog(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const { id: _id, idempotency_key: _ik, ...body } = args
+      const path = `/api/v1/products/${id}/adjust-stock`
+      const response = await handleProducts(
+        syntheticRequest('POST', path, body, {
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+        actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_product_categories': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const path = `/api/v1/product-categories${
+        optionalQuery(args, ['limit', 'cursor'])
+      }`
+      const response = await handleProductCategories(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/product-categories',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_product_category': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/product-categories/${id}`
+      const response = await handleProductCategories(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_product_category': {
+      assertCanAccessCatalog(membership.role, 'POST')
+      const response = await handleProductCategories(
+        syntheticRequest('POST', '/api/v1/product-categories', args),
+        db,
+        '/api/v1/product-categories',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_product_category': {
+      assertCanAccessCatalog(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/product-categories/${id}`
+      const response = await handleProductCategories(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
         db,
         path,
         orgId,
