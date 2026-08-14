@@ -227,6 +227,21 @@
 		</div>
 	</div>
 
+	<div class="space-y-2">
+		<Label for="invoice-discount">Discount</Label>
+		<Input
+			id="invoice-discount"
+			name="discount"
+			bind:value={$formData.discount}
+			placeholder="0.00"
+			disabled={readonly}
+			aria-invalid={!!$errors.discount}
+			data-testid="invoice-discount"
+		/>
+		{#if $errors.discount}<p class="text-destructive text-xs">{$errors.discount}</p>{/if}
+		<p class="text-muted-foreground text-xs">Fixed amount off the subtotal before tax rollup.</p>
+	</div>
+
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="invoice-issue">Issue on</Label>

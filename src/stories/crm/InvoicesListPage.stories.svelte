@@ -100,6 +100,7 @@
 			issueOn: '2026-03-01',
 			dueOn: '2026-04-01',
 			purchaseOrderNumber: '',
+			discount: '',
 			status: 'draft',
 			quoteId: ''
 		},

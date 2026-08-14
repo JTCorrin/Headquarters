@@ -31,6 +31,7 @@
 			clientName: 'Northwind',
 			title: 'Q2 retainer',
 			currency: 'GBP',
+			discount: '100',
 			status: 'draft',
 			recipients: []
 		},
@@ -51,7 +52,8 @@
 			description: 'Monthly retainer',
 			qty: '1',
 			unitPrice: '4200.00',
-			total: '4200.00'
+			total: '3990.00',
+			discountPercent: 5
 		}
 	]);
 	let lineDrawerOpen = $state(false);
@@ -94,7 +96,7 @@
 	}
 
 	const lineData = defaults(
-		{ productId: '', description: '', qty: '1', unitPrice: '' },
+		{ productId: '', description: '', qty: '1', unitPrice: '', discountPercent: '0' },
 		zod4(lineItemFormSchema)
 	);
 
@@ -138,10 +140,10 @@
 				products={catalog}
 				{timelineEvents}
 				moneyTotals={{
-					subtotalCents: 190000,
-					discountCents: 0,
-					taxCents: 38000,
-					totalCents: 228000
+					subtotalCents: 420000,
+					discountCents: 10000,
+					taxCents: 82000,
+					totalCents: 492000
 				}}
 				bind:lines
 				bind:lineDrawerOpen
