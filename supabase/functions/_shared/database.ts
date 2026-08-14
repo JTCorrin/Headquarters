@@ -2048,6 +2048,7 @@ export type Database = {
           p_expected_version: number;
           p_invoice_id: string;
           p_org_id: string;
+          p_sent_at?: string | null;
         };
         Returns: Json;
       };
@@ -2060,6 +2061,7 @@ export type Database = {
           p_request_hash: string;
           p_route: string;
           p_ttl_seconds?: number;
+          p_sent_at?: string | null;
         };
         Returns: Json;
       };
