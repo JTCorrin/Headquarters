@@ -68,6 +68,9 @@ export { default as OrgApiKeysController } from './org-api-keys-controller.svelt
 export { default as OrgApiKeysCreateDrawer } from './org-api-keys-create-drawer.svelte';
 export { default as DashboardPage } from './dashboard-page.svelte';
 export { default as DashboardHomePage } from './dashboard-home-page.svelte';
+export { default as DashboardAgingChart } from './dashboard-aging-chart.svelte';
+export { default as DashboardTrendChart } from './dashboard-trend-chart.svelte';
+export { default as DashboardPipelineChart } from './dashboard-pipeline-chart.svelte';
 export { default as QuoteForm } from './quote-form.svelte';
 export { default as QuoteFormDrawer } from './quote-form-drawer.svelte';
 export { default as InvoiceForm } from './invoice-form.svelte';

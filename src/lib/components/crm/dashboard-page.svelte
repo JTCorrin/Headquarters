@@ -8,6 +8,9 @@
 	import MyTasksPanel, { type DashboardTask } from './my-tasks-panel.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import TaskFormDrawer from './task-form-drawer.svelte';
+	import DashboardAgingChart, { type AgingBar } from './dashboard-aging-chart.svelte';
+	import DashboardTrendChart, { type TrendPoint } from './dashboard-trend-chart.svelte';
+	import DashboardPipelineChart, { type PipelineBar } from './dashboard-pipeline-chart.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
@@ -23,7 +26,9 @@
 		id: string;
 		label: string;
 		detail: string;
+		href?: string;
 		tone?: 'default' | 'warn';
+		badge?: string;
 	}
 
 	export interface DashboardMeeting {
@@ -41,6 +46,10 @@
 		attentionItems?: DashboardAttentionItem[];
 		upcomingMeetings?: DashboardMeeting[];
 		recentActivity: TimelineEvent[];
+		agingBars?: AgingBar[];
+		trendPoints?: TrendPoint[];
+		pipelineBars?: PipelineBar[];
+		currencyHint?: string | null;
 		/** Same create form as `/tasks` — when set, New task opens TaskFormDrawer. */
 		form?: SuperForm<TaskFormData>;
 		assigneeOptions?: TaskAssigneeOption[];
@@ -61,6 +70,10 @@
 		attentionItems = [],
 		upcomingMeetings = [],
 		recentActivity,
+		agingBars = [],
+		trendPoints = [],
+		pipelineBars = [],
+		currencyHint = null,
 		form,
 		assigneeOptions = [],
 		drawerOpen = $bindable(false),
@@ -70,6 +83,10 @@
 		showNav = true,
 		class: className
 	}: DashboardPageProps = $props();
+
+	const showMoneyCharts = $derived(
+		agingBars.length > 0 || trendPoints.length > 0 || pipelineBars.length > 0
+	);
 </script>
 
 <div
@@ -93,6 +110,60 @@
 				{/each}
 			</div>
 
+			{#if currencyHint}
+				<p class="text-muted-foreground text-xs">{currencyHint}</p>
+			{/if}
+
+			{#if showMoneyCharts}
+				<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.9fr)]">
+					<div class="space-y-6">
+						{#if agingBars.length > 0}
+							<DashboardAgingChart bars={agingBars} />
+						{/if}
+						{#if trendPoints.length > 0}
+							<DashboardTrendChart points={trendPoints} />
+						{/if}
+						{#if pipelineBars.length > 0}
+							<DashboardPipelineChart bars={pipelineBars} />
+						{/if}
+					</div>
+
+					<section
+						class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+					>
+						<div class="mb-4 flex items-center gap-2">
+							<AlertTriangleIcon class="text-muted-foreground size-4" />
+							<h2 class="text-sm font-semibold tracking-tight">Needs attention</h2>
+						</div>
+						{#if attentionItems.length === 0}
+							<p class="text-muted-foreground text-sm">All clear for now.</p>
+						{:else}
+							<ul class="m-0 list-none space-y-3 p-0">
+								{#each attentionItems as item (item.id)}
+									<li class="flex items-start justify-between gap-3">
+										<div class="min-w-0">
+											{#if item.href}
+												<a href={item.href} class="text-sm font-medium hover:underline"
+													>{item.label}</a
+												>
+											{:else}
+												<p class="text-sm font-medium">{item.label}</p>
+											{/if}
+											<p class="text-muted-foreground truncate text-xs">{item.detail}</p>
+										</div>
+										{#if item.badge}
+											<StatusBadge status={item.badge} />
+										{:else if item.tone === 'warn'}
+											<StatusBadge status="Overdue" />
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</section>
+				</div>
+			{/if}
+
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.85fr)]">
 				<MyTasksPanel
 					tasks={myTasks}
@@ -115,31 +186,41 @@
 				</MyTasksPanel>
 
 				<div class="space-y-6">
-					<section
-						class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
-					>
-						<div class="mb-4 flex items-center gap-2">
-							<AlertTriangleIcon class="text-muted-foreground size-4" />
-							<h2 class="text-sm font-semibold tracking-tight">Needs attention</h2>
-						</div>
-						{#if attentionItems.length === 0}
-							<p class="text-muted-foreground text-sm">All clear for now.</p>
-						{:else}
-							<ul class="m-0 list-none space-y-3 p-0">
-								{#each attentionItems as item (item.id)}
-									<li class="flex items-start justify-between gap-3">
-										<div class="min-w-0">
-											<p class="text-sm font-medium">{item.label}</p>
-											<p class="text-muted-foreground truncate text-xs">{item.detail}</p>
-										</div>
-										{#if item.tone === 'warn'}
-											<StatusBadge status="Overdue" />
-										{/if}
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</section>
+					{#if !showMoneyCharts}
+						<section
+							class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						>
+							<div class="mb-4 flex items-center gap-2">
+								<AlertTriangleIcon class="text-muted-foreground size-4" />
+								<h2 class="text-sm font-semibold tracking-tight">Needs attention</h2>
+							</div>
+							{#if attentionItems.length === 0}
+								<p class="text-muted-foreground text-sm">All clear for now.</p>
+							{:else}
+								<ul class="m-0 list-none space-y-3 p-0">
+									{#each attentionItems as item (item.id)}
+										<li class="flex items-start justify-between gap-3">
+											<div class="min-w-0">
+												{#if item.href}
+													<a href={item.href} class="text-sm font-medium hover:underline"
+														>{item.label}</a
+													>
+												{:else}
+													<p class="text-sm font-medium">{item.label}</p>
+												{/if}
+												<p class="text-muted-foreground truncate text-xs">{item.detail}</p>
+											</div>
+											{#if item.badge}
+												<StatusBadge status={item.badge} />
+											{:else if item.tone === 'warn'}
+												<StatusBadge status="Overdue" />
+											{/if}
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</section>
+					{/if}
 
 					<section
 						class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
