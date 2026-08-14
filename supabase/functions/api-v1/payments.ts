@@ -622,6 +622,7 @@ async function createPayment(
   db: DatabaseClient,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const rawKey = parseIdempotencyKey(req)
   const route = '/api/v1/payments'
@@ -640,6 +641,7 @@ async function createPayment(
     p_idempotency_key_hash: keyHash,
     p_request_hash: requestHash,
     p_route: route,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
   if (error) throw databaseError(error, requestId)
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -650,7 +652,8 @@ async function createPayment(
     )
   }
   const envelope = data as IdempotencyEnvelope
-  if (envelope.replay !== true) {
+  // API-key path: record payment only; skip playbooks (may email).
+  if (envelope.replay !== true && !actorUserId) {
     const payment = extractEnvelopeData(envelope)
     if (
       payment &&
@@ -762,10 +765,13 @@ export function handlePayments(
   path: string,
   orgId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   if (path === '/api/v1/payments') {
     if (req.method === 'GET') return listPayments(req, db, orgId, requestId)
-    if (req.method === 'POST') return createPayment(req, db, orgId, requestId)
+    if (req.method === 'POST') {
+      return createPayment(req, db, orgId, requestId, actorUserId)
+    }
     throw new ApiError(
       405,
       'METHOD_NOT_ALLOWED',
