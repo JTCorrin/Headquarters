@@ -150,7 +150,10 @@
 	);
 
 	const lineForm = superForm(
-		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
+		defaults(
+			{ productId: '', description: '', qty: '1', unitPrice: '0', discountPercent: '0' },
+			zod4(lineItemFormSchema)
+		),
 		{
 			validators: zod4(lineItemFormSchema),
 			SPA: true,
@@ -512,7 +515,13 @@
 			);
 			if (isStale(epoch)) return false;
 			applyDocument(updated);
-			lineForm.form.set({ productId: '', description: '', qty: '1', unitPrice: '0' });
+			lineForm.form.set({
+				productId: '',
+				description: '',
+				qty: '1',
+				unitPrice: '0',
+				discountPercent: '0'
+			});
 			lineDrawerOpen = false;
 			viewState = { kind: 'ready' };
 			return true;
