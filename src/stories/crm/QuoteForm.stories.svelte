@@ -21,6 +21,7 @@
 			clientName: 'Northwind',
 			title: 'Q2 retainer',
 			currency: 'GBP',
+			discount: '',
 			status: 'draft',
 			recipients: []
 		},

@@ -5,6 +5,14 @@ export const lineItemFormSchema = z.object({
 	description: z.string().min(1, 'Description is required').max(200),
 	qty: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Enter a quantity'),
 	unitPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Use a number like 12.50'),
+	discountPercent: z
+		.string()
+		.optional()
+		.or(z.literal(''))
+		.refine(
+			(v) => v === undefined || v === '' || (/^\d+(\.\d{1,4})?$/.test(v) && Number(v) <= 100),
+			'Discount must be between 0 and 100'
+		),
 	taxRatePercent: z
 		.string()
 		.optional()

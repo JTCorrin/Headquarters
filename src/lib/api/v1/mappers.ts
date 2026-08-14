@@ -514,6 +514,7 @@ export function toQuoteFormData(
 		clientName: partyNameFromSnapshot(quote.party_snapshot) || clientNameFallback,
 		title: quote.title,
 		currency,
+		discount: centsToAmountString(quote.discount_cents) || '',
 		status,
 		recipients: recipientsFromDocument(quote)
 	};
@@ -524,6 +525,7 @@ export function toQuoteCreateBody(data: QuoteFormData): ApiQuoteCreateBody {
 		title: data.title.trim(),
 		client_id: data.clientId,
 		currency: data.currency,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients),
 		lines: []
 	};
@@ -534,6 +536,7 @@ export function toQuoteUpdateBody(data: QuoteFormData): ApiQuoteUpdateBody {
 		title: data.title.trim(),
 		client_id: data.clientId,
 		currency: data.currency,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients)
 	};
 }
@@ -625,18 +628,27 @@ function lineTaxRatePercent(data: LineItemFormData): number | undefined {
 	return Number.isFinite(value) ? value : undefined;
 }
 
+function lineDiscountPercent(data: LineItemFormData): number {
+	const raw = data.discountPercent?.trim();
+	if (!raw) return 0;
+	const value = Number(raw);
+	return Number.isFinite(value) ? value : 0;
+}
+
 export function toQuoteLineInput(data: LineItemFormData, position?: number): ApiQuoteLineInput {
 	const quantity = Number(data.qty);
 	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
 	const productId = data.productId?.trim();
 	const taxRatePercent = lineTaxRatePercent(data);
 	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
+	const discount_percent = lineDiscountPercent(data);
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			discount_percent,
 			...tax,
 			...(position === undefined ? {} : { position })
 		};
@@ -646,6 +658,7 @@ export function toQuoteLineInput(data: LineItemFormData, position?: number): Api
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		discount_percent,
 		...tax,
 		...(position === undefined ? {} : { position })
 	};
@@ -681,9 +694,7 @@ export function lineItemRowsToQuoteLineInputs(
 					unit_price_cents: unitPriceCents,
 					position: index
 				};
-		if (line.discountPercent !== undefined) {
-			input.discount_percent = line.discountPercent;
-		}
+		input.discount_percent = line.discountPercent ?? 0;
 		if (line.taxRatePercent !== undefined) {
 			input.tax_rate_percent = line.taxRatePercent;
 		}
@@ -729,6 +740,7 @@ export function toInvoiceFormData(
 		issueOn: invoice.issue_on,
 		dueOn: invoice.due_on,
 		purchaseOrderNumber: invoice.purchase_order_number ?? '',
+		discount: centsToAmountString(invoice.discount_cents) || '',
 		status,
 		quoteId: invoice.quote_id ?? '',
 		recipients: recipientsFromDocument(invoice)
@@ -742,6 +754,7 @@ export function toInvoiceCreateBody(data: InvoiceFormData): ApiInvoiceCreateBody
 		issue_on: data.issueOn,
 		due_on: data.dueOn,
 		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients),
 		lines: []
 	};
@@ -754,6 +767,7 @@ export function toInvoiceUpdateBody(data: InvoiceFormData): ApiInvoiceUpdateBody
 		issue_on: data.issueOn,
 		due_on: data.dueOn,
 		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients)
 	};
 }
@@ -764,12 +778,14 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 	const productId = data.productId?.trim();
 	const taxRatePercent = lineTaxRatePercent(data);
 	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
+	const discount_percent = lineDiscountPercent(data);
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			discount_percent,
 			...tax,
 			...(position === undefined ? {} : { position })
 		};
@@ -779,6 +795,7 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		discount_percent,
 		...tax,
 		...(position === undefined ? {} : { position })
 	};
@@ -815,9 +832,7 @@ export function lineItemRowsToInvoiceLineInputs(
 					unit_price_cents: unitPriceCents,
 					position: index
 				};
-		if (line.discountPercent !== undefined) {
-			input.discount_percent = line.discountPercent;
-		}
+		input.discount_percent = line.discountPercent ?? 0;
 		if (line.taxRatePercent !== undefined) {
 			input.tax_rate_percent = line.taxRatePercent;
 		}
@@ -902,12 +917,17 @@ export function toBillLineInput(data: LineItemFormData, position?: number): ApiB
 	const quantity = Number(data.qty);
 	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
 	const productId = data.productId?.trim();
+	const taxRatePercent = lineTaxRatePercent(data);
+	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
+	const discount_percent = lineDiscountPercent(data);
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			discount_percent,
+			...tax,
 			...(position === undefined ? {} : { position })
 		};
 	}
@@ -916,6 +936,8 @@ export function toBillLineInput(data: LineItemFormData, position?: number): ApiB
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		discount_percent,
+		...tax,
 		...(position === undefined ? {} : { position })
 	};
 }
@@ -950,9 +972,7 @@ export function lineItemRowsToBillLineInputs(
 					unit_price_cents: unitPriceCents,
 					position: index
 				};
-		if (line.discountPercent !== undefined) {
-			input.discount_percent = line.discountPercent;
-		}
+		input.discount_percent = line.discountPercent ?? 0;
 		if (line.taxRatePercent !== undefined) {
 			input.tax_rate_percent = line.taxRatePercent;
 		}

@@ -95,6 +95,7 @@
 			description: '',
 			qty: '1',
 			unitPrice: '0',
+			discountPercent: '0',
 			taxRatePercent: defaultTaxRatePercentString(taxRates)
 		};
 	}
@@ -106,6 +107,7 @@
 				clientName: '',
 				title: '',
 				currency: 'GBP' as const,
+				discount: '',
 				status: 'draft' as const,
 				recipients: []
 			},

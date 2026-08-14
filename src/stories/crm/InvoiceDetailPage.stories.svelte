@@ -34,6 +34,7 @@
 			issueOn: '2026-03-01',
 			dueOn: '2026-04-01',
 			purchaseOrderNumber: '',
+			discount: '50',
 			status: 'sent',
 			quoteId: ''
 		},
@@ -54,7 +55,8 @@
 			description: 'Monthly retainer',
 			qty: '1',
 			unitPrice: '4200.00',
-			total: '4200.00'
+			total: '3990.00',
+			discountPercent: 5
 		},
 		{
 			id: 'l2',
@@ -111,7 +113,7 @@
 	}
 
 	const lineData = defaults(
-		{ productId: '', description: '', qty: '1', unitPrice: '' },
+		{ productId: '', description: '', qty: '1', unitPrice: '', discountPercent: '0' },
 		zod4(lineItemFormSchema)
 	);
 

@@ -97,6 +97,7 @@
 			clientName: '',
 			title: '',
 			currency: 'GBP',
+			discount: '',
 			status: 'draft',
 			recipients: []
 		},

@@ -76,6 +76,7 @@
 				issueOn: todayIso(),
 				dueOn: dueInDays(30),
 				purchaseOrderNumber: '',
+				discount: '',
 				status: 'draft' as const,
 				quoteId: '',
 				recipients: []
@@ -156,6 +157,7 @@
 			issueOn: todayIso(),
 			dueOn: dueInDays(30),
 			purchaseOrderNumber: '',
+			discount: '',
 			status: 'draft',
 			quoteId: '',
 			recipients: []
