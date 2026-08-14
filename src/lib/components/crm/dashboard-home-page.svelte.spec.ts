@@ -146,6 +146,60 @@ function sampleMeeting(overrides: Record<string, unknown> = {}) {
 	};
 }
 
+function sampleDashboardSummary(overrides: Record<string, unknown> = {}) {
+	return {
+		currency: 'GBP',
+		as_of: '2026-08-14',
+		kpis: {
+			outstanding_cents: 7500,
+			overdue_cents: 7500,
+			open_invoice_count: 1,
+			overdue_invoice_count: 1,
+			cash_collected_30d_cents: 2500,
+			cash_collected_prior_30d_cents: 0,
+			booked_30d_cents: 10000,
+			booked_prior_30d_cents: 0
+		},
+		aging: [
+			{ bucket: 'current', cents: 0, count: 0 },
+			{ bucket: '1_30', cents: 7500, count: 1 },
+			{ bucket: '31_60', cents: 0, count: 0 },
+			{ bucket: '61_90', cents: 0, count: 0 },
+			{ bucket: '90_plus', cents: 0, count: 0 }
+		],
+		monthly: [
+			{ month: '2026-03', cash_cents: 0, booked_cents: 0 },
+			{ month: '2026-04', cash_cents: 0, booked_cents: 0 },
+			{ month: '2026-05', cash_cents: 0, booked_cents: 0 },
+			{ month: '2026-06', cash_cents: 0, booked_cents: 0 },
+			{ month: '2026-07', cash_cents: 0, booked_cents: 0 },
+			{ month: '2026-08', cash_cents: 2500, booked_cents: 10000 }
+		],
+		quote_pipeline: [
+			{ status: 'draft', count: 0, total_cents: 0 },
+			{ status: 'sent', count: 1, total_cents: 50000 },
+			{ status: 'accepted', count: 0, total_cents: 0 },
+			{ status: 'rejected', count: 0, total_cents: 0 }
+		],
+		chase: {
+			overdue_invoices: [
+				{
+					id: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+					number: 'INV-0001',
+					client_name: 'Acme Client',
+					amount_cents: 7500,
+					days: 15
+				}
+			],
+			due_soon_invoices: [],
+			awaiting_quotes: [],
+			expiring_quotes: []
+		},
+		other_currency_doc_count: 0,
+		...overrides
+	};
+}
+
 describe('DashboardHomePage integration', () => {
 	it('loads my tasks with assignee=me and toggles done', async () => {
 		const seenTaskUrls: string[] = [];
@@ -442,5 +496,37 @@ describe('DashboardHomePage integration', () => {
 		releaseTimeline?.();
 		await vi.waitFor(() => expect(timelineCompletions).toBe(1));
 		await expect.element(page.getByText(staleTitle)).not.toBeInTheDocument();
+	});
+
+	it('loads money summary into KPIs and chase list', async () => {
+		const seenSummaryUrls: string[] = [];
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/me/org-members': async () => ({ body: orgMembersListBody() }),
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			'GET /api/v1/tasks': async () => ({
+				body: { data: [sampleTask()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/dashboard/summary': async (request) => {
+				seenSummaryUrls.push(request.url);
+				return { body: { data: sampleDashboardSummary() } };
+			},
+			'GET /api/v1/meetings': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/timeline-events': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(DashboardHomePage, { api, session });
+
+		await expect.element(page.getByText('Outstanding AR')).toBeInTheDocument();
+		await expect.element(page.getByText('AR aging')).toBeInTheDocument();
+		await expect.element(page.getByText('INV-0001 overdue')).toBeInTheDocument();
+		await expect.poll(() => seenSummaryUrls.length).toBeGreaterThan(0);
+		expect(seenSummaryUrls.some((url) => url.includes('/api/v1/dashboard/summary'))).toBe(true);
 	});
 });

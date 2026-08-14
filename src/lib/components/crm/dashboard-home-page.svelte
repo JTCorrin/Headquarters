@@ -36,9 +36,21 @@
 		type DashboardMeeting,
 		type DashboardStat
 	} from './dashboard-page.svelte';
+	import type { AgingBar } from './dashboard-aging-chart.svelte';
+	import type { PipelineBar } from './dashboard-pipeline-chart.svelte';
+	import type { TrendPoint } from './dashboard-trend-chart.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 	import { loadOrgTimeline } from '$lib/crm/entity-timeline.js';
+	import {
+		dashboardAgingFromSummary,
+		dashboardAttentionFromSummary,
+		dashboardCurrencyHint,
+		dashboardPipelineFromSummary,
+		dashboardStatsFromSummary,
+		dashboardTrendFromSummary
+	} from '$lib/crm/dashboard-money.js';
 	import type { TimelineEvent } from './timeline.svelte';
+	import type { ApiDashboardSummary } from '$lib/api/v1/types.js';
 
 	export interface DashboardHomePageProps {
 		api: ApiV1Client;
@@ -60,6 +72,7 @@
 
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let tasks = $state<TaskListItem[]>([]);
+	let moneySummary = $state<ApiDashboardSummary | null>(null);
 	let upcomingMeetingItems = $state<MeetingListItem[]>([]);
 	let recentActivityItems = $state<TimelineEvent[]>([]);
 	let assigneeOptions = $state<TaskAssigneeOption[]>([]);
@@ -98,6 +111,7 @@
 	const overdueTasks = $derived(openTasks.filter((t) => isTaskDueBeforeToday(t.dueAt)));
 
 	const stats = $derived.by((): DashboardStat[] => {
+		if (moneySummary) return dashboardStatsFromSummary(moneySummary);
 		const open = openTasks.length;
 		const overdue = overdueTasks.length;
 		const done = tasks.filter((t) => t.rawStatus === 'done').length;
@@ -117,14 +131,26 @@
 		];
 	});
 
-	const attentionItems = $derived.by((): DashboardAttentionItem[] =>
-		overdueTasks.slice(0, 5).map((task) => ({
+	const agingBars = $derived.by((): AgingBar[] =>
+		moneySummary ? dashboardAgingFromSummary(moneySummary) : []
+	);
+	const trendPoints = $derived.by((): TrendPoint[] =>
+		moneySummary ? dashboardTrendFromSummary(moneySummary) : []
+	);
+	const pipelineBars = $derived.by((): PipelineBar[] =>
+		moneySummary ? dashboardPipelineFromSummary(moneySummary) : []
+	);
+	const currencyHint = $derived(moneySummary ? dashboardCurrencyHint(moneySummary) : null);
+
+	const attentionItems = $derived.by((): DashboardAttentionItem[] => {
+		if (moneySummary) return dashboardAttentionFromSummary(moneySummary);
+		return overdueTasks.slice(0, 5).map((task) => ({
 			id: task.id,
 			label: task.title,
 			detail: `${task.relatedTo === '—' ? 'Task' : task.relatedTo} · due ${task.dueOn}`,
 			tone: 'warn' as const
-		}))
-	);
+		}));
+	});
 
 	const recentActivity = $derived(recentActivityItems);
 
@@ -169,6 +195,7 @@
 
 	function resetOrgScopedState() {
 		tasks = [];
+		moneySummary = null;
 		upcomingMeetingItems = [];
 		recentActivityItems = [];
 		assigneeOptions = [];
@@ -221,6 +248,16 @@
 			if (isStale(epoch)) return;
 
 			tasks = listed.data.map((task) => toTaskListItem(task, listItemOptions()));
+
+			try {
+				const summary = await api.dashboard.summary();
+				if (isStale(epoch)) return;
+				moneySummary = summary;
+			} catch {
+				if (isStale(epoch)) return;
+				// Money summary soft-fail — keep Home usable with task fallbacks.
+				moneySummary = null;
+			}
 
 			try {
 				const upcoming = await api.meetings.list({ limit: 5, upcoming: true });
@@ -370,6 +407,10 @@
 						{attentionItems}
 						{upcomingMeetings}
 						{recentActivity}
+						{agingBars}
+						{trendPoints}
+						{pipelineBars}
+						{currencyHint}
 						form={taskForm}
 						{assigneeOptions}
 						bind:drawerOpen

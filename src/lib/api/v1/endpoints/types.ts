@@ -34,6 +34,7 @@ import type {
 	ApiDocumentResult,
 	ApiDocumentUploadIntentBody,
 	ApiDocumentUploadIntentResult,
+	ApiDashboardSummary,
 	ApiOrganisationBranding,
 	ApiOrganisationConfiguration,
 	ApiOrganisationConfigurationPatch,
@@ -184,6 +185,10 @@ export interface OrganisationsEndpoints {
 
 export interface OrgMembersEndpoints {
 	list(signal?: AbortSignal): Promise<ApiOrgMember[]>;
+}
+
+export interface DashboardEndpoints {
+	summary(signal?: AbortSignal): Promise<ApiDashboardSummary>;
 }
 
 export interface OrganisationAccessEndpoints {
