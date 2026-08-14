@@ -50,6 +50,7 @@
 		onResume?: () => void | Promise<void>;
 		onCancel?: () => void | Promise<void>;
 		onRunNow?: () => void | Promise<void>;
+		onRetryDelivery?: (runId: string) => void | Promise<void>;
 		onDelete?: () => void | Promise<void>;
 		onReload?: () => void | Promise<void>;
 		showNav?: boolean;
@@ -84,6 +85,7 @@
 		onResume,
 		onCancel,
 		onRunNow,
+		onRetryDelivery,
 		onDelete,
 		onReload,
 		showNav = true,
@@ -248,7 +250,7 @@
 					</RecurringLinesTable>
 				</div>
 
-				<RecurringInvoiceRunsTable rows={runs} />
+				<RecurringInvoiceRunsTable rows={runs} {onRetryDelivery} />
 			</div>
 		</div>
 	</main>

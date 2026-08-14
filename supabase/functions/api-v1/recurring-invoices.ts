@@ -1037,6 +1037,41 @@ async function getRun(
   return jsonResponse({ data }, 200, requestId)
 }
 
+async function retryDelivery(
+  db: DatabaseClient,
+  orgId: string,
+  scheduleId: string,
+  runId: string,
+  requestId: string,
+): Promise<Response> {
+  const { data: schedule, error: scheduleError } = await db
+    .from('recurring_invoice_schedules')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('id', scheduleId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (scheduleError) throw databaseError(scheduleError, requestId)
+  if (!schedule) throw new ApiError(404, 'NOT_FOUND', 'Recurring schedule not found')
+
+  const { data: run, error: runError } = await db
+    .from('recurring_invoice_runs')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('schedule_id', scheduleId)
+    .eq('id', runId)
+    .maybeSingle()
+  if (runError) throw databaseError(runError, requestId)
+  if (!run) throw new ApiError(404, 'NOT_FOUND', 'Recurring run not found')
+
+  const { data, error } = await db.rpc('retry_recurring_invoice_delivery', {
+    p_run_id: runId,
+    p_org_id: orgId,
+  })
+  if (error) throw databaseError(error, requestId)
+  return jsonResponse({ data }, 200, requestId)
+}
+
 export function handleRecurringInvoices(
   req: Request,
   db: DatabaseClient,
@@ -1053,6 +1088,16 @@ export function handleRecurringInvoices(
   if (path === '/api/v1/recurring-invoice-schedules/preview') {
     if (req.method === 'POST') return previewSchedule(req, db, orgId, requestId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for preview')
+  }
+
+  const retryDeliveryMatch = path.match(
+    /^\/api\/v1\/recurring-invoice-schedules\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/runs\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/retry-delivery$/i,
+  )
+  if (retryDeliveryMatch) {
+    if (req.method !== 'POST') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for retry delivery')
+    }
+    return retryDelivery(db, orgId, retryDeliveryMatch[1], retryDeliveryMatch[2], requestId)
   }
 
   const runItemMatch = path.match(

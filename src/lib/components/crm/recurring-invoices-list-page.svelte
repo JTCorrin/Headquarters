@@ -55,7 +55,7 @@
 			<PageHeader
 				breadcrumb="Accounting"
 				title="Recurring invoices"
-				description="Templates that generate draft invoices on a schedule. Auto-send is stored only in this slice."
+				description="Templates that generate invoices on a schedule. Auto-send emails the PDF when organisation invoice email is configured."
 			>
 				{#snippet actions()}
 					<RecurringInvoiceFormDrawer

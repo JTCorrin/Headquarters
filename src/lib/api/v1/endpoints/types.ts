@@ -57,6 +57,7 @@ import type {
 	ApiInvoiceDocument,
 	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
+	ApiInvoiceSendBody,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
 	ApiBill,
@@ -122,6 +123,9 @@ import type {
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
+	ApiOrgInvoiceEmailAccount,
+	ApiOrgInvoiceEmailPutBody,
+	ApiOrgInvoiceEmailTestResult,
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
 	ApiAiModelUpdateBody,
@@ -226,6 +230,16 @@ export interface OrganisationConfigEndpoints {
 	deleteLogo(version: number, signal?: AbortSignal): Promise<ApiOrganisationConfiguration>;
 }
 
+export interface OrgInvoiceEmailEndpoints {
+	get(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailAccount | null>;
+	put(
+		body: ApiOrgInvoiceEmailPutBody,
+		signal?: AbortSignal
+	): Promise<ApiOrgInvoiceEmailAccount>;
+	test(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailTestResult>;
+	disconnect(signal?: AbortSignal): Promise<void>;
+}
+
 export interface TaxRatesEndpoints {
 	list(params?: ApiTaxRateListParams, signal?: AbortSignal): Promise<ApiTaxRate[]>;
 	create(body: ApiTaxRateCreateBody, signal?: AbortSignal): Promise<ApiTaxRate>;
@@ -298,7 +312,12 @@ export interface InvoicesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiInvoiceDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
-	send(id: string, version: number, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
+	send(
+		id: string,
+		version: number,
+		body?: ApiInvoiceSendBody,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
 	void(
 		id: string,
 		body: ApiInvoiceVoidBody,
@@ -519,6 +538,11 @@ export interface RecurringInvoiceSchedulesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiRecurringInvoiceRunNowResult>;
+	retryDelivery(
+		scheduleId: string,
+		runId: string,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceRun>;
 }
 
 export interface PaymentsEndpoints {

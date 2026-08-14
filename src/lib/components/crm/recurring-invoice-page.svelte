@@ -599,6 +599,19 @@
 						onResume={() => runLifecycle((v) => api.recurringInvoiceSchedules.resume(scheduleId, v))}
 						onCancel={() => runLifecycle((v) => api.recurringInvoiceSchedules.cancel(scheduleId, v))}
 						onRunNow={onRunNow}
+						onRetryDelivery={async (runId) => {
+							actionPending = true;
+							actionError = null;
+							try {
+								await api.recurringInvoiceSchedules.retryDelivery(scheduleId, runId);
+								const epoch = captureEpoch();
+								await loadRuns(epoch);
+							} catch (error) {
+								actionError = userMessage(error, 'Could not retry delivery.');
+							} finally {
+								actionPending = false;
+							}
+						}}
 						onDelete={onDelete}
 						onReload={loadAll}
 						showNav={false}

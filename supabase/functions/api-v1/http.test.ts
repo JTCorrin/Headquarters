@@ -56,6 +56,7 @@ import {
   decodeInvoiceCursor,
   invoiceLifecycleIdempotencyPayload,
   validateInvoiceBody,
+  validateSendInvoiceBody,
 } from './invoices.ts'
 import { billLifecycleIdempotencyPayload, validateBillBody } from './bills.ts'
 import { quoteAcceptIdempotencyPayload } from './quotes.ts'
@@ -1002,6 +1003,45 @@ Deno.test('invoice void_reason is required for the /void action body', () => {
         },
         false,
       ),
+    ApiError,
+  )
+})
+
+Deno.test('invoice create accepts optional number; PATCH rejects number', () => {
+  const clientId = '22222222-2222-4222-8222-222222222222'
+  const created = validateInvoiceBody(
+    {
+      client_id: clientId,
+      number: '  LEGACY-42  ',
+      lines: [],
+    },
+    false,
+  )
+  assertEquals(created.number, 'LEGACY-42')
+  assertThrows(
+    () =>
+      validateInvoiceBody(
+        {
+          number: 'LEGACY-99',
+        },
+        true,
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('invoice send body accepts optional sent_at ISO timestamptz', () => {
+  assertEquals(validateSendInvoiceBody({}), {})
+  assertEquals(
+    validateSendInvoiceBody({ sent_at: '2024-06-15T12:00:00Z' }),
+    { sent_at: '2024-06-15T12:00:00Z' },
+  )
+  assertThrows(
+    () => validateSendInvoiceBody({ sent_at: 'not-a-timestamp' }),
+    ApiError,
+  )
+  assertThrows(
+    () => validateSendInvoiceBody({ sent_at: '2024-06-15T12:00:00Z', extra: true }),
     ApiError,
   )
 })
@@ -2141,12 +2181,16 @@ Deno.test('MCP create_task requires assignee_membership_id', () => {
 Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => {
   const names = listMcpTools().map((tool) => tool.name).sort()
   assertEquals(names, [
+    'accept_quote',
     'add_timeline_note',
+    'allocate_payment',
     'create_client',
     'create_contact',
     'create_invoice',
+    'create_invoice_from_quote',
     'create_lead',
     'create_meeting',
+    'create_payment',
     'create_project',
     'create_quote',
     'create_task',
@@ -2155,6 +2199,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'get_invoice',
     'get_lead',
     'get_meeting',
+    'get_payment',
     'get_project',
     'get_quote',
     'get_task',
@@ -2163,9 +2208,14 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'list_invoices',
     'list_leads',
     'list_meetings',
+    'list_payments',
     'list_projects',
     'list_quotes',
     'list_tasks',
+    'reject_quote',
+    'reverse_payment',
+    'send_invoice',
+    'send_quote',
     'update_client',
     'update_contact',
     'update_invoice',
@@ -2174,6 +2224,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'update_project',
     'update_quote',
     'update_task',
+    'void_invoice',
   ])
 })
 

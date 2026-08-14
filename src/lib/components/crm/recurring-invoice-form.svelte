@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type {
@@ -359,9 +360,16 @@
 				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="draft" label="Save as draft">Save as draft</Select.Item>
-					<Select.Item value="auto_send" label="Auto-send (stored only)">Auto-send (stored only)</Select.Item>
+					<Select.Item value="auto_send" label="Auto-send by email">Auto-send by email</Select.Item>
 				</Select.Content>
 			</Select.Root>
+			{#if $formData.deliveryMode === 'auto_send'}
+				<p class="text-muted-foreground text-xs">
+					Requires organisation invoice email under
+					<a class="underline underline-offset-2" href={resolve('/org/integrations')}>Integrations</a>.
+					Generated invoices are emailed with a PDF attachment, then marked sent.
+				</p>
+			{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="ri-month-end">Month-end policy</Label>
