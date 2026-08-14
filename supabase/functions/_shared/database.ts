@@ -3109,6 +3109,10 @@ export type Database = {
         Args: { p_org_id: string };
         Returns: Json;
       };
+      dashboard_money_summary: {
+        Args: { p_org_id: string };
+        Returns: Json;
+      };
       mark_notification_read: {
         Args: {
           p_org_id: string;
