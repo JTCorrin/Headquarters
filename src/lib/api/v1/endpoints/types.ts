@@ -57,6 +57,7 @@ import type {
 	ApiInvoiceDocument,
 	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
+	ApiInvoiceSendBody,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
 	ApiBill,
@@ -298,7 +299,12 @@ export interface InvoicesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiInvoiceDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
-	send(id: string, version: number, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
+	send(
+		id: string,
+		version: number,
+		body?: ApiInvoiceSendBody,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
 	void(
 		id: string,
 		body: ApiInvoiceVoidBody,

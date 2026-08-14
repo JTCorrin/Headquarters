@@ -149,9 +149,20 @@ printf '%s' "$list_json" | jq -e '
 	and index("list_quotes") != null
 	and index("create_quote") != null
 	and index("update_quote") != null
+	and index("send_quote") != null
+	and index("accept_quote") != null
+	and index("reject_quote") != null
 	and index("list_invoices") != null
 	and index("create_invoice") != null
 	and index("update_invoice") != null
+	and index("send_invoice") != null
+	and index("void_invoice") != null
+	and index("create_invoice_from_quote") != null
+	and index("list_payments") != null
+	and index("get_payment") != null
+	and index("create_payment") != null
+	and index("allocate_payment") != null
+	and index("reverse_payment") != null
 ' >/dev/null || die "tools/list missing Wave A/B/C tools: ${list_json}"
 
 log "MCP tools/call create_task without assignee (expect error)"
@@ -408,6 +419,36 @@ update_quote_json="$(
 )"
 printf '%s' "$update_quote_json" | jq -e '.result.isError != true' >/dev/null \
 	|| die "update_quote isError: ${update_quote_json}"
+QUOTE_VER="$(
+	printf '%s' "$update_quote_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$QUOTE_VER" && "$QUOTE_VER" != null ]] \
+	|| die "update_quote missing version: ${update_quote_json}"
+
+log "MCP tools/call send_quote"
+send_quote_json="$(
+	mcp "$(jq -n \
+		--arg id "$QUOTE_ID" \
+		--argjson ver "$QUOTE_VER" \
+		'{jsonrpc:"2.0", id:17, method:"tools/call",
+			params:{name:"send_quote", arguments:{id:$id, version:$ver}}}')"
+)"
+printf '%s' "$send_quote_json" | jq -e '
+	.result.isError != true
+	and (
+		(.result.structuredContent.data.status == "sent")
+		or ((.result.content[0].text | fromjson | .data.status) == "sent")
+	)
+' >/dev/null || die "send_quote failed: ${send_quote_json}"
+QUOTE_VER="$(
+	printf '%s' "$send_quote_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
 
 log "MCP tools/call create_invoice (draft)"
 create_invoice_json="$(
@@ -450,6 +491,30 @@ update_invoice_json="$(
 )"
 printf '%s' "$update_invoice_json" | jq -e '.result.isError != true' >/dev/null \
 	|| die "update_invoice isError: ${update_invoice_json}"
+INVOICE_VER="$(
+	printf '%s' "$update_invoice_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$INVOICE_VER" && "$INVOICE_VER" != null ]] \
+	|| die "update_invoice missing version: ${update_invoice_json}"
+
+log "MCP tools/call send_invoice"
+send_invoice_json="$(
+	mcp "$(jq -n \
+		--arg id "$INVOICE_ID" \
+		--argjson ver "$INVOICE_VER" \
+		'{jsonrpc:"2.0", id:18, method:"tools/call",
+			params:{name:"send_invoice", arguments:{id:$id, version:$ver}}}')"
+)"
+printf '%s' "$send_invoice_json" | jq -e '
+	.result.isError != true
+	and (
+		(.result.structuredContent.data.status == "sent")
+		or ((.result.content[0].text | fromjson | .data.status) == "sent")
+	)
+' >/dev/null || die "send_invoice failed: ${send_invoice_json}"
 
 log "JWT rejected on /api/v1/mcp (expect 403)"
 jwt_mcp_status="$(
