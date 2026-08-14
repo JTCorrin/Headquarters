@@ -1,6 +1,6 @@
 begin;
 
-select plan(75);
+select plan(81);
 
 select has_table('public', 'invoices', 'invoices table exists');
 select has_table('public', 'invoice_lines', 'invoice_lines table exists');
@@ -386,6 +386,138 @@ select ok(
     where invoice_id = (select invoice_id from _invoices_fixture)
   ),
   'product line inherits sku, unit price, and tax rate snapshots'
+);
+
+-- Omitted tax_rate_percent inherits the org default (same as CRM UI blank lines).
+select lives_ok(
+  $$
+    select public.save_invoice_draft(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture),
+      jsonb_build_object('discount_cents', 0),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'Omit tax free-text',
+          'quantity', 1,
+          'unit_price_cents', 10000,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save accepts free-text invoice lines that omit tax_rate_percent'
+);
+
+update _invoices_fixture
+set invoice_version = invoices.version
+from public.invoices
+where invoices.id = _invoices_fixture.invoice_id;
+
+select ok(
+  (
+    select tax_rate_percent = 20
+      and tax_cents = 2000
+      and total_cents = 12000
+    from public.invoice_lines
+    where invoice_id = (select invoice_id from _invoices_fixture)
+  ),
+  'omitted free-text invoice tax inherits org default rate'
+);
+
+select lives_ok(
+  $$
+    select public.save_invoice_draft(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture),
+      jsonb_build_object('discount_cents', 0),
+      jsonb_build_array(
+        jsonb_build_object(
+          'description', 'Explicit zero tax',
+          'quantity', 1,
+          'unit_price_cents', 10000,
+          'tax_rate_percent', 0,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save accepts free-text invoice lines with explicit zero tax'
+);
+
+update _invoices_fixture
+set invoice_version = invoices.version
+from public.invoices
+where invoices.id = _invoices_fixture.invoice_id;
+
+select ok(
+  (
+    select tax_rate_percent = 0
+      and tax_cents = 0
+      and total_cents = 10000
+    from public.invoice_lines
+    where invoice_id = (select invoice_id from _invoices_fixture)
+  ),
+  'explicit invoice tax_rate_percent 0 stays zero-rated (not org default)'
+);
+
+reset role;
+
+with created_untaxed as (
+  insert into public.products (
+    org_id, sku, name, product_type, unit_price_cents, currency,
+    tax_rate_id, track_stock, status
+  )
+  select
+    org_id, 'NO-TAX', 'Untaxed service', 'service', 10000, 'GBP',
+    null, false, 'active'
+  from _invoices_fixture
+  returning id
+)
+select created_untaxed.id as untaxed_product_id
+into temporary table _invoice_untaxed_product
+from created_untaxed;
+
+grant all on table _invoice_untaxed_product to authenticated;
+
+select pg_temp.as_user((select owner_id from _invoices_fixture));
+set local role authenticated;
+
+select lives_ok(
+  $$
+    select public.save_invoice_draft(
+      (select invoice_id from _invoices_fixture),
+      (select org_id from _invoices_fixture),
+      (select invoice_version from _invoices_fixture),
+      jsonb_build_object('discount_cents', 0),
+      jsonb_build_array(
+        jsonb_build_object(
+          'product_id', (select untaxed_product_id from _invoice_untaxed_product),
+          'quantity', 1,
+          'position', 0
+        )
+      )
+    )
+  $$,
+  'save accepts product lines without a catalog tax rate'
+);
+
+update _invoices_fixture
+set invoice_version = invoices.version
+from public.invoices
+where invoices.id = _invoices_fixture.invoice_id;
+
+select ok(
+  (
+    select tax_rate_percent = 20
+      and tax_cents = 2000
+      and total_cents = 12000
+      and sku_snapshot = 'NO-TAX'
+    from public.invoice_lines
+    where invoice_id = (select invoice_id from _invoices_fixture)
+  ),
+  'invoice product without tax_rate_id inherits org default when tax omitted'
 );
 
 select throws_ok(
