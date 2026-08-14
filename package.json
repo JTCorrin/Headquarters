@@ -2,9 +2,16 @@
 	"name": "crm-project",
 	"private": true,
 	"version": "0.0.1",
+	"license": "Elastic-2.0",
 	"type": "module",
+	"packageManager": "pnpm@10.15.1",
+	"engines": {
+		"node": ">=22"
+	},
 	"scripts": {
 		"dev": "vite dev",
+		"dev:stack": "bash scripts/dev-up.sh",
+		"dev:stack:reset": "bash scripts/dev-up.sh --reset",
 		"build": "vite build",
 		"start": "node build/index.js",
 		"preview": "vite preview",
