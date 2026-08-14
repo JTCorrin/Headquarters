@@ -1418,6 +1418,69 @@ export interface ApiOrgMember {
 	job_title: string | null;
 }
 
+export type ApiDashboardAgingBucket =
+	| 'current'
+	| '1_30'
+	| '31_60'
+	| '61_90'
+	| '90_plus';
+
+export interface ApiDashboardKpis {
+	outstanding_cents: number;
+	overdue_cents: number;
+	open_invoice_count: number;
+	overdue_invoice_count: number;
+	cash_collected_30d_cents: number;
+	cash_collected_prior_30d_cents: number;
+	booked_30d_cents: number;
+	booked_prior_30d_cents: number;
+}
+
+export interface ApiDashboardAgingRow {
+	bucket: ApiDashboardAgingBucket;
+	cents: number;
+	count: number;
+}
+
+export interface ApiDashboardMonthlyRow {
+	month: string;
+	cash_cents: number;
+	booked_cents: number;
+}
+
+export interface ApiDashboardQuotePipelineRow {
+	status: 'draft' | 'sent' | 'accepted' | 'rejected';
+	count: number;
+	total_cents: number;
+}
+
+export interface ApiDashboardChaseItem {
+	id: string;
+	number: string;
+	client_name: string;
+	amount_cents: number;
+	days: number;
+}
+
+export interface ApiDashboardChase {
+	overdue_invoices: ApiDashboardChaseItem[];
+	due_soon_invoices: ApiDashboardChaseItem[];
+	awaiting_quotes: ApiDashboardChaseItem[];
+	expiring_quotes: ApiDashboardChaseItem[];
+}
+
+/** `GET /api/v1/dashboard/summary` — org money KPIs and chase lists. */
+export interface ApiDashboardSummary {
+	currency: string;
+	as_of: string;
+	kpis: ApiDashboardKpis;
+	aging: ApiDashboardAgingRow[];
+	monthly: ApiDashboardMonthlyRow[];
+	quote_pipeline: ApiDashboardQuotePipelineRow[];
+	chase: ApiDashboardChase;
+	other_currency_doc_count: number;
+}
+
 export type ApiOrganisationAccessRole = 'admin' | 'member' | 'billing' | 'readonly';
 
 export interface ApiOrganisationInvitation {
