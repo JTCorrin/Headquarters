@@ -16,6 +16,7 @@ import { ApiError, apiPath, errorResponse, jsonResponse, parseLimit, parseUuid }
 import { handleAiSuggestions } from './ai-suggestions.ts'
 import { handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
+import { handleOrgInvoiceEmail } from './org-invoice-email.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
@@ -331,6 +332,20 @@ async function routeOrgScoped(
 
   if (path === "/api/v1/organisation/configuration") {
     return await handleOrganisationConfiguration(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    );
+  }
+
+  if (
+    path === "/api/v1/organisation/invoice-email" ||
+    path === "/api/v1/organisation/invoice-email/test"
+  ) {
+    return await handleOrgInvoiceEmail(
       req,
       db,
       path,

@@ -123,6 +123,9 @@ import type {
 	ApiMailboxPutBody,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
+	ApiOrgInvoiceEmailAccount,
+	ApiOrgInvoiceEmailPutBody,
+	ApiOrgInvoiceEmailTestResult,
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
 	ApiAiModelUpdateBody,
@@ -225,6 +228,16 @@ export interface OrganisationConfigEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiOrganisationConfiguration>;
 	deleteLogo(version: number, signal?: AbortSignal): Promise<ApiOrganisationConfiguration>;
+}
+
+export interface OrgInvoiceEmailEndpoints {
+	get(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailAccount | null>;
+	put(
+		body: ApiOrgInvoiceEmailPutBody,
+		signal?: AbortSignal
+	): Promise<ApiOrgInvoiceEmailAccount>;
+	test(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailTestResult>;
+	disconnect(signal?: AbortSignal): Promise<void>;
 }
 
 export interface TaxRatesEndpoints {
@@ -525,6 +538,11 @@ export interface RecurringInvoiceSchedulesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiRecurringInvoiceRunNowResult>;
+	retryDelivery(
+		scheduleId: string,
+		runId: string,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceRun>;
 }
 
 export interface PaymentsEndpoints {
