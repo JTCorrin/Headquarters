@@ -32,6 +32,7 @@ import { handlePlaybooks } from './playbooks.ts'
 import { handleMailbox, listEntityEmailMessages, listMyEmailMessages } from './mailbox.ts'
 import { handleNotifications } from './notifications.ts'
 import { handleOrgMembers } from './org-members.ts'
+import { handleDashboardSummary } from './dashboard.ts'
 import { handleAuditEvents } from './audit-events.ts'
 import {
   acceptInvitation,
@@ -412,6 +413,17 @@ async function routeOrgScoped(
 
   if (path === "/api/v1/me/org-members") {
     return await handleOrgMembers(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    );
+  }
+
+  if (path === "/api/v1/dashboard/summary") {
+    return await handleDashboardSummary(
       req,
       db,
       path,
