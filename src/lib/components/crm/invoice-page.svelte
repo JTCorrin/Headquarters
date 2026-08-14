@@ -99,6 +99,7 @@
 			description: '',
 			qty: '1',
 			unitPrice: '0',
+			discountPercent: '0',
 			taxRatePercent: defaultTaxRatePercentString(taxRates)
 		};
 	}
@@ -124,6 +125,7 @@
 				issueOn: '',
 				dueOn: '',
 				purchaseOrderNumber: '',
+				discount: '',
 				status: 'draft' as const,
 				quoteId: '',
 				recipients: []
@@ -197,6 +199,7 @@
 			issueOn: form.issueOn,
 			dueOn: form.dueOn,
 			purchaseOrderNumber: form.purchaseOrderNumber,
+			discount: form.discount ?? '',
 			lines: rowLines.map((line) => ({
 				id: line.id,
 				productId: line.productId ?? null,

@@ -192,23 +192,38 @@
 			</Select.Root>
 		</div>
 		<div class="space-y-2">
-			<Label for="quote-status">Status</Label>
+			<Label for="quote-discount">Discount</Label>
 			<Input
-				id="quote-status"
-				name="status"
-				value={statusLabel}
-				readonly
-				disabled
-				tabindex={-1}
-				class="bg-muted/40"
-				data-testid="quote-status-readonly"
-				aria-describedby="quote-status-help"
+				id="quote-discount"
+				name="discount"
+				bind:value={$formData.discount}
+				placeholder="0.00"
+				disabled={readonly}
+				aria-invalid={!!$errors.discount}
+				data-testid="quote-discount"
 			/>
-			<p id="quote-status-help" class="text-muted-foreground text-xs">
-				Status is locked — use <span class="font-medium">Accept</span>, then
-				<span class="font-medium">Convert to invoice</span>. Saving details does not change status.
-			</p>
+			{#if $errors.discount}<p class="text-destructive text-xs">{$errors.discount}</p>{/if}
+			<p class="text-muted-foreground text-xs">Fixed amount off the subtotal before tax rollup.</p>
 		</div>
+	</div>
+
+	<div class="space-y-2">
+		<Label for="quote-status">Status</Label>
+		<Input
+			id="quote-status"
+			name="status"
+			value={statusLabel}
+			readonly
+			disabled
+			tabindex={-1}
+			class="bg-muted/40"
+			data-testid="quote-status-readonly"
+			aria-describedby="quote-status-help"
+		/>
+		<p id="quote-status-help" class="text-muted-foreground text-xs">
+			Status is locked — use <span class="font-medium">Accept</span>, then
+			<span class="font-medium">Convert to invoice</span>. Saving details does not change status.
+		</p>
 	</div>
 
 	{#if !readonly}

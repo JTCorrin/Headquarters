@@ -3,12 +3,19 @@ import {
 	documentRecipientsFieldSchema,
 	type DocumentContactOption
 } from '$lib/schemas/document-recipients.js';
+import { isValidAmountString } from '$lib/money.js';
 
 export const quoteFormSchema = z.object({
 	clientId: z.uuid('Select a client'),
 	clientName: z.string().max(160).optional().or(z.literal('')),
 	title: z.string().min(1, 'Title is required').max(160),
 	currency: z.enum(['GBP', 'USD', 'EUR']),
+	/** Fixed amount off subtotal (major units). Empty = 0. */
+	discount: z
+		.string()
+		.optional()
+		.or(z.literal(''))
+		.refine((v) => v === undefined || v === '' || isValidAmountString(v), 'Enter a valid amount'),
 	status: z.enum(['draft', 'sent', 'accepted', 'rejected', 'expired', 'void']),
 	recipients: documentRecipientsFieldSchema
 });
