@@ -1095,6 +1095,7 @@ export interface ApiClient {
 	phone: string | null;
 	tax_identifier: string | null;
 	tax_exempt: boolean;
+	email_domain?: string | null;
 	registration_number: string | null;
 	default_currency: string | null;
 	payment_terms_days: number | null;
@@ -1119,6 +1120,7 @@ export interface ApiClientCreateBody {
 	phone?: string | null;
 	tax_identifier?: string | null;
 	tax_exempt?: boolean;
+	email_domain?: string | null;
 	registration_number?: string | null;
 	default_currency?: string | null;
 	payment_terms_days?: number | null;
@@ -1653,6 +1655,9 @@ export interface ApiMailboxAccount {
 	oauth_provider?: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+	sync_catchup_complete?: boolean;
+	sync_high_uid?: number | null;
+	sync_low_uid?: number | null;
 }
 
 export type ApiMailboxOAuthProvider = 'microsoft' | 'google';
@@ -1735,6 +1740,9 @@ export interface ApiMailboxSyncResult {
 	message?: string | null;
 	/** Present on failure — pipeline step (connect/login/select/search/fetch/…). */
 	step?: string | null;
+	catchup_complete?: boolean;
+	sync_high_uid?: number | null;
+	sync_low_uid?: number | null;
 }
 
 export type ApiAiProvider = 'openai' | 'anthropic' | 'google' | 'openrouter';
@@ -1822,9 +1830,17 @@ export interface ApiEmailMessage {
 	subject: string;
 	preview_text?: string | null;
 	body_text?: string | null;
+	body_html?: string | null;
+	attachments?: Array<{
+		filename: string;
+		content_type: string;
+		size?: number;
+		content_id?: string | null;
+		inline?: boolean;
+	}> | null;
 	received_at?: string | null;
 	sent_at?: string | null;
-	link_reason?: 'address_match' | 'timeline_share' | null;
+	link_reason?: 'address_match' | 'timeline_share' | 'domain_match' | null;
 	unread?: boolean;
 	/** Present on personal inbox rows from `list_my_email_messages`. */
 	status?: string | null;
