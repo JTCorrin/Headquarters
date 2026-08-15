@@ -8,20 +8,19 @@ const MEETING_ID = '11111111-2222-4333-8444-555555555555';
 const DOCUMENT_ID = 'dddddddd-dddd-4eee-8fff-000000000000';
 
 describe('meeting transcript attachment', () => {
-	it('accepts text/markdown/vtt/pdf transcripts', () => {
+	it('accepts only .vtt transcripts', () => {
+		expect(isMeetingTranscriptFile(new File(['a'], 'a.vtt', { type: 'text/vtt' }))).toBe(true);
+		expect(isMeetingTranscriptFile(new File(['a'], 'a.VTT', { type: '' }))).toBe(true);
 		expect(isMeetingTranscriptFile(new File(['a'], 'a.txt', { type: 'text/plain' }))).toBe(
-			true
-		);
-		expect(isMeetingTranscriptFile(new File(['a'], 'a.md', { type: '' }))).toBe(true);
-		expect(isMeetingTranscriptFile(new File(['a'], 'a.vtt', { type: 'text/vtt' }))).toBe(
-			true
-		);
-		expect(
-			isMeetingTranscriptFile(new File(['a'], 'a.pdf', { type: 'application/pdf' }))
-		).toBe(true);
-		expect(isMeetingTranscriptFile(new File(['a'], 'a.bin', { type: 'application/octet-stream' }))).toBe(
 			false
 		);
+		expect(isMeetingTranscriptFile(new File(['a'], 'a.md', { type: '' }))).toBe(false);
+		expect(
+			isMeetingTranscriptFile(new File(['a'], 'a.pdf', { type: 'application/pdf' }))
+		).toBe(false);
+		expect(
+			isMeetingTranscriptFile(new File(['a'], 'a.bin', { type: 'application/octet-stream' }))
+		).toBe(false);
 	});
 
 	it('uploads via intent → put → finalize → attachTranscript', async () => {
@@ -29,8 +28,8 @@ describe('meeting transcript attachment', () => {
 			document: {
 				id: DOCUMENT_ID,
 				version: 1,
-				name: 'notes.txt',
-				mime_type: 'text/plain',
+				name: 'notes.vtt',
+				mime_type: 'text/vtt',
 				size_bytes: 5
 			},
 			link: { id: 'link-1' },
@@ -40,8 +39,8 @@ describe('meeting transcript attachment', () => {
 			document: {
 				id: DOCUMENT_ID,
 				version: 2,
-				name: 'notes.txt',
-				mime_type: 'text/plain',
+				name: 'notes.vtt',
+				mime_type: 'text/vtt',
 				size_bytes: 5
 			}
 		}));
@@ -62,7 +61,7 @@ describe('meeting transcript attachment', () => {
 				id: MEETING_ID,
 				version: 3
 			} as never,
-			new File(['hello'], 'notes.txt', { type: 'text/plain' }),
+			new File(['hello'], 'notes.vtt', { type: 'text/vtt' }),
 			{ fetchImpl }
 		);
 
@@ -70,9 +69,9 @@ describe('meeting transcript attachment', () => {
 			'meeting',
 			MEETING_ID,
 			expect.objectContaining({
-				name: 'notes.txt',
+				name: 'notes.vtt',
 				category: 'transcript',
-				mime_type: 'text/plain'
+				mime_type: 'text/vtt'
 			}),
 			undefined
 		);

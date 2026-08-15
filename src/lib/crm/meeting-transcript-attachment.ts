@@ -10,21 +10,8 @@ async function sha256Hex(data: ArrayBuffer): Promise<string> {
 	return sha256HexSync(data);
 }
 
-const ACCEPTED_MIME_EXACT = new Set([
-	'text/plain',
-	'text/markdown',
-	'text/vtt',
-	'application/pdf'
-]);
-const ACCEPTED_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.vtt', '.pdf']);
-
 export function isMeetingTranscriptFile(file: File): boolean {
-	const mime = (file.type || '').toLowerCase().split(';')[0]?.trim() ?? '';
-	if (mime && ACCEPTED_MIME_EXACT.has(mime)) return true;
-	const name = file.name.toLowerCase();
-	const dot = name.lastIndexOf('.');
-	if (dot < 0) return false;
-	return ACCEPTED_EXTENSIONS.has(name.slice(dot));
+	return file.name.toLowerCase().endsWith('.vtt');
 }
 
 async function putSignedUpload(
@@ -54,7 +41,7 @@ export async function uploadMeetingTranscriptDocument(
 	options: { fetchImpl?: typeof fetch; signal?: AbortSignal } = {}
 ): Promise<ApiDocument> {
 	if (!isMeetingTranscriptFile(file)) {
-		throw new Error('Transcript must be a text, Markdown, VTT, or PDF file.');
+		throw new Error('Transcript must be a .vtt file.');
 	}
 
 	const fetchImpl = options.fetchImpl ?? fetch;
@@ -64,9 +51,9 @@ export async function uploadMeetingTranscriptDocument(
 		'meeting',
 		meetingId,
 		{
-			name: file.name.slice(0, 160) || 'meeting-transcript',
+			name: file.name.slice(0, 160) || 'meeting-transcript.vtt',
 			category: 'transcript',
-			mime_type: file.type || 'text/plain',
+			mime_type: file.type || 'text/vtt',
 			size_bytes: file.size,
 			sha256: digest,
 			folder_id: null
@@ -88,15 +75,6 @@ export async function uploadMeetingTranscriptDocument(
 }
 
 async function extractPlainText(file: File): Promise<string | null> {
-	const mime = (file.type || '').toLowerCase().split(';')[0]?.trim() ?? '';
-	const name = file.name.toLowerCase();
-	const isText =
-		mime.startsWith('text/') ||
-		name.endsWith('.txt') ||
-		name.endsWith('.md') ||
-		name.endsWith('.markdown') ||
-		name.endsWith('.vtt');
-	if (!isText) return null;
 	const text = await file.text();
 	return text.trim() ? text : null;
 }
