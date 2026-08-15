@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { ApiClientError } from '$lib/api/v1/errors.js';
@@ -6,6 +6,13 @@ import EntityEmailInbox from './entity-email-inbox.svelte';
 import { sampleEmailMessages } from '../../../stories/crm/story-fixtures.js';
 
 describe('EntityEmailInbox', () => {
+	beforeEach(async () => {
+		await page.viewport(1280, 800);
+	});
+
+	afterEach(async () => {
+		await page.viewport(1280, 800);
+	});
 	it('shows no-mailbox empty state with Mail settings CTA', async () => {
 		render(EntityEmailInbox, {
 			messages: [],
@@ -199,5 +206,29 @@ describe('EntityEmailInbox', () => {
 		});
 
 		await expect.element(page.getByTestId('email-create-lead')).not.toBeInTheDocument();
+	});
+
+	it('shows one pane at a time on a narrow viewport', async () => {
+		await page.viewport(390, 844);
+		await expect
+			.poll(() => window.matchMedia('(max-width: 1023px)').matches)
+			.toBe(true);
+
+		render(EntityEmailInbox, {
+			messages: sampleEmailMessages,
+			mailboxConnected: true,
+			role: 'owner'
+		});
+
+		await expect.element(page.getByText('Re: Q2 retainer kickoff')).toBeVisible();
+		await expect.element(page.getByTestId('entity-email-back')).not.toBeInTheDocument();
+
+		await page.getByRole('button', { name: /Re: Q2 retainer kickoff/i }).click();
+		await expect.element(page.getByTestId('entity-email-back')).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Reply' })).toBeVisible();
+
+		await page.getByTestId('entity-email-back').click();
+		await expect.element(page.getByTestId('entity-email-back')).not.toBeInTheDocument();
+		await expect.element(page.getByText('Re: Q2 retainer kickoff')).toBeVisible();
 	});
 });

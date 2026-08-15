@@ -17,6 +17,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { cn } from '$lib/utils.js';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 
 	export interface DataTableShellProps<TData, TValue> {
@@ -39,10 +40,40 @@
 		class: className
 	}: DataTableShellProps<TData, TValue> = $props();
 
+	const isMobile = new IsMobile();
+	const mobileVisibleIds = new Set([
+		'select',
+		'actions',
+		'name',
+		'status',
+		'title',
+		'number',
+		'sku'
+	]);
+
+	function columnId(column: ColumnDef<TData, TValue>): string | undefined {
+		if (column.id) return column.id;
+		if ('accessorKey' in column && column.accessorKey != null) {
+			return String(column.accessorKey);
+		}
+		return undefined;
+	}
+
+	function visibilityForViewport(mobile: boolean): VisibilityState {
+		if (!mobile) return {};
+		const vis: VisibilityState = {};
+		for (const column of columns) {
+			const id = columnId(column);
+			if (!id || column.enableHiding === false) continue;
+			if (!mobileVisibleIds.has(id)) vis[id] = false;
+		}
+		return vis;
+	}
+
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 8 });
 	let sorting = $state<SortingState>([]);
 	let columnFilters = $state<ColumnFiltersState>([]);
-	let columnVisibility = $state<VisibilityState>({});
+	let columnVisibility = $state<VisibilityState>(visibilityForViewport(isMobile.current));
 	let rowSelection = $state<RowSelectionState>({});
 
 	// Sync pageSize from props without read/write looping on pagination.
@@ -51,6 +82,10 @@
 		if (pagination.pageSize !== nextSize) {
 			pagination = { pageIndex: pagination.pageIndex, pageSize: nextSize };
 		}
+	});
+
+	$effect(() => {
+		columnVisibility = visibilityForViewport(isMobile.current);
 	});
 
 	const hasSelectColumn = $derived(columns.some((column) => column.id === 'select'));
@@ -161,7 +196,7 @@
 				placeholder={filterPlaceholder}
 				value={filterValue}
 				oninput={(e) => table.getColumn(filterColumn)?.setFilterValue(e.currentTarget.value)}
-				class="max-w-xs"
+				class="w-full sm:max-w-xs"
 			/>
 		{/if}
 		<DropdownMenu.Root>

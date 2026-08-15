@@ -3,7 +3,8 @@
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import type { DocumentFormData } from '$lib/schemas/document.js';
 	import type { ClientFormData } from '$lib/schemas/client.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import ProfileHeader from './profile-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
 	import InfoCard, { type InfoCardField } from './info-card.svelte';
@@ -158,19 +159,19 @@
 	}
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="shrink-0" />
-	{/if}
 
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
-		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
+		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0">
 				<ProfileHeader {breadcrumb} {title} {status} {subtitle}>
 					{#snippet actions()}
@@ -316,4 +317,4 @@
 			</ProfileTabs>
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>
