@@ -79,6 +79,7 @@
 				orgSession.setThemePreference(themePreferenceFromApi(prefs.theme_preference));
 			}
 			if (
+				memberships.length > 0 &&
 				orgSession.selectedOrgId &&
 				!memberships.some((membership) => membership.org_id === orgSession.selectedOrgId)
 			) {
@@ -109,6 +110,7 @@
 		if (mode === 'clear') {
 			membershipsReady = true;
 			lastTokenForMemberships = null;
+			orgSession.clearSelection();
 			orgSession.setMemberships([]);
 			orgSession.setThemePreference('org_default');
 			applyResolvedTheme('org_default', 'system');
@@ -173,12 +175,19 @@
 			return;
 		}
 
-		if (orgSession.memberships.length === 0 && !isOnboardingPath(path) && !acceptingInvitation) {
+		// A just-created org can be selected in localStorage before discovery
+		// returns the new membership. Don't wipe the user back to create-org.
+		if (
+			orgSession.memberships.length === 0 &&
+			!orgSession.selectedOrgId &&
+			!isOnboardingPath(path) &&
+			!acceptingInvitation
+		) {
 			void goto(resolve('/onboarding/create-org'));
 			return;
 		}
 
-		if (invitingTeam) {
+		if (invitingTeam && orgSession.memberships.length > 0) {
 			const selectedMembership = orgSession.memberships.find(
 				(membership) => membership.org_id === orgSession.selectedOrgId
 			);
