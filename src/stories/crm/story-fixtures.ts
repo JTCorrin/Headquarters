@@ -6,6 +6,12 @@ import type {
 } from '$lib/components/crm/entity-documents.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
+export const storyViewport = {
+	mobile: { viewport: { value: 'mobile', isRotated: false } },
+	tablet: { viewport: { value: 'tablet', isRotated: false } },
+	desktop: { viewport: { value: 'desktop', isRotated: false } }
+};
+
 export function navGroupsWithActive(
 	activeLabel: string,
 	role: 'owner' | 'admin' | 'member' | 'billing' | 'readonly' = 'owner'

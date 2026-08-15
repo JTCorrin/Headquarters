@@ -307,7 +307,7 @@
 			{onLogout}
 			{onValidCreate}
 		>
-			<div class="space-y-6 px-6 py-6 md:px-8">
+			<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 				{#if viewState.kind !== 'ready'}
 					<ResourceStateBanner state={viewState} onReload={() => void load()} />
 				{:else if playbook}

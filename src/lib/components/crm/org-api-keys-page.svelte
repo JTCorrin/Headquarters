@@ -4,7 +4,8 @@
 	import { apiKeyRoleLabel } from '$lib/schemas/api-key.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
 	import { roleLabel } from '$lib/schemas/organisation.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
@@ -80,19 +81,19 @@
 	}
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-8 px-6 py-6 md:px-8">
+		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Organisation · Settings"
 				title="API keys"
@@ -164,7 +165,7 @@
 			{/if}
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>
 
 <OrgApiKeysCreateDrawer
 	actorRole={role}

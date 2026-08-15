@@ -9,6 +9,7 @@ export { default as InfoCard } from './info-card.svelte';
 export { default as ProfileHeader } from './profile-header.svelte';
 export { default as ProfileTabs } from './profile-tabs.svelte';
 export { default as AppNav } from './app-nav.svelte';
+export { default as AppSidebarFrame } from './app-sidebar-frame.svelte';
 export { default as ContactForm } from './contact-form.svelte';
 export { default as ContactFormDrawer } from './contact-form-drawer.svelte';
 export { default as ContactsTable } from './contacts-table.svelte';
@@ -168,6 +169,8 @@ export type { ResourceViewState } from './resource-state-banner.svelte';
 export type { OrgSwitcherProps } from './org-switcher.svelte';
 export type { SettingsConfigPageProps } from './settings-config-page.svelte';
 export type { AppShellProps } from './app-shell.svelte';
+export type { AppSidebarFrameProps } from './app-sidebar-frame.svelte';
+export type { AppNavGroup, AppNavItem, AppNavProps } from './app-nav.svelte';
 export type { SelectOrgPageProps } from './select-org-page.svelte';
 export type { OrgConfigPageProps } from './org-config-page.svelte';
 
