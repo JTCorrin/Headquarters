@@ -13,7 +13,7 @@ export default defineConfig({
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 1 : 0,
 	workers: 1,
-	timeout: againstStaging ? 90_000 : 30_000,
+	timeout: againstStaging ? 180_000 : 30_000,
 	expect: { timeout: againstStaging ? 45_000 : 5_000 },
 	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
 	use: {

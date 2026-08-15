@@ -64,3 +64,25 @@ export function postAuthDestination(options: {
 	if (options.selectedOrgId) return '/';
 	return '/select-org';
 }
+
+/**
+ * Email/password signup with confirmations off. `/check-email` means
+ * confirmations are still on and is not success.
+ */
+export function isPostSignupLandingPath(pathname: string): boolean {
+	return pathname === '/onboarding/create-org' || pathname === '/select-org' || pathname === '/';
+}
+
+/**
+ * After the first organisation is created the app goes to invite-team.
+ * Home, org config, and contacts are also success (skip / layout fallback).
+ */
+export function isPostOrgCreateLandingPath(pathname: string): boolean {
+	return (
+		pathname === '/onboarding/invite-team' ||
+		pathname === '/' ||
+		pathname === '/select-org' ||
+		pathname === '/org/config' ||
+		pathname === '/contacts'
+	);
+}
