@@ -86,6 +86,7 @@
 		primaryEmail: '',
 		phone: '',
 		taxIdentifier: '',
+		taxExempt: false,
 		registrationNumber: '',
 		defaultCurrency: '',
 		paymentTermsDays: '',

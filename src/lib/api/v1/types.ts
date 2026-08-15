@@ -1094,6 +1094,7 @@ export interface ApiClient {
 	primary_email: string | null;
 	phone: string | null;
 	tax_identifier: string | null;
+	tax_exempt: boolean;
 	registration_number: string | null;
 	default_currency: string | null;
 	payment_terms_days: number | null;
@@ -1117,6 +1118,7 @@ export interface ApiClientCreateBody {
 	primary_email?: string | null;
 	phone?: string | null;
 	tax_identifier?: string | null;
+	tax_exempt?: boolean;
 	registration_number?: string | null;
 	default_currency?: string | null;
 	payment_terms_days?: number | null;

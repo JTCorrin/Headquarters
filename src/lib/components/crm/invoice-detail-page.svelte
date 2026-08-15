@@ -133,6 +133,9 @@
 	}: InvoiceDetailPageProps = $props();
 
 	const formData = fromStore(invoiceForm.form);
+	const clientTaxExempt = $derived(
+		clientOptions.find((c) => c.id === formData.current.clientId)?.taxExempt ?? false
+	);
 
 	let chaseOpen = $state(false);
 	let chaseStatus = $state<AiSuggestionStatus>('idle');
@@ -348,6 +351,7 @@
 									bind:open={lineDrawerOpen}
 									form={lineForm}
 									{products}
+									{clientTaxExempt}
 									onValidSubmit={onAddLine}
 								>
 									{#snippet trigger()}

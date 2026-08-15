@@ -182,6 +182,17 @@
 		</div>
 	</div>
 
+	<label class="flex items-center gap-2 text-sm">
+		<input
+			type="checkbox"
+			name="taxExempt"
+			bind:checked={$formData.taxExempt}
+			class="accent-primary size-4 rounded"
+			data-testid="client-tax-exempt"
+		/>
+		VAT exempt (new quote/invoice lines default to 0% tax)
+	</label>
+
 	<div class="space-y-2">
 		<Label for="client-notes">Notes</Label>
 		<Textarea id="client-notes" name="notes" bind:value={$formData.notes} rows={3} />
