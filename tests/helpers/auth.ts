@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { isPostOrgCreateLandingPath, isPostSignupLandingPath } from '../../src/lib/auth/paths.js';
+import { isSelectedOrgStorageKey } from '../../src/lib/org/selected-org.js';
 import { uniqueProofEmail } from './e2e-env.js';
 
 export type E2ESession = {
@@ -10,6 +11,25 @@ export type E2ESession = {
 
 export function pagePathname(page: Page): string {
 	return new URL(page.url()).pathname;
+}
+
+/** Read the selected org id from unscoped or `hq.selected-org-id:<userId>` keys. */
+async function persistedSelectedOrgId(page: Page): Promise<string | null> {
+	const entries = await page.evaluate(() => {
+		const out: [string, string][] = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (!key) continue;
+			const value = localStorage.getItem(key);
+			if (value) out.push([key, value]);
+		}
+		return out;
+	});
+	for (const [key, value] of entries) {
+		const trimmed = value.trim();
+		if (isSelectedOrgStorageKey(key) && trimmed) return trimmed;
+	}
+	return null;
 }
 
 /** Sign up a fresh user via the UI (staging has email confirmations off). */
@@ -73,10 +93,19 @@ export async function createOrgViaUi(
 	expect(response.ok(), `org create HTTP ${response.status()}`).toBeTruthy();
 
 	await expect
-		.poll(async () => page.evaluate(() => localStorage.getItem('hq.selected-org-id')), {
-			timeout: 45_000
-		})
-		.toBeTruthy();
+		.poll(
+			async () => {
+				const createError = await page
+					.getByTestId('onboarding-create-error')
+					.textContent()
+					.catch(() => null);
+				if (createError?.trim()) return `error:${createError.trim()}`;
+				if (isPostOrgCreateLandingPath(pagePathname(page))) return 'ok';
+				return (await persistedSelectedOrgId(page)) ? 'ok' : pagePathname(page);
+			},
+			{ timeout: 45_000 }
+		)
+		.toBe('ok');
 
 	if (pagePathname(page) === '/onboarding/create-org') {
 		await page.goto('/');
