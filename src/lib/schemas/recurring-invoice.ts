@@ -76,6 +76,7 @@ export interface RecurringInvoiceListItem {
 export interface RecurringInvoiceClientOption {
 	id: string;
 	name: string;
+	taxExempt?: boolean;
 }
 
 export type RecurringInvoiceContactOption = DocumentContactOption;

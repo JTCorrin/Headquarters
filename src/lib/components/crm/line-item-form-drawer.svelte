@@ -10,6 +10,7 @@
 	export interface LineItemFormDrawerProps {
 		form: SuperForm<LineItemFormData>;
 		products?: CatalogProductOption[];
+		clientTaxExempt?: boolean;
 		open?: boolean;
 		title?: string;
 		description?: string;
@@ -23,6 +24,7 @@
 	let {
 		form,
 		products = [],
+		clientTaxExempt = false,
 		open = $bindable(false),
 		title = 'Add line item',
 		description = 'Link a catalog product or enter a custom line.',
@@ -51,7 +53,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<LineItemForm {form} {products} {submitLabel} {onValidSubmit} />
+			<LineItemForm {form} {products} {clientTaxExempt} {submitLabel} {onValidSubmit} />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

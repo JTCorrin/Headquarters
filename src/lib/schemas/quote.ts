@@ -36,6 +36,7 @@ export interface QuoteListItem {
 export interface QuoteClientOption {
 	id: string;
 	name: string;
+	taxExempt?: boolean;
 }
 
 export type QuoteContactOption = DocumentContactOption;

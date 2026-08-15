@@ -66,6 +66,7 @@ const orgConfigBody = {
 	phone: null,
 	website_url: null,
 	tax_identifier: null,
+	tax_exempt: false,
 	registration_number: null,
 	default_currency: 'GBP',
 	timezone: 'UTC',

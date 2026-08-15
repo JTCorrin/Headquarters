@@ -86,6 +86,7 @@
 		primaryEmail: '',
 		phone: '',
 		taxIdentifier: '',
+		taxExempt: false,
 		registrationNumber: '',
 		defaultCurrency: 'GBP',
 		paymentTermsDays: '',
@@ -134,6 +135,7 @@
 							client.payment_terms_days == null ? '—' : String(client.payment_terms_days)
 					},
 					{ label: 'Tax identifier', value: client.tax_identifier ?? '—' },
+					{ label: 'VAT exempt', value: client.tax_exempt ? 'Yes' : 'No' },
 					{ label: 'Registration number', value: client.registration_number ?? '—' },
 					{ label: 'Renewal on', value: client.renewal_on ?? '—' }
 				]

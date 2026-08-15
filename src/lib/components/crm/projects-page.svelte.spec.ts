@@ -70,6 +70,7 @@ function sampleClient() {
 		primary_email: null,
 		phone: null,
 		tax_identifier: null,
+		tax_exempt: false,
 		registration_number: null,
 		default_currency: 'GBP',
 		payment_terms_days: null,

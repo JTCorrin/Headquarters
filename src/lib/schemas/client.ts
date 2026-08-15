@@ -41,6 +41,8 @@ export const clientFormSchema = z.object({
 		),
 	phone: z.string().max(64).optional().or(z.literal('')),
 	taxIdentifier: z.string().max(120).optional().or(z.literal('')),
+	/** When true, new quote/invoice lines default to 0% tax for this client. */
+	taxExempt: z.boolean(),
 	registrationNumber: z.string().max(120).optional().or(z.literal('')),
 	defaultCurrency: z
 		.string()
@@ -74,6 +76,7 @@ export interface ClientResource {
 	primary_email?: string | null;
 	phone?: string | null;
 	tax_identifier?: string | null;
+	tax_exempt?: boolean;
 	registration_number?: string | null;
 	default_currency?: string | null;
 	payment_terms_days?: number | null;

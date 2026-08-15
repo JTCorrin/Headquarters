@@ -252,6 +252,7 @@ export type ClientRow = {
   primary_email: string | null;
   phone: string | null;
   tax_identifier: string | null;
+  tax_exempt: boolean;
   registration_number: string | null;
   default_currency: string | null;
   payment_terms_days: number | null;

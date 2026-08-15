@@ -93,17 +93,6 @@
 	let lineDrawerOpen = $state(false);
 	let paymentDrawerOpen = $state(false);
 
-	function emptyLineForm() {
-		return {
-			productId: '',
-			description: '',
-			qty: '1',
-			unitPrice: '0',
-			discountPercent: '0',
-			taxRatePercent: defaultTaxRatePercentString(taxRates)
-		};
-	}
-
 	function todayIso(): string {
 		return new Date().toISOString().slice(0, 10);
 	}
@@ -140,6 +129,19 @@
 			resetForm: false
 		}
 	);
+
+	function emptyLineForm() {
+		const clientId = get(invoiceForm.form).clientId;
+		const taxExempt = clientOptions.find((c) => c.id === clientId)?.taxExempt ?? false;
+		return {
+			productId: '',
+			description: '',
+			qty: '1',
+			unitPrice: '0',
+			discountPercent: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates, { taxExempt })
+		};
+	}
 
 	const lineForm = superForm(defaults(emptyLineForm(), zod4(lineItemFormSchema)), {
 		validators: zod4(lineItemFormSchema),
@@ -366,7 +368,11 @@
 			orgAddressLines = formatOrgLetterheadLines(brandingResource);
 			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
 			if (isStale(epoch)) return;
-			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			clientOptions = clients.data.map((c) => ({
+				id: c.id,
+				name: c.name,
+				taxExempt: Boolean(c.tax_exempt)
+			}));
 			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
 			lineForm.form.set(emptyLineForm());
 

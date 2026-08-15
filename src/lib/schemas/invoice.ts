@@ -40,6 +40,7 @@ export interface InvoiceListItem {
 export interface InvoiceClientOption {
 	id: string;
 	name: string;
+	taxExempt?: boolean;
 }
 
 export type InvoiceContactOption = DocumentContactOption;

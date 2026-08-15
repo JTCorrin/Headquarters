@@ -55,6 +55,7 @@
 		primaryEmail: '',
 		phone: '',
 		taxIdentifier: '',
+		taxExempt: false,
 		registrationNumber: '',
 		defaultCurrency: 'GBP',
 		paymentTermsDays: '',

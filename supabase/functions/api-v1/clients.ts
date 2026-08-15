@@ -11,7 +11,7 @@ import {
 } from './http.ts'
 
 const CLIENT_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,status,website_url,industry,primary_email,phone,tax_identifier,registration_number,default_currency,payment_terms_days,owner_membership_id,converted_from_lead_id,renewal_on,notes,metadata'
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,status,website_url,industry,primary_email,phone,tax_identifier,tax_exempt,registration_number,default_currency,payment_terms_days,owner_membership_id,converted_from_lead_id,renewal_on,notes,metadata'
 
 const WRITABLE_FIELDS = new Set([
   'name',
@@ -21,6 +21,7 @@ const WRITABLE_FIELDS = new Set([
   'primary_email',
   'phone',
   'tax_identifier',
+  'tax_exempt',
   'registration_number',
   'default_currency',
   'payment_terms_days',
@@ -62,6 +63,7 @@ type ClientWritable = {
   primary_email?: string | null
   phone?: string | null
   tax_identifier?: string | null
+  tax_exempt?: boolean
   registration_number?: string | null
   default_currency?: string | null
   payment_terms_days?: number | null
@@ -167,6 +169,17 @@ export function validateClientBody(
     }
   } else if (!partial) {
     output.status = 'active'
+  }
+
+  if ('tax_exempt' in body) {
+    const value = body.tax_exempt
+    if (typeof value !== 'boolean') {
+      fields.tax_exempt = 'Must be a boolean'
+    } else {
+      output.tax_exempt = value
+    }
+  } else if (!partial) {
+    output.tax_exempt = false
   }
 
   if ('default_currency' in body) {

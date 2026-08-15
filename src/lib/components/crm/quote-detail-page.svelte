@@ -102,6 +102,9 @@
 	}: QuoteDetailPageProps = $props();
 
 	const formData = fromStore(quoteForm.form);
+	const clientTaxExempt = $derived(
+		clientOptions.find((c) => c.id === formData.current.clientId)?.taxExempt ?? false
+	);
 
 	const attentionLine = $derived(
 		attentionLineFromRecipients(formData.current.recipients, contactOptions)
@@ -267,6 +270,7 @@
 									bind:open={lineDrawerOpen}
 									form={lineForm}
 									{products}
+									{clientTaxExempt}
 									onValidSubmit={onAddLine}
 								>
 									{#snippet trigger()}
