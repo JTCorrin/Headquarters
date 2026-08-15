@@ -36,6 +36,14 @@ describe('createOrgSession', () => {
 		expect(onSwitch).toHaveBeenLastCalledWith('org-b', 2);
 	});
 
+	it('persists selection under a user-scoped key when a user id is provided', () => {
+		const storage = memoryStorage();
+		const session = createOrgSession({ storage, userId: 'user-1' });
+		session.selectOrg('org-a');
+		expect(storage.getItem('hq.selected-org-id')).toBeNull();
+		expect(storage.getItem('hq.selected-org-id:user-1')).toBe('org-a');
+	});
+
 	it('clears selection when memberships no longer include the org', () => {
 		const session = createOrgSession({
 			storage: memoryStorage(),

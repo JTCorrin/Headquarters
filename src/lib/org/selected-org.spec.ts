@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	isSelectedOrgStorageKey,
 	readSelectedOrgId,
 	SELECTED_ORG_STORAGE_KEY,
 	selectedOrgStorageKey,
@@ -39,5 +40,11 @@ describe('selected org persistence', () => {
 		expect(readSelectedOrgId(storage, 'user-a')).toBe('org-a');
 		expect(readSelectedOrgId(storage, 'user-b')).toBe('org-b');
 		expect(storage.getItem(selectedOrgStorageKey('user-a'))).toBe('org-a');
+	});
+
+	it('recognises unscoped and user-scoped storage keys', () => {
+		expect(isSelectedOrgStorageKey(SELECTED_ORG_STORAGE_KEY)).toBe(true);
+		expect(isSelectedOrgStorageKey(selectedOrgStorageKey('user-a'))).toBe(true);
+		expect(isSelectedOrgStorageKey('hq.other')).toBe(false);
 	});
 });
