@@ -3,10 +3,10 @@
  *
  * Required:
  *   E2E_BASE_URL            — staging app origin (e.g. http://192.168.5.136:4173)
- *   E2E_SUPABASE_URL        — staging Kong/Auth (e.g. http://192.168.5.136:54321)
+ *   E2E_SUPABASE_URL        — staging Kong/Auth (CI gate; journeys use the app UI)
  *   E2E_SUPABASE_ANON_KEY   — staging anon key (never service-role)
  *
- * Optional (stable seeded account; v1 uses ephemeral signup instead):
+ * Optional leftovers (not used — journeys always sign up a unique user):
  *   E2E_USER_EMAIL / E2E_USER_PASSWORD / E2E_ORG_ID
  */
 
