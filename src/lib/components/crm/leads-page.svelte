@@ -84,6 +84,7 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',
 		taxExempt: false,

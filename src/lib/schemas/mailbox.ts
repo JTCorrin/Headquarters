@@ -74,6 +74,9 @@ export interface MailboxAccountResource {
 	oauth_provider: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+	sync_catchup_complete?: boolean;
+	sync_high_uid?: number | null;
+	sync_low_uid?: number | null;
 }
 
 export interface MailboxPresetDefaults {
@@ -185,15 +188,23 @@ export function describeMailboxSyncResult(result: {
 	error_code: string | null;
 	message?: string | null;
 	step?: string | null;
+	catchup_complete?: boolean;
 }): string {
 	const hint = humanizeMailboxSyncError(result.error_code, {
 		message: result.message,
 		step: result.step
 	});
 	if (result.ingested > 0) {
-		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${hint ? ` ${hint}` : ''}`;
+		const more =
+			result.catchup_complete === false
+				? ' Catch-up continues — sync again (or wait for the next automatic sync) to pull older mail.'
+				: '';
+		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${more}${hint ? ` ${hint}` : ''}`;
 	}
 	if (result.ok) {
+		if (result.catchup_complete === false) {
+			return hint ?? 'Sync completed this batch — older mail is still catching up.';
+		}
 		return hint ?? 'Sync completed — no new messages.';
 	}
 	return hint ?? 'Sync failed — try again or check mailbox settings.';

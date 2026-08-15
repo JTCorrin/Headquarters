@@ -142,6 +142,7 @@
 			websiteUrl: 'https://northwind.com',
 			industry: 'Wholesale / logistics',
 			primaryEmail: 'billing@northwind.com',
+			emailDomain: 'northwind.com',
 			phone: '',
 			taxIdentifier: '',
 		taxExempt: false,

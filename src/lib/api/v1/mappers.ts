@@ -1022,6 +1022,7 @@ export function toClientResource(client: ApiClient): ClientResource {
 		phone: client.phone,
 		tax_identifier: client.tax_identifier,
 		tax_exempt: Boolean(client.tax_exempt),
+		email_domain: client.email_domain,
 		registration_number: client.registration_number,
 		default_currency: client.default_currency,
 		payment_terms_days: client.payment_terms_days,
@@ -1039,6 +1040,7 @@ export function toClientFormData(client: ApiClient): ClientFormData {
 		websiteUrl: client.website_url ?? '',
 		industry: client.industry ?? '',
 		primaryEmail: client.primary_email ?? '',
+		emailDomain: client.email_domain ?? '',
 		phone: client.phone ?? '',
 		taxIdentifier: client.tax_identifier ?? '',
 		taxExempt: Boolean(client.tax_exempt),
@@ -1062,6 +1064,7 @@ export function toClientCreateBody(data: ClientFormData): ApiClientCreateBody {
 		website_url: emptyToNull(data.websiteUrl),
 		industry: emptyToNull(data.industry),
 		primary_email: emptyToNull(data.primaryEmail),
+		email_domain: emptyToNull(data.emailDomain),
 		phone: emptyToNull(data.phone),
 		tax_identifier: emptyToNull(data.taxIdentifier),
 		tax_exempt: Boolean(data.taxExempt),
@@ -1201,7 +1204,10 @@ export function toMailboxAccountResource(
 				? account.oauth_provider
 				: null,
 		last_checked_at: account.last_checked_at,
-		last_error_code: account.last_error_code
+		last_error_code: account.last_error_code,
+		sync_catchup_complete: account.sync_catchup_complete,
+		sync_high_uid: account.sync_high_uid ?? null,
+		sync_low_uid: account.sync_low_uid ?? null
 	};
 }
 
@@ -1535,6 +1541,14 @@ export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
 		subject: row.subject || '(no subject)',
 		preview: row.preview_text || row.body_text?.slice(0, 160) || '',
 		body: row.body_text || '',
+		bodyHtml: row.body_html ?? null,
+		attachments: Array.isArray(row.attachments)
+			? row.attachments.map((a) => ({
+					filename: a.filename,
+					contentType: a.content_type,
+					inline: Boolean(a.inline)
+				}))
+			: [],
 		occurredAt: occurred ? new Date(occurred).toLocaleString() : '',
 		unread: row.unread
 	};

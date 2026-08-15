@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { sanitizeEmailHtml } from '$lib/crm/sanitize-email-html.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
 	import { draftResponseGateCopy } from '$lib/schemas/integration.js';
 	import { cn } from '$lib/utils.js';
@@ -22,6 +23,8 @@
 		subject: string;
 		preview: string;
 		body: string;
+		bodyHtml?: string | null;
+		attachments?: Array<{ filename: string; contentType: string; inline?: boolean }>;
 		occurredAt: string;
 		unread?: boolean;
 	}
@@ -121,6 +124,8 @@
 	});
 
 	const selected = $derived(messages.find((m) => m.id === selectedId));
+	const selectedHtml = $derived(selected?.bodyHtml ? sanitizeEmailHtml(selected.bodyHtml) : '');
+	const selectedAttachments = $derived(selected?.attachments ?? []);
 	const draftGate = $derived(draftResponseGateCopy(role));
 	const draftDisabled = $derived(!aiProviderConnected);
 	const sendDisabled = $derived(!smtpReady || !replyBody.trim() || sending);
@@ -429,7 +434,34 @@
 			</header>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				<div class="px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap">{selected.body}</div>
+				{#if selectedHtml}
+					<div
+						class="email-html-body px-5 py-5 text-sm leading-relaxed"
+						data-testid="email-body-html"
+					>
+						{@html selectedHtml}
+					</div>
+				{:else}
+					<div
+						class="px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap"
+						data-testid="email-body-text"
+					>
+						{selected.body}
+					</div>
+				{/if}
+
+				{#if selectedAttachments.length > 0}
+					<div class="border-border flex flex-wrap gap-2 border-t px-5 py-3" data-testid="email-attachments">
+						{#each selectedAttachments as attachment (attachment.filename + attachment.contentType)}
+							<span
+								class="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-xs"
+								data-testid="email-attachment-chip"
+							>
+								{attachment.filename}{#if attachment.contentType}<span class="opacity-70"> · {attachment.contentType}</span>{/if}
+							</span>
+						{/each}
+					</div>
+				{/if}
 
 				{#if composing}
 					<div class="border-border space-y-3 border-t px-5 py-4">
@@ -575,3 +607,17 @@
 		{/if}
 	</section>
 </div>
+
+<style>
+	.email-html-body :global {
+		a {
+			color: inherit;
+			text-decoration: underline;
+		}
+
+		img {
+			max-width: 100%;
+			height: auto;
+		}
+	}
+</style>

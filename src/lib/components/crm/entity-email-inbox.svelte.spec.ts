@@ -172,6 +172,24 @@ describe('EntityEmailInbox', () => {
 		await expect.element(page.getByTestId('email-send')).toHaveTextContent('Send');
 	});
 
+	it('renders sanitized HTML body and attachment chips', async () => {
+		render(EntityEmailInbox, {
+			messages: [
+				{
+					...sampleEmailMessages[0],
+					bodyHtml: '<p>Thanks — can we move the kickoff?</p><script>alert(1)</script>',
+					attachments: [{ filename: 'invoice.pdf', contentType: 'application/pdf' }]
+				}
+			],
+			mailboxConnected: true,
+			role: 'owner'
+		});
+
+		await expect.element(page.getByTestId('email-body-html')).toHaveTextContent(/kickoff/i);
+		await expect.element(page.getByTestId('email-body-html')).not.toHaveTextContent(/script/i);
+		await expect.element(page.getByTestId('email-attachments')).toHaveTextContent(/invoice.pdf/i);
+	});
+
 	it('shows Create lead for inbound messages when enabled', async () => {
 		let created: { fromAddress: string; fromName: string | null } | null = null;
 		render(EntityEmailInbox, {
