@@ -1,16 +1,21 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { uniqueProofEmail, type E2EEnv } from './e2e-env.js';
+import { isPostOrgCreateLandingPath, isPostSignupLandingPath } from '../../src/lib/auth/paths.js';
+import { uniqueProofEmail } from './e2e-env.js';
 
 export type E2ESession = {
 	email: string;
 	password: string;
 };
 
+export function pagePathname(page: Page): string {
+	return new URL(page.url()).pathname;
+}
+
 /** Sign up a fresh user via the UI (staging has email confirmations off). */
-export async function signupViaUi(page: Page, env: E2EEnv): Promise<E2ESession> {
-	const email = env.userEmail ?? uniqueProofEmail();
-	const password = env.userPassword ?? 'E2eProofPass123!';
+export async function signupViaUi(page: Page): Promise<E2ESession> {
+	const email = uniqueProofEmail();
+	const password = 'E2eProofPass123!';
 
 	await page.goto('/signup');
 	await page.getByTestId('auth-display-name').fill('E2E User');
@@ -18,9 +23,18 @@ export async function signupViaUi(page: Page, env: E2EEnv): Promise<E2ESession> 
 	await page.getByTestId('auth-password').fill(password);
 	await page.getByTestId('auth-submit').click();
 
-	// New users land on create-org (0 memberships) or home if a seeded user already has orgs.
-	// Email confirmation must be off on staging (`enable_confirmations = false`) so signup returns a session.
-	await expect(page).toHaveURL(/\/(onboarding\/create-org|select-org|$)/, { timeout: 30_000 });
+	// New users land on create-org (0 memberships). `/check-email` means
+	// staging still has `enable_confirmations = true` — that is a real failure.
+	await expect
+		.poll(
+			() => {
+				const path = pagePathname(page);
+				if (path.startsWith('/check-email')) return 'check-email';
+				return isPostSignupLandingPath(path) ? 'ok' : path;
+			},
+			{ timeout: 30_000 }
+		)
+		.toBe('ok');
 	return { email, password };
 }
 
@@ -35,9 +49,8 @@ export async function signInViaUi(page: Page, session: E2ESession): Promise<void
 /**
  * Create first org through onboarding UI and wait for an authenticated app shell.
  *
- * Staging historically persisted `hq.selected-org-id` after a successful POST but
- * failed to client-navigate (goto raced the layout guard / Superforms enhance).
- * Prefer URL change; fall back to a hard navigation once selection is persisted.
+ * Success is `/onboarding/invite-team` (current product path). If selection is
+ * persisted but client navigation stalls, fall back to a hard navigation home.
  */
 export async function createOrgViaUi(
 	page: Page,
@@ -52,8 +65,7 @@ export async function createOrgViaUi(
 
 	const createResponse = page.waitForResponse(
 		(response) =>
-			response.url().includes('/api/v1/organisations') &&
-			response.request().method() === 'POST',
+			response.url().includes('/api/v1/organisations') && response.request().method() === 'POST',
 		{ timeout: 45_000 }
 	);
 	await page.getByTestId('organisation-create-submit').click();
@@ -66,22 +78,21 @@ export async function createOrgViaUi(
 		})
 		.toBeTruthy();
 
-	if (page.url().includes('/onboarding/create-org')) {
+	if (pagePathname(page) === '/onboarding/create-org') {
 		await page.goto('/');
 	}
 
-	await expect(page).toHaveURL(/\/(org\/config|$|contacts|select-org)/, { timeout: 45_000 });
-	await expect(page).not.toHaveURL(/\/onboarding\/create-org/);
+	await expect
+		.poll(() => isPostOrgCreateLandingPath(pagePathname(page)), { timeout: 45_000 })
+		.toBe(true);
+	expect(pagePathname(page)).not.toBe('/onboarding/create-org');
 }
 
 /** Bootstrap: signup → create org → ready for CRM journeys. */
-export async function bootstrapOwnerSession(
-	page: Page,
-	env: E2EEnv
-): Promise<E2ESession & { orgSlug: string }> {
-	const session = await signupViaUi(page, env);
+export async function bootstrapOwnerSession(page: Page): Promise<E2ESession & { orgSlug: string }> {
+	const session = await signupViaUi(page);
 	const slug = `e2e-${Date.now().toString(36)}`;
-	if (page.url().includes('/onboarding/create-org') || !env.orgId) {
+	if (pagePathname(page) === '/onboarding/create-org') {
 		await createOrgViaUi(page, { name: `E2E Org ${slug}`, slug });
 	}
 	return { ...session, orgSlug: slug };
