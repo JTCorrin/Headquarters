@@ -178,7 +178,10 @@ export type EmailMessageRow = {
   subject: string | null;
   from_address: string | null;
   body_text: string | null;
+  body_html: string | null;
   preview_text: string | null;
+  cc_addresses?: unknown;
+  imap_uid: number | null;
   deleted_at: string | null;
 };
 
@@ -253,6 +256,7 @@ export type ClientRow = {
   phone: string | null;
   tax_identifier: string | null;
   tax_exempt: boolean;
+  email_domain: string | null;
   registration_number: string | null;
   default_currency: string | null;
   payment_terms_days: number | null;
@@ -1057,6 +1061,10 @@ export type MailboxAccountRow = {
   consecutive_auth_failures: number;
   auth_mode: "password" | "oauth";
   oauth_provider: "microsoft" | "google" | null;
+  imap_uidvalidity: number | null;
+  sync_high_uid: number | null;
+  sync_low_uid: number | null;
+  sync_catchup_complete: boolean;
 };
 
 export type OrgInvoiceEmailAccountRow = {
@@ -3033,6 +3041,47 @@ export type Database = {
           p_preview_text: string;
           p_received_at: string;
           p_body_truncated?: boolean;
+          p_body_html?: string | null;
+          p_cc_addresses?: Json;
+          p_metadata?: Json;
+          p_imap_uid?: number | null;
+        };
+        Returns: Json;
+      };
+      advance_mailbox_sync_cursor: {
+        Args: {
+          p_mailbox_id: string;
+          p_uidvalidity: number;
+          p_uid: number;
+          p_mode: string;
+          p_catchup_complete?: boolean;
+        };
+        Returns: Json;
+      };
+      set_mailbox_sync_catchup: {
+        Args: {
+          p_mailbox_id: string;
+          p_uidvalidity: number;
+          p_catchup_complete: boolean;
+        };
+        Returns: undefined;
+      };
+      reset_mailbox_sync_cursor: {
+        Args: {
+          p_mailbox_id: string;
+          p_uidvalidity?: number | null;
+        };
+        Returns: undefined;
+      };
+      relink_mailbox_email_messages: {
+        Args: { p_org_id: string; p_mailbox_id: string };
+        Returns: Json;
+      };
+      relink_entity_email_messages: {
+        Args: {
+          p_org_id: string;
+          p_entity_type: string;
+          p_entity_id: string;
         };
         Returns: Json;
       };

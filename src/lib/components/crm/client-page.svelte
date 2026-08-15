@@ -84,6 +84,7 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',
 		taxExempt: false,
@@ -119,6 +120,7 @@
 					{ label: 'Industry', value: client.industry ?? '—' },
 					{ label: 'Website', value: client.website_url ?? '—' },
 					{ label: 'Primary email', value: client.primary_email ?? '—' },
+					{ label: 'Email domain', value: client.email_domain ?? '—' },
 					{ label: 'Phone', value: client.phone ?? '—' },
 					{ label: 'Notes', value: client.notes ?? '—' }
 				]
