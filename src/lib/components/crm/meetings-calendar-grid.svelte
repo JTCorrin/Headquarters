@@ -60,8 +60,9 @@
 >
 	<div class="bg-muted/40 grid grid-cols-7 border-b border-border">
 		{#each weekdayLabels as label (label)}
-			<div class="text-muted-foreground px-2 py-2 text-center text-xs font-medium tracking-wide">
-				{label}
+			<div class="text-muted-foreground px-1 py-2 text-center text-xs font-medium tracking-wide sm:px-2">
+				<span class="sm:hidden">{label.slice(0, 1)}</span>
+				<span class="hidden sm:inline">{label}</span>
 			</div>
 		{/each}
 	</div>
@@ -73,7 +74,7 @@
 			{@const inMonth = isSameMonth(day, month)}
 			<div
 				class={cn(
-					'min-h-28 border-border/70 flex flex-col gap-1 border-b border-r p-1.5 [&:nth-child(7n)]:border-r-0',
+					'min-h-16 border-border/70 flex flex-col gap-1 border-b border-r p-0.5 sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0',
 					!inMonth && 'bg-muted/20'
 				)}
 			>
@@ -99,7 +100,7 @@
 							onclick={() => onSelectMeeting?.(meeting.id)}
 						>
 							<span class="font-medium">{timeLabel(meeting.startsAt)}</span>
-							<span class="text-primary/80"> {meeting.title}</span>
+							<span class="text-primary/80 hidden sm:inline"> {meeting.title}</span>
 							{#if linkedLabel}
 								<span
 									class="text-primary/70 ml-0.5"

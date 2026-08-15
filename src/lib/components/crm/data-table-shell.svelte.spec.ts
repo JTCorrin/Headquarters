@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import type { ColumnDef } from '@tanstack/table-core';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
@@ -46,6 +46,9 @@ const selectableColumns: ColumnDef<Row>[] = [
 ];
 
 describe('DataTableShell', () => {
+	afterEach(async () => {
+		await page.viewport(1280, 720);
+	});
 	it('sorts by name when header clicked', async () => {
 		render(DataTableShell, {
 			columns: contactColumns,
@@ -97,5 +100,23 @@ describe('DataTableShell', () => {
 
 		await page.getByRole('checkbox', { name: 'Select row' }).nth(0).click();
 		await expect.element(page.getByText('1 of 3 row(s) selected.')).toBeInTheDocument();
+	});
+
+	it('hides secondary columns on a mobile viewport', async () => {
+		await page.viewport(390, 844);
+		await expect
+			.poll(() => window.matchMedia('(max-width: 767px)').matches)
+			.toBe(true);
+
+		render(DataTableShell, {
+			columns: contactColumns,
+			data: rows,
+			filterColumn: 'name',
+			pageSize: 8
+		});
+
+		await expect.element(page.getByRole('button', { name: /name/i })).toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: /status/i })).toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: /email/i })).not.toBeInTheDocument();
 	});
 });
