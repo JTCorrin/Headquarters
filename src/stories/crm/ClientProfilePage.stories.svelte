@@ -144,6 +144,7 @@
 			primaryEmail: 'billing@northwind.com',
 			phone: '',
 			taxIdentifier: '',
+		taxExempt: false,
 			registrationNumber: '',
 			defaultCurrency: 'GBP',
 			paymentTermsDays: '30',

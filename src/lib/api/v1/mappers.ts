@@ -1021,6 +1021,7 @@ export function toClientResource(client: ApiClient): ClientResource {
 		primary_email: client.primary_email,
 		phone: client.phone,
 		tax_identifier: client.tax_identifier,
+		tax_exempt: Boolean(client.tax_exempt),
 		registration_number: client.registration_number,
 		default_currency: client.default_currency,
 		payment_terms_days: client.payment_terms_days,
@@ -1040,6 +1041,7 @@ export function toClientFormData(client: ApiClient): ClientFormData {
 		primaryEmail: client.primary_email ?? '',
 		phone: client.phone ?? '',
 		taxIdentifier: client.tax_identifier ?? '',
+		taxExempt: Boolean(client.tax_exempt),
 		registrationNumber: client.registration_number ?? '',
 		defaultCurrency: client.default_currency ?? '',
 		paymentTermsDays:
@@ -1062,6 +1064,7 @@ export function toClientCreateBody(data: ClientFormData): ApiClientCreateBody {
 		primary_email: emptyToNull(data.primaryEmail),
 		phone: emptyToNull(data.phone),
 		tax_identifier: emptyToNull(data.taxIdentifier),
+		tax_exempt: Boolean(data.taxExempt),
 		registration_number: emptyToNull(data.registrationNumber),
 		default_currency: emptyToNull(data.defaultCurrency),
 		payment_terms_days: paymentTerms,
