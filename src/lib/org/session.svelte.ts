@@ -97,7 +97,13 @@ export function createOrgSession(options: CreateOrgSessionOptions = {}): OrgSess
 		},
 		setMemberships(next) {
 			memberships = [...next];
-			if (selectedOrgId && !memberships.some((m) => m.org_id === selectedOrgId)) {
+			// An empty discovery payload can lag a just-created org. Only drop the
+			// selection when we have memberships and the selected org is gone.
+			if (
+				memberships.length > 0 &&
+				selectedOrgId &&
+				!memberships.some((m) => m.org_id === selectedOrgId)
+			) {
 				clearSelection();
 			}
 		},

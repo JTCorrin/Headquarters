@@ -16,7 +16,8 @@ describe('auth paths', () => {
 		expect(isAuthPublicPath('/forgot-password')).toBe(true);
 		expect(isAuthPublicPath('/org/config')).toBe(false);
 		expect(isOnboardingPath('/onboarding/create-org')).toBe(true);
-		expect(isOnboardingPath('/onboarding/invite-team')).toBe(false);
+		expect(isOnboardingPath('/onboarding/invite-team')).toBe(true);
+		expect(isOnboardingPath('/onboarding/connect')).toBe(false);
 	});
 
 	it('requires selected org for org-scoped app routes', () => {

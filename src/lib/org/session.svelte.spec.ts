@@ -71,6 +71,26 @@ describe('createOrgSession', () => {
 		expect(session.cacheGeneration).toBe(1);
 	});
 
+	it('keeps the selected org when discovery returns no memberships', () => {
+		const storage = memoryStorage({ 'hq.selected-org-id': 'org-a' });
+		const session = createOrgSession({
+			storage,
+			initialOrgId: 'org-a',
+			initialMemberships: [
+				{
+					org_id: 'org-a',
+					org_name: 'A',
+					org_slug: 'a',
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+		session.setMemberships([]);
+		expect(session.selectedOrgId).toBe('org-a');
+		expect(storage.getItem('hq.selected-org-id')).toBe('org-a');
+	});
+
 	it('tracks theme preference and patches org theme_default', () => {
 		const session = createOrgSession({
 			storage: memoryStorage(),
