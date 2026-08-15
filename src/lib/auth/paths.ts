@@ -8,8 +8,11 @@ export const AUTH_PUBLIC_PATHS = new Set([
 	'/invite/accept'
 ]);
 
-/** Onboarding routes for signed-in users with zero memberships. */
-export const AUTH_ONBOARDING_PATHS = new Set(['/onboarding/create-org']);
+/** Onboarding routes that must not bounce to create-org while memberships catch up. */
+export const AUTH_ONBOARDING_PATHS = new Set([
+	'/onboarding/create-org',
+	'/onboarding/invite-team'
+]);
 
 export function isAuthPublicPath(pathname: string): boolean {
 	return (

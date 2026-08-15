@@ -70,7 +70,8 @@ export async function signInViaUi(page: Page, session: E2ESession): Promise<void
  * Create first org through onboarding UI and wait for an authenticated app shell.
  *
  * Success is `/onboarding/invite-team` (current product path). If selection is
- * persisted but client navigation stalls, fall back to a hard navigation home.
+ * persisted but client navigation stalls, fall back to a hard navigation there
+ * rather than `/` — a full reload of home can race membership discovery.
  */
 export async function createOrgViaUi(
 	page: Page,
@@ -108,7 +109,7 @@ export async function createOrgViaUi(
 		.toBe('ok');
 
 	if (pagePathname(page) === '/onboarding/create-org') {
-		await page.goto('/');
+		await page.goto('/onboarding/invite-team');
 	}
 
 	await expect

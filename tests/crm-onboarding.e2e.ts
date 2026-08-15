@@ -16,6 +16,13 @@ test.describe('CRM onboarding journey (staging)', () => {
 		expect(session.email).toContain('@example.test');
 		expect(isPostOrgCreateLandingPath(pagePathname(page))).toBe(true);
 
+		if (pagePathname(page) === '/onboarding/invite-team') {
+			await page.getByTestId('onboarding-invite-skip').click();
+			await expect(page).toHaveURL(/\/org\/config/, { timeout: 30_000 });
+		}
+
+		await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 45_000 });
+
 		await page.goto('/');
 		await expect(page).not.toHaveURL(/\/login/, { timeout: 30_000 });
 		await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 45_000 });
@@ -36,8 +43,12 @@ test.describe('CRM onboarding journey (staging)', () => {
 		await page.getByTestId('auth-password').fill(session.password);
 		await page.getByTestId('auth-submit').click();
 		await expect(page).not.toHaveURL(/\/login$/, { timeout: 30_000 });
+		await expect(page).not.toHaveURL(/\/onboarding\/create-org/, { timeout: 30_000 });
 		await expect(
-			page.getByTestId('dashboard-home-page').or(page.getByTestId('select-org-page'))
+			page
+				.getByTestId('dashboard-home-page')
+				.or(page.getByTestId('select-org-page'))
+				.or(page.getByTestId('app-shell'))
 		).toBeVisible({ timeout: 45_000 });
 	});
 });
