@@ -189,7 +189,7 @@ describe('MeetingPage integration', () => {
 			.toBeInTheDocument();
 		await expect.element(page.getByText('Northwind', { exact: true })).toBeInTheDocument();
 		await expect.element(page.getByText('Boardroom', { exact: true })).toBeInTheDocument();
-		await expect.element(page.getByText(/Upload a transcript file/i)).toBeInTheDocument();
+		await expect.element(page.getByText(/Upload a \.vtt transcript file/i)).toBeInTheDocument();
 
 		const upload = page.getByRole('button', { name: 'Upload transcript' });
 		await expect.element(upload).not.toBeDisabled();

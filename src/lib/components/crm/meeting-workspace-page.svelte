@@ -184,7 +184,7 @@
 						{:else}
 							<p class="text-muted-foreground text-sm">
 								{#if aiEnabled}
-									Upload a transcript file (text, Markdown, VTT, or PDF) to unlock summary generation.
+									Upload a .vtt transcript file to unlock summary generation.
 								{:else}
 									Transcript upload arrives in a later slice — schedule and attendees are live now.
 								{/if}
