@@ -35,7 +35,8 @@ const browserOptimizeDepsInclude = [
 	'pdfmake-html-renderer',
 	'pdfmake/build/pdfmake',
 	'pdfmake/build/vfs_fonts',
-	'vaul-svelte'
+	'vaul-svelte',
+	'@lucide/svelte/icons/arrow-left'
 ];
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
