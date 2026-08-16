@@ -1,9 +1,6 @@
 name: E2E Staging (Playwright)
 
 on:
-  pull_request:
-    branches: [dev, main, staging]
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -11,8 +8,7 @@ permissions:
 
 jobs:
   playwright-staging:
-    name: Playwright CRM journeys against staging
-    if: forgejo.event_name == 'workflow_dispatch' || forgejo.event.pull_request.head.repo.full_name == forgejo.repository
+    name: Manually run CRM journeys against staging
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

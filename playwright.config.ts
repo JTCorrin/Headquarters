@@ -18,6 +18,8 @@ export default defineConfig({
 	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
 	use: {
 		baseURL: e2eBaseURL || 'http://127.0.0.1:4173',
+		actionTimeout: againstStaging ? 30_000 : 0,
+		navigationTimeout: againstStaging ? 30_000 : 0,
 		trace: 'on-first-retry',
 		screenshot: 'only-on-failure',
 		video: 'retain-on-failure'
