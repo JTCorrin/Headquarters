@@ -102,7 +102,7 @@
 			{onLogout}
 			{onValidCreate}
 		>
-			<div class="flex min-h-0 flex-1 flex-col px-6 py-6 md:px-8">
+			<div class="flex min-h-0 flex-1 flex-col px-4 py-6 sm:px-6 md:px-8">
 				<DocumentWorkspaceApiHost
 					client={api}
 					entityType="organisation"

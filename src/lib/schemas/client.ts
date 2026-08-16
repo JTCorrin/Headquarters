@@ -25,6 +25,38 @@ const dateOnly = z
 	.optional()
 	.or(z.literal(''));
 
+/** Hosts that must never be used for client Mail-tab domain matching. */
+export const PUBLIC_EMAIL_DOMAINS = new Set([
+	'gmail.com',
+	'googlemail.com',
+	'outlook.com',
+	'hotmail.com',
+	'live.com',
+	'msn.com',
+	'yahoo.com',
+	'yahoo.co.uk',
+	'icloud.com',
+	'me.com',
+	'mac.com',
+	'proton.me',
+	'protonmail.com',
+	'aol.com',
+	'gmx.com',
+	'gmx.net',
+	'mail.com',
+	'zoho.com',
+	'yandex.com',
+	'yandex.ru'
+]);
+
+export function normalizeEmailDomain(value: string): string {
+	return value.trim().toLowerCase().replace(/^@+/, '').replace(/^www\./, '');
+}
+
+export function isPublicEmailDomain(domain: string): boolean {
+	return PUBLIC_EMAIL_DOMAINS.has(normalizeEmailDomain(domain));
+}
+
 export const clientFormSchema = z.object({
 	name: z.string().trim().min(1, 'Name is required').max(200),
 	status: z.enum(clientStatuses),
@@ -39,8 +71,20 @@ export const clientFormSchema = z.object({
 			(v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
 			'Must be a valid email address'
 		),
+	emailDomain: z
+		.string()
+		.max(255)
+		.optional()
+		.or(z.literal(''))
+		.refine(
+			(v) => !v || /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i.test(v),
+			'Must be a domain like hesis.co.uk'
+		)
+		.refine((v) => !v || !isPublicEmailDomain(v), 'Public mailbox domains cannot be used'),
 	phone: z.string().max(64).optional().or(z.literal('')),
 	taxIdentifier: z.string().max(120).optional().or(z.literal('')),
+	/** When true, new quote/invoice lines default to 0% tax for this client. */
+	taxExempt: z.boolean(),
 	registrationNumber: z.string().max(120).optional().or(z.literal('')),
 	defaultCurrency: z
 		.string()
@@ -72,8 +116,10 @@ export interface ClientResource {
 	website_url?: string | null;
 	industry?: string | null;
 	primary_email?: string | null;
+	email_domain?: string | null;
 	phone?: string | null;
 	tax_identifier?: string | null;
+	tax_exempt?: boolean;
 	registration_number?: string | null;
 	default_currency?: string | null;
 	payment_terms_days?: number | null;

@@ -8,7 +8,8 @@
 	} from '$lib/schemas/lead.js';
 	import type { ClientResource } from '$lib/schemas/client.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
 	import LeadForm from './lead-form.svelte';
@@ -128,19 +129,19 @@
 	];
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="shrink-0" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
+		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0 space-y-6">
 				<PageHeader
 					breadcrumb="Leads"
@@ -301,7 +302,7 @@
 			{/if}
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>
 
 {#if lead}
 	<ConvertLeadDialog

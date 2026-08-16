@@ -78,16 +78,6 @@
 	/** When set, line drawer updates this index instead of appending. */
 	let lineEditIndex = $state<number | null>(null);
 
-	function emptyRecurringLineForm(): RecurringLineFormData {
-		return {
-			productId: '',
-			descriptionTemplate: '',
-			qty: '1',
-			unitPrice: '0',
-			taxRatePercent: defaultTaxRatePercentString(taxRates)
-		};
-	}
-
 	const LINE_API_TO_FORM: Record<string, keyof RecurringLineFormData> = {
 		quantity: 'qty',
 		tax_rate_percent: 'taxRatePercent',
@@ -178,6 +168,18 @@
 			resetForm: false
 		}
 	);
+
+	function emptyRecurringLineForm(): RecurringLineFormData {
+		const clientId = get(scheduleForm.form).clientId;
+		const taxExempt = clientOptions.find((c) => c.id === clientId)?.taxExempt ?? false;
+		return {
+			productId: '',
+			descriptionTemplate: '',
+			qty: '1',
+			unitPrice: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates, { taxExempt })
+		};
+	}
 
 	const lineForm = superForm(defaults(emptyRecurringLineForm(), zod4(recurringLineFormSchema)), {
 		validators: zod4(recurringLineFormSchema),
@@ -346,7 +348,11 @@
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
-			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			clientOptions = clients.data.map((c) => ({
+				id: c.id,
+				name: c.name,
+				taxExempt: Boolean(c.tax_exempt)
+			}));
 			contactOptions = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,

@@ -1,7 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import ClientsListPageStoryHost from '$lib/components/crm/clients-list-page.story-host.svelte';
-	import { navGroupsWithActive } from './story-fixtures.js';
+	import { navGroupsWithActive, storyViewport } from './story-fixtures.js';
 
 	const rows = [
 		{
@@ -44,6 +44,30 @@
 </script>
 
 <Story name="Default">
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Desktop" globals={storyViewport.desktop}>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Mobile" globals={storyViewport.mobile}>
 	{#snippet template(args)}
 		{@const props =
 			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (

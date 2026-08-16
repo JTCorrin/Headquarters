@@ -125,6 +125,23 @@
 		</div>
 	</div>
 
+	<div class="space-y-2">
+		<Label for="client-email-domain">Email domain</Label>
+		<Input
+			id="client-email-domain"
+			name="emailDomain"
+			bind:value={$formData.emailDomain}
+			placeholder="hesis.co.uk"
+			data-testid="client-email-domain"
+			aria-invalid={!!$errors.emailDomain}
+		/>
+		<p class="text-muted-foreground text-xs">
+			Used to match inbox mail from this company. Leave blank to fill from the primary email
+			(Gmail/Outlook/etc. are skipped).
+		</p>
+		{#if $errors.emailDomain}<p class="text-destructive text-xs">{$errors.emailDomain}</p>{/if}
+	</div>
+
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="client-website">Website</Label>
@@ -181,6 +198,17 @@
 			/>
 		</div>
 	</div>
+
+	<label class="flex items-center gap-2 text-sm">
+		<input
+			type="checkbox"
+			name="taxExempt"
+			bind:checked={$formData.taxExempt}
+			class="accent-primary size-4 rounded"
+			data-testid="client-tax-exempt"
+		/>
+		VAT exempt (new quote/invoice lines default to 0% tax)
+	</label>
 
 	<div class="space-y-2">
 		<Label for="client-notes">Notes</Label>

@@ -79,7 +79,7 @@ select ok(
 select ok(
   has_function_privilege(
     'service_role',
-    'public.upsert_inbound_email_message(uuid, uuid, text, text, text, text, jsonb, text, text, text, timestamptz, boolean)',
+    'public.upsert_inbound_email_message(uuid, uuid, text, text, text, text, jsonb, text, text, text, timestamptz, boolean, text, jsonb, jsonb, bigint)',
     'execute'
   ),
   'service_role can execute upsert_inbound_email_message'
@@ -97,7 +97,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'authenticated',
-    'public.upsert_inbound_email_message(uuid, uuid, text, text, text, text, jsonb, text, text, text, timestamptz, boolean)',
+    'public.upsert_inbound_email_message(uuid, uuid, text, text, text, text, jsonb, text, text, text, timestamptz, boolean, text, jsonb, jsonb, bigint)',
     'execute'
   ),
   'authenticated cannot execute upsert_inbound_email_message'

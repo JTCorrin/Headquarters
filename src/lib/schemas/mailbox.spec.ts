@@ -100,5 +100,16 @@ describe('mailbox schema', () => {
 		expect(
 			describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null })
 		).toBe('Sync completed — no new messages.');
+		expect(
+			describeMailboxSyncResult({
+				ok: true,
+				ingested: 43,
+				error_code: null,
+				catchup_complete: false
+			})
+		).toMatch(/Catch-up continues/i);
+		expect(
+			describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null, catchup_complete: false })
+		).toMatch(/still catching up/i);
 	});
 });

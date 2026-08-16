@@ -11,6 +11,8 @@
 	export interface LineItemFormProps {
 		form: SuperForm<LineItemFormData>;
 		products?: CatalogProductOption[];
+		/** When true, product tax rates do not overwrite the line tax field. */
+		clientTaxExempt?: boolean;
 		submitLabel?: string;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -19,6 +21,7 @@
 	let {
 		form,
 		products = [],
+		clientTaxExempt = false,
 		submitLabel = 'Add line',
 		class: className,
 		onValidSubmit
@@ -52,7 +55,7 @@
 		if (!match) return;
 		$formData.description = match.name;
 		$formData.unitPrice = match.unitPrice;
-		if (match.taxRatePercent != null && match.taxRatePercent !== '') {
+		if (!clientTaxExempt && match.taxRatePercent != null && match.taxRatePercent !== '') {
 			$formData.taxRatePercent = match.taxRatePercent;
 		}
 		if (!$formData.qty) $formData.qty = '1';

@@ -2,6 +2,24 @@ import type { Preview, Renderer } from '@storybook/sveltekit';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import '../src/routes/layout.css';
 
+export const hqViewports = {
+	mobile: {
+		name: 'Mobile',
+		styles: { width: '390px', height: '844px' },
+		type: 'mobile' as const
+	},
+	tablet: {
+		name: 'Tablet',
+		styles: { width: '768px', height: '1024px' },
+		type: 'tablet' as const
+	},
+	desktop: {
+		name: 'Desktop',
+		styles: { width: '1280px', height: '800px' },
+		type: 'desktop' as const
+	}
+};
+
 /** Enables sveltekit-superforms Storybook-safe page handling (`STORYBOOK_MODE`). */
 (globalThis as typeof globalThis & { STORIES?: boolean }).STORIES = true;
 
@@ -28,6 +46,9 @@ const preview: Preview = {
 		},
 		layout: 'padded',
 		backgrounds: { disable: true },
+		viewport: {
+			options: hqViewports
+		},
 		a11y: {
 			test: 'todo'
 		}

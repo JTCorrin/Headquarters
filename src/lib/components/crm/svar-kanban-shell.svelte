@@ -68,7 +68,7 @@
 </script>
 
 <div
-	class={cn('crm-svar-kanban h-full min-h-[420px] w-full overflow-hidden rounded-3xl', className)}
+	class={cn('crm-svar-kanban h-full min-h-[420px] w-full overflow-x-auto overflow-y-hidden rounded-3xl', className)}
 >
 	{#if dark}
 		<WillowDark>
@@ -132,6 +132,7 @@
 	/* Keep empty columns usable as full-height drop targets. */
 	.crm-svar-kanban-theme :global(.wx-column:not(.wx-collapsed)) {
 		min-height: 420px;
+		min-width: 16rem;
 	}
 
 	.crm-svar-kanban-theme :global(.wx-column-cards),

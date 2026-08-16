@@ -24,7 +24,7 @@
 </script>
 
 <Tabs.Root bind:value class={cn('flex w-full min-h-0 flex-1 flex-col', className)}>
-	<Tabs.List variant="line" class="w-full shrink-0 justify-start">
+	<Tabs.List variant="line" class="w-full shrink-0 justify-start overflow-x-auto">
 		{#each tabs as tab (tab.id)}
 			<Tabs.Trigger value={tab.id}>{tab.label}</Tabs.Trigger>
 		{/each}

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { TaskAssigneeOption, TaskFormData } from '$lib/schemas/task.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import TasksBoard from './tasks-board.svelte';
 	import type { TaskBoardCard, TaskBoardMove } from './tasks-board.svelte';
@@ -64,21 +65,21 @@
 	}: TasksListPageProps = $props();
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div
 			class={cn(
-				'space-y-6 px-6 py-6 md:px-8',
+				'space-y-6 px-4 py-6 sm:px-6 md:px-8',
 				viewMode === 'board' && 'flex min-h-0 flex-1 flex-col gap-6'
 			)}
 		>
@@ -142,7 +143,7 @@
 			{/if}
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>
 
 {#if editForm}
 	<TaskFormDrawer

@@ -13,11 +13,13 @@ export default defineConfig({
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 1 : 0,
 	workers: 1,
-	timeout: againstStaging ? 90_000 : 30_000,
+	timeout: againstStaging ? 180_000 : 30_000,
 	expect: { timeout: againstStaging ? 45_000 : 5_000 },
 	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
 	use: {
 		baseURL: e2eBaseURL || 'http://127.0.0.1:4173',
+		actionTimeout: againstStaging ? 30_000 : 0,
+		navigationTimeout: againstStaging ? 30_000 : 0,
 		trace: 'on-first-retry',
 		screenshot: 'only-on-failure',
 		video: 'retain-on-failure'

@@ -455,7 +455,7 @@
 			bind:this={fileInput}
 			type="file"
 			class="sr-only"
-			accept=".txt,.md,.markdown,.vtt,.pdf,text/plain,text/markdown,text/vtt,application/pdf"
+			accept=".vtt,text/vtt"
 			data-testid="meeting-transcript-file"
 			onchange={onTranscriptFileSelected}
 		/>
