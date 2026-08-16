@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	isAuthPublicPath,
 	isOnboardingPath,
+	isPostAuthRedirectPath,
 	isPostOrgCreateLandingPath,
 	isPostSignupLandingPath,
 	postAuthDestination,
@@ -18,6 +19,18 @@ describe('auth paths', () => {
 		expect(isOnboardingPath('/onboarding/create-org')).toBe(true);
 		expect(isOnboardingPath('/onboarding/invite-team')).toBe(true);
 		expect(isOnboardingPath('/onboarding/connect')).toBe(false);
+	});
+
+	it('redirects signed-in users off auth public pages except password update and invite accept', () => {
+		expect(isPostAuthRedirectPath('/login')).toBe(true);
+		expect(isPostAuthRedirectPath('/signup')).toBe(true);
+		expect(isPostAuthRedirectPath('/forgot-password')).toBe(true);
+		expect(isPostAuthRedirectPath('/check-email')).toBe(true);
+		expect(isPostAuthRedirectPath('/auth/callback')).toBe(true);
+		expect(isPostAuthRedirectPath('/update-password')).toBe(false);
+		expect(isPostAuthRedirectPath('/invite/accept')).toBe(false);
+		expect(isPostAuthRedirectPath('/onboarding/create-org')).toBe(false);
+		expect(isPostAuthRedirectPath('/')).toBe(false);
 	});
 
 	it('requires selected org for org-scoped app routes', () => {

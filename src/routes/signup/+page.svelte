@@ -44,11 +44,11 @@
 			const query = `email=${encodeURIComponent(data.email)}${
 				next === '/' ? '' : `&next=${encodeURIComponent(next)}`
 			}`;
-			await goto(resolve(`/check-email?${query}`));
+			await goto(resolve(`/check-email?${query}`), { replaceState: true });
 			return true;
 		}
 		const destination = next === '/' ? '/onboarding/create-org' : next;
-		await goto(resolve(destination as '/'));
+		await goto(resolve(destination as '/'), { replaceState: true });
 		return true;
 	}
 </script>
