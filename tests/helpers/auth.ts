@@ -44,6 +44,12 @@ async function authResponseError(response: Response): Promise<string | null> {
 	return null;
 }
 
+async function visibleTestIdText(page: Page, testId: string): Promise<string | null> {
+	const locator = page.getByTestId(testId);
+	if (!(await locator.isVisible())) return null;
+	return locator.textContent({ timeout: 500 }).catch(() => null);
+}
+
 /** Sign up a fresh user via the UI (staging has email confirmations off). */
 export async function signupViaUi(page: Page): Promise<E2ESession> {
 	const email = uniqueProofEmail();
@@ -61,10 +67,7 @@ export async function signupViaUi(page: Page): Promise<E2ESession> {
 	await page.getByTestId('auth-submit').click();
 	const signupResponse = await signupResponsePromise;
 	if (!signupResponse.ok()) {
-		const formError = await page
-			.getByTestId('auth-form-error')
-			.textContent({ timeout: 2_000 })
-			.catch(() => null);
+		const formError = await visibleTestIdText(page, 'auth-form-error');
 		const detail = formError?.trim() || (await authResponseError(signupResponse));
 		throw new Error(
 			`Signup failed with HTTP ${signupResponse.status()}${detail ? `: ${detail}` : ''}`
@@ -85,10 +88,7 @@ export async function signupViaUi(page: Page): Promise<E2ESession> {
 			)
 			.toBe('ok');
 	} catch (error) {
-		const formError = await page
-			.getByTestId('auth-form-error')
-			.textContent({ timeout: 0 })
-			.catch(() => null);
+		const formError = await visibleTestIdText(page, 'auth-form-error');
 		throw new Error(
 			`Signup returned HTTP ${signupResponse.status()} but remained on ${pagePathname(page)}${formError?.trim() ? `: ${formError.trim()}` : ''}`,
 			{ cause: error }
@@ -138,10 +138,7 @@ export async function createOrgViaUi(
 		.poll(
 			async () => {
 				if (landed()) return 'ready';
-				createError = await page
-					.getByTestId('onboarding-create-error')
-					.textContent({ timeout: 0 })
-					.catch(() => null);
+				createError = await visibleTestIdText(page, 'onboarding-create-error');
 				if (createError?.trim()) return 'ready';
 				return (await persistedSelectedOrgId(page)) ? 'ready' : 'waiting';
 			},
