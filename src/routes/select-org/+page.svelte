@@ -28,8 +28,8 @@
 				type="button"
 				variant="outline"
 				size="sm"
-				onclick={() => {
-					void handleLogout();
+				onclick={async () => {
+					await handleLogout();
 				}}
 				data-testid="auth-logout"
 			>

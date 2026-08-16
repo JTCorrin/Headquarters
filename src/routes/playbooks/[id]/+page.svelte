@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
 	import { getAuthSession } from '$lib/auth/index.js';
+	import { logoutAndRedirect } from '$lib/auth/logout.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import PlaybookEditorPage from '$lib/components/crm/playbook-editor-page.svelte';
 
@@ -13,10 +15,7 @@
 	const playbookId = $derived(page.params.id ?? '');
 
 	async function handleLogout() {
-		await auth.signOut();
-		session.clearSelection();
-		session.setMemberships([]);
-		void goto('/login');
+		await logoutAndRedirect(auth, session);
 	}
 </script>
 
@@ -26,10 +25,10 @@
 		{session}
 		{playbookId}
 		onMissingOrg={() => {
-			void goto('/select-org');
+			void goto(resolve('/select-org'));
 		}}
 		onSwitchNavigate={() => {
-			void goto('/playbooks');
+			void goto(resolve('/playbooks'));
 		}}
 		onLogout={handleLogout}
 	/>
