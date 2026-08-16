@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { isPostOrgCreateLandingPath } from '../src/lib/auth/paths.js';
 import { bootstrapOwnerSession, pagePathname } from './helpers/auth.js';
 import { readE2EEnv } from './helpers/e2e-env.js';
 
 const env = readE2EEnv();
+const POST_ORG_CREATE_PATH = '/onboarding/invite-team';
 
 test.describe('CRM onboarding journey (staging)', () => {
 	test.skip(
@@ -14,12 +14,10 @@ test.describe('CRM onboarding journey (staging)', () => {
 	test('signup → create organisation → reach authenticated shell', async ({ page }) => {
 		const session = await bootstrapOwnerSession(page);
 		expect(session.email).toContain('@example.test');
-		expect(isPostOrgCreateLandingPath(pagePathname(page))).toBe(true);
+		expect(pagePathname(page)).toBe(POST_ORG_CREATE_PATH);
 
-		if (pagePathname(page) === '/onboarding/invite-team') {
-			await page.getByTestId('onboarding-invite-skip').click();
-			await expect(page).toHaveURL(/\/org\/config/, { timeout: 30_000 });
-		}
+		await page.getByTestId('onboarding-invite-skip').click();
+		await expect(page).toHaveURL(/\/org\/config/, { timeout: 30_000 });
 
 		await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 45_000 });
 
@@ -31,12 +29,11 @@ test.describe('CRM onboarding journey (staging)', () => {
 
 	test('sign-in after signup reaches an org-scoped route', async ({ page, context }) => {
 		const session = await bootstrapOwnerSession(page);
-		await context.clearCookies();
-		await page.goto('/login');
 		await page.evaluate(() => {
 			localStorage.clear();
 			sessionStorage.clear();
 		});
+		await context.clearCookies();
 		await page.goto('/login');
 		await expect(page.getByTestId('auth-email')).toBeVisible({ timeout: 30_000 });
 		await page.getByTestId('auth-email').fill(session.email);

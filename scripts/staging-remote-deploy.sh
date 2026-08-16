@@ -6,6 +6,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/home/deploy/apps/headquarters}"
 REPO_URL="${REPO_URL:-https://forge.purecambo.org/joe/crm-project.git}"
 BRANCH="${BRANCH:-staging}"
+DEPLOY_SHA="${DEPLOY_SHA:-}"
 APP_HOST="${APP_HOST:-192.168.5.136}"
 APP_PORT="${APP_PORT:-4173}"
 # Same-origin SvelteKit proxy serves `/api/v1/*` on :APP_PORT. Leave empty unless
@@ -43,6 +44,14 @@ else
 	fi
 	mv "$new_dir" "$APP_DIR"
 	rm -rf "$old_dir"
+fi
+
+if [[ -n "$DEPLOY_SHA" ]]; then
+	# Pin the deployment to the workflow revision. A newer staging push may
+	# otherwise move origin/staging while this job is waiting for a runner.
+	git -C "$APP_DIR" cat-file -e "${DEPLOY_SHA}^{commit}"
+	git -C "$APP_DIR" checkout -f -B "$BRANCH" "$DEPLOY_SHA"
+	git -C "$APP_DIR" reset --hard "$DEPLOY_SHA"
 fi
 
 cd "$APP_DIR"

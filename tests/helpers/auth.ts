@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { isPostOrgCreateLandingPath, isPostSignupLandingPath } from '../../src/lib/auth/paths.js';
+import { isPostSignupLandingPath } from '../../src/lib/auth/paths.js';
 import { isSelectedOrgStorageKey } from '../../src/lib/org/selected-org.js';
 import { uniqueProofEmail } from './e2e-env.js';
+
+const POST_ORG_CREATE_PATH = '/onboarding/invite-team';
 
 export type E2ESession = {
 	email: string;
@@ -69,9 +71,9 @@ export async function signInViaUi(page: Page, session: E2ESession): Promise<void
 /**
  * Create first org through onboarding UI and wait for an authenticated app shell.
  *
- * Success is `/onboarding/invite-team` (current product path). If selection is
- * persisted but client navigation stalls, fall back to a hard navigation there
- * rather than `/` — a full reload of home can race membership discovery.
+ * Success is exactly `/onboarding/invite-team` (the current product path).
+ * If selection is persisted but client navigation stalls, recover with one
+ * bounded navigation there rather than reloading home during membership discovery.
  */
 export async function createOrgViaUi(
 	page: Page,
@@ -93,31 +95,51 @@ export async function createOrgViaUi(
 	const response = await createResponse;
 	expect(response.ok(), `org create HTTP ${response.status()}`).toBeTruthy();
 
-	const landed = () => isPostOrgCreateLandingPath(pagePathname(page));
-	// Do not auto-wait `onboarding-create-error` here: that node is absent on
-	// success, so a 45s locator wait consumes the whole poll and never sees
-	// the invite-team navigation or persisted org id.
-	await page
-		.waitForURL((url) => isPostOrgCreateLandingPath(new URL(url).pathname), { timeout: 8_000 })
+	const landed = () => pagePathname(page) === POST_ORG_CREATE_PATH;
+	let createError: string | null = null;
+	await expect
+		.poll(
+			async () => {
+				if (landed()) return 'ready';
+				createError = await page
+					.getByTestId('onboarding-create-error')
+					.textContent({ timeout: 0 })
+					.catch(() => null);
+				if (createError?.trim()) return 'ready';
+				return (await persistedSelectedOrgId(page)) ? 'ready' : 'waiting';
+			},
+			{ timeout: 8_000 }
+		)
+		.toBe('ready')
 		.catch(() => undefined);
 
-	const createError = await page
-		.getByTestId('onboarding-create-error')
-		.textContent({ timeout: 0 })
-		.catch(() => null);
 	if (createError?.trim()) {
 		throw new Error(`Organisation create failed: ${createError.trim()}`);
 	}
 
+	const selectedOrgId = await persistedSelectedOrgId(page);
 	if (!landed()) {
-		await page.goto('/onboarding/invite-team');
+		if (!selectedOrgId) {
+			throw new Error(
+				`Organisation create POST returned HTTP ${response.status()}, but selection was not persisted (path=${pagePathname(page)})`
+			);
+		}
+
+		try {
+			await page.goto(POST_ORG_CREATE_PATH, { waitUntil: 'commit', timeout: 15_000 });
+		} catch (error) {
+			throw new Error(
+				`Organisation create recovery navigation failed (HTTP ${response.status()}, path=${pagePathname(page)}, selectedOrgId=${selectedOrgId})`,
+				{ cause: error }
+			);
+		}
 	}
 
-	await expect.poll(landed, { timeout: 45_000 }).toBe(true);
-	expect(
-		pagePathname(page),
-		`selected org id=${await persistedSelectedOrgId(page)}`
-	).not.toBe('/onboarding/create-org');
+	await expect(page).toHaveURL((url) => url.pathname === POST_ORG_CREATE_PATH, {
+		timeout: 15_000
+	});
+	await expect(page.getByTestId('onboarding-invite-skip')).toBeVisible({ timeout: 30_000 });
+	expect(pagePathname(page), `selected org id=${selectedOrgId}`).toBe(POST_ORG_CREATE_PATH);
 }
 
 /** Bootstrap: signup → create org → ready for CRM journeys. */
