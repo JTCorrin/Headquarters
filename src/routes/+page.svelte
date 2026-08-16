@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
 	import { getApiV1Client } from '$lib/api/v1/index.js';
-	import { getAuthSession, postAuthDestination } from '$lib/auth/index.js';
+	import { getAuthSession } from '$lib/auth/index.js';
 	import { logoutAndRedirect } from '$lib/auth/logout.js';
 	import { getOrgSession } from '$lib/org/index.js';
 	import DashboardHomePage from '$lib/components/crm/dashboard-home-page.svelte';
@@ -12,24 +14,11 @@
 
 	const showDashboard = $derived(Boolean(session.selectedOrgId));
 
-	$effect(() => {
-		if (!auth.ready) return;
-		if (session.selectedOrgId) return;
-
-		if (!auth.enabled) {
-			void goto('/select-org');
-			return;
+	onMount(() => {
+		// AuthSessionLayout owns all routing when authentication is enabled.
+		if (!auth.enabled && !session.selectedOrgId) {
+			void goto(resolve('/select-org'));
 		}
-		if (!auth.session) {
-			void goto('/login');
-			return;
-		}
-		void goto(
-			postAuthDestination({
-				membershipCount: session.memberships.length,
-				selectedOrgId: session.selectedOrgId
-			})
-		);
 	});
 
 	async function handleLogout() {
@@ -42,7 +31,7 @@
 		{api}
 		{session}
 		onMissingOrg={() => {
-			void goto('/select-org');
+			void goto(resolve('/select-org'));
 		}}
 		onSwitchNavigate={() => {
 			// Stay on home; page reloads via cacheGeneration.
@@ -50,5 +39,5 @@
 		onLogout={handleLogout}
 	/>
 {:else}
-	<p class="text-muted-foreground p-6 text-sm">Redirecting…</p>
+	<p class="p-6 text-sm text-muted-foreground">Redirecting…</p>
 {/if}
