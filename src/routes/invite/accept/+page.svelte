@@ -54,8 +54,7 @@
 		logoutError = null;
 		const next = `${page.url.pathname}${page.url.search}`;
 		// Return to this invite page so the guest landing explains signup vs sign-in.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		logoutError = await logoutAndRedirect(auth, orgSession, next);
+		logoutError = await logoutAndRedirect(auth, orgSession, { destination: next });
 	}
 
 	onMount(() => {
