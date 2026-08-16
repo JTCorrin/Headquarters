@@ -37,9 +37,7 @@
 		headerExtra?: Snippet;
 		onSwitchOrg?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
-		onValidCreate?: (
-			data: OrganisationCreateData
-		) => boolean | void | Promise<boolean | void>;
+		onValidCreate?: (data: OrganisationCreateData) => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -64,7 +62,9 @@
 		(memberships.find((m) => m.org_id === currentOrgId)?.role ?? null) as MembershipRole | null
 	);
 	const showNotifications = $derived(
-		Boolean(resolvedApi && currentOrgId && membershipRole && canAccessPersonalConfig(membershipRole))
+		Boolean(
+			resolvedApi && currentOrgId && membershipRole && canAccessPersonalConfig(membershipRole)
+		)
 	);
 
 	let createOpen = $state(false);
@@ -115,12 +115,12 @@
 			<Sidebar.Trigger class="shrink-0" data-testid="app-sidebar-trigger" />
 		{/if}
 		<OrgSwitcher
-			class="min-w-0 max-w-full flex-1 sm:max-w-xs sm:flex-none"
+			class="max-w-full min-w-0 flex-1 sm:max-w-xs sm:flex-none"
 			{currentOrgId}
 			{memberships}
 			{switchError}
 			{busy}
-			onSwitchOrg={onSwitchOrg}
+			{onSwitchOrg}
 			onCreateOrg={() => {
 				createOpen = true;
 			}}
@@ -137,8 +137,8 @@
 					type="button"
 					variant="outline"
 					size="sm"
-					onclick={() => {
-						void onLogout();
+					onclick={async () => {
+						await onLogout();
 					}}
 					data-testid="auth-logout"
 				>
