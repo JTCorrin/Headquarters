@@ -22,6 +22,14 @@ export function isAuthPublicPath(pathname: string): boolean {
 	);
 }
 
+/**
+ * Signed-in users on these routes should be sent to postAuthDestination
+ * (keep update-password and invite accept reachable while authenticated).
+ */
+export function isPostAuthRedirectPath(pathname: string): boolean {
+	return isAuthPublicPath(pathname) && pathname !== '/update-password' && pathname !== '/invite/accept';
+}
+
 export function isOnboardingPath(pathname: string): boolean {
 	return AUTH_ONBOARDING_PATHS.has(pathname);
 }

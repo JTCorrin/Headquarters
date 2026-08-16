@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { get } from 'svelte/store';
@@ -39,7 +38,8 @@
 			formError = result.error;
 			return false;
 		}
-		await goto(resolve(next as '/'));
+		// AuthSessionLayout owns post-auth routing (create-org / select-org / next).
+		// Navigating here raced that redirect and left login visible under org setup on mobile.
 		return true;
 	}
 </script>
