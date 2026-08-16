@@ -11,6 +11,7 @@ export {
 	AUTH_ONBOARDING_PATHS,
 	AUTH_PUBLIC_PATHS,
 	isAuthPublicPath,
+	isPostAuthRedirectPath,
 	isOnboardingPath,
 	isPostOrgCreateLandingPath,
 	isPostSignupLandingPath,
