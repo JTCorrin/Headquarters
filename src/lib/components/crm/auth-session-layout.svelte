@@ -13,6 +13,7 @@
 		createSupabaseBrowserClient,
 		isAuthPublicPath,
 		isOnboardingPath,
+		isPostAuthRedirectPath,
 		membershipRefreshMode,
 		postAuthDestination,
 		readPublicSupabaseConfig,
@@ -159,7 +160,7 @@
 
 		if (!membershipsReady) return;
 
-		if (isAuthPublicPath(path) && path !== '/update-password' && !acceptingInvitation) {
+		if (isPostAuthRedirectPath(path)) {
 			const requestedNext = page.url.searchParams.get('next');
 			const next = safeNextPath(requestedNext);
 			const destination =
@@ -171,7 +172,7 @@
 						});
 			// `destination` is either generated locally or sanitized by safeNextPath.
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			void goto(destination);
+			void goto(destination, { replaceState: true });
 			return;
 		}
 
@@ -183,7 +184,7 @@
 			!isOnboardingPath(path) &&
 			!acceptingInvitation
 		) {
-			void goto(resolve('/onboarding/create-org'));
+			void goto(resolve('/onboarding/create-org'), { replaceState: true });
 			return;
 		}
 
@@ -198,7 +199,7 @@
 				});
 				// postAuthDestination only returns known internal routes.
 				// eslint-disable-next-line svelte/no-navigation-without-resolve
-				void goto(destination);
+				void goto(destination, { replaceState: true });
 				return;
 			}
 		}
@@ -210,17 +211,17 @@
 			});
 			// postAuthDestination only returns known internal routes.
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			void goto(destination);
+			void goto(destination, { replaceState: true });
 			return;
 		}
 
 		if (requiresSelectedOrg(path) && !orgSession.selectedOrgId) {
-			void goto(resolve('/select-org'));
+			void goto(resolve('/select-org'), { replaceState: true });
 		}
 	});
 </script>
 
-{#if auth.enabled && auth.ready && auth.session && !membershipsReady}
+{#if auth.enabled && auth.ready && auth.session && (!membershipsReady || isPostAuthRedirectPath(page.url.pathname))}
 	<p class="p-6 text-sm text-muted-foreground">Loading workspace…</p>
 {:else if membershipsError && auth.session && isAuthPublicPath(page.url.pathname) === false}
 	<div class="mx-auto max-w-lg space-y-3 p-6">
