@@ -89,17 +89,6 @@
 	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
 
-	function emptyLineForm() {
-		return {
-			productId: '',
-			description: '',
-			qty: '1',
-			unitPrice: '0',
-			discountPercent: '0',
-			taxRatePercent: defaultTaxRatePercentString(taxRates)
-		};
-	}
-
 	const quoteForm = superForm(
 		defaults(
 			{
@@ -121,6 +110,19 @@
 			resetForm: false
 		}
 	);
+
+	function emptyLineForm() {
+		const clientId = get(quoteForm.form).clientId;
+		const taxExempt = clientOptions.find((c) => c.id === clientId)?.taxExempt ?? false;
+		return {
+			productId: '',
+			description: '',
+			qty: '1',
+			unitPrice: '0',
+			discountPercent: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates, { taxExempt })
+		};
+	}
 
 	const lineForm = superForm(defaults(emptyLineForm(), zod4(lineItemFormSchema)), {
 		validators: zod4(lineItemFormSchema),
@@ -264,7 +266,11 @@
 			orgAddressLines = formatOrgLetterheadLines(brandingResource);
 			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
 			if (isStale(epoch)) return;
-			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			clientOptions = clients.data.map((c) => ({
+				id: c.id,
+				name: c.name,
+				taxExempt: Boolean(c.tax_exempt)
+			}));
 			const options: QuoteContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,

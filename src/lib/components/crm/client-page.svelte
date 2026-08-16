@@ -84,8 +84,10 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',
+		taxExempt: false,
 		registrationNumber: '',
 		defaultCurrency: 'GBP',
 		paymentTermsDays: '',
@@ -118,6 +120,7 @@
 					{ label: 'Industry', value: client.industry ?? '—' },
 					{ label: 'Website', value: client.website_url ?? '—' },
 					{ label: 'Primary email', value: client.primary_email ?? '—' },
+					{ label: 'Email domain', value: client.email_domain ?? '—' },
 					{ label: 'Phone', value: client.phone ?? '—' },
 					{ label: 'Notes', value: client.notes ?? '—' }
 				]
@@ -134,6 +137,7 @@
 							client.payment_terms_days == null ? '—' : String(client.payment_terms_days)
 					},
 					{ label: 'Tax identifier', value: client.tax_identifier ?? '—' },
+					{ label: 'VAT exempt', value: client.tax_exempt ? 'Yes' : 'No' },
 					{ label: 'Registration number', value: client.registration_number ?? '—' },
 					{ label: 'Renewal on', value: client.renewal_on ?? '—' }
 				]

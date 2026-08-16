@@ -3,7 +3,8 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import AuditLogTable from './audit-log-table.svelte';
 	import DateField from './date-field.svelte';
@@ -39,19 +40,19 @@
 	}: AuditLogListPageProps = $props();
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
+		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Organisation"
 				title="Audit log"
@@ -122,4 +123,4 @@
 			<AuditLogTable {rows} />
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

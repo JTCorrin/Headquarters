@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { sanitizeEmailHtml } from '$lib/crm/sanitize-email-html.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
 	import { draftResponseGateCopy } from '$lib/schemas/integration.js';
 	import { cn } from '$lib/utils.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import AiAssistAction from './ai-assist-action.svelte';
 	import type { AiSuggestionStatus } from './ai-suggestion-panel.svelte';
 
@@ -20,6 +23,8 @@
 		subject: string;
 		preview: string;
 		body: string;
+		bodyHtml?: string | null;
+		attachments?: Array<{ filename: string; contentType: string; inline?: boolean }>;
 		occurredAt: string;
 		unread?: boolean;
 	}
@@ -109,14 +114,18 @@
 	let shareError = $state<string | null>(null);
 	let sendError = $state<string | null>(null);
 	let sending = $state(false);
+	const isNarrow = new IsMobile(1024);
 
 	$effect(() => {
+		if (isNarrow.current) return;
 		if (selectedId === undefined && messages.length > 0) {
 			selectedId = messages.find((m) => m.unread)?.id ?? messages[0]?.id;
 		}
 	});
 
 	const selected = $derived(messages.find((m) => m.id === selectedId));
+	const selectedHtml = $derived(selected?.bodyHtml ? sanitizeEmailHtml(selected.bodyHtml) : '');
+	const selectedAttachments = $derived(selected?.attachments ?? []);
 	const draftGate = $derived(draftResponseGateCopy(role));
 	const draftDisabled = $derived(!aiProviderConnected);
 	const sendDisabled = $derived(!smtpReady || !replyBody.trim() || sending);
@@ -305,7 +314,12 @@
 	data-testid="entity-email-inbox"
 	data-empty-state={messages.length === 0 ? emptyState : undefined}
 >
-	<aside class="border-border/80 flex min-h-0 flex-col border-b lg:border-r lg:border-b-0">
+	<aside
+		class={cn(
+			'border-border/80 flex min-h-0 flex-col border-b lg:border-r lg:border-b-0',
+			(selected || messages.length === 0) && 'hidden lg:flex'
+		)}
+	>
 		<div class="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
 			<p class="text-sm font-semibold tracking-tight">Inbox</p>
 			<span class="text-muted-foreground text-xs">{messages.length}</span>
@@ -351,11 +365,30 @@
 		</ul>
 	</aside>
 
-	<section class="flex min-h-0 flex-col overflow-hidden">
+	<section
+		class={cn(
+			'flex min-h-0 flex-col overflow-hidden',
+			!selected && messages.length > 0 && 'hidden lg:flex'
+		)}
+	>
 		{#if selected}
 			<header class="shrink-0 space-y-2 border-b px-5 py-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div class="min-w-0 space-y-1">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="-ms-2 mb-1 lg:hidden"
+							data-testid="entity-email-back"
+							onclick={() => {
+								selectedId = undefined;
+								cancelReply();
+							}}
+						>
+							<ArrowLeftIcon class="size-4" />
+							Inbox
+						</Button>
 						<h3 class="text-base font-semibold tracking-tight">{selected.subject}</h3>
 						<p class="text-muted-foreground text-xs">
 							{selected.direction === 'in' ? 'From' : 'To'}
@@ -401,7 +434,34 @@
 			</header>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				<div class="px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap">{selected.body}</div>
+				{#if selectedHtml}
+					<div
+						class="email-html-body px-5 py-5 text-sm leading-relaxed"
+						data-testid="email-body-html"
+					>
+						{@html selectedHtml}
+					</div>
+				{:else}
+					<div
+						class="px-5 py-5 text-sm leading-relaxed whitespace-pre-wrap"
+						data-testid="email-body-text"
+					>
+						{selected.body}
+					</div>
+				{/if}
+
+				{#if selectedAttachments.length > 0}
+					<div class="border-border flex flex-wrap gap-2 border-t px-5 py-3" data-testid="email-attachments">
+						{#each selectedAttachments as attachment (attachment.filename + attachment.contentType)}
+							<span
+								class="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-xs"
+								data-testid="email-attachment-chip"
+							>
+								{attachment.filename}{#if attachment.contentType}<span class="opacity-70"> · {attachment.contentType}</span>{/if}
+							</span>
+						{/each}
+					</div>
+				{/if}
 
 				{#if composing}
 					<div class="border-border space-y-3 border-t px-5 py-4">
@@ -547,3 +607,17 @@
 		{/if}
 	</section>
 </div>
+
+<style>
+	.email-html-body :global {
+		a {
+			color: inherit;
+			text-decoration: underline;
+		}
+
+		img {
+			max-width: 100%;
+			height: auto;
+		}
+	}
+</style>

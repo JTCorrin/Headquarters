@@ -214,7 +214,7 @@
 	{/if}
 {/snippet}
 
-<div class="space-y-8 px-6 py-6 md:px-8" data-testid="org-team-page">
+<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8" data-testid="org-team-page">
 	<PageHeader
 		breadcrumb="Organisation · Settings"
 		title="Team"
