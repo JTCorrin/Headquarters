@@ -100,9 +100,21 @@ text = re.sub(
 # Local config enables email confirmations; staging E2E needs immediate JWTs.
 # Only the email section uses `true` — SMS stays false.
 text = text.replace("enable_confirmations = true", "enable_confirmations = false", 1)
+# Deploy smoke proofs create many fresh users immediately before Playwright.
+# Keep this staging-only allowance above their combined five-minute request count.
+text = re.sub(
+    r"^sign_in_sign_ups = \d+",
+    "sign_in_sign_ups = 100",
+    text,
+    count=1,
+    flags=re.M,
+)
 
 path.write_text(text)
-print(f"patched auth site_url/redirects for {origin}; email confirmations disabled")
+print(
+    f"patched auth site_url/redirects for {origin}; "
+    "email confirmations disabled; sign-in/signup limit=100"
+)
 PY
 fi
 
