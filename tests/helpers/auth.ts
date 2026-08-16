@@ -1,9 +1,9 @@
 import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { isPostSignupLandingPath } from '../../src/lib/auth/paths.js';
 import { isSelectedOrgStorageKey } from '../../src/lib/org/selected-org.js';
 import { uniqueProofEmail } from './e2e-env.js';
 
+const POST_SIGNUP_PATH = '/onboarding/create-org';
 const POST_ORG_CREATE_PATH = '/onboarding/invite-team';
 
 export type E2ESession = {
@@ -77,16 +77,9 @@ export async function signupViaUi(page: Page): Promise<E2ESession> {
 	// New users land on create-org (0 memberships). `/check-email` means
 	// staging still has `enable_confirmations = true` — that is a real failure.
 	try {
-		await expect
-			.poll(
-				() => {
-					const path = pagePathname(page);
-					if (path.startsWith('/check-email')) return 'check-email';
-					return isPostSignupLandingPath(path) ? 'ok' : path;
-				},
-				{ timeout: 30_000 }
-			)
-			.toBe('ok');
+		await expect(page).toHaveURL((url) => url.pathname === POST_SIGNUP_PATH, {
+			timeout: 30_000
+		});
 	} catch (error) {
 		const formError = await visibleTestIdText(page, 'auth-form-error');
 		throw new Error(
@@ -133,13 +126,12 @@ export async function createOrgViaUi(
 	expect(response.ok(), `org create HTTP ${response.status()}`).toBeTruthy();
 
 	const landed = () => pagePathname(page) === POST_ORG_CREATE_PATH;
-	let createError: string | null = null;
 	await expect
 		.poll(
 			async () => {
 				if (landed()) return 'ready';
-				createError = await visibleTestIdText(page, 'onboarding-create-error');
-				if (createError?.trim()) return 'ready';
+				const visibleError = await visibleTestIdText(page, 'onboarding-create-error');
+				if (visibleError?.trim()) return 'ready';
 				return (await persistedSelectedOrgId(page)) ? 'ready' : 'waiting';
 			},
 			{ timeout: 8_000 }
@@ -147,6 +139,7 @@ export async function createOrgViaUi(
 		.toBe('ready')
 		.catch(() => undefined);
 
+	const createError = await visibleTestIdText(page, 'onboarding-create-error');
 	if (createError?.trim()) {
 		throw new Error(`Organisation create failed: ${createError.trim()}`);
 	}
@@ -180,8 +173,6 @@ export async function createOrgViaUi(
 export async function bootstrapOwnerSession(page: Page): Promise<E2ESession & { orgSlug: string }> {
 	const session = await signupViaUi(page);
 	const slug = `e2e-${Date.now().toString(36)}`;
-	if (pagePathname(page) === '/onboarding/create-org') {
-		await createOrgViaUi(page, { name: `E2E Org ${slug}`, slug });
-	}
+	await createOrgViaUi(page, { name: `E2E Org ${slug}`, slug });
 	return { ...session, orgSlug: slug };
 }

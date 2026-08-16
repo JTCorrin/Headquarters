@@ -47,7 +47,8 @@
 			await goto(resolve(`/check-email?${query}`));
 			return true;
 		}
-		await goto(resolve(next as `/${string}`));
+		const destination = next === '/' ? '/onboarding/create-org' : next;
+		await goto(resolve(destination as '/'));
 		return true;
 	}
 </script>
