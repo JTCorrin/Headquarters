@@ -44,12 +44,10 @@
 			const query = `email=${encodeURIComponent(data.email)}${
 				next === '/' ? '' : `&next=${encodeURIComponent(next)}`
 			}`;
-			void goto(resolve(`/check-email?${query}`));
+			await goto(resolve(`/check-email?${query}`));
 			return true;
 		}
-		// `next` is runtime data, but safeNextPath has restricted it to this origin.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		void goto(next);
+		await goto(resolve(next as `/${string}`));
 		return true;
 	}
 </script>
