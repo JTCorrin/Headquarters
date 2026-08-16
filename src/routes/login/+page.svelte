@@ -39,9 +39,7 @@
 			formError = result.error;
 			return false;
 		}
-		// `next` is runtime data, but safeNextPath has restricted it to this origin.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		void goto(next);
+		await goto(resolve(next as '/'));
 		return true;
 	}
 </script>
