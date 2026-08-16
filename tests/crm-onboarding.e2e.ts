@@ -41,11 +41,6 @@ test.describe('CRM onboarding journey (staging)', () => {
 		await page.getByTestId('auth-submit').click();
 		await expect(page).not.toHaveURL(/\/login$/, { timeout: 30_000 });
 		await expect(page).not.toHaveURL(/\/onboarding\/create-org/, { timeout: 30_000 });
-		await expect(
-			page
-				.getByTestId('dashboard-home-page')
-				.or(page.getByTestId('select-org-page'))
-				.or(page.getByTestId('app-shell'))
-		).toBeVisible({ timeout: 45_000 });
+		await expect(page.getByTestId('app-shell')).toBeVisible({ timeout: 45_000 });
 	});
 });
