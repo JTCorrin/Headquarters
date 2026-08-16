@@ -1,57 +1,56 @@
-import { goto } from '$app/navigation';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { OrgSession } from '$lib/org/session.svelte.js';
 import type { AuthSession } from './session.svelte.js';
-import { logoutAndRedirect } from './logout.js';
+import { logoutAndRedirect, type LogoutNavigation } from './logout.js';
 
-vi.mock('$app/navigation', () => ({
-	goto: vi.fn()
-}));
-
-function dependencies(signOutError: string | null = null) {
+function dependencies(signOutError: string | null = null, calls: string[] = []) {
 	const auth = {
-		signOut: vi.fn().mockResolvedValue({ error: signOutError })
+		signOut: vi.fn().mockImplementation(async () => {
+			calls.push('sign-out');
+			return { error: signOutError };
+		})
 	} as unknown as AuthSession;
 	const org = {
-		clearSelection: vi.fn(),
-		setMemberships: vi.fn()
+		clearSelection: vi.fn(() => calls.push('clear-selection')),
+		setMemberships: vi.fn(() => calls.push('clear-memberships'))
 	} as unknown as OrgSession;
 	return { auth, org };
 }
 
 describe('logoutAndRedirect', () => {
-	beforeEach(() => {
-		vi.mocked(goto).mockReset();
-	});
+	it('reloads the resolved login route after clearing auth and org state', async () => {
+		const calls: string[] = [];
+		const { auth, org } = dependencies(null, calls);
+		const navigate: LogoutNavigation = vi.fn(() => calls.push('navigate'));
 
-	it('leaves default navigation to the auth guard', async () => {
-		const { auth, org } = dependencies();
-
-		await expect(logoutAndRedirect(auth, org)).resolves.toBeNull();
+		await expect(logoutAndRedirect(auth, org, { navigate })).resolves.toBeNull();
 
 		expect(auth.signOut).toHaveBeenCalledOnce();
 		expect(org.clearSelection).toHaveBeenCalledOnce();
 		expect(org.setMemberships).toHaveBeenCalledWith([]);
-		expect(goto).not.toHaveBeenCalled();
+		expect(navigate).toHaveBeenCalledWith('/login');
+		expect(calls).toEqual(['sign-out', 'clear-selection', 'clear-memberships', 'navigate']);
 	});
 
-	it('navigates when a public flow supplies an explicit destination', async () => {
+	it('reloads an explicit public-flow destination', async () => {
 		const { auth, org } = dependencies();
 		const destination = '/invite/accept?token=invite-token';
+		const navigate: LogoutNavigation = vi.fn();
 
-		await expect(logoutAndRedirect(auth, org, destination)).resolves.toBeNull();
+		await expect(logoutAndRedirect(auth, org, { destination, navigate })).resolves.toBeNull();
 
-		expect(goto).toHaveBeenCalledOnce();
-		expect(goto).toHaveBeenCalledWith(destination);
+		expect(navigate).toHaveBeenCalledOnce();
+		expect(navigate).toHaveBeenCalledWith(destination);
 	});
 
 	it('preserves state and navigation when sign out fails', async () => {
 		const { auth, org } = dependencies('Could not sign out');
+		const navigate: LogoutNavigation = vi.fn();
 
-		await expect(logoutAndRedirect(auth, org)).resolves.toBe('Could not sign out');
+		await expect(logoutAndRedirect(auth, org, { navigate })).resolves.toBe('Could not sign out');
 
 		expect(org.clearSelection).not.toHaveBeenCalled();
 		expect(org.setMemberships).not.toHaveBeenCalled();
-		expect(goto).not.toHaveBeenCalled();
+		expect(navigate).not.toHaveBeenCalled();
 	});
 });
