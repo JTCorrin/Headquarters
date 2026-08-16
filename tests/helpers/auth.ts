@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { isPostSignupLandingPath } from '../../src/lib/auth/paths.js';
 import { isSelectedOrgStorageKey } from '../../src/lib/org/selected-org.js';
@@ -34,6 +34,16 @@ async function persistedSelectedOrgId(page: Page): Promise<string | null> {
 	return null;
 }
 
+async function authResponseError(response: Response): Promise<string | null> {
+	const body = await response.json().catch(() => null);
+	if (!body || typeof body !== 'object') return null;
+	for (const key of ['msg', 'message', 'error_description', 'error']) {
+		const value = (body as Record<string, unknown>)[key];
+		if (typeof value === 'string' && value.trim()) return value.trim();
+	}
+	return null;
+}
+
 /** Sign up a fresh user via the UI (staging has email confirmations off). */
 export async function signupViaUi(page: Page): Promise<E2ESession> {
 	const email = uniqueProofEmail();
@@ -43,20 +53,47 @@ export async function signupViaUi(page: Page): Promise<E2ESession> {
 	await page.getByTestId('auth-display-name').fill('E2E User');
 	await page.getByTestId('auth-email').fill(email);
 	await page.getByTestId('auth-password').fill(password);
+	const signupResponsePromise = page.waitForResponse(
+		(response) =>
+			response.url().includes('/auth/v1/signup') && response.request().method() === 'POST',
+		{ timeout: 30_000 }
+	);
 	await page.getByTestId('auth-submit').click();
+	const signupResponse = await signupResponsePromise;
+	if (!signupResponse.ok()) {
+		const formError = await page
+			.getByTestId('auth-form-error')
+			.textContent({ timeout: 2_000 })
+			.catch(() => null);
+		const detail = formError?.trim() || (await authResponseError(signupResponse));
+		throw new Error(
+			`Signup failed with HTTP ${signupResponse.status()}${detail ? `: ${detail}` : ''}`
+		);
+	}
 
 	// New users land on create-org (0 memberships). `/check-email` means
 	// staging still has `enable_confirmations = true` — that is a real failure.
-	await expect
-		.poll(
-			() => {
-				const path = pagePathname(page);
-				if (path.startsWith('/check-email')) return 'check-email';
-				return isPostSignupLandingPath(path) ? 'ok' : path;
-			},
-			{ timeout: 30_000 }
-		)
-		.toBe('ok');
+	try {
+		await expect
+			.poll(
+				() => {
+					const path = pagePathname(page);
+					if (path.startsWith('/check-email')) return 'check-email';
+					return isPostSignupLandingPath(path) ? 'ok' : path;
+				},
+				{ timeout: 30_000 }
+			)
+			.toBe('ok');
+	} catch (error) {
+		const formError = await page
+			.getByTestId('auth-form-error')
+			.textContent({ timeout: 0 })
+			.catch(() => null);
+		throw new Error(
+			`Signup returned HTTP ${signupResponse.status()} but remained on ${pagePathname(page)}${formError?.trim() ? `: ${formError.trim()}` : ''}`,
+			{ cause: error }
+		);
+	}
 	return { email, password };
 }
 
