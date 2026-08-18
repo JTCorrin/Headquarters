@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	clientStatusLabel,
 	contactLifecycleLabel,
@@ -26,6 +26,7 @@ import {
 	toProductRow,
 	toQuoteLineInput,
 	toRecurringLineInput,
+	toBillListItem,
 	toInvoiceListItem,
 	toLeadCard,
 	toLeadCreateBody,
@@ -48,6 +49,7 @@ import {
 	toProjectListItem
 } from './mappers.js';
 import type {
+	ApiBill,
 	ApiClient,
 	ApiContact,
 	ApiInvoice,
@@ -803,6 +805,110 @@ describe('api mappers', () => {
 				])
 			)[0].taxRatePercent
 		).toBe('20');
+	});
+
+	it('marks past-due open invoices as Overdue on the list', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-04-15T12:00:00.000Z'));
+		const invoice: ApiInvoice = {
+			id: 'aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			number: 'INV-0001',
+			client_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+			contact_id: null,
+			quote_id: null,
+			owner_membership_id: null,
+			source: 'manual',
+			recurring_run_id: null,
+			billing_period_start: null,
+			billing_period_end: null,
+			status: 'sent',
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			due_on: '2026-04-01',
+			purchase_order_number: null,
+			subtotal_cents: 1000,
+			discount_cents: 0,
+			tax_cents: 200,
+			total_cents: 1200,
+			paid_cents: 0,
+			balance_due_cents: 1200,
+			party_snapshot: { name: 'Northwind' },
+			payment_terms: null,
+			notes: null,
+			internal_notes: null,
+			sent_at: null,
+			viewed_at: null,
+			paid_at: null,
+			voided_at: null,
+			void_reason: null
+		};
+		try {
+			expect(toInvoiceListItem(invoice).status).toBe('Overdue');
+			expect(
+				toInvoiceListItem({ ...invoice, status: 'paid', paid_cents: 1200, balance_due_cents: 0 })
+					.status
+			).toBe('Paid');
+			expect(toInvoiceListItem({ ...invoice, status: 'void', balance_due_cents: 0 }).status).toBe(
+				'Void'
+			);
+			expect(toInvoiceListItem({ ...invoice, balance_due_cents: 0 }).status).toBe('Sent');
+			expect(toInvoiceListItem({ ...invoice, due_on: '2026-04-15' }).status).toBe('Sent');
+			expect(toInvoiceListItem({ ...invoice, status: 'draft' }).status).toBe('Draft');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('marks past-due open bills as Overdue on the list', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-04-15T12:00:00.000Z'));
+		const bill: ApiBill = {
+			id: 'bbbbbbbb-1111-4222-8333-bbbbbbbbbbbb',
+			org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+			created_at: '2026-01-01T00:00:00Z',
+			updated_at: '2026-01-01T00:00:00Z',
+			created_by: null,
+			updated_by: null,
+			deleted_at: null,
+			version: 1,
+			vendor_id: 'cccccccc-cccc-4ddd-8eee-ffffffffffff',
+			number: 'BILL-0001',
+			internal_reference: null,
+			status: 'received',
+			currency: 'GBP',
+			issue_on: '2026-03-01',
+			received_on: '2026-03-02',
+			due_on: '2026-04-01',
+			scheduled_payment_on: null,
+			subtotal_cents: 1000,
+			discount_cents: 0,
+			tax_cents: 200,
+			total_cents: 1200,
+			paid_cents: 0,
+			balance_due_cents: 1200,
+			party_snapshot: { name: 'Acme Supplies' },
+			notes: null,
+			attachment_document_id: null,
+			paid_at: null,
+			voided_at: null,
+			void_reason: null
+		};
+		try {
+			expect(toBillListItem(bill).status).toBe('Overdue');
+			expect(
+				toBillListItem({ ...bill, status: 'paid', paid_cents: 1200, balance_due_cents: 0 }).status
+			).toBe('Paid');
+			expect(toBillListItem({ ...bill, status: 'draft' }).status).toBe('Draft');
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('maps leads between API and form/board shapes', () => {

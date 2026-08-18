@@ -14,17 +14,26 @@
 	import { createSvelteTable, FlexRender } from '$lib/components/ui/data-table/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { cn } from '$lib/utils.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import {
+		ALL_FACET_VALUE,
+		withFacetFilterFns,
+		type DataTableFacet
+	} from './data-table-facets.js';
+
+	export type { DataTableFacet };
 
 	export interface DataTableShellProps<TData, TValue> {
 		columns: ColumnDef<TData, TValue>[];
 		data: TData[];
 		filterColumn?: string;
 		filterPlaceholder?: string;
+		facets?: DataTableFacet[];
 		pageSize?: number;
 		emptyMessage?: string;
 		class?: string;
@@ -35,6 +44,7 @@
 		data,
 		filterColumn,
 		filterPlaceholder = 'Filter…',
+		facets = [],
 		pageSize = 8,
 		emptyMessage = 'No results.',
 		class: className
@@ -89,13 +99,14 @@
 	});
 
 	const hasSelectColumn = $derived(columns.some((column) => column.id === 'select'));
+	const tableColumns = $derived(withFacetFilterFns(columns, facets));
 
 	const table = createSvelteTable({
 		get data() {
 			return data;
 		},
 		get columns() {
-			return columns;
+			return tableColumns;
 		},
 		getRowId: (row, index) => {
 			const id = (row as { id?: string }).id;
@@ -152,6 +163,7 @@
 		void rowSelection;
 		void columnVisibility;
 		void data;
+		void tableColumns;
 		return table.getRowModel().rows;
 	});
 	const selectedCount = $derived.by(() => {
@@ -187,6 +199,26 @@
 		if (!filterColumn) return '';
 		return (table.getColumn(filterColumn)?.getFilterValue() as string) ?? '';
 	});
+
+	function facetSelectedValue(column: string): string {
+		void columnFilters;
+		const raw = table.getColumn(column)?.getFilterValue();
+		return typeof raw === 'string' && raw.length > 0 ? raw : ALL_FACET_VALUE;
+	}
+
+	function facetTriggerLabel(facet: DataTableFacet): string {
+		const selected = facetSelectedValue(facet.column);
+		if (selected === ALL_FACET_VALUE) return `All ${facet.label.toLowerCase()}`;
+		return facet.options.find((option) => option.value === selected)?.label ?? facet.label;
+	}
+
+	function setFacetFilter(column: string, value: string | undefined) {
+		const next = !value || value === ALL_FACET_VALUE ? undefined : value;
+		table.getColumn(column)?.setFilterValue(next);
+		if (pagination.pageIndex !== 0) {
+			pagination = { ...pagination, pageIndex: 0 };
+		}
+	}
 </script>
 
 <div class={cn('space-y-3', className)}>
@@ -199,6 +231,30 @@
 				class="w-full sm:max-w-xs"
 			/>
 		{/if}
+		{#each facets as facet (facet.column)}
+			<Select.Root
+				type="single"
+				value={facetSelectedValue(facet.column)}
+				onValueChange={(value) => setFacetFilter(facet.column, value)}
+			>
+				<Select.Trigger
+					size="sm"
+					class="w-[10.5rem]"
+					aria-label={facet.label}
+					data-testid={`data-table-facet-${facet.column}`}
+				>
+					{facetTriggerLabel(facet)}
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value={ALL_FACET_VALUE} label={`All ${facet.label.toLowerCase()}`}>
+						All {facet.label.toLowerCase()}
+					</Select.Item>
+					{#each facet.options as option (option.value)}
+						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
+					{/each}
+				</Select.Content>
+			</Select.Root>
+		{/each}
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
