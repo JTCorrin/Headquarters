@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { emailTemplateStatusFacet } from './data-table-facets.js';
 	import { emailTemplateColumns, type EmailTemplateRow } from './email-templates-columns.js';
 
 	export type { EmailTemplateRow };
@@ -17,6 +18,7 @@
 	columns={emailTemplateColumns}
 	filterColumn="name"
 	filterPlaceholder="Filter templates…"
+	facets={[emailTemplateStatusFacet]}
 	emptyMessage="No email templates yet."
 	class={className}
 />

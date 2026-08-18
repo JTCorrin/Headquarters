@@ -706,13 +706,32 @@ export function invoiceStatusLabel(status: ApiInvoice['status']): string {
 	return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+/** True when `dueOn` is a calendar date strictly before UTC today. */
+export function isDueOnBeforeToday(dueOn: string | null | undefined, now = new Date()): boolean {
+	if (!dueOn) return false;
+	const dueDay = dueOn.slice(0, 10);
+	if (!dueDay) return false;
+	return dueDay < now.toISOString().slice(0, 10);
+}
+
+function invoiceListStatus(invoice: ApiInvoice, now = new Date()): string {
+	if (
+		(invoice.status === 'sent' || invoice.status === 'partial') &&
+		invoice.balance_due_cents > 0 &&
+		isDueOnBeforeToday(invoice.due_on, now)
+	) {
+		return 'Overdue';
+	}
+	return invoiceStatusLabel(invoice.status);
+}
+
 export function toInvoiceListItem(invoice: ApiInvoice): InvoiceListItem {
 	return {
 		id: invoice.id,
 		number: invoice.number,
 		client: partyNameFromSnapshot(invoice.party_snapshot),
 		total: formatMoney(invoice.total_cents, invoice.currency),
-		status: invoiceStatusLabel(invoice.status),
+		status: invoiceListStatus(invoice),
 		dueOn: invoice.due_on
 	};
 }
@@ -844,13 +863,24 @@ export function billStatusLabel(status: ApiBill['status']): string {
 	return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function billListStatus(bill: ApiBill, now = new Date()): string {
+	if (
+		(bill.status === 'received' || bill.status === 'scheduled' || bill.status === 'partial') &&
+		bill.balance_due_cents > 0 &&
+		isDueOnBeforeToday(bill.due_on, now)
+	) {
+		return 'Overdue';
+	}
+	return billStatusLabel(bill.status);
+}
+
 export function toBillListItem(bill: ApiBill): BillListItem {
 	return {
 		id: bill.id,
 		number: bill.number,
 		vendor: partyNameFromSnapshot(bill.party_snapshot),
 		total: formatMoney(bill.total_cents, bill.currency),
-		status: billStatusLabel(bill.status),
+		status: billListStatus(bill),
 		dueOn: bill.due_on
 	};
 }

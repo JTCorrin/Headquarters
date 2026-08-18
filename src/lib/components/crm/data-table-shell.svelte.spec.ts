@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { renderComponent } from '$lib/components/ui/data-table/index.js';
 import DataTableShell from './data-table-shell.svelte';
+import { invoiceStatusFacet } from './data-table-facets.js';
 import { contactColumns } from './contacts-columns.js';
 import DataTableCheckbox from './data-table-checkbox.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
@@ -118,5 +119,61 @@ describe('DataTableShell', () => {
 		await expect.element(page.getByRole('button', { name: /name/i })).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: /status/i })).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: /email/i })).not.toBeInTheDocument();
+	});
+
+	it('filters by a single status facet', async () => {
+		render(DataTableShell, {
+			columns: contactColumns,
+			data: rows,
+			filterColumn: 'name',
+			pageSize: 8,
+			facets: [
+				{
+					column: 'status',
+					label: 'Status',
+					options: [
+						{ value: 'Lead', label: 'Lead' },
+						{ value: 'Client', label: 'Client' },
+						{ value: 'Contact', label: 'Contact' }
+					]
+				}
+			]
+		});
+
+		await page.getByTestId('data-table-facet-status').click();
+		await page.getByRole('option', { name: 'Client' }).click();
+		await expect.element(page.getByText('1 row(s)')).toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Amy' })).toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Zed' })).not.toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Mia' })).not.toBeInTheDocument();
+	});
+
+	it('filters Unpaid as Sent, Partial, and Overdue', async () => {
+		const invoiceRows = [
+			{ id: '1', name: 'Paid co', email: 'a@ex.com', status: 'Paid' },
+			{ id: '2', name: 'Sent co', email: 'b@ex.com', status: 'Sent' },
+			{ id: '3', name: 'Partial co', email: 'c@ex.com', status: 'Partial' },
+			{ id: '4', name: 'Overdue co', email: 'd@ex.com', status: 'Overdue' },
+			{ id: '5', name: 'Draft co', email: 'e@ex.com', status: 'Draft' },
+			{ id: '6', name: 'Void co', email: 'f@ex.com', status: 'Void' }
+		];
+
+		render(DataTableShell, {
+			columns: contactColumns,
+			data: invoiceRows,
+			filterColumn: 'name',
+			pageSize: 8,
+			facets: [invoiceStatusFacet]
+		});
+
+		await page.getByTestId('data-table-facet-status').click();
+		await page.getByRole('option', { name: 'Unpaid' }).click();
+		await expect.element(page.getByText('3 row(s)')).toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Sent co' })).toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Partial co' })).toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Overdue co' })).toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Paid co' })).not.toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Draft co' })).not.toBeInTheDocument();
+		await expect.element(page.getByRole('cell', { name: 'Void co' })).not.toBeInTheDocument();
 	});
 });

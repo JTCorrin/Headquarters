@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { leadStageFacet } from './data-table-facets.js';
 	import { leadColumns, type LeadRow } from './leads-columns.js';
 
 	export type { LeadRow };
@@ -18,6 +19,7 @@
 		columns={leadColumns}
 		filterColumn="name"
 		filterPlaceholder="Filter leads…"
+		facets={[leadStageFacet]}
 		emptyMessage="No leads yet."
 	/>
 </div>
