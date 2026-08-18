@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { taskStatusFacet } from './data-table-facets.js';
 	import { createTaskColumns, type TaskRow } from './tasks-columns.js';
 
 	export type { TaskRow };
@@ -20,6 +21,7 @@
 	{columns}
 	filterColumn="title"
 	filterPlaceholder="Filter tasks…"
+	facets={[taskStatusFacet]}
 	emptyMessage="No tasks yet."
 	class={className}
 />

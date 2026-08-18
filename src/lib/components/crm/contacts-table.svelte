@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { contactStatusFacet } from './data-table-facets.js';
 	import { contactColumns, type ContactRow } from './contacts-columns.js';
 
 	export type { ContactRow };
@@ -17,6 +18,7 @@
 	columns={contactColumns}
 	filterColumn="name"
 	filterPlaceholder="Filter contacts…"
+	facets={[contactStatusFacet]}
 	emptyMessage="No contacts yet."
 	class={className}
 />

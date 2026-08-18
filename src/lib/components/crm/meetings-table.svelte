@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { meetingStatusFacet } from './data-table-facets.js';
 	import { createMeetingColumns, type MeetingRow } from './meetings-columns.js';
 
 	export type { MeetingRow };
@@ -23,6 +24,7 @@
 	{columns}
 	filterColumn="title"
 	filterPlaceholder="Filter meetings…"
+	facets={[meetingStatusFacet]}
 	emptyMessage="No meetings yet."
 	class={className}
 />
