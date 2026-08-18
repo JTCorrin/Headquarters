@@ -46,8 +46,8 @@ async function authResponseError(response: Response): Promise<string | null> {
 
 async function visibleTestIdText(page: Page, testId: string): Promise<string | null> {
 	const locator = page.getByTestId(testId);
-	if (!(await locator.isVisible())) return null;
-	return locator.textContent({ timeout: 500 }).catch(() => null);
+	if (!(await locator.isVisible({ timeout: 0 }).catch(() => false))) return null;
+	return locator.textContent({ timeout: 0 }).catch(() => null);
 }
 
 /** Sign up a fresh user via the UI (staging has email confirmations off). */
@@ -92,10 +92,42 @@ export async function signupViaUi(page: Page): Promise<E2ESession> {
 
 export async function signInViaUi(page: Page, session: E2ESession): Promise<void> {
 	await page.goto('/login');
+	await expect(page.getByTestId('auth-email')).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByTestId('auth-submit')).toBeEnabled();
 	await page.getByTestId('auth-email').fill(session.email);
 	await page.getByTestId('auth-password').fill(session.password);
+	const tokenResponsePromise = page.waitForResponse(
+		(response) =>
+			response.url().includes('/auth/v1/token') && response.request().method() === 'POST',
+		{ timeout: 30_000 }
+	);
 	await page.getByTestId('auth-submit').click();
-	await expect(page).not.toHaveURL(/\/login$/, { timeout: 30_000 });
+	let tokenResponse: Response;
+	try {
+		tokenResponse = await tokenResponsePromise;
+	} catch (error) {
+		const formError = await visibleTestIdText(page, 'auth-form-error');
+		throw new Error(
+			`Sign-in did not call GoTrue (path=${pagePathname(page)}${formError?.trim() ? `: ${formError.trim()}` : ''})`,
+			{ cause: error }
+		);
+	}
+	if (!tokenResponse.ok()) {
+		const formError = await visibleTestIdText(page, 'auth-form-error');
+		const detail = formError?.trim() || (await authResponseError(tokenResponse));
+		throw new Error(
+			`Sign-in failed with HTTP ${tokenResponse.status()}${detail ? `: ${detail}` : ''}`
+		);
+	}
+	try {
+		await expect(page).not.toHaveURL(/\/login$/, { timeout: 30_000 });
+	} catch (error) {
+		const formError = await visibleTestIdText(page, 'auth-form-error');
+		throw new Error(
+			`Sign-in returned HTTP ${tokenResponse.status()} but remained on ${pagePathname(page)}${formError?.trim() ? `: ${formError.trim()}` : ''}`,
+			{ cause: error }
+		);
+	}
 }
 
 /**
