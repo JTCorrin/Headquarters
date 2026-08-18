@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { productStatusFacet } from './data-table-facets.js';
 	import { productColumns, type ProductRow } from './products-columns.js';
 
 	export type { ProductRow };
@@ -17,6 +18,7 @@
 	columns={productColumns}
 	filterColumn="name"
 	filterPlaceholder="Filter products…"
+	facets={[productStatusFacet]}
 	emptyMessage="No products yet."
 	class={className}
 />

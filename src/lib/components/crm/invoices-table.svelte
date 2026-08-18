@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
+	import { invoiceStatusFacet } from './data-table-facets.js';
 	import { invoiceColumns, type InvoiceRow } from './invoices-columns.js';
 
 	export type { InvoiceRow };
@@ -17,6 +18,7 @@
 	columns={invoiceColumns}
 	filterColumn="client"
 	filterPlaceholder="Filter invoices…"
+	facets={[invoiceStatusFacet]}
 	emptyMessage="No invoices yet."
 	class={className}
 />
