@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { get } from 'svelte/store';
@@ -33,13 +34,16 @@
 	async function handleSubmit(): Promise<boolean> {
 		formError = null;
 		const data = get(credentialsForm.form);
+		const destination = next;
 		const result = await auth.signIn(data.email, data.password);
 		if (result.error) {
 			formError = result.error;
 			return false;
 		}
-		// AuthSessionLayout owns post-auth routing (create-org / select-org / next).
-		// Navigating here raced that redirect and left login visible under org setup on mobile.
+		// Superforms SPA submit can ignore layout `goto` until this callback returns
+		// (signup navigates here for the same reason). Overlay still hides this page
+		// so it cannot stack under org setup; replaceState avoids a login history entry.
+		await goto(resolve(destination as '/'), { replaceState: true });
 		return true;
 	}
 </script>

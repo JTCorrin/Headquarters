@@ -133,6 +133,32 @@ describe('auth session', () => {
 		expect(session.ready).toBe(true);
 	});
 
+	it('does not let a stale getSession overwrite SIGNED_IN', async () => {
+		let resolveGetSession: (value: { data: { session: Session | null } }) => void = () => {};
+		const { auth, client } = mockClient();
+		auth.getSession.mockReturnValue(
+			new Promise((resolve) => {
+				resolveGetSession = resolve;
+			})
+		);
+
+		const session = createAuthSession({ client, initialSession: null });
+		const listener = auth.onAuthStateChange.mock.calls[0]?.[0] as (
+			event: string,
+			next: Session | null
+		) => void;
+
+		listener('SIGNED_IN', {
+			access_token: 'signed-in-token',
+			user: { id: 'user-1' }
+		} as Session);
+		expect(session.accessToken).toBe('signed-in-token');
+
+		resolveGetSession({ data: { session: null } });
+		await Promise.resolve();
+		expect(session.accessToken).toBe('signed-in-token');
+	});
+
 	it('records auth change events including TOKEN_REFRESHED', () => {
 		const { auth, client } = mockClient();
 		const session = createAuthSession({ client, initialSession: null });
