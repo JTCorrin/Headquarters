@@ -67,6 +67,8 @@ export function createAuthSession(options: CreateAuthSessionOptions): AuthSessio
 
 	if (client) {
 		void client.auth.getSession().then(({ data }) => {
+			// A slow getSession() must not wipe SIGNED_IN from a later password login.
+			if (lastAuthEvent !== null) return;
 			session = data.session;
 			ready = true;
 		});
