@@ -1078,6 +1078,17 @@ export type ApiProjectColumnUpdateBody = Partial<{
 
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
+export type ApiClientContactRole = 'primary' | 'billing' | 'decision_maker' | 'other';
+
+/** Person linked to a client via `client_contacts` (read model). */
+export interface ApiClientLinkedContact {
+	id: string;
+	display_name: string;
+	primary_email: string | null;
+	role: ApiClientContactRole;
+	is_primary: boolean;
+}
+
 export interface ApiClient {
 	id: string;
 	org_id: string;
@@ -1104,6 +1115,8 @@ export interface ApiClient {
 	renewal_on: string | null;
 	notes: string | null;
 	metadata: Record<string, unknown>;
+	/** People linked via `client_contacts` (present on get/list). */
+	contacts?: ApiClientLinkedContact[];
 }
 
 export interface ApiClientListParams {
@@ -1223,6 +1236,8 @@ export interface ApiContact {
 	company_name: string | null;
 	/** Resolved primary client via `client_contacts` (read model). */
 	client_id: string | null;
+	/** Role on the filtered client when listing with `client_id`. */
+	client_role?: ApiClientContactRole;
 	owner_membership_id: string | null;
 	lifecycle_status: ApiContactLifecycleStatus;
 	source: string | null;
@@ -1254,6 +1269,8 @@ export interface ApiContactListParams {
 	limit?: number;
 	cursor?: string;
 	lifecycle_status?: ApiContactLifecycleStatus;
+	/** Restrict to people linked to this client via `client_contacts`. */
+	client_id?: string;
 }
 
 export interface ApiTaxRateListParams {

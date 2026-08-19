@@ -15,7 +15,8 @@ export function createContactsEndpoints(request: ApiRequestFn): ContactsEndpoint
 				query: {
 					limit: params.limit,
 					cursor: params.cursor,
-					lifecycle_status: params.lifecycle_status
+					lifecycle_status: params.lifecycle_status,
+					client_id: params.client_id
 				},
 				signal
 			});
