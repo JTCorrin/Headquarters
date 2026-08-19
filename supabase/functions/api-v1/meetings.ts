@@ -553,6 +553,16 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   if (lower.includes('version conflict')) {
     return new ApiError(412, 'PRECONDITION_FAILED', 'Meeting version does not match If-Match')
   }
+  if (
+    (lower.includes('was cancelled') && lower.includes('cannot be accepted')) ||
+    lower.includes('meeting is not open for accept')
+  ) {
+    return new ApiError(
+      409,
+      'CONFLICT',
+      'This meeting was cancelled, so follow-up tasks cannot be accepted.',
+    )
+  }
   if (lower.includes('not open for accept') || lower.includes('not open for dismiss')) {
     return new ApiError(409, 'CONFLICT', message || 'Task proposal is not open for accept')
   }
