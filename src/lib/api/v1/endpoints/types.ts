@@ -136,11 +136,13 @@ import type {
 	ApiOrgApiKeyCreateBody,
 	ApiOrgApiKeyCreateResult,
 	ApiAiInvoiceChaseGenerateBody,
+	ApiAiComposeGenerateBody,
 	ApiAiPrompts,
 	ApiAiPromptsUpdateBody,
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
+	ApiEmailMessageComposeBody,
 	ApiEmailMessageReplyBody,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
@@ -237,10 +239,7 @@ export interface OrganisationConfigEndpoints {
 
 export interface OrgInvoiceEmailEndpoints {
 	get(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailAccount | null>;
-	put(
-		body: ApiOrgInvoiceEmailPutBody,
-		signal?: AbortSignal
-	): Promise<ApiOrgInvoiceEmailAccount>;
+	put(body: ApiOrgInvoiceEmailPutBody, signal?: AbortSignal): Promise<ApiOrgInvoiceEmailAccount>;
 	test(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailTestResult>;
 	disconnect(signal?: AbortSignal): Promise<void>;
 }
@@ -705,9 +704,20 @@ export interface EmailMessagesEndpoints {
 		body: ApiEmailMessageReplyBody,
 		signal?: AbortSignal
 	): Promise<ApiEmailMessage>;
+	/** New outbound compose on an entity Email tab. */
+	sendForEntity(
+		entityType: ApiEntityEmailType,
+		entityId: string,
+		body: ApiEmailMessageComposeBody,
+		signal?: AbortSignal
+	): Promise<ApiEmailMessage>;
 	generateDraft(body: ApiAiSuggestionGenerateBody, signal?: AbortSignal): Promise<ApiAiSuggestion>;
 	generateInvoiceChase(
 		body: ApiAiInvoiceChaseGenerateBody,
+		signal?: AbortSignal
+	): Promise<ApiAiSuggestion>;
+	generateComposeDraft(
+		body: ApiAiComposeGenerateBody,
 		signal?: AbortSignal
 	): Promise<ApiAiSuggestion>;
 	useDraft(
@@ -735,10 +745,7 @@ export interface EmailTemplatesEndpoints {
 }
 
 export interface PlaybooksEndpoints {
-	list(
-		params?: ApiPlaybookListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiPlaybook[]>>;
+	list(params?: ApiPlaybookListParams, signal?: AbortSignal): Promise<ApiResult<ApiPlaybook[]>>;
 	create(body: ApiPlaybookCreateBody, signal?: AbortSignal): Promise<ApiPlaybook>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiPlaybook>>;
 	update(

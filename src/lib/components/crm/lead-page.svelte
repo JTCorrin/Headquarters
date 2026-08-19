@@ -23,10 +23,7 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { resolveLeadCurrency } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -151,12 +148,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Leads', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -311,15 +306,42 @@
 		emailTab = await loadEntityEmailTab(api, 'lead', leadId);
 	}
 
+	async function onSendNew(payload: { to: string; subject: string; body: string }) {
+		await api.emailMessages.sendForEntity('lead', leadId, {
+			to: payload.to,
+			subject: payload.subject,
+			body_text: payload.body
+		});
+		emailTab = await loadEntityEmailTab(api, 'lead', leadId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'lead', leadId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
-	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+	async function onDraftResponse(payload: {
+		messageId: string;
+		tone: 'warm' | 'neutral' | 'firm';
+	}) {
 		const suggestion = await api.emailMessages.generateDraft({
 			email_message_id: payload.messageId,
 			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onDraftCompose(payload: {
+		tone: 'warm' | 'neutral' | 'firm';
+		subject: string;
+		to: string;
+	}) {
+		void payload.to;
+		const suggestion = await api.emailMessages.generateComposeDraft({
+			entity_type: 'lead',
+			entity_id: leadId,
+			variant: payload.tone,
+			subject: payload.subject
 		});
 		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
 	}
@@ -508,12 +530,15 @@
 						mailboxConnected={emailTab.mailboxConnected}
 						aiProviderConnected={emailTab.aiProviderConnected}
 						smtpReady={emailTab.smtpReady}
+						emailDefaultTo={leadResource.primary_email ?? ''}
 						{role}
 						{sharingId}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
+						{onSendNew}
 						{onDraftResponse}
+						{onDraftCompose}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						{onSave}
@@ -545,7 +570,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="lead-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening leads.
 		</p>
 	</div>

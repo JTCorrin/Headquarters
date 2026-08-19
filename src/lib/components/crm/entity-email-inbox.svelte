@@ -5,6 +5,7 @@
 	import { draftResponseGateCopy } from '$lib/schemas/integration.js';
 	import { cn } from '$lib/utils.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
@@ -38,6 +39,8 @@
 
 	export type DraftTone = 'warm' | 'neutral' | 'firm';
 
+	const recipientPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 	export interface EntityEmailInboxProps {
 		messages: EmailMessage[];
 		selectedId?: string;
@@ -59,8 +62,13 @@
 		sharingId?: string | null;
 		/** When true, show Create lead on inbound messages (personal inbox). */
 		canCreateLead?: boolean;
+		/** Prefill for new-email To (entity primary_email). */
+		defaultTo?: string;
+		/** Parent-driven compose (header Email). Inbox New also sets this. */
+		composingNew?: boolean;
 		class?: string;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
+		onSendNew?: (payload: { to: string; subject: string; body: string }) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onCreateLead?: (payload: {
 			messageId: string;
@@ -71,6 +79,11 @@
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: DraftTone;
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onDraftCompose?: (payload: {
+			tone: DraftTone;
+			subject: string;
+			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
 		onUseSuggestion?: (payload: {
 			suggestionId?: string;
@@ -95,17 +108,23 @@
 		canAddToTimeline = true,
 		sharingId = null,
 		canCreateLead = false,
+		defaultTo = '',
+		composingNew = $bindable(false),
 		class: className,
 		onSendReply,
+		onSendNew,
 		onAddToTimeline,
 		onCreateLead,
 		onDraftResponse,
+		onDraftCompose,
 		onUseSuggestion,
 		onDiscardSuggestion
 	}: EntityEmailInboxProps = $props();
 
 	let composing = $state(false);
 	let replyBody = $state('');
+	let composeTo = $state('');
+	let composeSubject = $state('');
 	let suggestionBody = $state('');
 	let suggestionId = $state<string | undefined>(undefined);
 	let aiStatus = $state<AiSuggestionStatus>('idle');
@@ -114,12 +133,30 @@
 	let shareError = $state<string | null>(null);
 	let sendError = $state<string | null>(null);
 	let sending = $state(false);
+	let composePrimed = false;
 	const isNarrow = new IsMobile(1024);
+	const canCompose = $derived(typeof onSendNew === 'function');
 
 	$effect(() => {
 		if (isNarrow.current) return;
+		if (composingNew) return;
 		if (selectedId === undefined && messages.length > 0) {
 			selectedId = messages.find((m) => m.unread)?.id ?? messages[0]?.id;
+		}
+	});
+
+	$effect(() => {
+		if (composingNew) {
+			if (!composePrimed) {
+				composePrimed = true;
+				resetDraftState();
+				composeTo = defaultTo;
+				composing = false;
+			} else if (!composeTo.trim() && defaultTo) {
+				composeTo = defaultTo;
+			}
+		} else {
+			composePrimed = false;
 		}
 	});
 
@@ -128,7 +165,12 @@
 	const selectedAttachments = $derived(selected?.attachments ?? []);
 	const draftGate = $derived(draftResponseGateCopy(role));
 	const draftDisabled = $derived(!aiProviderConnected);
+	const validComposeTo = $derived(recipientPattern.test(composeTo.trim()));
 	const sendDisabled = $derived(!smtpReady || !replyBody.trim() || sending);
+	const sendNewDisabled = $derived(
+		!smtpReady || !validComposeTo || !composeSubject.trim() || !replyBody.trim() || sending
+	);
+	const showReadingPane = $derived(Boolean(selected) || composingNew);
 
 	const emptyCopy = $derived.by(() => {
 		if (emptyMessage) {
@@ -177,9 +219,9 @@
 		if (id === 'warm' || id === 'neutral' || id === 'firm') tone = id;
 	}
 
-	function startReply() {
-		composing = true;
+	function resetDraftState() {
 		replyBody = '';
+		composeSubject = '';
 		suggestionBody = '';
 		suggestionId = undefined;
 		aiStatus = 'idle';
@@ -188,15 +230,27 @@
 		sending = false;
 	}
 
+	function startCompose() {
+		composingNew = true;
+	}
+
+	function cancelCompose() {
+		composingNew = false;
+		composing = false;
+		resetDraftState();
+		composeTo = '';
+	}
+
+	function startReply() {
+		composingNew = false;
+		composing = true;
+		resetDraftState();
+		composeTo = '';
+	}
+
 	function cancelReply() {
 		composing = false;
-		replyBody = '';
-		suggestionBody = '';
-		suggestionId = undefined;
-		aiStatus = 'idle';
-		draftError = null;
-		sendError = null;
-		sending = false;
+		resetDraftState();
 	}
 
 	function createLeadFromSelected() {
@@ -219,8 +273,48 @@
 		);
 	}
 
+	function buildComposeDraft(to: string, subject: string, draftTone: DraftTone): string {
+		const firstName = to.split('@')[0]?.split('.')[0] ?? 'there';
+		const greeting = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+		const about = subject.trim() ? ` about “${subject.trim()}”` : '';
+		return (
+			`Hi ${greeting},\n\nI wanted to get in touch${about}.\n\n` +
+			`Happy to find a time that works.\n\nThanks\n\nTONE: ${draftTone}\n`
+		);
+	}
+
+	function draftFailureMessage(error: unknown, fallback: string): string {
+		if (isApiClientError(error) && error.message) return error.message;
+		if (error instanceof Error && error.message) return error.message;
+		return fallback;
+	}
+
 	async function draftResponse() {
-		if (!selected || draftDisabled) return;
+		if (draftDisabled) return;
+		if (composingNew) {
+			aiStatus = 'generating';
+			draftError = null;
+			const draftTone = tone;
+			const to = composeTo.trim();
+			const subject = composeSubject.trim();
+			try {
+				if (onDraftCompose) {
+					const result = await onDraftCompose({ tone: draftTone, subject, to });
+					suggestionBody = result.suggestionText;
+					suggestionId = result.suggestionId;
+				} else {
+					await new Promise((r) => setTimeout(r, draftDelayMs));
+					suggestionBody = buildComposeDraft(to, subject, draftTone);
+					suggestionId = undefined;
+				}
+				aiStatus = 'ready';
+			} catch (error) {
+				aiStatus = 'idle';
+				draftError = draftFailureMessage(error, 'Could not draft an email — try again.');
+			}
+			return;
+		}
+		if (!selected) return;
 		aiStatus = 'generating';
 		draftError = null;
 		const message = selected;
@@ -238,13 +332,7 @@
 			aiStatus = 'ready';
 		} catch (error) {
 			aiStatus = 'idle';
-			if (isApiClientError(error) && error.message) {
-				draftError = error.message;
-			} else if (error instanceof Error && error.message) {
-				draftError = error.message;
-			} else {
-				draftError = 'Could not draft a reply — try again.';
-			}
+			draftError = draftFailureMessage(error, 'Could not draft a reply — try again.');
 		}
 	}
 
@@ -294,6 +382,28 @@
 		}
 	}
 
+	async function sendNew() {
+		if (sendNewDisabled) return;
+		sendError = null;
+		if (!onSendNew) {
+			cancelCompose();
+			return;
+		}
+		sending = true;
+		try {
+			await onSendNew({
+				to: composeTo.trim(),
+				subject: composeSubject.trim(),
+				body: replyBody.trim()
+			});
+			cancelCompose();
+		} catch {
+			sendError = 'Could not send email — try again.';
+		} finally {
+			sending = false;
+		}
+	}
+
 	async function addToTimeline() {
 		if (!selected || !onAddToTimeline) return;
 		shareError = null;
@@ -313,16 +423,32 @@
 	)}
 	data-testid="entity-email-inbox"
 	data-empty-state={messages.length === 0 ? emptyState : undefined}
+	data-composing-new={composingNew ? 'true' : undefined}
 >
 	<aside
 		class={cn(
 			'border-border/80 flex min-h-0 flex-col border-b lg:border-r lg:border-b-0',
-			(selected || messages.length === 0) && 'hidden lg:flex'
+			(showReadingPane || messages.length === 0) && 'hidden lg:flex'
 		)}
 	>
 		<div class="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
 			<p class="text-sm font-semibold tracking-tight">Inbox</p>
-			<span class="text-muted-foreground text-xs">{messages.length}</span>
+			<div class="flex items-center gap-2">
+				<span class="text-muted-foreground text-xs">{messages.length}</span>
+				{#if canCompose}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						data-testid="email-compose-new"
+						disabled={!smtpReady || sending}
+						title={smtpReady ? undefined : 'Connect mailbox in My settings'}
+						onclick={startCompose}
+					>
+						New
+					</Button>
+				{/if}
+			</div>
 		</div>
 		<ul class="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain p-0">
 			{#each messages as message (message.id)}
@@ -331,11 +457,11 @@
 						type="button"
 						class={cn(
 							'hover:bg-muted/60 w-full border-t px-4 py-3 text-left transition-colors',
-							message.id === selectedId && 'bg-muted/80'
+							message.id === selectedId && !composingNew && 'bg-muted/80'
 						)}
 						onclick={() => {
 							selectedId = message.id;
-							cancelReply();
+							cancelCompose();
 						}}
 					>
 						<div class="flex items-start justify-between gap-2">
@@ -368,10 +494,66 @@
 	<section
 		class={cn(
 			'flex min-h-0 flex-col overflow-hidden',
-			!selected && messages.length > 0 && 'hidden lg:flex'
+			!showReadingPane && messages.length > 0 && 'hidden lg:flex'
 		)}
 	>
-		{#if selected}
+		{#if composingNew}
+			<header class="shrink-0 space-y-2 border-b px-5 py-4">
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<div class="min-w-0 space-y-1">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="-ms-2 mb-1 lg:hidden"
+							data-testid="entity-email-compose-back"
+							onclick={cancelCompose}
+						>
+							<ArrowLeftIcon class="size-4" />
+							Inbox
+						</Button>
+						<h3 class="text-base font-semibold tracking-tight">New email</h3>
+						<p class="text-muted-foreground text-xs">Write a new message, or use Draft response.</p>
+					</div>
+					<Button variant="ghost" size="sm" onclick={cancelCompose}>Cancel</Button>
+				</div>
+			</header>
+			<div class="min-h-0 flex-1 overflow-y-auto">
+				<div class="space-y-3 px-5 py-4">
+					<div class="space-y-2">
+						<label class="text-muted-foreground text-xs font-medium" for="email-compose-to">To</label>
+						<Input
+							id="email-compose-to"
+							type="email"
+							bind:value={composeTo}
+							placeholder="recipient@example.com"
+							data-testid="email-compose-to"
+							class="text-sm"
+						/>
+					</div>
+					<div class="space-y-2">
+						<label class="text-muted-foreground text-xs font-medium" for="email-compose-subject"
+							>Subject</label
+						>
+						<Input
+							id="email-compose-subject"
+							bind:value={composeSubject}
+							placeholder="Subject"
+							data-testid="email-compose-subject"
+							class="text-sm"
+						/>
+					</div>
+					{@render composerChrome(
+						'New email',
+						composeTo.trim() || 'Add a recipient',
+						'Write a message, or use Draft response…',
+						sendNew,
+						sendNewDisabled,
+						'email-compose-send'
+					)}
+				</div>
+			</div>
+		{:else if selected}
 			<header class="shrink-0 space-y-2 border-b px-5 py-4">
 				<div class="flex flex-wrap items-start justify-between gap-3">
 					<div class="min-w-0 space-y-1">
@@ -465,123 +647,14 @@
 
 				{#if composing}
 					<div class="border-border space-y-3 border-t px-5 py-4">
-						<div class="flex flex-wrap items-center justify-between gap-2">
-							<div>
-								<p class="text-sm font-semibold tracking-tight">Reply</p>
-								<p class="text-muted-foreground text-xs">
-									To {selected.direction === 'in' ? selected.from : selected.to}
-								</p>
-							</div>
-							<div class="flex flex-wrap items-center gap-2">
-								<div class="flex gap-1">
-									{#each [
-										{ id: 'warm', label: 'Warm' },
-										{ id: 'neutral', label: 'Neutral' },
-										{ id: 'firm', label: 'Firm' }
-									] as option (option.id)}
-										<button
-											type="button"
-											class={cn(
-												'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition-colors',
-												tone === option.id
-													? 'bg-foreground text-background ring-foreground'
-													: 'bg-background text-foreground ring-foreground/10 hover:bg-muted'
-											)}
-											onclick={() => setTone(option.id)}
-										>
-											{option.label}
-										</button>
-									{/each}
-								</div>
-								<AiAssistAction
-									label="Draft response"
-									busy={aiStatus === 'generating'}
-									disabled={draftDisabled}
-									onclick={draftResponse}
-								/>
-							</div>
-						</div>
-
-						{#if draftDisabled}
-							<p class="text-muted-foreground text-xs" data-testid="draft-response-gate">
-								{draftGate.hint}
-								<a
-									href={draftGate.href || integrationsHref}
-									class="text-foreground font-medium underline underline-offset-2"
-								>
-									{draftGate.linkLabel}
-								</a>
-							</p>
-						{/if}
-						{#if draftError}
-							<p class="text-destructive text-xs" data-testid="draft-response-error">{draftError}</p>
-						{/if}
-
-						{#if aiStatus === 'ready'}
-							<div
-								class="bg-muted/40 space-y-2 rounded-2xl px-3 py-3"
-								data-testid="draft-suggestion-panel"
-							>
-								<p class="text-xs font-medium">AI suggestion — edit before you send.</p>
-								<pre class="text-muted-foreground whitespace-pre-wrap font-sans text-xs leading-relaxed">{suggestionBody}</pre>
-								<div class="flex justify-end gap-2">
-									<Button type="button" size="sm" variant="ghost" onclick={discardSuggestion}>
-										Discard
-									</Button>
-									<Button
-										type="button"
-										size="sm"
-										onclick={useSuggestion}
-										data-testid="use-suggestion"
-									>
-										Use suggestion
-									</Button>
-								</div>
-							</div>
-						{/if}
-
-						<Textarea
-							bind:value={replyBody}
-							rows={7}
-							placeholder="Write a reply, or use Draft response…"
-							class="min-h-[140px] resize-y text-sm"
-						/>
-
-						<div class="flex flex-col items-end gap-1">
-							{#if sendError}
-								<p class="text-destructive text-xs" data-testid="email-send-error">{sendError}</p>
-							{/if}
-							<div class="flex justify-end gap-2">
-								<Button
-									type="button"
-									size="sm"
-									variant="outline"
-									onclick={cancelReply}
-									disabled={sending}
-								>
-									Discard
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									disabled={sendDisabled}
-									onclick={sendReply}
-									data-testid="email-send"
-									title={smtpReady ? undefined : 'Connect mailbox in My settings'}
-								>
-									{sending ? 'Sending…' : 'Send'}
-								</Button>
-							</div>
-							{#if !smtpReady}
-								<p class="text-muted-foreground text-xs" data-testid="email-send-gate">
-									Connect mailbox in <a
-										href={mailSettingsHref}
-										class="text-foreground font-medium underline underline-offset-2"
-										>My settings</a
-									> before sending.
-								</p>
-							{/if}
-						</div>
+						{@render composerChrome(
+							'Reply',
+							`To ${selected.direction === 'in' ? selected.from : selected.to}`,
+							'Write a reply, or use Draft response…',
+							sendReply,
+							sendDisabled,
+							'email-send'
+						)}
 					</div>
 				{/if}
 			</div>
@@ -607,6 +680,128 @@
 		{/if}
 	</section>
 </div>
+
+{#snippet composerChrome(
+	title: string,
+	toLine: string,
+	placeholder: string,
+	onSend: () => void,
+	sendIsDisabled: boolean,
+	sendTestId: string
+)}
+	<div class="flex flex-wrap items-center justify-between gap-2">
+		<div>
+			<p class="text-sm font-semibold tracking-tight">{title}</p>
+			<p class="text-muted-foreground text-xs">{toLine}</p>
+		</div>
+		<div class="flex flex-wrap items-center gap-2">
+			<div class="flex gap-1">
+				{#each [
+					{ id: 'warm', label: 'Warm' },
+					{ id: 'neutral', label: 'Neutral' },
+					{ id: 'firm', label: 'Firm' }
+				] as option (option.id)}
+					<button
+						type="button"
+						class={cn(
+							'rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition-colors',
+							tone === option.id
+								? 'bg-foreground text-background ring-foreground'
+								: 'bg-background text-foreground ring-foreground/10 hover:bg-muted'
+						)}
+						onclick={() => setTone(option.id)}
+					>
+						{option.label}
+					</button>
+				{/each}
+			</div>
+			<AiAssistAction
+				label="Draft response"
+				busy={aiStatus === 'generating'}
+				disabled={draftDisabled}
+				onclick={draftResponse}
+			/>
+		</div>
+	</div>
+
+	{#if draftDisabled}
+		<p class="text-muted-foreground text-xs" data-testid="draft-response-gate">
+			{draftGate.hint}
+			<a
+				href={draftGate.href || integrationsHref}
+				class="text-foreground font-medium underline underline-offset-2"
+			>
+				{draftGate.linkLabel}
+			</a>
+		</p>
+	{/if}
+	{#if draftError}
+		<p class="text-destructive text-xs" data-testid="draft-response-error">{draftError}</p>
+	{/if}
+
+	{#if aiStatus === 'ready'}
+		<div class="bg-muted/40 space-y-2 rounded-2xl px-3 py-3" data-testid="draft-suggestion-panel">
+			<p class="text-xs font-medium">AI suggestion — edit before you send.</p>
+			<pre class="text-muted-foreground whitespace-pre-wrap font-sans text-xs leading-relaxed">{suggestionBody}</pre>
+			<div class="flex justify-end gap-2">
+				<Button type="button" size="sm" variant="ghost" onclick={discardSuggestion}>
+					Discard
+				</Button>
+				<Button type="button" size="sm" onclick={useSuggestion} data-testid="use-suggestion">
+					Use suggestion
+				</Button>
+			</div>
+		</div>
+	{/if}
+
+	<Textarea
+		bind:value={replyBody}
+		rows={7}
+		{placeholder}
+		class="min-h-[140px] resize-y text-sm"
+	/>
+
+	<div class="flex flex-col items-end gap-1">
+		{#if sendError}
+			<p class="text-destructive text-xs" data-testid="email-send-error">{sendError}</p>
+		{/if}
+		{#if composingNew && !composeTo.trim()}
+			<p class="text-muted-foreground text-xs" data-testid="email-compose-to-hint">
+				Add a recipient email before sending.
+			</p>
+		{/if}
+		<div class="flex justify-end gap-2">
+			<Button
+				type="button"
+				size="sm"
+				variant="outline"
+				onclick={composingNew ? cancelCompose : cancelReply}
+				disabled={sending}
+			>
+				Discard
+			</Button>
+			<Button
+				type="button"
+				size="sm"
+				disabled={sendIsDisabled}
+				onclick={onSend}
+				data-testid={sendTestId}
+				title={smtpReady ? undefined : 'Connect mailbox in My settings'}
+			>
+				{sending ? 'Sending…' : 'Send'}
+			</Button>
+		</div>
+		{#if !smtpReady}
+			<p class="text-muted-foreground text-xs" data-testid="email-send-gate">
+				Connect mailbox in <a
+					href={mailSettingsHref}
+					class="text-foreground font-medium underline underline-offset-2"
+					>My settings</a
+				> before sending.
+			</p>
+		{/if}
+	</div>
+{/snippet}
 
 <style>
 	.email-html-body :global {

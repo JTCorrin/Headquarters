@@ -56,6 +56,8 @@
 		role?: MembershipRole;
 		mailSettingsHref?: string;
 		sharingId?: string | null;
+		/** Prefill for new-email To (lead primary_email). */
+		emailDefaultTo?: string;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
@@ -68,9 +70,15 @@
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
+		onSendNew?: (payload: { to: string; subject: string; body: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: 'warm' | 'neutral' | 'firm';
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onDraftCompose?: (payload: {
+			tone: 'warm' | 'neutral' | 'firm';
+			subject: string;
+			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
 		onUseSuggestion?: (payload: {
 			suggestionId?: string;
@@ -101,6 +109,7 @@
 		role = 'member',
 		mailSettingsHref = '/settings#mail',
 		sharingId = null,
+		emailDefaultTo = '',
 		showNav = true,
 		class: className,
 		onSave,
@@ -112,7 +121,9 @@
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
+		onSendNew,
 		onDraftResponse,
+		onDraftCompose,
 		onUseSuggestion,
 		onDiscardSuggestion
 	}: LeadDetailPageProps = $props();
@@ -127,6 +138,14 @@
 		{ id: 'details', label: 'Details' },
 		{ id: 'email', label: 'Email' }
 	];
+
+	let activeTab = $state('details');
+	let composingNew = $state(false);
+
+	function handleEmailClick() {
+		activeTab = 'email';
+		composingNew = true;
+	}
 </script>
 
 <AppSidebarFrame
@@ -152,6 +171,17 @@
 						: 'Lead workspace'}
 				>
 					{#snippet actions()}
+						{#if lead}
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								data-testid="lead-email-action"
+								onclick={handleEmailClick}
+							>
+								Email
+							</Button>
+						{/if}
 						{#if lead && !isWon}
 							<Button
 								type="button"
@@ -213,7 +243,7 @@
 			</div>
 
 			{#if lead && viewState.kind === 'ready'}
-				<ProfileTabs {tabs}>
+				<ProfileTabs {tabs} bind:value={activeTab}>
 					{#snippet children({ active })}
 						{#if active === 'details'}
 							<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
@@ -288,9 +318,13 @@
 								{smtpReady}
 								{mailSettingsHref}
 								{sharingId}
+								defaultTo={emailDefaultTo}
+								bind:composingNew
 								{onAddToTimeline}
 								{onSendReply}
+								{onSendNew}
 								{onDraftResponse}
+								{onDraftCompose}
 								{onUseSuggestion}
 								{onDiscardSuggestion}
 								{role}
