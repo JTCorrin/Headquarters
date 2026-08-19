@@ -50,4 +50,26 @@ describe('ContactProfilePage tabs', () => {
 
 		await expect.element(page.getByTestId('contact-delete')).toBeInTheDocument();
 	});
+
+	it('opens the Email tab and compose from the header Email button', async () => {
+		render(ContactProfilePage, {
+			orgName: 'Corrin Data',
+			navGroups: navGroupsWithActive('Contacts'),
+			breadcrumb: 'Contacts / Ava Chen',
+			title: 'Ava Chen',
+			status: 'Active',
+			contactFields: [{ label: 'Email', value: 'ava@northwind.com' }],
+			companyFields: [{ label: 'Company', value: 'Northwind' }],
+			emailDefaultTo: 'ava@northwind.com',
+			smtpReady: true,
+			onSendNew: async () => undefined,
+			showNav: false
+		});
+
+		await page.getByTestId('contact-email-action').click();
+		await expect
+			.element(page.getByRole('tab', { name: 'Email' }))
+			.toHaveAttribute('data-state', 'active');
+		await expect.element(page.getByTestId('email-compose-to')).toHaveValue('ava@northwind.com');
+	});
 });

@@ -4,6 +4,7 @@ import type {
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
+	ApiEmailMessageComposeBody,
 	ApiEmailMessageReplyBody,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
@@ -24,11 +25,7 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 		},
 		listForEntity: async (entityType: ApiEntityEmailType, entityId: string, signal) => {
 			const plural =
-				entityType === 'contact'
-					? 'contacts'
-					: entityType === 'lead'
-						? 'leads'
-						: 'clients';
+				entityType === 'contact' ? 'contacts' : entityType === 'lead' ? 'leads' : 'clients';
 			const { data } = await request<ApiEmailMessage[]>(
 				`/api/v1/${plural}/${entityId}/email-messages`,
 				{ orgScoped: true, signal }
@@ -43,13 +40,25 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 			return data;
 		},
 		reply: async (messageId: string, body: ApiEmailMessageReplyBody, signal) => {
+			const { data } = await request<ApiEmailMessage>(`/api/v1/email-messages/${messageId}/reply`, {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				headers: { 'Idempotency-Key': newIdempotencyKey('email-reply') },
+				signal
+			});
+			return data;
+		},
+		sendForEntity: async (entityType, entityId, body: ApiEmailMessageComposeBody, signal) => {
+			const plural =
+				entityType === 'contact' ? 'contacts' : entityType === 'lead' ? 'leads' : 'clients';
 			const { data } = await request<ApiEmailMessage>(
-				`/api/v1/email-messages/${messageId}/reply`,
+				`/api/v1/${plural}/${entityId}/email-messages`,
 				{
 					method: 'POST',
 					body,
 					orgScoped: true,
-					headers: { 'Idempotency-Key': newIdempotencyKey('email-reply') },
+					headers: { 'Idempotency-Key': newIdempotencyKey('email-compose') },
 					signal
 				}
 			);
@@ -65,15 +74,21 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 			return data;
 		},
 		generateInvoiceChase: async (body, signal) => {
-			const { data } = await request<ApiAiSuggestion>(
-				'/api/v1/ai-suggestions/invoice-chase',
-				{
-					method: 'POST',
-					body,
-					orgScoped: true,
-					signal
-				}
-			);
+			const { data } = await request<ApiAiSuggestion>('/api/v1/ai-suggestions/invoice-chase', {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
+		},
+		generateComposeDraft: async (body, signal) => {
+			const { data } = await request<ApiAiSuggestion>('/api/v1/ai-suggestions/email-compose', {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
 			return data;
 		},
 		useDraft: async (suggestionId: string, acceptedText, signal) => {
@@ -81,8 +96,7 @@ export function createEmailMessagesEndpoints(request: ApiRequestFn): EmailMessag
 				`/api/v1/ai-suggestions/${suggestionId}/use`,
 				{
 					method: 'POST',
-					body:
-						acceptedText !== undefined ? { accepted_text: acceptedText ?? null } : undefined,
+					body: acceptedText !== undefined ? { accepted_text: acceptedText ?? null } : undefined,
 					orgScoped: true,
 					signal
 				}

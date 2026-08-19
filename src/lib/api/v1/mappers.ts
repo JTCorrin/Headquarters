@@ -73,6 +73,8 @@ import type {
 	ApiEmailTemplateUpdateBody,
 	ApiClient,
 	ApiClientCreateBody,
+	ApiClientLinkedContact,
+	ApiClientContactRole,
 	ApiClientUpdateBody,
 	ApiContact,
 	ApiContactCreateBody,
@@ -1029,6 +1031,27 @@ export function clientStatusLabel(status: ApiClient['status']): string {
 		.join(' ');
 }
 
+export function clientContactRoleLabel(role: ApiClientContactRole): string {
+	return role
+		.split('_')
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(' ');
+}
+
+export function toClientRelatedContacts(contacts: ApiClientLinkedContact[] | undefined): Array<{
+	id: string;
+	name: string;
+	role: string;
+	email: string;
+}> {
+	return (contacts ?? []).map((person) => ({
+		id: person.id,
+		name: person.display_name,
+		role: clientContactRoleLabel(person.role),
+		email: person.primary_email ?? '—'
+	}));
+}
+
 export function toClientRow(client: ApiClient): ClientRow {
 	return {
 		id: client.id,
@@ -1036,7 +1059,11 @@ export function toClientRow(client: ApiClient): ClientRow {
 		status: clientStatusLabel(client.status),
 		owner: undefined,
 		openInvoices: '—',
-		pipeline: '—'
+		pipeline: '—',
+		people: (client.contacts ?? []).map((person) => ({
+			id: person.id,
+			name: person.display_name
+		}))
 	};
 }
 

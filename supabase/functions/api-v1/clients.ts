@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ClientRow, Database, Json } from "../_shared/database.ts";
+import type {
+  ClientContactRow,
+  ClientRow,
+  Database,
+  Json,
+} from "../_shared/database.ts";
 import {
   ApiError,
   etag,
@@ -86,6 +91,93 @@ const PUBLIC_EMAIL_DOMAINS = new Set([
 ]);
 
 type DatabaseClient = SupabaseClient<Database>;
+
+export type ClientLinkedContact = {
+  id: string;
+  display_name: string;
+  primary_email: string | null;
+  role: ClientContactRow["role"];
+  is_primary: boolean;
+};
+
+type ClientWithContacts = ClientRow & { contacts: ClientLinkedContact[] };
+
+function sortClientLinkedContacts(
+  people: ClientLinkedContact[],
+): ClientLinkedContact[] {
+  return [...people].sort((a, b) => {
+    if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+    return a.display_name.localeCompare(b.display_name);
+  });
+}
+
+async function loadLinkedContactsByClientIds(
+  db: DatabaseClient,
+  orgId: string,
+  clientIds: string[],
+  requestId: string,
+): Promise<Map<string, ClientLinkedContact[]>> {
+  const map = new Map<string, ClientLinkedContact[]>();
+  for (const id of clientIds) map.set(id, []);
+  if (clientIds.length === 0) return map;
+
+  const { data: links, error: linkError } = await db
+    .from("client_contacts")
+    .select("client_id, contact_id, role, is_primary")
+    .eq("org_id", orgId)
+    .in("client_id", clientIds)
+    .is("deleted_at", null);
+
+  if (linkError) throw databaseError(linkError, requestId);
+  if (!links?.length) return map;
+
+  const contactIds = [...new Set(links.map((row) => row.contact_id))];
+  const { data: contacts, error: contactError } = await db
+    .from("contacts")
+    .select("id, display_name, primary_email")
+    .eq("org_id", orgId)
+    .in("id", contactIds)
+    .is("deleted_at", null);
+
+  if (contactError) throw databaseError(contactError, requestId);
+
+  const byId = new Map((contacts ?? []).map((contact) => [contact.id, contact]));
+  for (const link of links) {
+    const contact = byId.get(link.contact_id);
+    if (!contact) continue;
+    map.get(link.client_id)?.push({
+      id: contact.id,
+      display_name: contact.display_name,
+      primary_email: contact.primary_email,
+      role: link.role,
+      is_primary: link.is_primary,
+    });
+  }
+
+  for (const [clientId, people] of map) {
+    map.set(clientId, sortClientLinkedContacts(people));
+  }
+  return map;
+}
+
+async function withLinkedContacts(
+  db: DatabaseClient,
+  orgId: string,
+  clients: ClientRow[],
+  requestId: string,
+): Promise<ClientWithContacts[]> {
+  const linked = await loadLinkedContactsByClientIds(
+    db,
+    orgId,
+    clients.map((client) => client.id),
+    requestId,
+  );
+  return clients.map((client) => ({
+    ...client,
+    contacts: linked.get(client.id) ?? [],
+  }));
+}
+
 type ClientStatus = ClientRow["status"];
 type ClientWritable = {
   name?: string;
@@ -422,14 +514,15 @@ async function listClients(
   const { data, error } = await query;
   if (error) throw databaseError(error, requestId);
 
-  const clients = data ?? [];
+  const clients = (data ?? []) as ClientRow[];
   const hasNextPage = clients.length > limit;
   const page = hasNextPage ? clients.slice(0, limit) : clients;
   const lastClient = page.at(-1) as ClientCursor | undefined;
+  const withContacts = await withLinkedContacts(db, orgId, page, requestId);
 
   return jsonResponse(
     {
-      data: page,
+      data: withContacts,
       meta: {
         next_cursor: hasNextPage && lastClient
           ? encodeCursor(lastClient)
@@ -456,7 +549,8 @@ async function createClient(
 
   if (error) throw databaseError(error, requestId);
 
-  return jsonResponse({ data }, 201, requestId, {
+  const [withContacts] = await withLinkedContacts(db, orgId, [data], requestId);
+  return jsonResponse({ data: withContacts }, 201, requestId, {
     etag: etag(data.version),
     location: `/api/v1/clients/${data.id}`,
   });
@@ -488,7 +582,10 @@ async function getClient(
   requestId: string,
 ): Promise<Response> {
   const data = await findClient(db, orgId, clientId, requestId);
-  return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) });
+  const [withContacts] = await withLinkedContacts(db, orgId, [data], requestId);
+  return jsonResponse({ data: withContacts }, 200, requestId, {
+    etag: etag(data.version),
+  });
 }
 
 async function updateClient(
@@ -528,7 +625,10 @@ async function updateClient(
     );
   }
 
-  return jsonResponse({ data }, 200, requestId, { etag: etag(data.version) });
+  const [withContacts] = await withLinkedContacts(db, orgId, [data], requestId);
+  return jsonResponse({ data: withContacts }, 200, requestId, {
+    etag: etag(data.version),
+  });
 }
 
 async function deleteClient(

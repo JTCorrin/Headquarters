@@ -152,7 +152,7 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
 		</div>
 	{/snippet}
@@ -176,7 +176,7 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
 		</div>
 	{/snippet}
@@ -197,7 +197,7 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
 		</div>
 	{/snippet}
@@ -218,7 +218,7 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
 		</div>
 	{/snippet}
@@ -239,7 +239,7 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
 		</div>
 	{/snippet}
@@ -260,8 +260,32 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
+		</div>
+	{/snippet}
+</Story>
+
+<Story
+	name="Compose"
+	args={{
+		messages: [],
+		emptyState: 'no_matches',
+		mailboxConnected: true,
+		aiProviderConnected: true,
+		smtpReady: true,
+		role: 'owner',
+		defaultTo: 'ava@northwind.com',
+		composingNew: true
+	}}
+>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
+				args
+			)}
+		<div class="h-screen bg-background p-4">
+			<EntityEmailInbox {...props} class="h-full" onSendNew={() => undefined} />
 		</div>
 	{/snippet}
 </Story>
@@ -281,7 +305,7 @@
 			/** @type {import('$lib/components/crm/entity-email-inbox.svelte').EntityEmailInboxProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen p-4">
+		<div class="h-screen bg-background p-4">
 			<EntityEmailInbox {...props} class="h-full" />
 		</div>
 	{/snippet}

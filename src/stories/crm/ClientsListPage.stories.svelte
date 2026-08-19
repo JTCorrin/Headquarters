@@ -10,7 +10,11 @@
 			status: 'Active',
 			owner: 'Joe',
 			openInvoices: '£4,200',
-			pipeline: '£18k'
+			pipeline: '£18k',
+			people: [
+				{ id: 'c1', name: 'Ava Chen' },
+				{ id: 'c2', name: 'Northwind Billing' }
+			]
 		},
 		{
 			id: '2',
@@ -18,7 +22,8 @@
 			status: 'Prospect',
 			owner: 'Maya',
 			openInvoices: '—',
-			pipeline: '£12k'
+			pipeline: '£12k',
+			people: [{ id: 'c3', name: 'Priya Shah' }]
 		},
 		{
 			id: '3',
@@ -26,7 +31,8 @@
 			status: 'At risk',
 			owner: 'Joe',
 			openInvoices: '£6,500',
-			pipeline: '£12k'
+			pipeline: '£12k',
+			people: []
 		}
 	];
 

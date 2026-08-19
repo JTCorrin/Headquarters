@@ -4,6 +4,12 @@ import StatusBadge from './status-badge.svelte';
 import DataTableSortHeader from './data-table-sort-header.svelte';
 import DataTableRowActions from './data-table-row-actions.svelte';
 import ClientNameLink from './client-name-link.svelte';
+import ClientPeopleCell from './client-people-cell.svelte';
+
+export interface ClientPersonLink {
+	id: string;
+	name: string;
+}
 
 export interface ClientRow {
 	id: string;
@@ -12,6 +18,7 @@ export interface ClientRow {
 	owner?: string;
 	openInvoices: string;
 	pipeline: string;
+	people?: ClientPersonLink[];
 }
 
 export const clientColumns: ColumnDef<ClientRow>[] = [
@@ -26,6 +33,15 @@ export const clientColumns: ColumnDef<ClientRow>[] = [
 			renderComponent(ClientNameLink, {
 				id: row.original.id,
 				name: row.original.name
+			})
+	},
+	{
+		id: 'people',
+		enableSorting: false,
+		header: 'People',
+		cell: ({ row }) =>
+			renderComponent(ClientPeopleCell, {
+				people: row.original.people ?? []
 			})
 	},
 	{
