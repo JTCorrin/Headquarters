@@ -2240,6 +2240,27 @@ export function canGenerateMeetingSummary(meeting: ApiMeetingDocument): boolean 
 	return meeting.transcript_status === 'ready';
 }
 
+/** Completed meetings stay open for wrap-up accept; cancelled meetings do not. */
+export function canAcceptMeetingTaskProposals(status: ApiMeetingStatus): boolean {
+	return status !== 'cancelled';
+}
+
+const MEETING_CANCELLED_ACCEPT_MESSAGE =
+	'This meeting was cancelled, so follow-up tasks cannot be accepted.';
+
+/** Map accept-proposal 409 copy (including the legacy SQL phrase) to a human sentence. */
+export function meetingAcceptProposalUserMessage(errorMessage: string | undefined): string | null {
+	const lower = (errorMessage ?? '').toLowerCase();
+	if (!lower) return null;
+	if (lower.includes('was cancelled') && lower.includes('cannot be accepted')) {
+		return MEETING_CANCELLED_ACCEPT_MESSAGE;
+	}
+	if (lower.includes('meeting is not open for accept')) {
+		return MEETING_CANCELLED_ACCEPT_MESSAGE;
+	}
+	return null;
+}
+
 export function formatMeetingWhen(
 	startsAt: string,
 	endsAt: string,

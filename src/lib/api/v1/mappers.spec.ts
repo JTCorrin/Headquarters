@@ -46,7 +46,9 @@ import {
 	emptyProjectFormData,
 	toProjectCreateBody,
 	toProjectFormData,
-	toProjectListItem
+	toProjectListItem,
+	canAcceptMeetingTaskProposals,
+	meetingAcceptProposalUserMessage
 } from './mappers.js';
 import type {
 	ApiBill,
@@ -1205,5 +1207,25 @@ describe('api mappers', () => {
 			clientName: 'Internal',
 			name: 'Ops handbook'
 		});
+	});
+
+	it('allows wrap-up accept on completed meetings but not cancelled', () => {
+		expect(canAcceptMeetingTaskProposals('scheduled')).toBe(true);
+		expect(canAcceptMeetingTaskProposals('in_progress')).toBe(true);
+		expect(canAcceptMeetingTaskProposals('completed')).toBe(true);
+		expect(canAcceptMeetingTaskProposals('cancelled')).toBe(false);
+	});
+
+	it('maps meeting accept-blocked copy to a human sentence', () => {
+		expect(
+			meetingAcceptProposalUserMessage(
+				'This meeting was cancelled, so follow-up tasks cannot be accepted.'
+			)
+		).toBe('This meeting was cancelled, so follow-up tasks cannot be accepted.');
+		expect(meetingAcceptProposalUserMessage('Meeting is not open for accept')).toBe(
+			'This meeting was cancelled, so follow-up tasks cannot be accepted.'
+		);
+		expect(meetingAcceptProposalUserMessage('Task proposal is not open for accept')).toBeNull();
+		expect(meetingAcceptProposalUserMessage(undefined)).toBeNull();
 	});
 });

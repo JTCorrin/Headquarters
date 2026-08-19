@@ -1,6 +1,6 @@
 begin;
 
-select plan(13);
+select plan(14);
 
 select ok(
   has_function_privilege(
@@ -320,7 +320,7 @@ select throws_ok(
   're-accepting a decided proposal conflicts'
 );
 
--- Fresh proposals must still fail once the meeting is terminal.
+-- Fresh proposals must still succeed once the meeting is completed (wrap-up).
 with proposal as (
   insert into public.meeting_task_proposals (
     org_id, meeting_id, title, description, confidence, status
@@ -329,7 +329,7 @@ with proposal as (
     org_id,
     meeting_id,
     'After completed',
-    'Should reject',
+    'Should accept',
     0.5000,
     'proposed'
   from _a1_fixture
@@ -343,18 +343,52 @@ update public.meetings
 set status = 'completed'
 where id = (select meeting_id from _a1_fixture);
 
-select throws_ok(
-  $$
-    select public.accept_meeting_task_proposal(
-      (select org_id from _a1_fixture),
-      (select meeting_id from _a1_fixture),
-      (select proposal_id from _a1_fixture)
-    )
-  $$,
-  'P0001',
-  'Meeting is not open for accept',
-  'accept rejects when meeting is completed'
+with accepted as (
+  select public.accept_meeting_task_proposal(
+    (select org_id from _a1_fixture),
+    (select meeting_id from _a1_fixture),
+    (select proposal_id from _a1_fixture)
+  ) as body
+)
+update _a1_fixture
+set accepted_task_id = (accepted.body ->> 'accepted_task_id')::uuid
+from accepted;
+
+select is(
+  (
+    select status from public.meeting_task_proposals
+    where id = (select proposal_id from _a1_fixture)
+  ),
+  'accepted',
+  'accept succeeds when meeting is completed'
 );
+
+select is(
+  (
+    select source from public.tasks
+    where id = (select accepted_task_id from _a1_fixture)
+  ),
+  'meeting',
+  'completed-meeting accept still creates a meeting-sourced task'
+);
+
+with proposal as (
+  insert into public.meeting_task_proposals (
+    org_id, meeting_id, title, description, confidence, status
+  )
+  select
+    org_id,
+    meeting_id,
+    'After cancelled',
+    'Should reject',
+    0.5000,
+    'proposed'
+  from _a1_fixture
+  returning id
+)
+update _a1_fixture
+set proposal_id = proposal.id
+from proposal;
 
 update public.meetings
 set status = 'cancelled'
@@ -369,7 +403,7 @@ select throws_ok(
     )
   $$,
   'P0001',
-  'Meeting is not open for accept',
+  'This meeting was cancelled, so follow-up tasks cannot be accepted.',
   'accept rejects when meeting is cancelled'
 );
 

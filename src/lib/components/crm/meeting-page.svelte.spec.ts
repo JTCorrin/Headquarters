@@ -35,7 +35,11 @@ function sampleTranscript() {
 	};
 }
 
-function sampleProposal(id: string, title: string, status: 'proposed' | 'accepted' | 'dismissed' = 'proposed') {
+function sampleProposal(
+	id: string,
+	title: string,
+	status: 'proposed' | 'accepted' | 'dismissed' = 'proposed'
+) {
 	return {
 		id,
 		org_id: ORG_A,
@@ -184,9 +188,7 @@ describe('MeetingPage integration', () => {
 		render(MeetingPage, { api, session, meetingId: MEETING_ID });
 
 		await expect.element(page.getByText('Q2 planning')).toBeInTheDocument();
-		await expect
-			.element(page.getByText('Ava Chen · ava@northwind.com'))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('Ava Chen · ava@northwind.com')).toBeInTheDocument();
 		await expect.element(page.getByText('Northwind', { exact: true })).toBeInTheDocument();
 		await expect.element(page.getByText('Boardroom', { exact: true })).toBeInTheDocument();
 		await expect.element(page.getByText(/Upload a \.vtt transcript file/i)).toBeInTheDocument();
@@ -270,9 +272,7 @@ describe('MeetingPage integration', () => {
 
 		await expect.element(page.getByText('Joe: Ship the kickoff pack.')).toBeInTheDocument();
 		await page.getByRole('button', { name: 'Generate summary' }).click();
-		await expect
-			.element(page.getByText('Follow up on the kickoff pack.'))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('Follow up on the kickoff pack.')).toBeInTheDocument();
 		await expect.element(page.getByText('Send kickoff pack')).toBeInTheDocument();
 
 		await page.getByRole('button', { name: 'Accept', exact: true }).first().click();
@@ -314,5 +314,107 @@ describe('MeetingPage integration', () => {
 		await expect
 			.element(page.getByTestId('meeting-ai-error'))
 			.toHaveTextContent(/Transcript is not ready/i);
+	});
+
+	it('keeps Accept available after a completed meeting wrap-up', async () => {
+		const session = sessionForOrg();
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			[`GET /api/v1/meetings/${MEETING_ID}`]: async () => ({
+				body: {
+					data: sampleMeeting({
+						status: 'completed',
+						transcript_status: 'ready',
+						transcript: sampleTranscript(),
+						summary_status: 'ready',
+						summary: 'Follow up on the kickoff pack.',
+						task_proposals: [
+							sampleProposal(PROPOSAL_ID, 'Send kickoff pack'),
+							sampleProposal(PROPOSAL_ID_2, 'Book Thursday kickoff')
+						]
+					})
+				}
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(MeetingPage, { api, session, meetingId: MEETING_ID });
+
+		await expect.element(page.getByText('Send kickoff pack')).toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Accept all' })).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: 'Accept', exact: true }).first())
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: 'Dismiss', exact: true }).first())
+			.toBeInTheDocument();
+	});
+
+	it('hides Accept on cancelled meetings and still allows Dismiss', async () => {
+		const session = sessionForOrg();
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			[`GET /api/v1/meetings/${MEETING_ID}`]: async () => ({
+				body: {
+					data: sampleMeeting({
+						status: 'cancelled',
+						transcript_status: 'ready',
+						transcript: sampleTranscript(),
+						summary_status: 'ready',
+						summary: 'Follow up on the kickoff pack.',
+						task_proposals: [sampleProposal(PROPOSAL_ID, 'Send kickoff pack')]
+					})
+				}
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(MeetingPage, { api, session, meetingId: MEETING_ID });
+
+		await expect.element(page.getByText('Send kickoff pack')).toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: 'Dismiss', exact: true }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('button', { name: 'Accept', exact: true }))
+			.not.toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Accept all' })).not.toBeInTheDocument();
+	});
+
+	it('surfaces cancelled-meeting accept 409 as a human sentence', async () => {
+		const session = sessionForOrg();
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			[`GET /api/v1/meetings/${MEETING_ID}`]: async () => ({
+				body: {
+					data: sampleMeeting({
+						version: 2,
+						transcript_status: 'ready',
+						transcript: sampleTranscript(),
+						summary_status: 'ready',
+						summary: 'Follow up on the kickoff pack.',
+						task_proposals: [sampleProposal(PROPOSAL_ID, 'Send kickoff pack')]
+					})
+				}
+			}),
+			[`POST /api/v1/meetings/${MEETING_ID}/task-proposals/${PROPOSAL_ID}/accept`]: async () => ({
+				status: 409,
+				body: {
+					error: {
+						code: 'CONFLICT',
+						message: 'Meeting is not open for accept'
+					}
+				}
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(MeetingPage, { api, session, meetingId: MEETING_ID });
+
+		await expect.element(page.getByText('Send kickoff pack')).toBeInTheDocument();
+		await page.getByRole('button', { name: 'Accept', exact: true }).click();
+		await expect
+			.element(page.getByTestId('meeting-ai-error'))
+			.toHaveTextContent(/This meeting was cancelled, so follow-up tasks cannot be accepted/i);
 	});
 });
