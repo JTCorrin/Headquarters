@@ -9,7 +9,12 @@ import {
   setOpenSmtpConnectionForTests,
   SmtpSendError,
 } from '../_shared/smtp-outbound.ts'
-import { emailReplyIdempotencyPayload, validateReplyBody } from './email-messages.ts'
+import {
+  emailComposeIdempotencyPayload,
+  emailReplyIdempotencyPayload,
+  validateComposeBody,
+  validateReplyBody,
+} from './email-messages.ts'
 import { ApiError } from './http.ts'
 import { hashIdempotencyRequest } from './idempotency.ts'
 
@@ -61,6 +66,61 @@ Deno.test('validateReplyBody requires body_text and rejects extras', () => {
     () => validateReplyBody({ body_text: 'hi', cc: [] }),
     ApiError,
   )
+})
+
+Deno.test('validateComposeBody requires subject and body_text', () => {
+  assertEquals(
+    validateComposeBody({
+      to: 'peer@example.test',
+      subject: 'Hello',
+      body_text: 'hi',
+      body_html: null,
+    }),
+    {
+      to: 'peer@example.test',
+      subject: 'Hello',
+      body_text: 'hi',
+      body_html: null,
+    },
+  )
+  assertEquals(
+    validateComposeBody({ subject: 'Hello', body_text: 'hi' }).to,
+    null,
+  )
+  assertThrows(
+    () => validateComposeBody({ subject: 'Hello', body_text: 'hi', to: 'not-an-email' }),
+    ApiError,
+  )
+  assertThrows(() => validateComposeBody({ body_text: 'hi' }), ApiError)
+  assertThrows(
+    () => validateComposeBody({ to: 'a@b.co', subject: 'Hi', body_text: 'x', cc: [] }),
+    ApiError,
+  )
+})
+
+Deno.test('email compose idempotency hash is stable for same payload', async () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  const body = {
+    to: 'peer@example.test',
+    subject: 'Hello',
+    body_text: 'thanks',
+    body_html: null,
+  }
+  const route = `/api/v1/clients/${id}/email-messages`
+  const a = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload('client', id, body),
+  )
+  const b = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload('client', id, body),
+  )
+  assertEquals(a, b)
+  const c = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload('client', id, { ...body, subject: 'Other' }),
+  )
+  assertEquals(a === c, false)
 })
 
 Deno.test('email reply idempotency hash is stable for same payload', async () => {

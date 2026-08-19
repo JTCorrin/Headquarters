@@ -1422,12 +1422,7 @@ export interface ApiOrgMember {
 	job_title: string | null;
 }
 
-export type ApiDashboardAgingBucket =
-	| 'current'
-	| '1_30'
-	| '31_60'
-	| '61_90'
-	| '90_plus';
+export type ApiDashboardAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
 
 export interface ApiDashboardKpis {
 	outstanding_cents: number;
@@ -1778,7 +1773,7 @@ export interface ApiAiModelUpdateBody {
 }
 
 export type ApiAiPromptKey =
-	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase';
+	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase' | 'email_compose';
 
 export type ApiAiPromptsMap = Record<ApiAiPromptKey, string>;
 
@@ -1919,13 +1914,7 @@ export interface ApiPlaybookListParams {
 }
 
 export type ApiPlaybookRunStatus =
-	| 'scheduled'
-	| 'running'
-	| 'waiting'
-	| 'completed'
-	| 'failed'
-	| 'cancelled'
-	| 'skipped_busy';
+	'scheduled' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'skipped_busy';
 
 export interface ApiPlaybookRun {
 	id: string;
@@ -1970,6 +1959,14 @@ export interface ApiEmailMessageShareResult {
 
 /** Body for `POST /api/v1/email-messages/{id}/reply` (SMTP outbound v1). */
 export interface ApiEmailMessageReplyBody {
+	body_text: string;
+	body_html?: string | null;
+}
+
+/** Body for `POST /api/v1/{contacts|leads|clients}/{id}/email-messages`. */
+export interface ApiEmailMessageComposeBody {
+	to?: string;
+	subject: string;
 	body_text: string;
 	body_html?: string | null;
 }
@@ -2057,6 +2054,14 @@ export interface ApiAiInvoiceChaseGenerateBody {
 	invoice_id: string;
 	/** polite | firm (injected as TONE at generate time). */
 	variant?: 'polite' | 'firm' | string;
+}
+
+export interface ApiAiComposeGenerateBody {
+	entity_type: ApiEntityEmailType;
+	entity_id: string;
+	/** warm | neutral | firm. */
+	variant?: 'warm' | 'neutral' | 'firm' | string;
+	subject?: string;
 }
 
 export interface ApiAiSuggestion {

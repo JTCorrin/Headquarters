@@ -5,6 +5,7 @@ export const AI_PROMPT_KEYS = [
   'meeting_summary',
   'meeting_task_proposals',
   'invoice_chase',
+  'email_compose',
 ] as const
 
 export type AiPromptKey = (typeof AI_PROMPT_KEYS)[number]
@@ -18,6 +19,8 @@ export const DEFAULT_AI_PROMPTS: Record<AiPromptKey, string> = {
     'Extract 1–3 concrete follow-up tasks from the transcript. Reply with ONLY a JSON array of objects shaped like [{"title":"...","description":"...","confidence":0.8}]. No markdown fences or prose outside the JSON.',
   invoice_chase:
     'Draft a short payment-reminder email for this invoice. Be clear about the amount/due date when provided. Do not threaten legal action.',
+  email_compose:
+    'Draft a concise new outbound email to this recipient. Stay professional and actionable. Do not invent facts that are not provided.',
 }
 
 const MAX_PROMPT_CHARS = 16384
