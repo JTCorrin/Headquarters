@@ -205,6 +205,99 @@ export function emailReplyIdempotencyPayload(
   };
 }
 
+const COMPOSE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COMPOSE_ENTITY_TYPES = ["contact", "lead", "client"] as const;
+type ComposeEntityType = (typeof COMPOSE_ENTITY_TYPES)[number];
+
+function isComposeEmail(value: string): boolean {
+  return COMPOSE_EMAIL_RE.test(value) && value.length <= 320;
+}
+
+export function validateComposeBody(
+  body: Record<string, unknown>,
+): {
+  to: string | null;
+  subject: string;
+  body_text: string;
+  body_html: string | null;
+} {
+  const fields: Record<string, string> = {};
+  for (const key of Object.keys(body)) {
+    if (
+      key !== "to" && key !== "subject" && key !== "body_text" &&
+      key !== "body_html"
+    ) {
+      fields[key] = "Field is not writable";
+    }
+  }
+  let to: string | null = null;
+  if (body.to !== undefined && body.to !== null) {
+    if (typeof body.to !== "string") {
+      fields.to = "Must be a valid email address";
+    } else {
+      const trimmed = body.to.trim();
+      if (trimmed) {
+        if (!isComposeEmail(trimmed)) {
+          fields.to = "Must be a valid email address";
+        } else {
+          to = trimmed;
+        }
+      }
+    }
+  }
+  const subject = typeof body.subject === "string" ? body.subject : "";
+  if (!subject.trim()) {
+    fields.subject = "Must be a non-empty string";
+  } else if (new TextEncoder().encode(subject).byteLength > 998) {
+    fields.subject = "Must be at most 998 bytes";
+  }
+  const bodyText = typeof body.body_text === "string" ? body.body_text : "";
+  if (!bodyText.trim()) {
+    fields.body_text = "Must be a non-empty string";
+  } else if (new TextEncoder().encode(bodyText).byteLength > 64_000) {
+    fields.body_text = "Must be at most 64 KiB";
+  }
+  let bodyHtml: string | null = null;
+  if (body.body_html !== undefined && body.body_html !== null) {
+    if (typeof body.body_html !== "string") {
+      fields.body_html = "Must be a string or null";
+    } else if (new TextEncoder().encode(body.body_html).byteLength > 64_000) {
+      fields.body_html = "Must be at most 64 KiB";
+    } else {
+      bodyHtml = body.body_html;
+    }
+  }
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(
+      422,
+      "VALIDATION_ERROR",
+      "Compose validation failed",
+      fields,
+    );
+  }
+  return { to, subject, body_text: bodyText, body_html: bodyHtml };
+}
+
+export function emailComposeIdempotencyPayload(
+  entityType: ComposeEntityType,
+  entityId: string,
+  body: {
+    to: string;
+    subject: string;
+    body_text: string;
+    body_html: string | null;
+  },
+): Record<string, unknown> {
+  return {
+    entity_type: entityType,
+    entity_id: entityId,
+    to: body.to,
+    subject: body.subject,
+    body_text: body.body_text,
+    body_html: body.body_html,
+  };
+}
+
 function replyEnvelopeResponse(
   envelope: IdempotencyEnvelope,
   requestId: string,
@@ -502,6 +595,306 @@ async function shareEmailMessage(
   });
   if (error) throw databaseError(error, requestId);
   return jsonResponse({ data }, 200, requestId);
+}
+
+async function abortComposeClaim(
+  db: DatabaseClient,
+  orgId: string,
+  keyHash: string,
+): Promise<void> {
+  await db.rpc("abort_email_compose_idempotent", {
+    p_org_id: orgId,
+    p_idempotency_key_hash: keyHash,
+  });
+}
+
+async function loadEntityPrimaryEmail(
+  db: DatabaseClient,
+  orgId: string,
+  entityType: ComposeEntityType,
+  entityId: string,
+): Promise<string | null> {
+  const query = entityType === "contact"
+    ? db.from("contacts").select("primary_email")
+    : entityType === "lead"
+    ? db.from("leads").select("primary_email")
+    : db.from("clients").select("primary_email");
+  const { data, error } = await query
+    .eq("org_id", orgId)
+    .eq("id", entityId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) {
+    throw databaseError(error, "compose-entity-lookup");
+  }
+  const email = data && typeof data.primary_email === "string"
+    ? data.primary_email.trim()
+    : "";
+  return email && isComposeEmail(email) ? email : null;
+}
+
+export async function composeEntityEmailMessage(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  entityType: ComposeEntityType,
+  entityId: string,
+  role: MembershipRole,
+  requestId: string,
+): Promise<Response> {
+  if (role === "billing" || role === "readonly") {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "This membership cannot send email messages",
+    );
+  }
+  if (!COMPOSE_ENTITY_TYPES.includes(entityType)) {
+    throw new ApiError(404, "NOT_FOUND", "Route not found");
+  }
+
+  const rawKey = parseIdempotencyKey(req);
+  const plural = entityType === "contact"
+    ? "contacts"
+    : entityType === "lead"
+    ? "leads"
+    : "clients";
+  const route = `/api/v1/${plural}/${entityId}/email-messages`;
+  const parsed = validateComposeBody(await jsonBody(req));
+  let toAddress = parsed.to;
+  if (!toAddress) {
+    toAddress = await loadEntityPrimaryEmail(db, orgId, entityType, entityId);
+    if (!toAddress) {
+      throw new ApiError(
+        422,
+        "VALIDATION_ERROR",
+        "Compose validation failed",
+        {
+          to: "A recipient email is required (set primary email on this record or pass to)",
+        },
+      );
+    }
+  }
+  const payload = {
+    to: toAddress,
+    subject: parsed.subject,
+    body_text: parsed.body_text,
+    body_html: parsed.body_html,
+  };
+  const requestHash = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload(entityType, entityId, payload),
+  );
+  const keyHash = await sha256Hex(rawKey);
+
+  const { data: beginData, error: beginError } = await db.rpc(
+    "begin_email_compose_idempotent",
+    {
+      p_org_id: orgId,
+      p_entity_type: entityType,
+      p_entity_id: entityId,
+      p_idempotency_key_hash: keyHash,
+      p_request_hash: requestHash,
+      p_route: route,
+    },
+  );
+  if (beginError) {
+    const conflict = idempotencyConflictError(beginError);
+    if (conflict) throw conflict;
+    throw databaseError(beginError, requestId);
+  }
+  if (!beginData || typeof beginData !== "object" || Array.isArray(beginData)) {
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "Email compose begin returned an unexpected payload",
+    );
+  }
+
+  const begin = beginData as Record<string, unknown>;
+  if (begin.replay === true) {
+    return replyEnvelopeResponse(
+      begin as IdempotencyEnvelope,
+      requestId,
+      rawKey,
+    );
+  }
+
+  const mailbox = begin.mailbox as Record<string, unknown> | undefined;
+  if (!mailbox) {
+    await abortComposeClaim(db, orgId, keyHash);
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "Email compose begin missing mailbox",
+    );
+  }
+
+  const mailboxId = String(mailbox.id ?? "");
+  const smtpHost = String(mailbox.smtp_host ?? "");
+  const smtpPort = Number(mailbox.smtp_port ?? 0);
+  const fromAddress = String(mailbox.email_address ?? "");
+
+  if (!mailbox.credentials_configured) {
+    await abortComposeClaim(db, orgId, keyHash);
+    throw new ApiError(
+      422,
+      "VALIDATION_ERROR",
+      "Mailbox credentials are not configured",
+      {
+        mailbox: "Credentials required to send mail",
+      },
+    );
+  }
+  if (
+    !smtpHost || !Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535
+  ) {
+    await abortComposeClaim(db, orgId, keyHash);
+    throw new ApiError(
+      422,
+      "VALIDATION_ERROR",
+      "Mailbox SMTP settings are incomplete",
+      {
+        smtp_host: "Host and port are required",
+      },
+    );
+  }
+  if (!fromAddress) {
+    await abortComposeClaim(db, orgId, keyHash);
+    throw new ApiError(
+      422,
+      "VALIDATION_ERROR",
+      "Compose addresses are incomplete",
+      {
+        from_address: "Mailbox address required",
+      },
+    );
+  }
+
+  const messageId = generateOutboundMessageId(fromAddress);
+  let failureCode: string | null = null;
+  let smtpReached = false;
+
+  try {
+    const service = serviceRoleClient();
+    const resolved = await resolveMailboxAuth(service, mailboxId);
+    if (!resolved) {
+      await abortComposeClaim(db, orgId, keyHash);
+      throw new ApiError(
+        422,
+        "VALIDATION_ERROR",
+        "Mailbox credentials are not configured",
+        {
+          mailbox: "Connect your mailbox or save a password to send mail",
+        },
+      );
+    }
+
+    const security = parseSmtpSecurity(
+      resolved.row.smtp_security ?? mailbox.smtp_security,
+    );
+    smtpReached = true;
+    await smtpMailSender({
+      host: smtpHost,
+      port: smtpPort,
+      security,
+      auth: resolved.smtpAuth,
+      from: fromAddress,
+      to: payload.to,
+      subject: payload.subject,
+      bodyText: payload.body_text,
+      bodyHtml: payload.body_html,
+      messageId,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+
+    if (error instanceof SmtpSendError) {
+      failureCode = error.code;
+    } else {
+      failureCode = "smtp_send_failed";
+    }
+    console.error("SMTP compose failed", {
+      request_id: requestId,
+      code: failureCode,
+      synthetic: isSyntheticSmtpHost(smtpHost),
+    });
+
+    if (smtpReached) {
+      const { data: failData, error: failError } = await db.rpc(
+        "finish_email_compose_idempotent",
+        {
+          p_org_id: orgId,
+          p_entity_type: entityType,
+          p_entity_id: entityId,
+          p_to_address: payload.to,
+          p_subject: payload.subject,
+          p_body_text: payload.body_text,
+          p_body_html: payload.body_html,
+          p_provider_message_id: messageId,
+          p_status: "failed",
+          p_failure_code: failureCode,
+          p_idempotency_key_hash: keyHash,
+        },
+      );
+      if (failError) {
+        await abortComposeClaim(db, orgId, keyHash);
+        throw databaseError(failError, requestId);
+      }
+      await abortComposeClaim(db, orgId, keyHash);
+      const failEnvelope = failData as IdempotencyEnvelope;
+      return jsonResponse(
+        failEnvelope?.response_body ?? {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "Outbound SMTP delivery failed",
+            request_id: requestId,
+          },
+        },
+        failEnvelope?.response_status ?? 502,
+        requestId,
+        { [IDEMPOTENCY_KEY_HEADER]: rawKey },
+      );
+    }
+
+    await abortComposeClaim(db, orgId, keyHash);
+    throw new ApiError(502, "INTERNAL_ERROR", "Outbound SMTP delivery failed");
+  }
+
+  const { data: finishData, error: finishError } = await db.rpc(
+    "finish_email_compose_idempotent",
+    {
+      p_org_id: orgId,
+      p_entity_type: entityType,
+      p_entity_id: entityId,
+      p_to_address: payload.to,
+      p_subject: payload.subject,
+      p_body_text: payload.body_text,
+      p_body_html: payload.body_html,
+      p_provider_message_id: messageId,
+      p_status: "sent",
+      p_failure_code: null,
+      p_idempotency_key_hash: keyHash,
+    },
+  );
+  if (finishError) {
+    await abortComposeClaim(db, orgId, keyHash);
+    throw databaseError(finishError, requestId);
+  }
+  if (
+    !finishData || typeof finishData !== "object" || Array.isArray(finishData)
+  ) {
+    throw new ApiError(
+      500,
+      "INTERNAL_ERROR",
+      "Email compose finish returned an unexpected payload",
+    );
+  }
+  return replyEnvelopeResponse(
+    finishData as IdempotencyEnvelope,
+    requestId,
+    rawKey,
+  );
 }
 
 async function ingestInboundMessage(

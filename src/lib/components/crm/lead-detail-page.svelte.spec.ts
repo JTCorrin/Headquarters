@@ -65,4 +65,19 @@ describe('LeadDetailPage', () => {
 			.element(page.getByTestId('convert-result'))
 			.toHaveTextContent(/already converted/i);
 	});
+
+	it('opens the Email tab and compose from the header Email button', async () => {
+		render(LeadDetailTestHost, {
+			lead: {
+				...lead,
+				primary_email: 'ava@contoso.test'
+			}
+		});
+
+		await page.getByTestId('lead-email-action').click();
+		await expect
+			.element(page.getByRole('tab', { name: 'Email' }))
+			.toHaveAttribute('data-state', 'active');
+		await expect.element(page.getByTestId('email-compose-to')).toBeInTheDocument();
+	});
 });

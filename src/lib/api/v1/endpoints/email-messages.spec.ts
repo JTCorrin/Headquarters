@@ -40,3 +40,47 @@ describe('emailMessages.reply', () => {
 		expect(sent.status).toBe('sent');
 	});
 });
+
+describe('emailMessages.sendForEntity', () => {
+	it('POSTs compose body with Idempotency-Key to entity email-messages', async () => {
+		const clientId = 'cccccccc-cccc-4ddd-8eee-ffffffffffff';
+		let capturedHeaders: Headers | undefined;
+		let capturedBody: unknown;
+
+		const fetchMock = createMockFetch({
+			[`POST /api/v1/clients/${clientId}/email-messages`]: async (request) => {
+				capturedHeaders = request.headers;
+				capturedBody = await request.json();
+				return {
+					body: {
+						data: {
+							id: OUTBOUND_ID,
+							direction: 'outbound',
+							from_address: 'me@example.com',
+							subject: 'Hello',
+							body_text: 'Thanks',
+							status: 'sent',
+							in_reply_to_message_id: null
+						}
+					}
+				};
+			}
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const sent = await api.emailMessages.sendForEntity('client', clientId, {
+			to: 'peer@example.com',
+			subject: 'Hello',
+			body_text: 'Thanks'
+		});
+
+		expect(capturedBody).toEqual({
+			to: 'peer@example.com',
+			subject: 'Hello',
+			body_text: 'Thanks'
+		});
+		expect(capturedHeaders?.get('Idempotency-Key')).toBeTruthy();
+		expect(sent.id).toBe(OUTBOUND_ID);
+		expect(sent.status).toBe('sent');
+	});
+});

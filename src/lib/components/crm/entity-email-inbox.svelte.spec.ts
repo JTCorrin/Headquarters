@@ -70,12 +70,12 @@ describe('EntityEmailInbox', () => {
 		});
 
 		await page.getByRole('button', { name: 'Reply' }).click();
-		await expect.element(page.getByTestId('draft-response-gate')).toHaveTextContent(/Ask an Owner/i);
+		await expect
+			.element(page.getByTestId('draft-response-gate'))
+			.toHaveTextContent(/Ask an Owner/i);
 		await expect.element(page.getByRole('button', { name: 'Draft response' })).toBeDisabled();
 		await expect.element(page.getByTestId('email-send')).toBeDisabled();
-		await expect
-			.element(page.getByTestId('email-send-gate'))
-			.toHaveTextContent(/Connect mailbox/i);
+		await expect.element(page.getByTestId('email-send-gate')).toHaveTextContent(/Connect mailbox/i);
 	});
 
 	it('offers Use suggestion after drafting when AI is connected', async () => {
@@ -226,11 +226,71 @@ describe('EntityEmailInbox', () => {
 		await expect.element(page.getByTestId('email-create-lead')).not.toBeInTheDocument();
 	});
 
+	it('opens New compose on an empty inbox', async () => {
+		render(EntityEmailInbox, {
+			messages: [],
+			emptyState: 'no_matches',
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			defaultTo: 'ava@northwind.com',
+			onSendNew: async () => undefined
+		});
+
+		await expect.element(page.getByTestId('email-compose-new')).toBeInTheDocument();
+		await page.getByTestId('email-compose-new').click();
+		await expect.element(page.getByTestId('email-compose-to')).toHaveValue('ava@northwind.com');
+		await expect.element(page.getByRole('heading', { name: 'New email' })).toBeInTheDocument();
+	});
+
+	it('drafts a new email without a selected message', async () => {
+		render(EntityEmailInbox, {
+			messages: [],
+			emptyState: 'no_matches',
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			defaultTo: 'ava@northwind.com',
+			draftDelayMs: 10,
+			onSendNew: async () => undefined
+		});
+
+		await page.getByTestId('email-compose-new').click();
+		await page.getByRole('button', { name: 'Draft response' }).click();
+		await expect.element(page.getByTestId('use-suggestion')).toBeInTheDocument();
+	});
+
+	it('sends a new email via onSendNew', async () => {
+		let sent: { to: string; subject: string; body: string } | null = null;
+		render(EntityEmailInbox, {
+			messages: [],
+			emptyState: 'no_matches',
+			mailboxConnected: true,
+			aiProviderConnected: true,
+			smtpReady: true,
+			role: 'owner',
+			defaultTo: 'ava@northwind.com',
+			onSendNew: async (payload) => {
+				sent = payload;
+			}
+		});
+
+		await page.getByTestId('email-compose-new').click();
+		await page.getByTestId('email-compose-subject').fill('Hello');
+		await page.getByPlaceholder('Write a message, or use Draft response…').fill('Can we talk?');
+		await page.getByTestId('email-compose-send').click();
+		expect(sent).toEqual({
+			to: 'ava@northwind.com',
+			subject: 'Hello',
+			body: 'Can we talk?'
+		});
+	});
+
 	it('shows one pane at a time on a narrow viewport', async () => {
 		await page.viewport(390, 844);
-		await expect
-			.poll(() => window.matchMedia('(max-width: 1023px)').matches)
-			.toBe(true);
+		await expect.poll(() => window.matchMedia('(max-width: 1023px)').matches).toBe(true);
 
 		render(EntityEmailInbox, {
 			messages: sampleEmailMessages,
