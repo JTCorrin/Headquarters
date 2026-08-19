@@ -54,6 +54,8 @@
 		role?: MembershipRole;
 		mailSettingsHref?: string;
 		sharingId?: string | null;
+		/** Prefill for new-email To (client primary_email). */
+		emailDefaultTo?: string;
 		/** Live API workspace — preferred over Storybook mock props. */
 		documentsApi?: ApiV1Client;
 		documentsEntityId?: string;
@@ -77,9 +79,15 @@
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
+		onSendNew?: (payload: { to: string; subject: string; body: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: 'warm' | 'neutral' | 'firm';
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onDraftCompose?: (payload: {
+			tone: 'warm' | 'neutral' | 'firm';
+			subject: string;
+			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
 		onUseSuggestion?: (payload: {
 			suggestionId?: string;
@@ -110,6 +118,7 @@
 		role = 'member',
 		mailSettingsHref = '/settings#mail',
 		sharingId = null,
+		emailDefaultTo = '',
 		documentsApi,
 		documentsEntityId,
 		documentsReloadKey = 0,
@@ -130,7 +139,9 @@
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
+		onSendNew,
 		onDraftResponse,
+		onDraftCompose,
 		onUseSuggestion,
 		onDiscardSuggestion,
 		onNewQuote
@@ -145,6 +156,7 @@
 	];
 
 	let activeTab = $state('details');
+	let composingNew = $state(false);
 
 	const newQuoteHref = $derived(
 		clientId ? `/quotes?client_id=${encodeURIComponent(clientId)}&new=1` : '/quotes?new=1'
@@ -152,6 +164,7 @@
 
 	function handleEmailClick() {
 		activeTab = 'email';
+		composingNew = true;
 	}
 
 	function handleNewQuoteClick() {
@@ -280,9 +293,13 @@
 							{role}
 							{mailSettingsHref}
 							{sharingId}
+							defaultTo={emailDefaultTo}
+							bind:composingNew
 							{onAddToTimeline}
 							{onSendReply}
+							{onSendNew}
 							{onDraftResponse}
+							{onDraftCompose}
 							{onUseSuggestion}
 							{onDiscardSuggestion}
 							class="min-h-0 flex-1"
