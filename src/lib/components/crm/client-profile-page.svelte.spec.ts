@@ -47,8 +47,8 @@ describe('ClientProfilePage actions', () => {
 		await expect.element(link).toHaveAttribute('href', `/quotes?client_id=${CLIENT_ID}&new=1`);
 	});
 
-	it('invokes onNewQuote when provided instead of using href', async () => {
-		const onNewQuote = vi.fn();
+	it('links related contacts from the Details tab', async () => {
+		const CONTACT_ID = '22222222-3333-4444-8555-666666666666';
 		render(ClientProfilePage, {
 			orgName: 'Corrin Data',
 			navGroups: navGroupsWithActive('Clients'),
@@ -57,11 +57,19 @@ describe('ClientProfilePage actions', () => {
 			status: 'Active',
 			companyFields: [{ label: 'Industry', value: 'Logistics' }],
 			clientId: CLIENT_ID,
-			onNewQuote,
+			relatedContacts: [
+				{
+					id: CONTACT_ID,
+					name: 'Ava Chen',
+					role: 'Primary',
+					email: 'ava@northwind.com'
+				}
+			],
 			showNav: false
 		});
 
-		await page.getByTestId('client-new-quote-action').click();
-		expect(onNewQuote).toHaveBeenCalledOnce();
+		const link = page.getByRole('link', { name: 'Ava Chen' });
+		await expect.element(link).toHaveAttribute('href', `/contacts/${CONTACT_ID}`);
+		await expect.element(page.getByText('ava@northwind.com')).toBeInTheDocument();
 	});
 });

@@ -10,6 +10,7 @@
 		clientStatusLabel,
 		membershipFromCreateResult,
 		toClientFormData,
+		toClientRelatedContacts,
 		toClientUpdateBody,
 		toEntityProject,
 		toOrganisationCreateBody,
@@ -137,6 +138,8 @@
 				]
 			: []
 	);
+
+	const relatedContacts = $derived(toClientRelatedContacts(client?.contacts));
 
 	function userMessage(error: unknown, fallback: string): string {
 		if (isApiClientError(error)) {
@@ -439,6 +442,7 @@
 						subtitle={client.industry ?? undefined}
 						{companyFields}
 						{billingFields}
+						{relatedContacts}
 						{clientForm}
 						bind:editDrawerOpen
 						{viewState}

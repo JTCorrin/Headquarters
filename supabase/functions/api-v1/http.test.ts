@@ -14,6 +14,7 @@ import { validateClientBody } from "./clients.ts";
 import {
   decodeCursor,
   extractContactClientId,
+  parseOptionalClientIdQuery,
   validateContactBody,
 } from "./contacts.ts";
 import {
@@ -282,6 +283,14 @@ Deno.test("contact client_id is a virtual field extracted for client_contacts sy
     validateContactBody({ client_id: clientId }, true),
     {},
   );
+});
+
+Deno.test("contact list client_id query rejects invalid UUIDs", () => {
+  const clientId = "52e1a71a-1c93-4ec8-a566-e0eecaf06747";
+  assertEquals(parseOptionalClientIdQuery(null), null);
+  assertEquals(parseOptionalClientIdQuery(""), null);
+  assertEquals(parseOptionalClientIdQuery(clientId), clientId);
+  assertThrows(() => parseOptionalClientIdQuery("not-a-uuid"), ApiError);
 });
 
 Deno.test("contact cursors reject untrusted values", () => {
