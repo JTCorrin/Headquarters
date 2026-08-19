@@ -14,6 +14,7 @@ import { validateClientBody } from "./clients.ts";
 import {
   decodeCursor,
   extractContactClientId,
+  parseOptionalClientIdQuery,
   validateContactBody,
 } from "./contacts.ts";
 import {
@@ -33,6 +34,7 @@ import {
 } from "./http.ts";
 import {
   sanitizeAiOutput,
+  validateComposeGenerateBody,
   validateDecideBody,
   validateGenerateBody,
   validateInvoiceChaseBody,
@@ -281,6 +283,14 @@ Deno.test("contact client_id is a virtual field extracted for client_contacts sy
     validateContactBody({ client_id: clientId }, true),
     {},
   );
+});
+
+Deno.test("contact list client_id query rejects invalid UUIDs", () => {
+  const clientId = "52e1a71a-1c93-4ec8-a566-e0eecaf06747";
+  assertEquals(parseOptionalClientIdQuery(null), null);
+  assertEquals(parseOptionalClientIdQuery(""), null);
+  assertEquals(parseOptionalClientIdQuery(clientId), clientId);
+  assertThrows(() => parseOptionalClientIdQuery("not-a-uuid"), ApiError);
 });
 
 Deno.test("contact cursors reject untrusted values", () => {
@@ -1902,10 +1912,44 @@ Deno.test("AI invoice_chase generate validation", () => {
   assertThrows(() => validateInvoiceChaseBody({ invoice_id: "x" }), ApiError);
 });
 
+Deno.test("AI email_compose generate validation", () => {
+  const id = "44444444-4444-4444-8444-444444444444";
+  assertEquals(
+    validateComposeGenerateBody({ entity_type: "client", entity_id: id }),
+    {
+      entity_type: "client",
+      entity_id: id,
+      variant: "neutral",
+      subject: null,
+    },
+  );
+  assertEquals(
+    validateComposeGenerateBody({
+      entity_type: "contact",
+      entity_id: id,
+      variant: "warm",
+      subject: "Hello",
+    }).subject,
+    "Hello",
+  );
+  assertThrows(
+    () => validateComposeGenerateBody({ entity_type: "invoice", entity_id: id }),
+    ApiError,
+  );
+  assertThrows(
+    () => validateComposeGenerateBody({ entity_type: "client", entity_id: "x" }),
+    ApiError,
+  );
+});
+
 Deno.test("AI org prompts merge defaults and validate PUT body", () => {
   assertEquals(
     mergeEffectivePrompts({}).email_reply,
     DEFAULT_AI_PROMPTS.email_reply,
+  );
+  assertEquals(
+    mergeEffectivePrompts({}).email_compose,
+    DEFAULT_AI_PROMPTS.email_compose,
   );
   assertEquals(
     mergeEffectivePrompts({ email_reply: " Custom reply prompt " }).email_reply,

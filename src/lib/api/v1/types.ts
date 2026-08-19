@@ -1078,6 +1078,17 @@ export type ApiProjectColumnUpdateBody = Partial<{
 
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
+export type ApiClientContactRole = 'primary' | 'billing' | 'decision_maker' | 'other';
+
+/** Person linked to a client via `client_contacts` (read model). */
+export interface ApiClientLinkedContact {
+	id: string;
+	display_name: string;
+	primary_email: string | null;
+	role: ApiClientContactRole;
+	is_primary: boolean;
+}
+
 export interface ApiClient {
 	id: string;
 	org_id: string;
@@ -1104,6 +1115,8 @@ export interface ApiClient {
 	renewal_on: string | null;
 	notes: string | null;
 	metadata: Record<string, unknown>;
+	/** People linked via `client_contacts` (present on get/list). */
+	contacts?: ApiClientLinkedContact[];
 }
 
 export interface ApiClientListParams {
@@ -1223,6 +1236,8 @@ export interface ApiContact {
 	company_name: string | null;
 	/** Resolved primary client via `client_contacts` (read model). */
 	client_id: string | null;
+	/** Role on the filtered client when listing with `client_id`. */
+	client_role?: ApiClientContactRole;
 	owner_membership_id: string | null;
 	lifecycle_status: ApiContactLifecycleStatus;
 	source: string | null;
@@ -1254,6 +1269,8 @@ export interface ApiContactListParams {
 	limit?: number;
 	cursor?: string;
 	lifecycle_status?: ApiContactLifecycleStatus;
+	/** Restrict to people linked to this client via `client_contacts`. */
+	client_id?: string;
 }
 
 export interface ApiTaxRateListParams {
@@ -1422,12 +1439,7 @@ export interface ApiOrgMember {
 	job_title: string | null;
 }
 
-export type ApiDashboardAgingBucket =
-	| 'current'
-	| '1_30'
-	| '31_60'
-	| '61_90'
-	| '90_plus';
+export type ApiDashboardAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
 
 export interface ApiDashboardKpis {
 	outstanding_cents: number;
@@ -1778,7 +1790,7 @@ export interface ApiAiModelUpdateBody {
 }
 
 export type ApiAiPromptKey =
-	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase';
+	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase' | 'email_compose';
 
 export type ApiAiPromptsMap = Record<ApiAiPromptKey, string>;
 
@@ -1919,13 +1931,7 @@ export interface ApiPlaybookListParams {
 }
 
 export type ApiPlaybookRunStatus =
-	| 'scheduled'
-	| 'running'
-	| 'waiting'
-	| 'completed'
-	| 'failed'
-	| 'cancelled'
-	| 'skipped_busy';
+	'scheduled' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'skipped_busy';
 
 export interface ApiPlaybookRun {
 	id: string;
@@ -1970,6 +1976,14 @@ export interface ApiEmailMessageShareResult {
 
 /** Body for `POST /api/v1/email-messages/{id}/reply` (SMTP outbound v1). */
 export interface ApiEmailMessageReplyBody {
+	body_text: string;
+	body_html?: string | null;
+}
+
+/** Body for `POST /api/v1/{contacts|leads|clients}/{id}/email-messages`. */
+export interface ApiEmailMessageComposeBody {
+	to?: string;
+	subject: string;
 	body_text: string;
 	body_html?: string | null;
 }
@@ -2057,6 +2071,14 @@ export interface ApiAiInvoiceChaseGenerateBody {
 	invoice_id: string;
 	/** polite | firm (injected as TONE at generate time). */
 	variant?: 'polite' | 'firm' | string;
+}
+
+export interface ApiAiComposeGenerateBody {
+	entity_type: ApiEntityEmailType;
+	entity_id: string;
+	/** warm | neutral | firm. */
+	variant?: 'warm' | 'neutral' | 'firm' | string;
+	subject?: string;
 }
 
 export interface ApiAiSuggestion {

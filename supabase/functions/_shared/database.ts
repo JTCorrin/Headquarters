@@ -3013,6 +3013,51 @@ export type Database = {
         };
         Returns: Json;
       };
+      begin_email_compose_idempotent: {
+        Args: {
+          p_org_id: string;
+          p_entity_type: string;
+          p_entity_id: string;
+          p_idempotency_key_hash: string;
+          p_request_hash: string;
+          p_route: string;
+          p_ttl_seconds?: number;
+        };
+        Returns: Json;
+      };
+      abort_email_compose_idempotent: {
+        Args: { p_org_id: string; p_idempotency_key_hash: string };
+        Returns: undefined;
+      };
+      finish_email_compose_idempotent: {
+        Args: {
+          p_org_id: string;
+          p_entity_type: string;
+          p_entity_id: string;
+          p_to_address: string;
+          p_subject: string;
+          p_body_text: string;
+          p_body_html: string | null;
+          p_provider_message_id: string;
+          p_status: string;
+          p_failure_code: string | null;
+          p_idempotency_key_hash: string;
+        };
+        Returns: Json;
+      };
+      create_email_compose_suggestion: {
+        Args: {
+          p_org_id: string;
+          p_entity_type: string;
+          p_entity_id: string;
+          p_output_text: string;
+          p_model_provider: string;
+          p_model_name: string;
+          p_variant?: string;
+          p_prompt_version?: string | null;
+        };
+        Returns: Json;
+      };
       release_mailbox_sync_lease: {
         Args: {
           p_mailbox_id: string;
