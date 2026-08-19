@@ -88,6 +88,59 @@ export function validateInvoiceChaseBody(
   return { invoice_id: invoiceId, variant }
 }
 
+export function validateComposeGenerateBody(
+  body: Record<string, unknown>,
+): {
+  entity_type: 'contact' | 'lead' | 'client'
+  entity_id: string
+  variant: string
+  subject: string | null
+} {
+  const fields: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    if (
+      key !== 'entity_type' && key !== 'entity_id' && key !== 'variant' &&
+      key !== 'subject'
+    ) {
+      fields[key] = 'Field is not writable'
+    }
+  }
+  const entityType = typeof body.entity_type === 'string' ? body.entity_type : ''
+  if (!['contact', 'lead', 'client'].includes(entityType)) {
+    fields.entity_type = 'Must be contact, lead, or client'
+  }
+  let entityId = ''
+  try {
+    entityId = parseUuid(
+      typeof body.entity_id === 'string' ? body.entity_id : '',
+      'entity_id',
+    )
+  } catch {
+    fields.entity_id = 'Must be a UUID'
+  }
+  const variant = typeof body.variant === 'string' && body.variant.trim()
+    ? body.variant.trim()
+    : 'neutral'
+  if (variant.length > 40) fields.variant = 'Must be at most 40 characters'
+  let subject: string | null = null
+  if (body.subject !== undefined && body.subject !== null) {
+    if (typeof body.subject !== 'string') {
+      fields.subject = 'Must be a string or null'
+    } else {
+      subject = body.subject.trim() || null
+    }
+  }
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Generate validation failed', fields)
+  }
+  return {
+    entity_type: entityType as 'contact' | 'lead' | 'client',
+    entity_id: entityId,
+    variant,
+    subject,
+  }
+}
+
 export function validateDecideBody(
   body: Record<string, unknown>,
 ): { accepted_text: string | null } {
@@ -218,6 +271,105 @@ async function generateInvoiceChase(
   return jsonResponse({ data }, 201, requestId)
 }
 
+async function loadComposeEntityContext(
+  db: DatabaseClient,
+  orgId: string,
+  entityType: 'contact' | 'lead' | 'client',
+  entityId: string,
+): Promise<{ name: string; primary_email: string; company: string }> {
+  if (entityType === 'contact') {
+    const { data, error } = await db
+      .from('contacts')
+      .select('display_name, primary_email, company_name')
+      .eq('org_id', orgId)
+      .eq('id', entityId)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (error) throw databaseError(error, 'email-compose')
+    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Contact not found')
+    return {
+      name: data.display_name?.trim() || 'there',
+      primary_email: data.primary_email?.trim() || '',
+      company: data.company_name?.trim() || '',
+    }
+  }
+  if (entityType === 'lead') {
+    const { data, error } = await db
+      .from('leads')
+      .select('name, primary_email, company_name')
+      .eq('org_id', orgId)
+      .eq('id', entityId)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (error) throw databaseError(error, 'email-compose')
+    if (!data) throw new ApiError(404, 'NOT_FOUND', 'Lead not found')
+    return {
+      name: data.name?.trim() || 'there',
+      primary_email: data.primary_email?.trim() || '',
+      company: data.company_name?.trim() || '',
+    }
+  }
+  const { data, error } = await db
+    .from('clients')
+    .select('name, primary_email')
+    .eq('org_id', orgId)
+    .eq('id', entityId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (error) throw databaseError(error, 'email-compose')
+  if (!data) throw new ApiError(404, 'NOT_FOUND', 'Client not found')
+  return {
+    name: data.name?.trim() || 'there',
+    primary_email: data.primary_email?.trim() || '',
+    company: '',
+  }
+}
+
+async function generateEmailCompose(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  role: MembershipRole,
+  requestId: string,
+): Promise<Response> {
+  assertCanUseAi(role)
+  const payload = validateComposeGenerateBody(await jsonBody(req))
+  const entity = await loadComposeEntityContext(
+    db,
+    orgId,
+    payload.entity_type,
+    payload.entity_id,
+  )
+
+  const completion = await runOrgAiCompletion(
+    db,
+    orgId,
+    'email_compose',
+    buildToneAwareUserContent({
+      contextLabel: 'New outbound email',
+      contextBody: [
+        `Recipient: ${entity.name}${entity.primary_email ? ` <${entity.primary_email}>` : ''}`,
+        entity.company ? `Company: ${entity.company}` : null,
+        `Subject: ${payload.subject || '(none provided)'}`,
+      ].filter((line): line is string => Boolean(line)).join('\n'),
+      tone: payload.variant,
+    }),
+  )
+
+  const { data, error } = await db.rpc('create_email_compose_suggestion', {
+    p_org_id: orgId,
+    p_entity_type: payload.entity_type,
+    p_entity_id: payload.entity_id,
+    p_output_text: sanitizeAiOutput(completion.text),
+    p_model_provider: completion.provider,
+    p_model_name: completion.model,
+    p_variant: payload.variant,
+    p_prompt_version: completion.promptVersion,
+  })
+  if (error) throw databaseError(error, requestId)
+  return jsonResponse({ data }, 201, requestId)
+}
+
 async function decideSuggestion(
   db: DatabaseClient,
   orgId: string,
@@ -252,6 +404,10 @@ export async function handleAiSuggestions(
 
   if (path === '/api/v1/ai-suggestions/invoice-chase' && req.method === 'POST') {
     return generateInvoiceChase(req, db, orgId, role, requestId)
+  }
+
+  if (path === '/api/v1/ai-suggestions/email-compose' && req.method === 'POST') {
+    return generateEmailCompose(req, db, orgId, role, requestId)
   }
 
   const useMatch = path.match(/^\/api\/v1\/ai-suggestions\/([0-9a-f-]{36})\/use$/i)

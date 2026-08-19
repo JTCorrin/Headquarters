@@ -51,7 +51,8 @@ export const aiPromptKeys = [
 	'email_reply',
 	'meeting_summary',
 	'meeting_task_proposals',
-	'invoice_chase'
+	'invoice_chase',
+	'email_compose'
 ] as const;
 
 export type AiPromptKey = (typeof aiPromptKeys)[number];
@@ -60,7 +61,8 @@ export const aiPromptLabels: Record<AiPromptKey, string> = {
 	email_reply: 'Email reply',
 	meeting_summary: 'Meeting summary',
 	meeting_task_proposals: 'Meeting task proposals',
-	invoice_chase: 'Invoice chase'
+	invoice_chase: 'Invoice chase',
+	email_compose: 'New email'
 };
 
 export const aiPromptHints: Record<AiPromptKey, string> = {
@@ -68,8 +70,9 @@ export const aiPromptHints: Record<AiPromptKey, string> = {
 		'Used by Draft response. Tone is injected at generate time as TONE: {warm|neutral|firm} — do not hardcode tone variants here.',
 	meeting_summary: 'Used by Generate summary on the meeting workspace.',
 	meeting_task_proposals: 'Used with Generate summary to propose follow-up tasks.',
-	invoice_chase:
-		'Used by Draft chase on invoices. Tone is injected as TONE: {polite|firm}.'
+	invoice_chase: 'Used by Draft chase on invoices. Tone is injected as TONE: {polite|firm}.',
+	email_compose:
+		'Used by Draft response when composing a new email. Tone is injected as TONE: {warm|neutral|firm}.'
 };
 
 export const DEFAULT_AI_PROMPTS: Record<AiPromptKey, string> = {
@@ -80,7 +83,9 @@ export const DEFAULT_AI_PROMPTS: Record<AiPromptKey, string> = {
 	meeting_task_proposals:
 		'Extract 1–3 concrete follow-up tasks from the transcript. Reply with ONLY a JSON array of objects shaped like [{"title":"...","description":"...","confidence":0.8}]. No markdown fences or prose outside the JSON.',
 	invoice_chase:
-		'Draft a short payment-reminder email for this invoice. Be clear about the amount/due date when provided. Do not threaten legal action.'
+		'Draft a short payment-reminder email for this invoice. Be clear about the amount/due date when provided. Do not threaten legal action.',
+	email_compose:
+		'Draft a concise new outbound email to this recipient. Stay professional and actionable. Do not invent facts that are not provided.'
 };
 
 /** True when at least one AI provider is connected for Draft response. */

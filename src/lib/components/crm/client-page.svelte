@@ -23,10 +23,7 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
@@ -104,12 +101,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Clients', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -133,8 +128,7 @@
 					{ label: 'Default currency', value: client.default_currency ?? '—' },
 					{
 						label: 'Payment terms (days)',
-						value:
-							client.payment_terms_days == null ? '—' : String(client.payment_terms_days)
+						value: client.payment_terms_days == null ? '—' : String(client.payment_terms_days)
 					},
 					{ label: 'Tax identifier', value: client.tax_identifier ?? '—' },
 					{ label: 'VAT exempt', value: client.tax_exempt ? 'Yes' : 'No' },
@@ -287,15 +281,42 @@
 		emailTab = await loadEntityEmailTab(api, 'client', clientId);
 	}
 
+	async function onSendNew(payload: { to: string; subject: string; body: string }) {
+		await api.emailMessages.sendForEntity('client', clientId, {
+			to: payload.to,
+			subject: payload.subject,
+			body_text: payload.body
+		});
+		emailTab = await loadEntityEmailTab(api, 'client', clientId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'client', clientId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
-	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+	async function onDraftResponse(payload: {
+		messageId: string;
+		tone: 'warm' | 'neutral' | 'firm';
+	}) {
 		const suggestion = await api.emailMessages.generateDraft({
 			email_message_id: payload.messageId,
 			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onDraftCompose(payload: {
+		tone: 'warm' | 'neutral' | 'firm';
+		subject: string;
+		to: string;
+	}) {
+		void payload.to;
+		const suggestion = await api.emailMessages.generateComposeDraft({
+			entity_type: 'client',
+			entity_id: clientId,
+			variant: payload.tone,
+			subject: payload.subject
 		});
 		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
 	}
@@ -427,6 +448,7 @@
 						mailboxConnected={emailTab.mailboxConnected}
 						aiProviderConnected={emailTab.aiProviderConnected}
 						smtpReady={emailTab.smtpReady}
+						emailDefaultTo={client.primary_email ?? ''}
 						{role}
 						{sharingId}
 						documentsApi={api}
@@ -438,7 +460,9 @@
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
+						{onSendNew}
 						{onDraftResponse}
+						{onDraftCompose}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						onValidSubmit={onSaveClient}
@@ -453,7 +477,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="client-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening clients.
 		</p>
 	</div>

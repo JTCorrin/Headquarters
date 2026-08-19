@@ -14,7 +14,7 @@ import { handleContacts } from './contacts.ts'
 import { handleDocuments } from './documents.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseLimit, parseUuid } from './http.ts'
 import { handleAiSuggestions } from './ai-suggestions.ts'
-import { handleEmailMessages } from './email-messages.ts'
+import { composeEntityEmailMessage, handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
 import { handleOrgInvoiceEmail } from './org-invoice-email.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
@@ -539,13 +539,6 @@ async function routeOrgScoped(
         "Billing members cannot access entity email",
       );
     }
-    if (req.method !== "GET") {
-      throw new ApiError(
-        405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for entity email",
-      );
-    }
     // Path segment is plural; stub expects singular entity type.
     const entityTypeByResource = {
       contacts: "contact",
@@ -557,6 +550,24 @@ async function routeOrgScoped(
     const entityType = entityTypeByResource[resource];
     if (!entityType) {
       throw new ApiError(404, "NOT_FOUND", "Route not found");
+    }
+    if (req.method === "POST") {
+      return await composeEntityEmailMessage(
+        req,
+        db,
+        orgId,
+        entityType,
+        entityEmailMatch[2],
+        membership.role,
+        requestId,
+      );
+    }
+    if (req.method !== "GET") {
+      throw new ApiError(
+        405,
+        "METHOD_NOT_ALLOWED",
+        "Method not allowed for entity email",
+      );
     }
     return await listEntityEmailMessages(
       db,
