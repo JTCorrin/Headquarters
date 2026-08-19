@@ -55,6 +55,7 @@
 		'select',
 		'actions',
 		'name',
+		'people',
 		'status',
 		'title',
 		'number',

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
 	clientStatusLabel,
+	clientContactRoleLabel,
 	contactLifecycleLabel,
 	invoiceStatusLabel,
 	leadStageLabel,
@@ -10,6 +11,7 @@ import {
 	toClientCreateBody,
 	toClientFormData,
 	toClientRow,
+	toClientRelatedContacts,
 	toContactCreateBody,
 	toContactFormData,
 	toContactListItem,
@@ -1022,8 +1024,28 @@ describe('api mappers', () => {
 		expect(toClientRow(sampleClient)).toMatchObject({
 			id: sampleClient.id,
 			name: 'Northwind',
-			status: 'On Hold'
+			status: 'On Hold',
+			people: []
 		});
+		expect(clientContactRoleLabel('decision_maker')).toBe('Decision Maker');
+		expect(
+			toClientRelatedContacts([
+				{
+					id: '22222222-3333-4444-8555-666666666666',
+					display_name: 'Ava Chen',
+					primary_email: 'ava@northwind.com',
+					role: 'primary',
+					is_primary: true
+				}
+			])
+		).toEqual([
+			{
+				id: '22222222-3333-4444-8555-666666666666',
+				name: 'Ava Chen',
+				role: 'Primary',
+				email: 'ava@northwind.com'
+			}
+		]);
 		expect(toClientFormData(sampleClient)).toMatchObject({
 			name: 'Northwind',
 			status: 'on_hold',

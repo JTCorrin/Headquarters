@@ -31,7 +31,12 @@ const WRITABLE_FIELDS = new Set([
 /** Virtual write field — persists via client_contacts, not contacts.client_id. */
 const VIRTUAL_FIELDS = new Set(['client_id'])
 
-export type ContactWithClientId = ContactRow & { client_id: string | null }
+export type ContactClientRole = 'primary' | 'billing' | 'decision_maker' | 'other'
+
+export type ContactWithClientId = ContactRow & {
+  client_id: string | null
+  client_role?: ContactClientRole
+}
 
 const NULLABLE_TEXT_FIELDS = [
   'first_name',
@@ -262,6 +267,54 @@ function databaseError(error: DatabaseError, requestId: string): ApiError {
   return new ApiError(500, 'INTERNAL_ERROR', 'The contact operation failed')
 }
 
+/** Parse optional `client_id` list filter; invalid UUIDs become 400. */
+export function parseOptionalClientIdQuery(value: string | null): string | null {
+  if (!value) return null
+  try {
+    return parseUuid(value, 'client_id')
+  } catch {
+    throw new ApiError(400, 'BAD_REQUEST', 'client_id is invalid')
+  }
+}
+
+type ClientContactLink = {
+  contact_id: string
+  role: ContactClientRole
+  is_primary: boolean
+}
+
+async function listClientContactLinks(
+  db: DatabaseClient,
+  orgId: string,
+  clientId: string,
+  requestId: string,
+): Promise<ClientContactLink[]> {
+  const { data, error } = await db
+    .from('client_contacts')
+    .select('contact_id, role, is_primary')
+    .eq('org_id', orgId)
+    .eq('client_id', clientId)
+    .is('deleted_at', null)
+
+  if (error) throw databaseError(error, requestId)
+  return (data ?? []) as ClientContactLink[]
+}
+
+function sortContactsForClient(
+  contacts: ContactRow[],
+  links: ClientContactLink[],
+): ContactRow[] {
+  const primaryIds = new Set(
+    links.filter((link) => link.is_primary).map((link) => link.contact_id),
+  )
+  return [...contacts].sort((a, b) => {
+    const aPrimary = primaryIds.has(a.id) ? 0 : 1
+    const bPrimary = primaryIds.has(b.id) ? 0 : 1
+    if (aPrimary !== bPrimary) return aPrimary - bPrimary
+    return a.display_name.localeCompare(b.display_name)
+  })
+}
+
 async function listContacts(
   req: Request,
   db: DatabaseClient,
@@ -275,6 +328,19 @@ async function listContacts(
     throw new ApiError(400, 'BAD_REQUEST', 'lifecycle_status is invalid')
   }
 
+  const clientId = parseOptionalClientIdQuery(url.searchParams.get('client_id'))
+  let clientLinks: ClientContactLink[] = []
+  if (clientId) {
+    clientLinks = await listClientContactLinks(db, orgId, clientId, requestId)
+    if (clientLinks.length === 0) {
+      return jsonResponse(
+        { data: [], meta: { next_cursor: null } },
+        200,
+        requestId,
+      )
+    }
+  }
+
   let query = db
     .from('contacts')
     .select(CONTACT_SELECT)
@@ -286,6 +352,12 @@ async function listContacts(
 
   if (lifecycleStatus) {
     query = query.eq('lifecycle_status', lifecycleStatus as ContactLifecycle)
+  }
+  if (clientId) {
+    query = query.in(
+      'id',
+      clientLinks.map((link) => link.contact_id),
+    )
   }
 
   const cursorValue = url.searchParams.get('cursor')
@@ -302,17 +374,25 @@ async function listContacts(
   const contacts = (data ?? []) as ContactRow[]
   const hasNextPage = contacts.length > limit
   const page = hasNextPage ? contacts.slice(0, limit) : contacts
+  const orderedPage = clientId ? sortContactsForClient(page, clientLinks) : page
   const lastContact = page.at(-1) as ContactCursor | undefined
   const clientIds = await resolveContactClientIds(
     db,
     orgId,
-    page.map((contact) => contact.id),
+    orderedPage.map((contact) => contact.id),
     requestId,
+  )
+  const roleByContact = new Map(
+    clientLinks.map((link) => [link.contact_id, link.role] as const),
   )
 
   return jsonResponse(
     {
-      data: page.map((contact) => withClientId(contact, clientIds)),
+      data: orderedPage.map((contact) => {
+        const withId = withClientId(contact, clientIds)
+        const role = roleByContact.get(contact.id)
+        return role ? { ...withId, client_role: role } : withId
+      }),
       meta: {
         next_cursor: hasNextPage && lastContact ? encodeCursor(lastContact) : null,
       },

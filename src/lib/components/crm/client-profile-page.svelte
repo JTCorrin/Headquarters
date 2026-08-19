@@ -23,6 +23,7 @@
 		type ResourceViewState
 	} from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
+	import ContactNameLink from './contact-name-link.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
@@ -259,21 +260,25 @@
 								{#if billingFields.length}
 									<InfoCard title="Billing" fields={billingFields} />
 								{/if}
-								{#if relatedContacts.length}
-									<InfoCard title="Contacts">
-										<div class="space-y-3">
-											{#each relatedContacts as person (person.id)}
-												<div class="flex items-start justify-between gap-3">
-													<div class="min-w-0">
-														<p class="text-sm font-medium">{person.name}</p>
-														<p class="text-muted-foreground truncate text-xs">{person.email}</p>
-													</div>
-													<StatusBadge status={person.role} />
+								<InfoCard title="Contacts">
+									<div class="space-y-3" data-testid="client-related-contacts">
+										{#each relatedContacts as person (person.id)}
+											<div class="flex items-start justify-between gap-3">
+												<div class="min-w-0">
+													<p class="text-sm font-medium">
+														<ContactNameLink id={person.id} name={person.name} />
+													</p>
+													<p class="text-muted-foreground truncate text-xs">{person.email}</p>
 												</div>
-											{/each}
-										</div>
-									</InfoCard>
-								{/if}
+												<StatusBadge status={person.role} />
+											</div>
+										{:else}
+											<p class="text-muted-foreground text-sm">
+												No people linked to this client yet.
+											</p>
+										{/each}
+									</div>
+								</InfoCard>
 							</div>
 							<Timeline
 								bind:events={timelineEvents}
