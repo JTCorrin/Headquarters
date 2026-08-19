@@ -41,6 +41,8 @@
 		role?: MembershipRole;
 		mailSettingsHref?: string;
 		sharingId?: string | null;
+		/** Prefill for new-email To (contact primary_email). */
+		emailDefaultTo?: string;
 		/** Live API workspace — preferred over Storybook mock props. */
 		documentsApi?: ApiV1Client;
 		documentsEntityId?: string;
@@ -59,9 +61,15 @@
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
+		onSendNew?: (payload: { to: string; subject: string; body: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: 'warm' | 'neutral' | 'firm';
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onDraftCompose?: (payload: {
+			tone: 'warm' | 'neutral' | 'firm';
+			subject: string;
+			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
 		onUseSuggestion?: (payload: {
 			suggestionId?: string;
@@ -89,6 +97,7 @@
 		role = 'member',
 		mailSettingsHref = '/settings#mail',
 		sharingId = null,
+		emailDefaultTo = '',
 		documentsApi,
 		documentsEntityId,
 		documentsReloadKey = 0,
@@ -105,7 +114,9 @@
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
+		onSendNew,
 		onDraftResponse,
+		onDraftCompose,
 		onUseSuggestion,
 		onDiscardSuggestion
 	}: ContactProfilePageProps = $props();
@@ -115,6 +126,14 @@
 		{ id: 'email', label: 'Email' },
 		{ id: 'documents', label: 'Documents' }
 	];
+
+	let activeTab = $state('details');
+	let composingNew = $state(false);
+
+	function handleEmailClick() {
+		activeTab = 'email';
+		composingNew = true;
+	}
 </script>
 
 <AppSidebarFrame
@@ -133,7 +152,15 @@
 			<div class="shrink-0">
 				<ProfileHeader {breadcrumb} {title} {status} {subtitle}>
 					{#snippet actions()}
-						<Button variant="outline" size="sm">Email</Button>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							data-testid="contact-email-action"
+							onclick={handleEmailClick}
+						>
+							Email
+						</Button>
 						<Button variant="outline" size="sm">Add note</Button>
 						{#if contactForm}
 							<ContactFormDrawer
@@ -167,7 +194,7 @@
 				</ProfileHeader>
 			</div>
 
-			<ProfileTabs {tabs}>
+			<ProfileTabs {tabs} bind:value={activeTab}>
 				{#snippet children({ active })}
 					{#if active === 'details'}
 						<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
@@ -193,9 +220,13 @@
 							{role}
 							{mailSettingsHref}
 							{sharingId}
+							defaultTo={emailDefaultTo}
+							bind:composingNew
 							{onAddToTimeline}
 							{onSendReply}
+							{onSendNew}
 							{onDraftResponse}
+							{onDraftCompose}
 							{onUseSuggestion}
 							{onDiscardSuggestion}
 							class="min-h-0 flex-1"
