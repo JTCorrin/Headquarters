@@ -47,7 +47,26 @@ describe('SettingsConfigPage', () => {
 			role: 'owner',
 			configuration,
 			taxRates,
-			includeMailbox: true
+			includeMailbox: true,
+			mailboxAccount: {
+				id: 'mb-1',
+				email_address: 'joe@acme.test',
+				username: 'joe@acme.test',
+				from_name: 'Joe',
+				imap_host: 'imap.example.test',
+				imap_port: 993,
+				imap_security: 'tls',
+				smtp_host: 'smtp.example.test',
+				smtp_port: 465,
+				smtp_security: 'tls',
+				credentials_configured: true,
+				status: 'configured',
+				auth_mode: 'password',
+				oauth_provider: null,
+				last_checked_at: null,
+				last_error_code: null,
+				syncIntervalMinutes: 10
+			}
 		});
 
 		await expect.element(page.getByTestId('personal-mail-section')).toBeInTheDocument();
@@ -55,6 +74,7 @@ describe('SettingsConfigPage', () => {
 			.element(page.getByText(/not the org Email sending/i))
 			.toBeInTheDocument();
 		await expect.element(page.getByTestId('profile-mailbox-form')).toBeInTheDocument();
+		expect(page.getByTestId('mailbox-sync-interval').elements().length).toBe(0);
 	});
 
 	it('omits personal Mail on Owner org Config when mailboxForm is absent', async () => {

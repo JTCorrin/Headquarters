@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
@@ -180,6 +180,71 @@ describe('PersonalSettingsController', () => {
 		await page.getByTestId('mailbox-test').click();
 		await expect.element(page.getByTestId('mailbox-test-feedback')).toHaveTextContent(
 			/Missing saved credentials/i
+		);
+	});
+
+	it('saves the selected mailbox sync interval and shows returned state or errors', async () => {
+		const mailboxAccount = {
+			id: 'mb-1',
+			email_address: 'joe@acme.test',
+			username: 'joe@acme.test',
+			from_name: 'Joe',
+			imap_host: 'imap.gmail.com',
+			imap_port: 993,
+			imap_security: 'tls' as const,
+			smtp_host: 'smtp.gmail.com',
+			smtp_port: 465,
+			smtp_security: 'tls' as const,
+			credentials_configured: true,
+			status: 'configured',
+			auth_mode: 'password' as const,
+			oauth_provider: null,
+			last_checked_at: null,
+			last_error_code: null,
+			sync_interval_minutes: 15
+		};
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A
+		});
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'GET /api/v1/organisations': async () => ({ body: memberships() }),
+				'GET /api/v1/profile/preferences': async () => ({
+					body: { data: { theme_preference: null, locale: null, timezone: null } }
+				}),
+				'GET /api/v1/me/mailbox': async () => ({ body: { data: mailboxAccount } })
+			}),
+			getOrgId: () => session.selectedOrgId
+		});
+		const updateSyncInterval = vi
+			.fn()
+			.mockResolvedValueOnce({ ...mailboxAccount, sync_interval_minutes: 30 })
+			.mockRejectedValueOnce(new Error('save failed'));
+		Object.assign(api.mailbox, { updateSyncInterval });
+
+		render(PersonalSettingsController, { api, session });
+
+		await page.getByRole('tab', { name: 'Mail' }).click();
+		const trigger = page.getByTestId('mailbox-sync-interval-trigger');
+		await expect.element(trigger).toHaveTextContent('15 minutes');
+
+		await trigger.click();
+		await page.getByRole('option', { name: '30 minutes' }).click();
+		await page.getByTestId('mailbox-sync-interval-save').click();
+
+		await expect.poll(() => updateSyncInterval).toHaveBeenCalledWith(30);
+		await expect.element(page.getByTestId('mailbox-sync-interval-feedback')).toHaveTextContent(
+			/Sync interval saved/i
+		);
+		await expect.element(trigger).toHaveTextContent('30 minutes');
+
+		await trigger.click();
+		await page.getByRole('option', { name: '60 minutes' }).click();
+		await page.getByTestId('mailbox-sync-interval-save').click();
+
+		await expect.element(page.getByTestId('mailbox-sync-interval-feedback')).toHaveTextContent(
+			/Could not save sync interval/i
 		);
 	});
 

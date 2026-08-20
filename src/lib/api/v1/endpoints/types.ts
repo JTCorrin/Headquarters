@@ -122,6 +122,7 @@ import type {
 	ApiMailboxOAuthProvider,
 	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
+	ApiMailboxSyncIntervalPatchResult,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
 	ApiOrgInvoiceEmailAccount,
@@ -626,6 +627,10 @@ export interface DocumentsEndpoints {
 export interface MailboxEndpoints {
 	get(signal?: AbortSignal): Promise<ApiMailboxAccount | null>;
 	put(body: ApiMailboxPutBody, signal?: AbortSignal): Promise<ApiMailboxAccount>;
+	updateSyncInterval(
+		minutes: number,
+		signal?: AbortSignal
+	): Promise<ApiMailboxSyncIntervalPatchResult>;
 	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
 	sync(signal?: AbortSignal): Promise<ApiMailboxSyncResult>;
 	disconnect(signal?: AbortSignal): Promise<void>;
