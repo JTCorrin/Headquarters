@@ -1065,6 +1065,7 @@ export type MailboxAccountRow = {
   sync_high_uid: number | null;
   sync_low_uid: number | null;
   sync_catchup_complete: boolean;
+  sync_interval_minutes: number;
 };
 
 export type OrgInvoiceEmailAccountRow = {
@@ -2813,6 +2814,10 @@ export type Database = {
       };
       get_mailbox_account: {
         Args: { p_org_id: string };
+        Returns: Json;
+      };
+      update_mailbox_sync_interval: {
+        Args: { p_org_id: string; p_sync_interval_minutes: number };
         Returns: Json;
       };
       upsert_mailbox_account: {
