@@ -1262,6 +1262,7 @@ export function toMailboxAccountResource(
 				: null,
 		last_checked_at: account.last_checked_at,
 		last_error_code: account.last_error_code,
+		syncIntervalMinutes: account.sync_interval_minutes ?? 5,
 		sync_catchup_complete: account.sync_catchup_complete,
 		sync_high_uid: account.sync_high_uid ?? null,
 		sync_low_uid: account.sync_low_uid ?? null

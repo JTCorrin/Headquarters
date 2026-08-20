@@ -74,6 +74,7 @@ export interface MailboxAccountResource {
 	oauth_provider: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+	syncIntervalMinutes: number;
 	sync_catchup_complete?: boolean;
 	sync_high_uid?: number | null;
 	sync_low_uid?: number | null;
