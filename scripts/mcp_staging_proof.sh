@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prove MCP: mint crm_key_ → tools/list → create_task → add_timeline_note
 # → create/update contact + create lead (Wave A)
-# → create project + create meeting (Wave B).
+# → create project + create/update/delete card + create meeting (Wave B).
 #
 # Usage:
 #   SUPABASE_URL=http://192.168.5.136:54321 \
@@ -143,6 +143,9 @@ printf '%s' "$list_json" | jq -e '
 	and index("list_projects") != null
 	and index("create_project") != null
 	and index("update_project") != null
+	and index("create_card") != null
+	and index("update_card") != null
+	and index("delete_card") != null
 	and index("list_meetings") != null
 	and index("create_meeting") != null
 	and index("update_meeting") != null
@@ -355,6 +358,95 @@ update_project_json="$(
 )"
 printf '%s' "$update_project_json" | jq -e '.result.isError != true' >/dev/null \
 	|| die "update_project isError: ${update_project_json}"
+
+log "MCP tools/call get_project (resolve column for create_card)"
+get_project_json="$(
+	mcp "$(jq -n \
+		--arg id "$PROJECT_ID" \
+		'{jsonrpc:"2.0", id:110, method:"tools/call",
+			params:{name:"get_project", arguments:{id:$id}}}')"
+)"
+COLUMN_ID="$(
+	printf '%s' "$get_project_json" | jq -r '
+		(.result.structuredContent.data.columns
+			// (.result.content[0].text | fromjson | .data.columns)
+			// [])
+		| (map(select(.key == "backlog"))[0].id // .[0].id // empty)'
+)"
+[[ -n "$COLUMN_ID" && "$COLUMN_ID" != null ]] \
+	|| die "get_project missing column id: ${get_project_json}"
+
+log "MCP tools/call create_card"
+create_card_json="$(
+	mcp "$(jq -n \
+		--arg pid "$PROJECT_ID" \
+		--arg cid "$COLUMN_ID" \
+		--arg title "MCP proof card $(date +%s)" \
+		'{jsonrpc:"2.0", id:111, method:"tools/call",
+			params:{name:"create_card",
+				arguments:{
+					project_id:$pid,
+					column_id:$cid,
+					title:$title,
+					description:"wave-b card proof"
+				}}}')"
+)"
+CARD_ID="$(
+	printf '%s' "$create_card_json" | jq -r '
+		.result.structuredContent.data.id
+		// (.result.content[0].text | fromjson | .data.id)
+		// empty'
+)"
+CARD_VER="$(
+	printf '%s' "$create_card_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$CARD_ID" && "$CARD_ID" != null ]] || die "create_card failed: ${create_card_json}"
+[[ -n "$CARD_VER" && "$CARD_VER" != null ]] \
+	|| die "create_card missing version: ${create_card_json}"
+printf '%s' "$create_card_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "create_card isError: ${create_card_json}"
+
+log "MCP tools/call update_card"
+update_card_json="$(
+	mcp "$(jq -n \
+		--arg pid "$PROJECT_ID" \
+		--arg id "$CARD_ID" \
+		--argjson ver "$CARD_VER" \
+		'{jsonrpc:"2.0", id:112, method:"tools/call",
+			params:{name:"update_card",
+				arguments:{
+					project_id:$pid,
+					id:$id,
+					version:$ver,
+					description:"wave-b card proof update"
+				}}}')"
+)"
+CARD_VER="$(
+	printf '%s' "$update_card_json" | jq -r '
+		.result.structuredContent.data.version
+		// (.result.content[0].text | fromjson | .data.version)
+		// empty'
+)"
+[[ -n "$CARD_VER" && "$CARD_VER" != null ]] \
+	|| die "update_card missing version: ${update_card_json}"
+printf '%s' "$update_card_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "update_card isError: ${update_card_json}"
+
+log "MCP tools/call delete_card"
+delete_card_json="$(
+	mcp "$(jq -n \
+		--arg pid "$PROJECT_ID" \
+		--arg id "$CARD_ID" \
+		--argjson ver "$CARD_VER" \
+		'{jsonrpc:"2.0", id:113, method:"tools/call",
+			params:{name:"delete_card",
+				arguments:{project_id:$pid, id:$id, version:$ver}}}')"
+)"
+printf '%s' "$delete_card_json" | jq -e '.result.isError != true' >/dev/null \
+	|| die "delete_card isError: ${delete_card_json}"
 
 log "MCP tools/call create_meeting"
 STARTS="$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || date -u -v+1H +%Y-%m-%dT%H:%M:%S.000Z)"
