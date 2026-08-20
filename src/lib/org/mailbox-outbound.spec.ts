@@ -18,6 +18,7 @@ function mailbox(partial: Partial<ApiMailboxAccount>): ApiMailboxAccount {
 		status: 'ok',
 		last_checked_at: null,
 		last_error_code: null,
+		sync_interval_minutes: 5,
 		...partial
 	};
 }
