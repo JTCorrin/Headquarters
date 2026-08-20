@@ -2559,6 +2559,34 @@ Deno.test("MCP create_task requires assignee_membership_id", () => {
   );
 });
 
+Deno.test("MCP create_card requires project_id, column_id, and title", () => {
+  const createCard = listMcpTools().find((tool) => tool.name === "create_card");
+  assertEquals(createCard?.inputSchema.required, [
+    "project_id",
+    "column_id",
+    "title",
+  ]);
+  assertEquals(
+    (createCard?.inputSchema.properties as Record<string, unknown>)
+      ?.column_id,
+    { type: "string", format: "uuid" },
+  );
+
+  const updateCard = listMcpTools().find((tool) => tool.name === "update_card");
+  assertEquals(updateCard?.inputSchema.required, [
+    "project_id",
+    "id",
+    "version",
+  ]);
+
+  const deleteCard = listMcpTools().find((tool) => tool.name === "delete_card");
+  assertEquals(deleteCard?.inputSchema.required, [
+    "project_id",
+    "id",
+    "version",
+  ]);
+});
+
 Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => {
   const names = listMcpTools().map((tool) => tool.name).sort();
   assertEquals(names, [
@@ -2566,6 +2594,7 @@ Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => 
     "add_timeline_note",
     "adjust_product_stock",
     "allocate_payment",
+    "create_card",
     "create_client",
     "create_contact",
     "create_invoice",
@@ -2578,6 +2607,7 @@ Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => 
     "create_project",
     "create_quote",
     "create_task",
+    "delete_card",
     "get_client",
     "get_contact",
     "get_invoice",
@@ -2604,6 +2634,7 @@ Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => 
     "reverse_payment",
     "send_invoice",
     "send_quote",
+    "update_card",
     "update_client",
     "update_contact",
     "update_invoice",
