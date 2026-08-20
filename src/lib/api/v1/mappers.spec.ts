@@ -33,6 +33,7 @@ import {
 	toLeadCard,
 	toLeadCreateBody,
 	toLeadFormData,
+	toMailboxAccountResource,
 	toOrganisationBrandingResource,
 	toOrganisationConfigFormData,
 	toOrganisationConfigPatch,
@@ -58,6 +59,7 @@ import type {
 	ApiContact,
 	ApiInvoice,
 	ApiLead,
+	ApiMailboxAccount,
 	ApiPayment,
 	ApiQuote
 } from './types.js';
@@ -88,6 +90,34 @@ const sampleContact: ApiContact = {
 };
 
 describe('api mappers', () => {
+	it('maps mailbox sync interval and safely defaults legacy payloads', () => {
+		const account: ApiMailboxAccount = {
+			id: 'mb-1',
+			email_address: 'joe@example.test',
+			username: 'joe@example.test',
+			from_name: null,
+			imap_host: 'imap.example.test',
+			imap_port: 993,
+			imap_security: 'tls',
+			smtp_host: 'smtp.example.test',
+			smtp_port: 587,
+			smtp_security: 'starttls',
+			credentials_configured: true,
+			status: 'configured',
+			last_checked_at: null,
+			last_error_code: null,
+			sync_interval_minutes: 15
+		};
+
+		expect(toMailboxAccountResource(account)?.syncIntervalMinutes).toBe(15);
+		expect(
+			toMailboxAccountResource({
+				...account,
+				sync_interval_minutes: undefined
+			} as unknown as ApiMailboxAccount)?.syncIntervalMinutes
+		).toBe(5);
+	});
+
 	it('maps create form fields to API body', () => {
 		expect(
 			toOrganisationCreateBody({

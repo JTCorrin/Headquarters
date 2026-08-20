@@ -502,6 +502,61 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "create_card",
+    description:
+      "Create a project board card (same validation as POST /api/v1/projects/{project_id}/cards). column_id is required — call get_project first to read column UUIDs. MCP cards cannot omit column_id (HTTP may still default to backlog).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string", format: "uuid" },
+        column_id: { type: "string", format: "uuid" },
+        title: { type: "string" },
+        description: { type: ["string", "null"] },
+        assignee_membership_id: { type: ["string", "null"], format: "uuid" },
+        due_at: { type: ["string", "null"] },
+      },
+      required: ["project_id", "column_id", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "update_card",
+    description:
+      "Update a project board card (same validation as PATCH /api/v1/projects/{project_id}/cards/{id}). Requires version for If-Match. Move between columns with column_id and optional position.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string", format: "uuid" },
+        id: { type: "string", format: "uuid" },
+        version: { type: "integer", minimum: 1 },
+        title: { type: "string" },
+        description: { type: ["string", "null"] },
+        assignee_membership_id: { type: ["string", "null"], format: "uuid" },
+        due_at: { type: ["string", "null"] },
+        column_id: { type: "string", format: "uuid" },
+        position: { type: "number" },
+        completed_at: { type: ["string", "null"] },
+      },
+      required: ["project_id", "id", "version"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "delete_card",
+    description:
+      "Soft-delete a project board card (same as DELETE /api/v1/projects/{project_id}/cards/{id}). Requires version for If-Match.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string", format: "uuid" },
+        id: { type: "string", format: "uuid" },
+        version: { type: "integer", minimum: 1 },
+      },
+      required: ["project_id", "id", "version"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "list_meetings",
     description: "List meetings in the organisation pinned to the API key.",
     inputSchema: {
@@ -1967,6 +2022,77 @@ async function callTool(
       const path = `/api/v1/projects/${id}`;
       const response = await handleProjects(
         syntheticRequest("PATCH", path, patch, {
+          "if-match": `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      );
+      return await toolResultFromHttp(response);
+    }
+    case "create_card": {
+      assertCanAccessProjects(membership.role, "POST");
+      requireUserBackedActor(auth.userId);
+      const projectId = parseUuid(
+        requireString(args, "project_id"),
+        "project_id",
+      );
+      parseUuid(requireString(args, "column_id"), "column_id");
+      requireString(args, "title");
+      const { project_id: _projectId, ...body } = args;
+      const path = `/api/v1/projects/${projectId}/cards`;
+      const response = await handleProjects(
+        syntheticRequest("POST", path, body),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      );
+      return await toolResultFromHttp(response);
+    }
+    case "update_card": {
+      assertCanAccessProjects(membership.role, "PATCH");
+      requireUserBackedActor(auth.userId);
+      const projectId = parseUuid(
+        requireString(args, "project_id"),
+        "project_id",
+      );
+      const id = parseUuid(requireString(args, "id"), "id");
+      const version = requireVersion(args);
+      const {
+        project_id: _projectId,
+        id: _id,
+        version: _version,
+        ...patch
+      } = args;
+      const path = `/api/v1/projects/${projectId}/cards/${id}`;
+      const response = await handleProjects(
+        syntheticRequest("PATCH", path, patch, {
+          "if-match": `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      );
+      return await toolResultFromHttp(response);
+    }
+    case "delete_card": {
+      assertCanAccessProjects(membership.role, "DELETE");
+      requireUserBackedActor(auth.userId);
+      const projectId = parseUuid(
+        requireString(args, "project_id"),
+        "project_id",
+      );
+      const id = parseUuid(requireString(args, "id"), "id");
+      const version = requireVersion(args);
+      const path = `/api/v1/projects/${projectId}/cards/${id}`;
+      const response = await handleProjects(
+        syntheticRequest("DELETE", path, undefined, {
           "if-match": `"${version}"`,
         }),
         db,

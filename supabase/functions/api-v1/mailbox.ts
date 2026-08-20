@@ -75,6 +75,10 @@ export type MailboxUpsertBody = {
   password: string | null
 }
 
+export type MailboxPatchBody = {
+  sync_interval_minutes: number
+}
+
 function assertCanAccessMailbox(role: MembershipRole, method: string): void {
   if (role === 'billing') {
     throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access mailboxes')
@@ -216,6 +220,25 @@ export function validateMailboxBody(body: Record<string, unknown>): MailboxUpser
   }
 }
 
+export function validateMailboxPatchBody(body: Record<string, unknown>): MailboxPatchBody {
+  const fields: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    if (key !== 'sync_interval_minutes') fields[key] = 'Field is not writable'
+  }
+
+  const syncInterval = typeof body.sync_interval_minutes === 'number'
+    ? body.sync_interval_minutes
+    : NaN
+  if (!Number.isInteger(syncInterval) || syncInterval < 1 || syncInterval > 60) {
+    fields.sync_interval_minutes = 'Must be an integer 1–60'
+  }
+
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Mailbox validation failed', fields)
+  }
+  return { sync_interval_minutes: syncInterval }
+}
+
 export function validateMailboxTestBody(
   body: Record<string, unknown>,
 ): { password: string | null } {
@@ -313,6 +336,22 @@ async function putMailbox(
     p_smtp_security: payload.smtp_security,
     p_username: payload.username,
     p_password: payload.password,
+  })
+  if (error) throw databaseError(error, requestId)
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
+}
+
+async function patchMailbox(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  requestId: string,
+): Promise<Response> {
+  const payload = validateMailboxPatchBody(await jsonBody(req))
+  const { data, error } = await db.rpc('update_mailbox_sync_interval', {
+    p_org_id: orgId,
+    p_sync_interval_minutes: payload.sync_interval_minutes,
   })
   if (error) throw databaseError(error, requestId)
   assertNoSecretEcho(data)
@@ -774,6 +813,7 @@ export function handleMailbox(
   if (path === '/api/v1/me/mailbox') {
     if (req.method === 'GET') return getMailbox(db, orgId, requestId)
     if (req.method === 'PUT') return putMailbox(req, db, orgId, requestId)
+    if (req.method === 'PATCH') return patchMailbox(req, db, orgId, requestId)
     if (req.method === 'DELETE') return deleteMailbox(db, orgId, requestId)
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for mailbox')
   }

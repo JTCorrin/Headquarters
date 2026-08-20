@@ -30,6 +30,9 @@
 		) => boolean | void | Promise<boolean | void>;
 		onTest?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onSync?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
+		onSaveSyncInterval?: (
+			minutes: number
+		) => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnect?: () => boolean | void | Promise<boolean | void>;
 	}
 
@@ -43,6 +46,7 @@
 		onConnectOAuth,
 		onTest,
 		onSync,
+		onSaveSyncInterval,
 		onDisconnect
 	}: ProfileMailboxFormProps = $props();
 
@@ -54,16 +58,19 @@
 	let pendingSubmit = $state(false);
 	let pendingTest = $state(false);
 	let pendingSync = $state(false);
+	let pendingSyncInterval = $state(false);
 	let pendingDisconnect = $state(false);
 	let pendingOAuth = $state(false);
 	let testFeedback = $state<MailboxTestFeedback | null>(null);
 	let syncFeedback = $state<MailboxTestFeedback | null>(null);
+	let syncIntervalFeedback = $state<MailboxTestFeedback | null>(null);
 	let submitLock = false;
 	const busy = $derived(
 		$submitting ||
 			pendingSubmit ||
 			pendingTest ||
 			pendingSync ||
+			pendingSyncInterval ||
 			pendingDisconnect ||
 			pendingOAuth
 	);
@@ -79,10 +86,15 @@
 		starttls: 'STARTTLS',
 		none: 'None'
 	};
+	const syncIntervalOptions = [1, 5, 10, 15, 30, 60] as const;
 
 	const presetLabel = $derived(presetLabels[$formData.preset] ?? 'Preset');
 	const imapSecurityLabel = $derived(securityLabels[$formData.imapSecurity] ?? 'Security');
 	const smtpSecurityLabel = $derived(securityLabels[$formData.smtpSecurity] ?? 'Security');
+	let selectedSyncInterval = $derived(String(account?.syncIntervalMinutes ?? 5));
+	const syncIntervalLabel = $derived(
+		`${selectedSyncInterval} ${selectedSyncInterval === '1' ? 'minute' : 'minutes'}`
+	);
 
 	const oauthPreset = $derived(
 		$formData.preset === 'outlook' || $formData.preset === 'gmail' ? $formData.preset : null
@@ -142,6 +154,20 @@
 			}
 		} finally {
 			pendingSync = false;
+		}
+	}
+
+	async function handleSaveSyncInterval() {
+		if (pendingSyncInterval || !onSaveSyncInterval) return;
+		pendingSyncInterval = true;
+		syncIntervalFeedback = null;
+		try {
+			const result = await onSaveSyncInterval(Number(selectedSyncInterval));
+			if (result && typeof result === 'object' && 'ok' in result) {
+				syncIntervalFeedback = result;
+			}
+		} finally {
+			pendingSyncInterval = false;
 		}
 	}
 
@@ -226,6 +252,57 @@
 				</span>
 			{/if}
 		</p>
+	{/if}
+
+	{#if account?.credentials_configured && onSaveSyncInterval}
+		<div class="space-y-2" data-testid="mailbox-sync-interval">
+			<Label for="mailbox-sync-interval">Automatic sync every</Label>
+			<div class="flex flex-wrap items-center gap-2">
+				<Select.Root type="single" bind:value={selectedSyncInterval} disabled={busy}>
+					<Select.Trigger
+						id="mailbox-sync-interval"
+						class="w-36"
+						data-testid="mailbox-sync-interval-trigger"
+						disabled={busy}
+					>
+						{syncIntervalLabel}
+					</Select.Trigger>
+					<Select.Content>
+						{#each syncIntervalOptions as minutes (minutes)}
+							{@const label = `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`}
+							<Select.Item value={String(minutes)} {label}>{label}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					disabled={busy || Number(selectedSyncInterval) === account.syncIntervalMinutes}
+					onclick={handleSaveSyncInterval}
+					data-testid="mailbox-sync-interval-save"
+				>
+					{pendingSyncInterval ? 'Saving…' : 'Save sync interval'}
+				</Button>
+			</div>
+			<p class="text-muted-foreground text-xs">
+				Pulls new mail from your provider. Catch-up of older mail may sync more often until finished.
+			</p>
+			{#if syncIntervalFeedback}
+				<p
+					class={cn(
+						'rounded-2xl px-3 py-2 text-xs',
+						syncIntervalFeedback.ok
+							? 'bg-emerald-500/10 text-emerald-900 ring-1 ring-emerald-500/20 dark:text-emerald-100'
+							: 'bg-destructive/10 text-destructive ring-1 ring-destructive/20'
+					)}
+					role="status"
+					data-testid="mailbox-sync-interval-feedback"
+				>
+					{syncIntervalFeedback.message}
+				</p>
+			{/if}
+		</div>
 	{/if}
 
 	<div class="space-y-2">

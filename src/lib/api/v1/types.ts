@@ -1667,6 +1667,7 @@ export interface ApiMailboxAccount {
 	oauth_provider?: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+	sync_interval_minutes: number;
 	sync_catchup_complete?: boolean;
 	sync_high_uid?: number | null;
 	sync_low_uid?: number | null;
@@ -1693,6 +1694,12 @@ export interface ApiMailboxPutBody {
 	smtp_port: number;
 	smtp_security: 'tls' | 'starttls' | 'none';
 }
+
+export interface ApiMailboxSyncIntervalPatchBody {
+	sync_interval_minutes: number;
+}
+
+export type ApiMailboxSyncIntervalPatchResult = ApiMailboxAccount;
 
 export interface ApiMailboxTestResult {
 	ok: boolean;

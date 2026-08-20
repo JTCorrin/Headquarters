@@ -59,7 +59,12 @@ import {
   validateAiModelBody,
 } from "./integrations.ts";
 import { isMailboxOAuthStubMode } from "../_shared/mailbox-oauth.ts";
-import { validateMailboxBody, validateMailboxTestBody } from "./mailbox.ts";
+import {
+  handleMailbox,
+  validateMailboxBody,
+  validateMailboxPatchBody,
+  validateMailboxTestBody,
+} from "./mailbox.ts";
 import { resolveLeadCurrency, validateLeadBody } from "./leads.ts";
 import { hashIdempotencyRequest, parseIdempotencyKey } from "./idempotency.ts";
 import {
@@ -1651,6 +1656,64 @@ Deno.test("mailbox test body accepts optional password only", () => {
   assertThrows(() => validateMailboxTestBody({ host: "nope" }), ApiError);
 });
 
+Deno.test("mailbox sync interval validation accepts only an integer from 1 to 60", () => {
+  assertEquals(validateMailboxPatchBody({ sync_interval_minutes: 15 }), {
+    sync_interval_minutes: 15,
+  });
+  for (const sync_interval_minutes of [0, 61, 1.5, "5", null]) {
+    assertThrows(
+      () => validateMailboxPatchBody({ sync_interval_minutes }),
+      ApiError,
+    );
+  }
+  assertThrows(() => validateMailboxPatchBody({}), ApiError);
+  assertThrows(
+    () =>
+      validateMailboxPatchBody({
+        sync_interval_minutes: 5,
+        email_address: "not-writable@example.test",
+      }),
+    ApiError,
+  );
+});
+
+Deno.test("mailbox PATCH updates the sync interval through the dedicated RPC", async () => {
+  let rpcCall: { name: string; args: unknown } | null = null;
+  const db = {
+    rpc(name: string, args: unknown) {
+      rpcCall = { name, args };
+      return Promise.resolve({
+        data: { id: "mailbox-1", sync_interval_minutes: 10 },
+        error: null,
+      });
+    },
+  } as unknown as Parameters<typeof handleMailbox>[1];
+  const response = await handleMailbox(
+    new Request("http://localhost/api/v1/me/mailbox", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sync_interval_minutes: 10 }),
+    }),
+    db,
+    "/api/v1/me/mailbox",
+    "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "member",
+    "request-1",
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(rpcCall, {
+    name: "update_mailbox_sync_interval",
+    args: {
+      p_org_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      p_sync_interval_minutes: 10,
+    },
+  });
+  assertEquals(await response.json(), {
+    data: { id: "mailbox-1", sync_interval_minutes: 10 },
+  });
+});
+
 Deno.test("AI connect validation requires api_key and parses providers", () => {
   assertEquals(
     validateAiConnectBody({ api_key: "sk-test-123456" }).api_key,
@@ -2496,6 +2559,34 @@ Deno.test("MCP create_task requires assignee_membership_id", () => {
   );
 });
 
+Deno.test("MCP create_card requires project_id, column_id, and title", () => {
+  const createCard = listMcpTools().find((tool) => tool.name === "create_card");
+  assertEquals(createCard?.inputSchema.required, [
+    "project_id",
+    "column_id",
+    "title",
+  ]);
+  assertEquals(
+    (createCard?.inputSchema.properties as Record<string, unknown>)
+      ?.column_id,
+    { type: "string", format: "uuid" },
+  );
+
+  const updateCard = listMcpTools().find((tool) => tool.name === "update_card");
+  assertEquals(updateCard?.inputSchema.required, [
+    "project_id",
+    "id",
+    "version",
+  ]);
+
+  const deleteCard = listMcpTools().find((tool) => tool.name === "delete_card");
+  assertEquals(deleteCard?.inputSchema.required, [
+    "project_id",
+    "id",
+    "version",
+  ]);
+});
+
 Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => {
   const names = listMcpTools().map((tool) => tool.name).sort();
   assertEquals(names, [
@@ -2503,6 +2594,7 @@ Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => 
     "add_timeline_note",
     "adjust_product_stock",
     "allocate_payment",
+    "create_card",
     "create_client",
     "create_contact",
     "create_invoice",
@@ -2515,6 +2607,7 @@ Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => 
     "create_project",
     "create_quote",
     "create_task",
+    "delete_card",
     "get_client",
     "get_contact",
     "get_invoice",
@@ -2541,6 +2634,7 @@ Deno.test("MCP tools/list catalog covers MVP + Wave A/B/C entity writes", () => 
     "reverse_payment",
     "send_invoice",
     "send_quote",
+    "update_card",
     "update_client",
     "update_contact",
     "update_invoice",

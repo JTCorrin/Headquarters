@@ -58,6 +58,9 @@
 			| false
 			| void
 			| Promise<MailboxTestFeedback | false | void>;
+		onSaveMailboxSyncInterval?: (
+			minutes: number
+		) => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		onConnectMailboxOAuth?: (
 			provider: 'microsoft' | 'google'
@@ -102,6 +105,7 @@
 		onSaveMailbox,
 		onTestMailbox,
 		onSyncMailbox,
+		onSaveMailboxSyncInterval,
 		onDisconnectMailbox,
 		onConnectMailboxOAuth,
 		mailboxOAuthError = null,
@@ -203,6 +207,7 @@
 									onConnectOAuth={onConnectMailboxOAuth}
 									onTest={onTestMailbox}
 									onSync={onSyncMailbox}
+									onSaveSyncInterval={onSaveMailboxSyncInterval}
 									onDisconnect={onDisconnectMailbox}
 								/>
 							</section>
