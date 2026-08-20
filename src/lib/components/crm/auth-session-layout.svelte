@@ -55,8 +55,8 @@
 	// Empty PUBLIC_API_BASE_URL → same-origin `/api/v1/...` (proxied by SvelteKit).
 	const api = createApiV1Client({
 		baseUrl: resolveApiV1BaseUrl(env.PUBLIC_API_BASE_URL),
-		getOrgId: () => orgSession.selectedOrgId,
-		getAccessToken: () => auth.accessToken
+		getOrgId: () => untrack(() => orgSession.selectedOrgId),
+		getAccessToken: () => untrack(() => auth.accessToken)
 	});
 
 	setOrgSession(orgSession);
