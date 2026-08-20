@@ -59,7 +59,12 @@ import {
   validateAiModelBody,
 } from "./integrations.ts";
 import { isMailboxOAuthStubMode } from "../_shared/mailbox-oauth.ts";
-import { validateMailboxBody, validateMailboxTestBody } from "./mailbox.ts";
+import {
+  handleMailbox,
+  validateMailboxBody,
+  validateMailboxPatchBody,
+  validateMailboxTestBody,
+} from "./mailbox.ts";
 import { resolveLeadCurrency, validateLeadBody } from "./leads.ts";
 import { hashIdempotencyRequest, parseIdempotencyKey } from "./idempotency.ts";
 import {
@@ -1649,6 +1654,64 @@ Deno.test("mailbox test body accepts optional password only", () => {
   assertEquals(validateMailboxTestBody({ password: "x" }), { password: "x" });
   assertThrows(() => validateMailboxTestBody({ password: "" }), ApiError);
   assertThrows(() => validateMailboxTestBody({ host: "nope" }), ApiError);
+});
+
+Deno.test("mailbox sync interval validation accepts only an integer from 1 to 60", () => {
+  assertEquals(validateMailboxPatchBody({ sync_interval_minutes: 15 }), {
+    sync_interval_minutes: 15,
+  });
+  for (const sync_interval_minutes of [0, 61, 1.5, "5", null]) {
+    assertThrows(
+      () => validateMailboxPatchBody({ sync_interval_minutes }),
+      ApiError,
+    );
+  }
+  assertThrows(() => validateMailboxPatchBody({}), ApiError);
+  assertThrows(
+    () =>
+      validateMailboxPatchBody({
+        sync_interval_minutes: 5,
+        email_address: "not-writable@example.test",
+      }),
+    ApiError,
+  );
+});
+
+Deno.test("mailbox PATCH updates the sync interval through the dedicated RPC", async () => {
+  let rpcCall: { name: string; args: unknown } | null = null;
+  const db = {
+    rpc(name: string, args: unknown) {
+      rpcCall = { name, args };
+      return Promise.resolve({
+        data: { id: "mailbox-1", sync_interval_minutes: 10 },
+        error: null,
+      });
+    },
+  } as unknown as Parameters<typeof handleMailbox>[1];
+  const response = await handleMailbox(
+    new Request("http://localhost/api/v1/me/mailbox", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sync_interval_minutes: 10 }),
+    }),
+    db,
+    "/api/v1/me/mailbox",
+    "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "member",
+    "request-1",
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(rpcCall, {
+    name: "update_mailbox_sync_interval",
+    args: {
+      p_org_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      p_sync_interval_minutes: 10,
+    },
+  });
+  assertEquals(await response.json(), {
+    data: { id: "mailbox-1", sync_interval_minutes: 10 },
+  });
 });
 
 Deno.test("AI connect validation requires api_key and parses providers", () => {

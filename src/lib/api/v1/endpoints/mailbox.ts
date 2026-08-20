@@ -4,6 +4,8 @@ import type {
 	ApiMailboxOAuthProvider,
 	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
+	ApiMailboxSyncIntervalPatchBody,
+	ApiMailboxSyncIntervalPatchResult,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult
 } from '../types.js';
@@ -21,6 +23,18 @@ export function createMailboxEndpoints(request: ApiRequestFn): MailboxEndpoints 
 		put: async (body: ApiMailboxPutBody, signal) => {
 			const { data } = await request<ApiMailboxAccount>('/api/v1/me/mailbox', {
 				method: 'PUT',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
+		},
+		updateSyncInterval: async (minutes, signal) => {
+			const body: ApiMailboxSyncIntervalPatchBody = {
+				sync_interval_minutes: minutes
+			};
+			const { data } = await request<ApiMailboxSyncIntervalPatchResult>('/api/v1/me/mailbox', {
+				method: 'PATCH',
 				body,
 				orgScoped: true,
 				signal

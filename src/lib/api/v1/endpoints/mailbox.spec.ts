@@ -3,6 +3,42 @@ import { createApiV1Client } from '../client.js';
 import { createMockFetch } from '../mock-fetch.js';
 
 describe('mailbox endpoints', () => {
+	it('updates the sync interval with PATCH and returns the mailbox account', async () => {
+		const api = createApiV1Client({
+			fetch: createMockFetch({
+				'PATCH /api/v1/me/mailbox': async (request) => {
+					expect(await request.json()).toEqual({ sync_interval_minutes: 15 });
+					return {
+						body: {
+							data: {
+								id: 'mb-1',
+								email_address: 'joe@example.test',
+								username: 'joe@example.test',
+								from_name: null,
+								imap_host: 'imap.example.test',
+								imap_port: 993,
+								imap_security: 'tls',
+								smtp_host: 'smtp.example.test',
+								smtp_port: 587,
+								smtp_security: 'starttls',
+								credentials_configured: true,
+								status: 'configured',
+								last_checked_at: null,
+								last_error_code: null,
+								sync_interval_minutes: 15
+							}
+						}
+					};
+				}
+			}),
+			getOrgId: () => 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+		});
+
+		const account = await api.mailbox.updateSyncInterval(15);
+
+		expect(account.sync_interval_minutes).toBe(15);
+	});
+
 	it('starts OAuth with provider query and completes callback without echoing secrets', async () => {
 		let startUrl = '';
 		const api = createApiV1Client({
@@ -40,7 +76,8 @@ describe('mailbox endpoints', () => {
 								auth_mode: 'oauth',
 								oauth_provider: 'microsoft',
 								last_checked_at: null,
-								last_error_code: null
+								last_error_code: null,
+								sync_interval_minutes: 5
 							}
 						}
 					};

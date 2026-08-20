@@ -392,6 +392,24 @@
 		}
 	}
 
+	async function onSaveMailboxSyncInterval(
+		minutes: number
+	): Promise<MailboxTestFeedback | false> {
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.mailbox.updateSyncInterval(minutes);
+			if (isStale(epoch)) return false;
+			mailboxAccount = toMailboxAccountResource(updated);
+			return { ok: true, message: 'Sync interval saved.' };
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			return {
+				ok: false,
+				message: userMessage(error, 'Could not save sync interval.')
+			};
+		}
+	}
+
 	async function onDisconnectMailbox() {
 		const epoch = captureEpoch();
 		try {
@@ -640,6 +658,7 @@
 				{onSaveMailbox}
 				{onTestMailbox}
 				{onSyncMailbox}
+				{onSaveMailboxSyncInterval}
 				{onDisconnectMailbox}
 				{onConnectMailboxOAuth}
 				{mailboxOAuthError}

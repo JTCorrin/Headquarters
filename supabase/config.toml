@@ -458,7 +458,7 @@ entrypoint = "./functions/api-v1/index.ts"
 # static_files = [ "./functions/api-v1/*.html" ]
 
 # Wave B: bounded mailbox sync cron entry (service-role RPCs inside).
-# Schedule externally (e.g. every 5m) against /functions/v1/mailbox-sync.
+# Schedule externally every minute; the SQL due-list enforces mailbox intervals.
 [functions.mailbox-sync]
 enabled = true
 verify_jwt = false
