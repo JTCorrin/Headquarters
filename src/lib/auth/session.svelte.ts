@@ -50,7 +50,12 @@ export function membershipRefreshMode(input: {
 }): 'clear' | 'skip' | 'adopt-token' | 'quiet' | 'blocking' {
 	if (!input.nextToken) return 'clear';
 	if (input.nextToken === input.previousToken) return 'skip';
-	if (input.authEvent === 'TOKEN_REFRESHED' && input.membershipsReady) return 'adopt-token';
+	if (
+		(input.authEvent === 'TOKEN_REFRESHED' || input.authEvent === 'SIGNED_IN') &&
+		input.membershipsReady
+	) {
+		return 'adopt-token';
+	}
 	if (input.membershipsReady && input.previousToken !== null) return 'quiet';
 	return 'blocking';
 }
@@ -74,7 +79,14 @@ export function createAuthSession(options: CreateAuthSessionOptions): AuthSessio
 		});
 		client.auth.onAuthStateChange((event, next) => {
 			lastAuthEvent = event;
-			session = next;
+			const isDuplicateSession =
+				next !== null &&
+				session !== null &&
+				next.access_token === session.access_token &&
+				next.user.id === session.user.id;
+			if (event === 'USER_UPDATED' || !isDuplicateSession) {
+				session = next;
+			}
 			ready = true;
 		});
 	}
