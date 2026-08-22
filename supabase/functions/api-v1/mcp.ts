@@ -1677,7 +1677,7 @@ export function mcpToolFailureResult(
   };
 }
 
-async function callTool(
+export async function callTool(
   auth: McpAuth,
   name: string,
   args: Record<string, unknown>,
