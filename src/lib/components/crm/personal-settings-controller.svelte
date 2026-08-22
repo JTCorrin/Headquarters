@@ -4,7 +4,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
 		roleFromMemberships,
@@ -123,21 +123,7 @@
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isValidationError) {
-				if (error.fields) {
-					const keyed = Object.entries(error.fields)
-						.map(([field, message]) => `${field}: ${message}`)
-						.join(' · ');
-					return keyed || error.message;
-				}
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, { keyedValidationFields: true });
 	}
 
 	interface RequestEpoch {

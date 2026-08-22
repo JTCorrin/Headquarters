@@ -81,19 +81,48 @@ Deno.test('validateComposeBody requires subject and body_text', () => {
       subject: 'Hello',
       body_text: 'hi',
       body_html: null,
+      allow_external_recipients: false,
     },
   )
   assertEquals(
     validateComposeBody({ subject: 'Hello', body_text: 'hi' }).to,
     null,
   )
+  assertEquals(
+    validateComposeBody({
+      to: 'peer@example.test',
+      subject: 'Hello',
+      body_text: 'hi',
+      allow_external_recipients: true,
+    }).allow_external_recipients,
+    true,
+  )
   assertThrows(
     () => validateComposeBody({ subject: 'Hello', body_text: 'hi', to: 'not-an-email' }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateComposeBody({
+        subject: 'Hello',
+        body_text: 'hi',
+        to: 'peer@example.test\u0000',
+      }),
     ApiError,
   )
   assertThrows(() => validateComposeBody({ body_text: 'hi' }), ApiError)
   assertThrows(
     () => validateComposeBody({ to: 'a@b.co', subject: 'Hi', body_text: 'x', cc: [] }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateComposeBody({
+        to: 'a@b.co',
+        subject: 'Hi',
+        body_text: 'x',
+        allow_external_recipients: 'yes',
+      }),
     ApiError,
   )
 })

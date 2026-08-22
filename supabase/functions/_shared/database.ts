@@ -1136,6 +1136,13 @@ export type IntegrationRow = {
   credentials_updated_at: string | null;
 };
 
+export type EmailSendQuotaUsageRow = {
+  org_id: string;
+  mailbox_account_id: string;
+  usage_date: string;
+  sent_count: number;
+};
+
 export type DocumentLinkRow = {
   id: string;
   org_id: string;
@@ -1849,6 +1856,12 @@ export type Database = {
         Row: IntegrationRow;
         Insert: Partial<IntegrationRow>;
         Update: Partial<IntegrationRow>;
+        Relationships: [];
+      };
+      email_send_quota_usage: {
+        Row: EmailSendQuotaUsageRow;
+        Insert: Partial<EmailSendQuotaUsageRow>;
+        Update: Partial<EmailSendQuotaUsageRow>;
         Relationships: [];
       };
     };
@@ -2986,7 +2999,7 @@ export type Database = {
         Returns: Json;
       };
       read_mailbox_sync_credentials: {
-        Args: { p_mailbox_id: string };
+        Args: { p_mailbox_id: string; p_org_id?: string | null };
         Returns: Json;
       };
       begin_email_reply_idempotent: {
@@ -3027,6 +3040,8 @@ export type Database = {
           p_request_hash: string;
           p_route: string;
           p_ttl_seconds?: number;
+          p_to_address?: string | null;
+          p_allow_external_recipients?: boolean;
         };
         Returns: Json;
       };

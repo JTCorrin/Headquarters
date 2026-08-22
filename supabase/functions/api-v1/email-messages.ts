@@ -100,6 +100,13 @@ function databaseError(
   if (error.code === "P0002" || message.includes("not found")) {
     return new ApiError(404, "NOT_FOUND", "Email resource not found");
   }
+  if (error.code === "55006" || message.includes("daily email send limit")) {
+    return new ApiError(
+      429,
+      "RATE_LIMITED",
+      "Daily email send limit reached for this mailbox",
+    );
+  }
   if (
     error.code === "22023" ||
     message.includes("must be inbound") ||
@@ -206,11 +213,13 @@ export function emailReplyIdempotencyPayload(
 }
 
 const COMPOSE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COMPOSE_CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]/;
 const COMPOSE_ENTITY_TYPES = ["contact", "lead", "client"] as const;
 type ComposeEntityType = (typeof COMPOSE_ENTITY_TYPES)[number];
 
 function isComposeEmail(value: string): boolean {
-  return COMPOSE_EMAIL_RE.test(value) && value.length <= 320;
+  return !COMPOSE_CONTROL_CHARS_RE.test(value) &&
+    COMPOSE_EMAIL_RE.test(value) && value.length <= 320;
 }
 
 export function validateComposeBody(
@@ -220,12 +229,13 @@ export function validateComposeBody(
   subject: string;
   body_text: string;
   body_html: string | null;
+  allow_external_recipients: boolean;
 } {
   const fields: Record<string, string> = {};
   for (const key of Object.keys(body)) {
     if (
       key !== "to" && key !== "subject" && key !== "body_text" &&
-      key !== "body_html"
+      key !== "body_html" && key !== "allow_external_recipients"
     ) {
       fields[key] = "Field is not writable";
     }
@@ -243,6 +253,14 @@ export function validateComposeBody(
           to = trimmed;
         }
       }
+    }
+  }
+  let allowExternalRecipients = false;
+  if (body.allow_external_recipients !== undefined) {
+    if (typeof body.allow_external_recipients !== "boolean") {
+      fields.allow_external_recipients = "Must be a boolean";
+    } else {
+      allowExternalRecipients = body.allow_external_recipients;
     }
   }
   const subject = typeof body.subject === "string" ? body.subject : "";
@@ -275,7 +293,13 @@ export function validateComposeBody(
       fields,
     );
   }
-  return { to, subject, body_text: bodyText, body_html: bodyHtml };
+  return {
+    to,
+    subject,
+    body_text: bodyText,
+    body_html: bodyHtml,
+    allow_external_recipients: allowExternalRecipients,
+  };
 }
 
 export function emailComposeIdempotencyPayload(
@@ -286,6 +310,7 @@ export function emailComposeIdempotencyPayload(
     subject: string;
     body_text: string;
     body_html: string | null;
+    allow_external_recipients?: boolean;
   },
 ): Record<string, unknown> {
   return {
@@ -453,7 +478,7 @@ async function replyEmailMessage(
 
   try {
     const service = serviceRoleClient();
-    const resolved = await resolveMailboxAuth(service, mailboxId);
+    const resolved = await resolveMailboxAuth(service, mailboxId, orgId);
     if (!resolved) {
       await abortReplyClaim(db, orgId, keyHash);
       throw new ApiError(
@@ -608,31 +633,6 @@ async function abortComposeClaim(
   });
 }
 
-async function loadEntityPrimaryEmail(
-  db: DatabaseClient,
-  orgId: string,
-  entityType: ComposeEntityType,
-  entityId: string,
-): Promise<string | null> {
-  const query = entityType === "contact"
-    ? db.from("contacts").select("primary_email")
-    : entityType === "lead"
-    ? db.from("leads").select("primary_email")
-    : db.from("clients").select("primary_email");
-  const { data, error } = await query
-    .eq("org_id", orgId)
-    .eq("id", entityId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) {
-    throw databaseError(error, "compose-entity-lookup");
-  }
-  const email = data && typeof data.primary_email === "string"
-    ? data.primary_email.trim()
-    : "";
-  return email && isComposeEmail(email) ? email : null;
-}
-
 export async function composeEntityEmailMessage(
   req: Request,
   db: DatabaseClient,
@@ -661,29 +661,12 @@ export async function composeEntityEmailMessage(
     : "clients";
   const route = `/api/v1/${plural}/${entityId}/email-messages`;
   const parsed = validateComposeBody(await jsonBody(req));
-  let toAddress = parsed.to;
-  if (!toAddress) {
-    toAddress = await loadEntityPrimaryEmail(db, orgId, entityType, entityId);
-    if (!toAddress) {
-      throw new ApiError(
-        422,
-        "VALIDATION_ERROR",
-        "Compose validation failed",
-        {
-          to: "A recipient email is required (set primary email on this record or pass to)",
-        },
-      );
-    }
-  }
-  const payload = {
-    to: toAddress,
-    subject: parsed.subject,
-    body_text: parsed.body_text,
-    body_html: parsed.body_html,
-  };
   const requestHash = await hashIdempotencyRequest(
     route,
-    emailComposeIdempotencyPayload(entityType, entityId, payload),
+    emailComposeIdempotencyPayload(entityType, entityId, {
+      ...parsed,
+      to: parsed.to ?? "",
+    }),
   );
   const keyHash = await sha256Hex(rawKey);
 
@@ -696,6 +679,11 @@ export async function composeEntityEmailMessage(
       p_idempotency_key_hash: keyHash,
       p_request_hash: requestHash,
       p_route: route,
+      ...(parsed.to ? { p_to_address: parsed.to } : {}),
+      p_allow_external_recipients:
+        role === "owner" || role === "admin"
+          ? parsed.allow_external_recipients
+          : false,
     },
   );
   if (beginError) {
@@ -721,14 +709,24 @@ export async function composeEntityEmailMessage(
   }
 
   const mailbox = begin.mailbox as Record<string, unknown> | undefined;
-  if (!mailbox) {
+  const resolvedTo = typeof begin.to_address === "string"
+    ? begin.to_address.trim()
+    : "";
+  if (!mailbox || !resolvedTo) {
     await abortComposeClaim(db, orgId, keyHash);
     throw new ApiError(
       500,
       "INTERNAL_ERROR",
-      "Email compose begin missing mailbox",
+      "Email compose begin missing mailbox or recipient",
     );
   }
+
+  const payload = {
+    to: resolvedTo,
+    subject: parsed.subject,
+    body_text: parsed.body_text,
+    body_html: parsed.body_html,
+  };
 
   const mailboxId = String(mailbox.id ?? "");
   const smtpHost = String(mailbox.smtp_host ?? "");
@@ -777,7 +775,7 @@ export async function composeEntityEmailMessage(
 
   try {
     const service = serviceRoleClient();
-    const resolved = await resolveMailboxAuth(service, mailboxId);
+    const resolved = await resolveMailboxAuth(service, mailboxId, orgId);
     if (!resolved) {
       await abortComposeClaim(db, orgId, keyHash);
       throw new ApiError(
