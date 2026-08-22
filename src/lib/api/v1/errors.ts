@@ -60,3 +60,63 @@ export class ApiClientError extends Error {
 export function isApiClientError(error: unknown): error is ApiClientError {
 	return error instanceof ApiClientError;
 }
+
+export interface UserMessageOptions {
+	/** Replaces the server message when the API reports 404. */
+	notFoundMessage?: string;
+	/** Shown on 412 conflicts when the server did not provide a message. */
+	conflictMessage?: string;
+	/** Replaces the server message when the API reports 403. */
+	forbiddenMessage?: string;
+	/** Domain-specific hook evaluated after network/forbidden handling. */
+	customMessage?: (error: ApiClientError) => string | null;
+	/** Skips joining validation fields (forms that place field errors themselves). */
+	ignoreValidationFields?: boolean;
+	/** Renders validation fields as "field: message" pairs instead of messages only. */
+	keyedValidationFields?: boolean;
+}
+
+/**
+ * Translate an API error into a user-facing banner message.
+ * Shared replacement for the per-component userMessage() copies.
+ */
+export function userMessage(
+	error: unknown,
+	fallback: string,
+	options: UserMessageOptions = {}
+): string {
+	if (isApiClientError(error)) {
+		if (error.isNetworkError) return 'Network error — check your connection and retry.';
+		if (error.isForbidden) {
+			if (options.forbiddenMessage) return options.forbiddenMessage;
+			return error.message || 'You do not have permission for this action.';
+		}
+		const custom = options.customMessage?.(error);
+		if (custom) return custom;
+		if (error.status === 404 || error.code === 'NOT_FOUND') {
+			if (options.notFoundMessage) return options.notFoundMessage;
+			return error.message || fallback;
+		}
+		if (error.isPreconditionFailed) {
+			return (
+				error.message ||
+				options.conflictMessage ||
+				'This record changed elsewhere — reload and try again.'
+			);
+		}
+		if (error.isValidationError) {
+			if (error.fields && !options.ignoreValidationFields) {
+				if (options.keyedValidationFields) {
+					const keyed = Object.entries(error.fields)
+						.map(([field, message]) => `${field}: ${message}`)
+						.join(' · ');
+					return keyed || error.message;
+				}
+				return Object.values(error.fields).join(' · ') || error.message;
+			}
+			return error.message;
+		}
+		return error.message || fallback;
+	}
+	return fallback;
+}

@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		emptyRecurringInvoiceFormData,
 		membershipFromCreateResult,
@@ -228,20 +228,11 @@
 	});
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Schedule not found.';
-			if (error.isPreconditionFailed) {
-				return error.message || 'Schedule changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				// Prefer Superforms field placement — do not join opaque banners.
-				return error.message || fallback;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Schedule not found.',
+			conflictMessage: 'Schedule changed elsewhere — reload and try again.',
+			ignoreValidationFields: true
+		});
 	}
 
 	interface RequestEpoch {

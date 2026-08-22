@@ -108,6 +108,7 @@ async function refreshAccessToken(
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     }),
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) {
     throw new Error(`Google token refresh failed (${res.status})`)

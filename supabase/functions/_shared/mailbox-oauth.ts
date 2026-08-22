@@ -141,6 +141,7 @@ async function fetchGoogleAccountEmail(
 ): Promise<string | null> {
   const res = await fetchImpl('https://www.googleapis.com/oauth2/v2/userinfo', {
     headers: { authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) return null
   const json = await res.json() as { email?: string }
@@ -183,6 +184,7 @@ export async function exchangeMailboxAuthCode(
       grant_type: 'authorization_code',
       ...(provider === 'microsoft' ? { scope: MICROSOFT_SCOPES } : {}),
     }),
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) {
     throw new Error(`${provider} code exchange failed (${res.status})`)
@@ -247,6 +249,7 @@ export async function refreshMailboxAccessToken(
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body,
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) {
     throw new Error(`${provider} token refresh failed (${res.status})`)

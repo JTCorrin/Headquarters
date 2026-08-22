@@ -1993,6 +1993,8 @@ export interface ApiEmailMessageComposeBody {
 	subject: string;
 	body_text: string;
 	body_html?: string | null;
+	/** Owner/admin only: permits a recipient other than the entity primary email. */
+	allow_external_recipients?: boolean;
 }
 
 /** Entity types supported by `GET/POST …/timeline-events`. */
