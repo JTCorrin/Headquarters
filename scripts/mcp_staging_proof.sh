@@ -16,7 +16,11 @@ API_BASE="${API_BASE:-${SUPABASE_URL}/functions/v1/api-v1}"
 API_BASE="${API_BASE%/}"
 
 EMAIL="${PROOF_EMAIL:-mcp-proof-$(date +%s)-$RANDOM@example.test}"
-PASSWORD="${PROOF_PASSWORD:-ProofPass123!}"
+if [[ -z "${PROOF_PASSWORD:-}" ]]; then
+	PROOF_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)"
+	log "PROOF_PASSWORD not set; generated a random password"
+fi
+PASSWORD="$PROOF_PASSWORD"
 SLUG="${PROOF_SLUG:-mcp-proof-$(date +%s)}"
 DISPLAY_NAME="${PROOF_DISPLAY_NAME:-MCP Curl Proof}"
 

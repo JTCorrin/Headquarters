@@ -63,9 +63,11 @@ function asCredentialRow(raw: unknown): MailboxCredentialRow | null {
 export async function readMailboxCredentialRow(
   service: SupabaseClient,
   mailboxId: string,
+  orgId?: string,
 ): Promise<MailboxCredentialRow | null> {
   const { data, error } = await service.rpc('read_mailbox_sync_credentials', {
     p_mailbox_id: mailboxId,
+    ...(orgId ? { p_org_id: orgId } : {}),
   })
   if (error) throw error
   return asCredentialRow(data)
@@ -121,8 +123,9 @@ export async function resolveMailboxAuthFromCredentials(
 export async function resolveMailboxAuth(
   service: SupabaseClient,
   mailboxId: string,
+  orgId?: string,
 ): Promise<ResolvedMailboxAuth | null> {
-  const creds = await readMailboxCredentialRow(service, mailboxId)
+  const creds = await readMailboxCredentialRow(service, mailboxId, orgId)
   if (!creds) return null
   return resolveMailboxAuthFromCredentials(service, mailboxId, creds)
 }
