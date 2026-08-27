@@ -150,7 +150,6 @@ export { default as ProjectsBoardPage } from './projects-board-page.svelte';
 export { default as ProjectWorkspaceBoard } from './project-workspace-board.svelte';
 export { default as ProjectWorkspacePage } from './project-workspace-page.svelte';
 export { default as EntityProjects } from './entity-projects.svelte';
-export { default as ProductDetailPage } from './product-detail-page.svelte';
 export { default as AiAssistAction } from './ai-assist-action.svelte';
 export { default as AiSuggestionPanel } from './ai-suggestion-panel.svelte';
 export type { ContactRow } from './contacts-columns.js';

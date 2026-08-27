@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		canAcceptMeetingTaskProposals,
 		canGenerateMeetingSummary,
@@ -142,18 +142,10 @@
 	);
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') {
-				return error.message || 'Meeting not found.';
-			}
-			const acceptBlocked = meetingAcceptProposalUserMessage(error.message);
-			if (acceptBlocked) return acceptBlocked;
-			return error.message || fallback;
-		}
-		if (error instanceof Error && error.message) return error.message;
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Meeting not found.',
+			customMessage: (apiError) => meetingAcceptProposalUserMessage(apiError.message)
+		});
 	}
 
 	interface RequestEpoch {
