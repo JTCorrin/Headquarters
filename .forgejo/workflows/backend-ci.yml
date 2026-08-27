@@ -59,7 +59,20 @@ jobs:
           deno fmt --check . ../_shared
           deno check index.ts http.test.ts
           deno lint . ../_shared
-          deno test
+
+      - name: Deno unit tests (edge functions)
+        working-directory: supabase/functions/api-v1
+        run: |
+          deno test --no-check --junit-path=deno-junit.xml --coverage=deno-coverage
+          deno coverage deno-coverage
+
+      - name: Upload Deno test report and coverage
+        if: always()
+        uses: https://data.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: deno-tests
+          path: supabase/functions/api-v1/deno-junit.xml
+          retention-days: 7
 
       - name: Bridge the job container to Docker-published Postgres
         run: |
