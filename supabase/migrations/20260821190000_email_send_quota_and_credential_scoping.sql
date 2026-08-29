@@ -253,7 +253,7 @@ declare
   mailbox public.mailbox_accounts;
   v_replay jsonb;
   v_exists boolean := false;
-  v_entity_primary_email citext;
+  v_entity_primary_email extensions.citext;
   v_to text;
 begin
   if actor_id is null then
@@ -557,7 +557,7 @@ declare
   to_addrs jsonb;
   v_stored jsonb;
   v_flat jsonb;
-  v_entity_primary_email citext;
+  v_entity_primary_email extensions.citext;
   v_external_recipient boolean;
 begin
   if actor_id is null then
