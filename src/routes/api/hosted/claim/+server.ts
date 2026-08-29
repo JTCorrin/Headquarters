@@ -1,5 +1,4 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types.js';
+import { json, type RequestHandler } from '@sveltejs/kit';
 import { claimHostedSubscription, lookupHostedClaim } from '$lib/server/hosted-billing.js';
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -20,8 +19,8 @@ export const GET: RequestHandler = async ({ url }) => {
 };
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	const session = locals.session;
-	if (!session?.user?.id || !session.user.email) {
+	const { session, user } = await locals.getValidatedSession();
+	if (!session || !user?.id || !user.email) {
 		return json({ error: 'Not authenticated' }, { status: 401 });
 	}
 
@@ -39,8 +38,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const result = await claimHostedSubscription({
 		token,
-		userId: session.user.id,
-		email: session.user.email
+		userId: user.id,
+		email: user.email
 	});
 
 	if (!result.ok) {
