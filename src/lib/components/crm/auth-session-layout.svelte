@@ -27,6 +27,10 @@
 		resolveThemeChoice,
 		subscribePrefersDark
 	} from '$lib/theme/index.js';
+	import {
+		clearHostedClaimToken,
+		readHostedClaimToken
+	} from '$lib/hosted/claim-storage.js';
 
 	export interface AuthSessionLayoutProps {
 		children: Snippet;
@@ -66,6 +70,7 @@
 	let membershipsReady = $state(!auth.enabled);
 	let membershipsError = $state<string | null>(null);
 	let lastTokenForMemberships = $state<string | null>(null);
+	let claimAttemptedForToken = $state<string | null>(null);
 
 	async function refreshMemberships(token: string): Promise<void> {
 		membershipsError = null;
@@ -97,6 +102,30 @@
 			membershipsError = error instanceof Error ? error.message : 'Could not load organisations';
 		}
 	}
+
+	// After email-confirm / OAuth return, finish linking a paid hosted claim if present.
+	$effect(() => {
+		if (!auth.enabled || !auth.ready || !auth.session?.user?.id) return;
+		const pendingClaim = readHostedClaimToken();
+		if (!pendingClaim) return;
+		if (claimAttemptedForToken === pendingClaim) return;
+		claimAttemptedForToken = pendingClaim;
+		void (async () => {
+			try {
+				const res = await fetch('/api/hosted/claim', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ token: pendingClaim })
+				});
+				if (res.ok || res.status === 409) {
+					clearHostedClaimToken();
+				}
+			} catch {
+				/* retry on next navigation */
+				claimAttemptedForToken = null;
+			}
+		})();
+	});
 
 	$effect(() => {
 		if (!auth.enabled || !auth.ready) return;
