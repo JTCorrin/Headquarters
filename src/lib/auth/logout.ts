@@ -1,24 +1,29 @@
-import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import type { OrgSession } from '$lib/org/session.svelte.js';
 import type { AuthSession } from './session.svelte.js';
 
+export type LogoutNavigation = (destination: string | URL) => void;
+
+export interface LogoutOptions {
+	destination?: string | URL;
+	navigate?: LogoutNavigation;
+}
+
+function navigateDocument(destination: string | URL): void {
+	window.location.assign(destination.toString());
+}
+
 export async function logoutAndRedirect(
 	auth: AuthSession,
 	org: OrgSession,
-	destination?: string | URL
+	options: LogoutOptions = {}
 ): Promise<string | null> {
 	const { error } = await auth.signOut();
 	if (error) return error;
 
 	org.clearSelection();
 	org.setMemberships([]);
-	if (destination) {
-		// Callers only pass local, resolved application URLs.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		await goto(destination);
-	} else {
-		await goto(resolve('/login'));
-	}
+	const destination = options.destination ?? resolve('/login');
+	(options.navigate ?? navigateDocument)(destination);
 	return null;
 }

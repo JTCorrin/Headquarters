@@ -17,7 +17,8 @@
 		PaymentInvoiceOption,
 		PaymentListItem
 	} from '$lib/schemas/payment.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import InvoiceForm from './invoice-form.svelte';
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
@@ -37,6 +38,8 @@
 
 	export interface InvoiceDetailPageProps {
 		orgName: string;
+		orgLogoDataUrl?: string;
+		orgAddressLines?: string[];
 		navGroups: AppNavGroup[];
 		title: string;
 		status: string;
@@ -89,6 +92,8 @@
 
 	let {
 		orgName,
+		orgLogoDataUrl,
+		orgAddressLines = [],
 		navGroups,
 		title,
 		status = 'Draft',
@@ -129,6 +134,9 @@
 	}: InvoiceDetailPageProps = $props();
 
 	const formData = fromStore(invoiceForm.form);
+	const clientTaxExempt = $derived(
+		clientOptions.find((c) => c.id === formData.current.clientId)?.taxExempt ?? false
+	);
 
 	let chaseOpen = $state(false);
 	let chaseStatus = $state<AiSuggestionStatus>('idle');
@@ -177,6 +185,8 @@
 		buildMoneyDocumentDef({
 			kind: 'invoice',
 			orgName,
+			orgLogoDataUrl,
+			orgAddressLines,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
 			attentionLine,
@@ -211,19 +221,19 @@
 	);
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
+		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Accounting / Invoices"
 				{title}
@@ -342,6 +352,7 @@
 									bind:open={lineDrawerOpen}
 									form={lineForm}
 									{products}
+									{clientTaxExempt}
 									onValidSubmit={onAddLine}
 								>
 									{#snippet trigger()}
@@ -392,4 +403,4 @@
 			</div>
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
 		roleFromMemberships,
@@ -54,12 +54,26 @@
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let logoBusy = $state(false);
 	let taxDrawerOpen = $state(false);
 	let editingTaxRateId = $state<string | null>(null);
 
 	const configForm = superForm(
 		defaults(
 			{
+				name: '',
+				legalName: '',
+				phone: '',
+				billingEmail: '',
+				websiteUrl: '',
+				taxIdentifier: '',
+				registrationNumber: '',
+				addressLine1: '',
+				addressLine2: '',
+				city: '',
+				region: '',
+				postalCode: '',
+				country: 'GB',
 				timezone: 'UTC',
 				currency: 'GBP',
 				locale: 'en-GB',
@@ -107,19 +121,7 @@
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isPreconditionFailed) {
-				return 'This record changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback);
 	}
 
 	interface RequestEpoch {
@@ -148,6 +150,12 @@
 
 	function isStale(epoch: RequestEpoch): boolean {
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
+	}
+
+	function syncSessionBranding(config: OrganisationConfigResource) {
+		if (!session.selectedOrgId) return;
+		session.patchOrgThemeDefault(session.selectedOrgId, config.theme_default);
+		session.patchOrgLogoUrl(session.selectedOrgId, config.logo_url);
 	}
 
 	function resetOrgScopedState() {
@@ -197,9 +205,7 @@
 			configuration = toOrganisationConfigResource(config);
 			taxRates = rates.map(toTaxRateResource);
 			configForm.form.set(toOrganisationConfigFormData(config));
-			if (session.selectedOrgId) {
-				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
-			}
+			syncSessionBranding(configuration);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -238,9 +244,7 @@
 			}
 			configuration = toOrganisationConfigResource(updated);
 			configForm.form.set(toOrganisationConfigFormData(updated));
-			if (session.selectedOrgId) {
-				session.patchOrgThemeDefault(session.selectedOrgId, configuration.theme_default);
-			}
+			syncSessionBranding(configuration);
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -270,6 +274,114 @@
 				kind: 'validation',
 				message: userMessage(error, 'Could not save configuration.')
 			};
+		}
+	}
+
+	async function onUploadLogo(file: File) {
+		if (!configuration) return;
+		const epoch = captureEpoch();
+		const allowed = new Set(['image/png', 'image/jpeg', 'image/webp']);
+		if (!allowed.has(file.type)) {
+			viewState = {
+				kind: 'validation',
+				message: 'Logo must be a PNG, JPEG, or WebP image.'
+			};
+			return;
+		}
+		if (file.size > 2_097_152) {
+			viewState = {
+				kind: 'validation',
+				message: 'Logo must be 2 MB or smaller.'
+			};
+			return;
+		}
+
+		logoBusy = true;
+		try {
+			const intent = await api.organisationConfig.createLogoUploadIntent({
+				mime_type: file.type,
+				size_bytes: file.size
+			});
+			if (isStale(epoch)) return;
+
+			const uploadResponse = await fetch(intent.upload.signed_url, {
+				method: 'PUT',
+				headers: {
+					'Content-Type': file.type,
+					'x-upsert': 'true'
+				},
+				body: file
+			});
+			if (!uploadResponse.ok) {
+				throw new Error('Logo upload failed');
+			}
+			if (isStale(epoch)) return;
+
+			const updated = await api.organisationConfig.finalizeLogo(
+				{ path: intent.path },
+				configuration.version
+			);
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			configuration = toOrganisationConfigResource(updated);
+			configForm.form.set(toOrganisationConfigFormData(updated));
+			syncSessionBranding(configuration);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Configuration is out of date.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not upload logo.')
+			};
+		} finally {
+			logoBusy = false;
+		}
+	}
+
+	async function onRemoveLogo() {
+		if (!configuration) return;
+		const epoch = captureEpoch();
+		logoBusy = true;
+		try {
+			const updated = await api.organisationConfig.deleteLogo(configuration.version);
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			configuration = toOrganisationConfigResource(updated);
+			configForm.form.set(toOrganisationConfigFormData(updated));
+			syncSessionBranding(configuration);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return;
+			}
+			if (isApiClientError(error) && error.isPreconditionFailed) {
+				viewState = {
+					kind: 'conflict',
+					message: userMessage(error, 'Configuration is out of date.')
+				};
+				return;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not remove logo.')
+			};
+		} finally {
+			logoBusy = false;
 		}
 	}
 
@@ -440,8 +552,11 @@
 					bind:taxDrawerOpen
 					{editingTaxRateId}
 					{viewState}
+					{logoBusy}
 					onReload={loadAll}
 					{onSaveConfig}
+					{onUploadLogo}
+					{onRemoveLogo}
 					{onSaveTaxRate}
 					{onSetDefaultTaxRate}
 					{onArchiveTaxRate}

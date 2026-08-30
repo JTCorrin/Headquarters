@@ -24,6 +24,8 @@ export interface ApiOrganisationSummary {
 	name: string;
 	slug: string;
 	logo_path: string | null;
+	/** Short-lived signed URL when logo_path is set. */
+	logo_url?: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
@@ -64,11 +66,18 @@ export interface ApiOrganisationConfiguration {
 	legal_name: string | null;
 	slug: string;
 	logo_path: string | null;
+	/** Short-lived signed URL when logo_path is set. */
+	logo_url?: string | null;
 	billing_email: string | null;
 	phone: string | null;
 	website_url: string | null;
 	tax_identifier: string | null;
 	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
@@ -90,6 +99,11 @@ export type ApiOrganisationConfigurationPatch = Partial<{
 	website_url: string | null;
 	tax_identifier: string | null;
 	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
 	default_currency: string;
 	timezone: string;
 	locale: string;
@@ -97,6 +111,48 @@ export type ApiOrganisationConfigurationPatch = Partial<{
 	theme_default: ThemeOption;
 	settings: unknown;
 }>;
+
+/** Letterhead fields readable by any active org member (quotes/invoices PDF). */
+export interface ApiOrganisationBranding {
+	id: string;
+	name: string;
+	legal_name: string | null;
+	slug: string;
+	logo_path: string | null;
+	logo_url: string | null;
+	billing_email: string | null;
+	phone: string | null;
+	website_url: string | null;
+	tax_identifier: string | null;
+	registration_number: string | null;
+	address_line1: string | null;
+	address_line2: string | null;
+	city: string | null;
+	region: string | null;
+	postal_code: string | null;
+	country_code: string;
+	version: number;
+}
+
+export interface ApiOrganisationLogoUploadIntentBody {
+	mime_type: string;
+	size_bytes: number;
+}
+
+export interface ApiOrganisationLogoUploadIntent {
+	bucket: string;
+	path: string;
+	upload: {
+		signed_url: string;
+		token: string;
+		path: string;
+		expires_in: number;
+	};
+}
+
+export interface ApiOrganisationLogoFinalizeBody {
+	path: string;
+}
 
 export interface ApiTaxRate {
 	id: string;
@@ -478,6 +534,8 @@ interface ApiInvoiceWritableFields {
 export type ApiInvoiceCreateBody = ApiInvoiceWritableFields & {
 	client_id: string;
 	lines: ApiInvoiceLineInput[];
+	/** Optional document number on create (migration); otherwise auto-allocated. */
+	number?: string;
 };
 
 export type ApiInvoiceUpdateBody = ApiInvoiceWritableFields & {
@@ -491,6 +549,11 @@ export interface ApiInvoiceFromQuoteBody {
 
 export interface ApiInvoiceVoidBody {
 	void_reason: string;
+}
+
+export interface ApiInvoiceSendBody {
+	/** Optional ISO timestamptz override for migration. */
+	sent_at?: string;
 }
 
 export interface ApiInvoiceListParams {
@@ -938,7 +1001,7 @@ export interface ApiProject {
 	updated_by: string | null;
 	deleted_at: string | null;
 	version: number;
-	client_id: string;
+	client_id: string | null;
 	name: string;
 	description: string | null;
 	status: ApiProjectStatus;
@@ -966,7 +1029,7 @@ export interface ApiProjectListParams {
 }
 
 export interface ApiProjectCreateBody {
-	client_id: string;
+	client_id?: string | null;
 	name: string;
 	description?: string | null;
 	status?: ApiProjectStatus;
@@ -977,7 +1040,7 @@ export interface ApiProjectCreateBody {
 }
 
 export type ApiProjectUpdateBody = Partial<Omit<ApiProjectCreateBody, 'client_id'>> & {
-	client_id?: string;
+	client_id?: string | null;
 	status?: ApiProjectStatus;
 	position?: number;
 };
@@ -1015,6 +1078,17 @@ export type ApiProjectColumnUpdateBody = Partial<{
 
 export type ApiClientStatus = 'prospect' | 'active' | 'on_hold' | 'inactive' | 'archived';
 
+export type ApiClientContactRole = 'primary' | 'billing' | 'decision_maker' | 'other';
+
+/** Person linked to a client via `client_contacts` (read model). */
+export interface ApiClientLinkedContact {
+	id: string;
+	display_name: string;
+	primary_email: string | null;
+	role: ApiClientContactRole;
+	is_primary: boolean;
+}
+
 export interface ApiClient {
 	id: string;
 	org_id: string;
@@ -1031,6 +1105,8 @@ export interface ApiClient {
 	primary_email: string | null;
 	phone: string | null;
 	tax_identifier: string | null;
+	tax_exempt: boolean;
+	email_domain?: string | null;
 	registration_number: string | null;
 	default_currency: string | null;
 	payment_terms_days: number | null;
@@ -1039,6 +1115,8 @@ export interface ApiClient {
 	renewal_on: string | null;
 	notes: string | null;
 	metadata: Record<string, unknown>;
+	/** People linked via `client_contacts` (present on get/list). */
+	contacts?: ApiClientLinkedContact[];
 }
 
 export interface ApiClientListParams {
@@ -1054,6 +1132,8 @@ export interface ApiClientCreateBody {
 	primary_email?: string | null;
 	phone?: string | null;
 	tax_identifier?: string | null;
+	tax_exempt?: boolean;
+	email_domain?: string | null;
 	registration_number?: string | null;
 	default_currency?: string | null;
 	payment_terms_days?: number | null;
@@ -1079,6 +1159,7 @@ export interface ApiLead {
 	version: number;
 	name: string;
 	company_name: string | null;
+	primary_email: string | null;
 	contact_id: string | null;
 	client_id: string | null;
 	stage: ApiLeadStage;
@@ -1100,6 +1181,7 @@ export interface ApiLead {
 export interface ApiLeadCreateBody {
 	name: string;
 	company_name?: string | null;
+	primary_email?: string | null;
 	contact_id?: string | null;
 	client_id?: string | null;
 	stage?: ApiLeadWritableStage;
@@ -1154,6 +1236,8 @@ export interface ApiContact {
 	company_name: string | null;
 	/** Resolved primary client via `client_contacts` (read model). */
 	client_id: string | null;
+	/** Role on the filtered client when listing with `client_id`. */
+	client_role?: ApiClientContactRole;
 	owner_membership_id: string | null;
 	lifecycle_status: ApiContactLifecycleStatus;
 	source: string | null;
@@ -1185,6 +1269,8 @@ export interface ApiContactListParams {
 	limit?: number;
 	cursor?: string;
 	lifecycle_status?: ApiContactLifecycleStatus;
+	/** Restrict to people linked to this client via `client_contacts`. */
+	client_id?: string;
 }
 
 export interface ApiTaxRateListParams {
@@ -1353,6 +1439,64 @@ export interface ApiOrgMember {
 	job_title: string | null;
 }
 
+export type ApiDashboardAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
+
+export interface ApiDashboardKpis {
+	outstanding_cents: number;
+	overdue_cents: number;
+	open_invoice_count: number;
+	overdue_invoice_count: number;
+	cash_collected_30d_cents: number;
+	cash_collected_prior_30d_cents: number;
+	booked_30d_cents: number;
+	booked_prior_30d_cents: number;
+}
+
+export interface ApiDashboardAgingRow {
+	bucket: ApiDashboardAgingBucket;
+	cents: number;
+	count: number;
+}
+
+export interface ApiDashboardMonthlyRow {
+	month: string;
+	cash_cents: number;
+	booked_cents: number;
+}
+
+export interface ApiDashboardQuotePipelineRow {
+	status: 'draft' | 'sent' | 'accepted' | 'rejected';
+	count: number;
+	total_cents: number;
+}
+
+export interface ApiDashboardChaseItem {
+	id: string;
+	number: string;
+	client_name: string;
+	amount_cents: number;
+	days: number;
+}
+
+export interface ApiDashboardChase {
+	overdue_invoices: ApiDashboardChaseItem[];
+	due_soon_invoices: ApiDashboardChaseItem[];
+	awaiting_quotes: ApiDashboardChaseItem[];
+	expiring_quotes: ApiDashboardChaseItem[];
+}
+
+/** `GET /api/v1/dashboard/summary` — org money KPIs and chase lists. */
+export interface ApiDashboardSummary {
+	currency: string;
+	as_of: string;
+	kpis: ApiDashboardKpis;
+	aging: ApiDashboardAgingRow[];
+	monthly: ApiDashboardMonthlyRow[];
+	quote_pipeline: ApiDashboardQuotePipelineRow[];
+	chase: ApiDashboardChase;
+	other_currency_doc_count: number;
+}
+
 export type ApiOrganisationAccessRole = 'admin' | 'member' | 'billing' | 'readonly';
 
 export interface ApiOrganisationInvitation {
@@ -1519,8 +1663,22 @@ export interface ApiMailboxAccount {
 	smtp_security: 'tls' | 'starttls' | 'none';
 	credentials_configured: boolean;
 	status: 'disconnected' | 'configured' | 'ok' | 'error' | 'auth_failed';
+	auth_mode?: 'password' | 'oauth';
+	oauth_provider?: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+	sync_interval_minutes: number;
+	sync_catchup_complete?: boolean;
+	sync_high_uid?: number | null;
+	sync_low_uid?: number | null;
+}
+
+export type ApiMailboxOAuthProvider = 'microsoft' | 'google';
+
+export interface ApiMailboxOAuthStart {
+	url: string;
+	state: string;
+	provider: ApiMailboxOAuthProvider;
 }
 
 export interface ApiMailboxPutBody {
@@ -1537,7 +1695,56 @@ export interface ApiMailboxPutBody {
 	smtp_security: 'tls' | 'starttls' | 'none';
 }
 
+export interface ApiMailboxSyncIntervalPatchBody {
+	sync_interval_minutes: number;
+}
+
+export type ApiMailboxSyncIntervalPatchResult = ApiMailboxAccount;
+
 export interface ApiMailboxTestResult {
+	ok: boolean;
+	error_code?: string | null;
+	message?: string | null;
+}
+
+export interface ApiOrgInvoiceEmailAccount {
+	id: string;
+	org_id: string;
+	from_address: string;
+	from_name: string | null;
+	reply_to: string | null;
+	smtp_host: string;
+	smtp_port: number;
+	smtp_security: 'tls' | 'starttls' | 'none';
+	username: string;
+	status: 'pending' | 'active' | 'error' | 'disabled';
+	subject_template: string;
+	body_template: string;
+	credentials_configured: boolean;
+	credentials_updated_at: string | null;
+	last_tested_at: string | null;
+	last_error_code: string | null;
+	last_error_message: string | null;
+	version: number;
+	created_at?: string;
+	updated_at?: string;
+}
+
+export interface ApiOrgInvoiceEmailPutBody {
+	from_address: string;
+	from_name?: string | null;
+	reply_to?: string | null;
+	smtp_host: string;
+	smtp_port: number;
+	smtp_security: 'tls' | 'starttls' | 'none';
+	username: string;
+	/** Omit or empty to keep the existing secret. */
+	password?: string | null;
+	subject_template?: string | null;
+	body_template?: string | null;
+}
+
+export interface ApiOrgInvoiceEmailTestResult {
 	ok: boolean;
 	error_code?: string | null;
 	message?: string | null;
@@ -1552,6 +1759,9 @@ export interface ApiMailboxSyncResult {
 	message?: string | null;
 	/** Present on failure — pipeline step (connect/login/select/search/fetch/…). */
 	step?: string | null;
+	catchup_complete?: boolean;
+	sync_high_uid?: number | null;
+	sync_low_uid?: number | null;
 }
 
 export type ApiAiProvider = 'openai' | 'anthropic' | 'google' | 'openrouter';
@@ -1587,7 +1797,7 @@ export interface ApiAiModelUpdateBody {
 }
 
 export type ApiAiPromptKey =
-	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase';
+	'email_reply' | 'meeting_summary' | 'meeting_task_proposals' | 'invoice_chase' | 'email_compose';
 
 export type ApiAiPromptsMap = Record<ApiAiPromptKey, string>;
 
@@ -1639,9 +1849,17 @@ export interface ApiEmailMessage {
 	subject: string;
 	preview_text?: string | null;
 	body_text?: string | null;
+	body_html?: string | null;
+	attachments?: Array<{
+		filename: string;
+		content_type: string;
+		size?: number;
+		content_id?: string | null;
+		inline?: boolean;
+	}> | null;
 	received_at?: string | null;
 	sent_at?: string | null;
-	link_reason?: 'address_match' | 'timeline_share' | null;
+	link_reason?: 'address_match' | 'timeline_share' | 'domain_match' | null;
 	unread?: boolean;
 	/** Present on personal inbox rows from `list_my_email_messages`. */
 	status?: string | null;
@@ -1720,13 +1938,7 @@ export interface ApiPlaybookListParams {
 }
 
 export type ApiPlaybookRunStatus =
-	| 'scheduled'
-	| 'running'
-	| 'waiting'
-	| 'completed'
-	| 'failed'
-	| 'cancelled'
-	| 'skipped_busy';
+	'scheduled' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'skipped_busy';
 
 export interface ApiPlaybookRun {
 	id: string;
@@ -1773,6 +1985,16 @@ export interface ApiEmailMessageShareResult {
 export interface ApiEmailMessageReplyBody {
 	body_text: string;
 	body_html?: string | null;
+}
+
+/** Body for `POST /api/v1/{contacts|leads|clients}/{id}/email-messages`. */
+export interface ApiEmailMessageComposeBody {
+	to?: string;
+	subject: string;
+	body_text: string;
+	body_html?: string | null;
+	/** Owner/admin only: permits a recipient other than the entity primary email. */
+	allow_external_recipients?: boolean;
 }
 
 /** Entity types supported by `GET/POST …/timeline-events`. */
@@ -1858,6 +2080,14 @@ export interface ApiAiInvoiceChaseGenerateBody {
 	invoice_id: string;
 	/** polite | firm (injected as TONE at generate time). */
 	variant?: 'polite' | 'firm' | string;
+}
+
+export interface ApiAiComposeGenerateBody {
+	entity_type: ApiEntityEmailType;
+	entity_id: string;
+	/** warm | neutral | firm. */
+	variant?: 'warm' | 'neutral' | 'firm' | string;
+	subject?: string;
 }
 
 export interface ApiAiSuggestion {

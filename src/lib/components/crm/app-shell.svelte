@@ -12,10 +12,12 @@
 		type OrganisationCreateData,
 		type OrgMembershipSummary
 	} from '$lib/schemas/organisation.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import type { AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import NotificationsBell from './notifications-bell.svelte';
 	import OrgSwitcher from './org-switcher.svelte';
 	import OrganisationCreateDrawer from './organisation-create-drawer.svelte';
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -35,9 +37,7 @@
 		headerExtra?: Snippet;
 		onSwitchOrg?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
-		onValidCreate?: (
-			data: OrganisationCreateData
-		) => boolean | void | Promise<boolean | void>;
+		onValidCreate?: (data: OrganisationCreateData) => boolean | void | Promise<boolean | void>;
 	}
 
 	let {
@@ -62,7 +62,9 @@
 		(memberships.find((m) => m.org_id === currentOrgId)?.role ?? null) as MembershipRole | null
 	);
 	const showNotifications = $derived(
-		Boolean(resolvedApi && currentOrgId && membershipRole && canAccessPersonalConfig(membershipRole))
+		Boolean(
+			resolvedApi && currentOrgId && membershipRole && canAccessPersonalConfig(membershipRole)
+		)
 	);
 
 	let createOpen = $state(false);
@@ -97,57 +99,60 @@
 	const showNav = $derived(Boolean(orgName && navGroups && navGroups.length > 0));
 </script>
 
-<div
-	class={cn('bg-background text-foreground flex h-svh overflow-hidden', className)}
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={false}
+	class={cn('h-svh overflow-hidden', className)}
 	data-testid="app-shell"
 >
-	{#if showNav && orgName && navGroups}
-		<AppNav {orgName} groups={navGroups} class="h-svh shrink-0" />
-	{/if}
-
-	<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-		<header
-			class="flex flex-wrap items-center gap-3 border-b px-4 py-3"
-			data-testid="app-shell-header"
-		>
-			<OrgSwitcher
-				{currentOrgId}
-				{memberships}
-				{switchError}
-				{busy}
-				onSwitchOrg={onSwitchOrg}
-				onCreateOrg={() => {
-					createOpen = true;
-				}}
-			/>
-			<div class="ms-auto flex items-center gap-2">
-				{#if showNotifications && resolvedApi}
-					<NotificationsBell api={resolvedApi} orgId={currentOrgId} />
-				{/if}
-				{#if headerExtra}
-					{@render headerExtra()}
-				{/if}
-				{#if onLogout}
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onclick={() => {
-							void onLogout();
-						}}
-						data-testid="auth-logout"
-					>
-						Log out
-					</Button>
-				{/if}
-			</div>
-		</header>
-		<main class="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="app-shell-main">
-			{#if children}
-				{@render children()}
+	<header
+		class="flex min-w-0 flex-wrap items-center gap-2 border-b px-3 py-3 sm:gap-3 sm:px-4"
+		data-testid="app-shell-header"
+	>
+		{#if showNav}
+			<Sidebar.Trigger class="shrink-0" data-testid="app-sidebar-trigger" />
+		{/if}
+		<OrgSwitcher
+			class="max-w-full min-w-0 flex-1 sm:max-w-xs sm:flex-none"
+			{currentOrgId}
+			{memberships}
+			{switchError}
+			{busy}
+			{onSwitchOrg}
+			onCreateOrg={() => {
+				createOpen = true;
+			}}
+		/>
+		<div class="ms-auto flex shrink-0 items-center gap-2">
+			{#if showNotifications && resolvedApi}
+				<NotificationsBell api={resolvedApi} orgId={currentOrgId} />
 			{/if}
-		</main>
-	</div>
+			{#if headerExtra}
+				{@render headerExtra()}
+			{/if}
+			{#if onLogout}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onclick={async () => {
+						await onLogout();
+					}}
+					data-testid="auth-logout"
+				>
+					<span class="hidden sm:inline">Log out</span>
+					<span class="sm:hidden">Out</span>
+				</Button>
+			{/if}
+		</div>
+	</header>
+	<main class="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="app-shell-main">
+		{#if children}
+			{@render children()}
+		{/if}
+	</main>
 
 	<OrganisationCreateDrawer
 		form={createForm}
@@ -155,4 +160,4 @@
 		{createError}
 		onValidSubmit={handleCreate}
 	/>
-</div>
+</AppSidebarFrame>

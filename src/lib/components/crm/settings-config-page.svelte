@@ -10,7 +10,8 @@
 	} from '$lib/schemas/organisation.js';
 	import { canMutateOrgConfig, roleLabel } from '$lib/schemas/organisation.js';
 	import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
@@ -41,8 +42,11 @@
 		editingTaxRateId?: string | null;
 		viewState?: ResourceViewState;
 		class?: string;
+		logoBusy?: boolean;
 		onReload?: () => void;
 		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
+		onUploadLogo?: (file: File) => void | Promise<void>;
+		onRemoveLogo?: () => void | Promise<void>;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
 		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
@@ -74,8 +78,11 @@
 		editingTaxRateId = null,
 		viewState = { kind: 'ready' },
 		class: className,
+		logoBusy = false,
 		onReload,
 		onSaveConfig,
+		onUploadLogo,
+		onRemoveLogo,
 		onSavePreferences,
 		onSaveMailbox,
 		onTestMailbox,
@@ -113,19 +120,19 @@
 	}
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-8 px-6 py-6 md:px-8">
+		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Organisation · Settings"
 				title="Config"
@@ -141,9 +148,9 @@
 			{#if showContent && configuration}
 				<section class="space-y-4" data-testid="org-defaults-section">
 					<div>
-						<h2 class="text-lg font-semibold tracking-tight">Organisation defaults</h2>
+						<h2 class="text-lg font-semibold tracking-tight">Organisation</h2>
 						<p class="text-muted-foreground text-sm">
-							Timezone, currency, locale, and the org theme default.
+							Company letterhead for quotes and invoices, plus org defaults.
 							{#if !canEdit}
 								Read-only for your role.
 							{/if}
@@ -152,6 +159,10 @@
 					<OrganisationConfigForm
 						form={configForm}
 						readonly={!canEdit}
+						logoUrl={configuration.logo_url}
+						{logoBusy}
+						{onUploadLogo}
+						{onRemoveLogo}
 						onValidSubmit={onSaveConfig}
 					/>
 				</section>
@@ -287,7 +298,7 @@
 			{/if}
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>
 
 {#if canEdit}
 	<Drawer.Root bind:open={taxDrawerOpen} direction="right" shouldScaleBackground={false}>

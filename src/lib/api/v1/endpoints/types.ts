@@ -34,8 +34,13 @@ import type {
 	ApiDocumentResult,
 	ApiDocumentUploadIntentBody,
 	ApiDocumentUploadIntentResult,
+	ApiDashboardSummary,
+	ApiOrganisationBranding,
 	ApiOrganisationConfiguration,
 	ApiOrganisationConfigurationPatch,
+	ApiOrganisationLogoFinalizeBody,
+	ApiOrganisationLogoUploadIntent,
+	ApiOrganisationLogoUploadIntentBody,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
 	ApiOrganisationMembership,
@@ -53,6 +58,7 @@ import type {
 	ApiInvoiceDocument,
 	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
+	ApiInvoiceSendBody,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
 	ApiBill,
@@ -113,9 +119,15 @@ import type {
 	ApiOrgMember,
 	ApiUserNotification,
 	ApiMailboxAccount,
+	ApiMailboxOAuthProvider,
+	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
+	ApiMailboxSyncIntervalPatchResult,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult,
+	ApiOrgInvoiceEmailAccount,
+	ApiOrgInvoiceEmailPutBody,
+	ApiOrgInvoiceEmailTestResult,
 	ApiAiIntegration,
 	ApiAiIntegrationConnectBody,
 	ApiAiModelUpdateBody,
@@ -125,11 +137,13 @@ import type {
 	ApiOrgApiKeyCreateBody,
 	ApiOrgApiKeyCreateResult,
 	ApiAiInvoiceChaseGenerateBody,
+	ApiAiComposeGenerateBody,
 	ApiAiPrompts,
 	ApiAiPromptsUpdateBody,
 	ApiAiSuggestion,
 	ApiAiSuggestionGenerateBody,
 	ApiEmailMessage,
+	ApiEmailMessageComposeBody,
 	ApiEmailMessageReplyBody,
 	ApiEmailMessageShareBody,
 	ApiEmailMessageShareResult,
@@ -176,6 +190,10 @@ export interface OrgMembersEndpoints {
 	list(signal?: AbortSignal): Promise<ApiOrgMember[]>;
 }
 
+export interface DashboardEndpoints {
+	summary(signal?: AbortSignal): Promise<ApiDashboardSummary>;
+}
+
 export interface OrganisationAccessEndpoints {
 	listInvitations(signal?: AbortSignal): Promise<ApiOrganisationInvitation[]>;
 	invite(
@@ -207,6 +225,24 @@ export interface OrganisationConfigEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiOrganisationConfiguration>;
+	getBranding(signal?: AbortSignal): Promise<ApiOrganisationBranding>;
+	createLogoUploadIntent(
+		body: ApiOrganisationLogoUploadIntentBody,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationLogoUploadIntent>;
+	finalizeLogo(
+		body: ApiOrganisationLogoFinalizeBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiOrganisationConfiguration>;
+	deleteLogo(version: number, signal?: AbortSignal): Promise<ApiOrganisationConfiguration>;
+}
+
+export interface OrgInvoiceEmailEndpoints {
+	get(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailAccount | null>;
+	put(body: ApiOrgInvoiceEmailPutBody, signal?: AbortSignal): Promise<ApiOrgInvoiceEmailAccount>;
+	test(signal?: AbortSignal): Promise<ApiOrgInvoiceEmailTestResult>;
+	disconnect(signal?: AbortSignal): Promise<void>;
 }
 
 export interface TaxRatesEndpoints {
@@ -281,7 +317,12 @@ export interface InvoicesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiInvoiceDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
-	send(id: string, version: number, signal?: AbortSignal): Promise<ApiInvoiceDocument>;
+	send(
+		id: string,
+		version: number,
+		body?: ApiInvoiceSendBody,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
 	void(
 		id: string,
 		body: ApiInvoiceVoidBody,
@@ -502,6 +543,11 @@ export interface RecurringInvoiceSchedulesEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiRecurringInvoiceRunNowResult>;
+	retryDelivery(
+		scheduleId: string,
+		runId: string,
+		signal?: AbortSignal
+	): Promise<ApiRecurringInvoiceRun>;
 }
 
 export interface PaymentsEndpoints {
@@ -581,9 +627,21 @@ export interface DocumentsEndpoints {
 export interface MailboxEndpoints {
 	get(signal?: AbortSignal): Promise<ApiMailboxAccount | null>;
 	put(body: ApiMailboxPutBody, signal?: AbortSignal): Promise<ApiMailboxAccount>;
+	updateSyncInterval(
+		minutes: number,
+		signal?: AbortSignal
+	): Promise<ApiMailboxSyncIntervalPatchResult>;
 	test(signal?: AbortSignal): Promise<ApiMailboxTestResult>;
 	sync(signal?: AbortSignal): Promise<ApiMailboxSyncResult>;
 	disconnect(signal?: AbortSignal): Promise<void>;
+	startOAuth(
+		provider: ApiMailboxOAuthProvider,
+		signal?: AbortSignal
+	): Promise<ApiMailboxOAuthStart>;
+	completeOAuth(
+		body: { code: string; state: string },
+		signal?: AbortSignal
+	): Promise<ApiMailboxAccount>;
 }
 
 /** Personal calendar (Google OAuth + CalDAV credentials) — never echoes secrets. */
@@ -651,9 +709,20 @@ export interface EmailMessagesEndpoints {
 		body: ApiEmailMessageReplyBody,
 		signal?: AbortSignal
 	): Promise<ApiEmailMessage>;
+	/** New outbound compose on an entity Email tab. */
+	sendForEntity(
+		entityType: ApiEntityEmailType,
+		entityId: string,
+		body: ApiEmailMessageComposeBody,
+		signal?: AbortSignal
+	): Promise<ApiEmailMessage>;
 	generateDraft(body: ApiAiSuggestionGenerateBody, signal?: AbortSignal): Promise<ApiAiSuggestion>;
 	generateInvoiceChase(
 		body: ApiAiInvoiceChaseGenerateBody,
+		signal?: AbortSignal
+	): Promise<ApiAiSuggestion>;
+	generateComposeDraft(
+		body: ApiAiComposeGenerateBody,
 		signal?: AbortSignal
 	): Promise<ApiAiSuggestion>;
 	useDraft(
@@ -681,10 +750,7 @@ export interface EmailTemplatesEndpoints {
 }
 
 export interface PlaybooksEndpoints {
-	list(
-		params?: ApiPlaybookListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiPlaybook[]>>;
+	list(params?: ApiPlaybookListParams, signal?: AbortSignal): Promise<ApiResult<ApiPlaybook[]>>;
 	create(body: ApiPlaybookCreateBody, signal?: AbortSignal): Promise<ApiPlaybook>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiPlaybook>>;
 	update(

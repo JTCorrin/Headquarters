@@ -1,7 +1,11 @@
 import type { ApiRequestFn } from '../request.js';
 import type {
 	ApiMailboxAccount,
+	ApiMailboxOAuthProvider,
+	ApiMailboxOAuthStart,
 	ApiMailboxPutBody,
+	ApiMailboxSyncIntervalPatchBody,
+	ApiMailboxSyncIntervalPatchResult,
 	ApiMailboxSyncResult,
 	ApiMailboxTestResult
 } from '../types.js';
@@ -19,6 +23,18 @@ export function createMailboxEndpoints(request: ApiRequestFn): MailboxEndpoints 
 		put: async (body: ApiMailboxPutBody, signal) => {
 			const { data } = await request<ApiMailboxAccount>('/api/v1/me/mailbox', {
 				method: 'PUT',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
+		},
+		updateSyncInterval: async (minutes, signal) => {
+			const body: ApiMailboxSyncIntervalPatchBody = {
+				sync_interval_minutes: minutes
+			};
+			const { data } = await request<ApiMailboxSyncIntervalPatchResult>('/api/v1/me/mailbox', {
+				method: 'PATCH',
 				body,
 				orgScoped: true,
 				signal
@@ -47,6 +63,25 @@ export function createMailboxEndpoints(request: ApiRequestFn): MailboxEndpoints 
 				orgScoped: true,
 				signal
 			});
+		},
+		startOAuth: async (provider: ApiMailboxOAuthProvider, signal) => {
+			const { data } = await request<ApiMailboxOAuthStart>(
+				`/api/v1/me/mailbox/oauth/start?provider=${encodeURIComponent(provider)}`,
+				{
+					orgScoped: true,
+					signal
+				}
+			);
+			return data;
+		},
+		completeOAuth: async (body, signal) => {
+			const { data } = await request<ApiMailboxAccount>('/api/v1/me/mailbox/oauth/callback', {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
+			return data;
 		}
 	};
 }

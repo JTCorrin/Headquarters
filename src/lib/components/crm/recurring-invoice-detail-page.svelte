@@ -10,7 +10,8 @@
 		RecurringInvoiceRunListItem,
 		RecurringLineFormData
 	} from '$lib/schemas/recurring-invoice.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import RecurringInvoiceForm from './recurring-invoice-form.svelte';
 	import RecurringLinesTable from './recurring-lines-table.svelte';
@@ -50,6 +51,7 @@
 		onResume?: () => void | Promise<void>;
 		onCancel?: () => void | Promise<void>;
 		onRunNow?: () => void | Promise<void>;
+		onRetryDelivery?: (runId: string) => void | Promise<void>;
 		onDelete?: () => void | Promise<void>;
 		onReload?: () => void | Promise<void>;
 		showNav?: boolean;
@@ -84,6 +86,7 @@
 		onResume,
 		onCancel,
 		onRunNow,
+		onRetryDelivery,
 		onDelete,
 		onReload,
 		showNav = true,
@@ -94,19 +97,19 @@
 	const statusLower = $derived(status.toLowerCase());
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
+		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Accounting / Recurring invoices"
 				{title}
@@ -248,8 +251,8 @@
 					</RecurringLinesTable>
 				</div>
 
-				<RecurringInvoiceRunsTable rows={runs} />
+				<RecurringInvoiceRunsTable rows={runs} {onRetryDelivery} />
 			</div>
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

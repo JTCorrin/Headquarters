@@ -13,6 +13,8 @@
 		createSupabaseBrowserClient,
 		isAuthPublicPath,
 		isOnboardingPath,
+		isPostAuthRedirectPath,
+		membershipRefreshMode,
 		postAuthDestination,
 		readPublicSupabaseConfig,
 		requiresSelectedOrg,
@@ -25,6 +27,10 @@
 		resolveThemeChoice,
 		subscribePrefersDark
 	} from '$lib/theme/index.js';
+	import {
+		clearHostedClaimToken,
+		readHostedClaimToken
+	} from '$lib/hosted/claim-storage.js';
 
 	export interface AuthSessionLayoutProps {
 		children: Snippet;
@@ -53,8 +59,8 @@
 	// Empty PUBLIC_API_BASE_URL → same-origin `/api/v1/...` (proxied by SvelteKit).
 	const api = createApiV1Client({
 		baseUrl: resolveApiV1BaseUrl(env.PUBLIC_API_BASE_URL),
-		getOrgId: () => orgSession.selectedOrgId,
-		getAccessToken: () => auth.accessToken
+		getOrgId: () => untrack(() => orgSession.selectedOrgId),
+		getAccessToken: () => untrack(() => auth.accessToken)
 	});
 
 	setOrgSession(orgSession);
@@ -64,6 +70,7 @@
 	let membershipsReady = $state(!auth.enabled);
 	let membershipsError = $state<string | null>(null);
 	let lastTokenForMemberships = $state<string | null>(null);
+	let claimAttemptedForToken = $state<string | null>(null);
 
 	async function refreshMemberships(token: string): Promise<void> {
 		membershipsError = null;
@@ -78,6 +85,7 @@
 				orgSession.setThemePreference(themePreferenceFromApi(prefs.theme_preference));
 			}
 			if (
+				memberships.length > 0 &&
 				orgSession.selectedOrgId &&
 				!memberships.some((membership) => membership.org_id === orgSession.selectedOrgId)
 			) {
@@ -95,20 +103,59 @@
 		}
 	}
 
+	// After email-confirm / OAuth return, finish linking a paid hosted claim if present.
+	$effect(() => {
+		if (!auth.enabled || !auth.ready || !auth.session?.user?.id) return;
+		const pendingClaim = readHostedClaimToken();
+		if (!pendingClaim) return;
+		if (claimAttemptedForToken === pendingClaim) return;
+		claimAttemptedForToken = pendingClaim;
+		void (async () => {
+			try {
+				const res = await fetch('/api/hosted/claim', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ token: pendingClaim })
+				});
+				if (res.ok || res.status === 409) {
+					clearHostedClaimToken();
+				}
+			} catch {
+				/* retry on next navigation */
+				claimAttemptedForToken = null;
+			}
+		})();
+	});
+
 	$effect(() => {
 		if (!auth.enabled || !auth.ready) return;
 		const token = auth.accessToken;
-		if (!token) {
+		const mode = membershipRefreshMode({
+			previousToken: lastTokenForMemberships,
+			nextToken: token,
+			membershipsReady,
+			authEvent: auth.lastAuthEvent
+		});
+
+		if (mode === 'clear') {
 			membershipsReady = true;
 			lastTokenForMemberships = null;
+			orgSession.clearSelection();
 			orgSession.setMemberships([]);
 			orgSession.setThemePreference('org_default');
 			applyResolvedTheme('org_default', 'system');
 			return;
 		}
-		if (token === lastTokenForMemberships) return;
-		membershipsReady = false;
-		void refreshMemberships(token);
+		if (mode === 'skip') return;
+		// Tab-focus JWT refresh: keep the shell mounted; API client already reads the new token.
+		if (mode === 'adopt-token') {
+			lastTokenForMemberships = token;
+			return;
+		}
+		if (mode === 'blocking') {
+			membershipsReady = false;
+		}
+		void refreshMemberships(token!);
 	});
 
 	// Apply organisation / personal theme to <html class="dark">.
@@ -142,7 +189,7 @@
 
 		if (!membershipsReady) return;
 
-		if (isAuthPublicPath(path) && path !== '/update-password' && !acceptingInvitation) {
+		if (isPostAuthRedirectPath(path)) {
 			const requestedNext = page.url.searchParams.get('next');
 			const next = safeNextPath(requestedNext);
 			const destination =
@@ -154,16 +201,23 @@
 						});
 			// `destination` is either generated locally or sanitized by safeNextPath.
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			void goto(destination);
+			void goto(destination, { replaceState: true });
 			return;
 		}
 
-		if (orgSession.memberships.length === 0 && !isOnboardingPath(path) && !acceptingInvitation) {
-			void goto(resolve('/onboarding/create-org'));
+		// A just-created org can be selected in localStorage before discovery
+		// returns the new membership. Don't wipe the user back to create-org.
+		if (
+			orgSession.memberships.length === 0 &&
+			!orgSession.selectedOrgId &&
+			!isOnboardingPath(path) &&
+			!acceptingInvitation
+		) {
+			void goto(resolve('/onboarding/create-org'), { replaceState: true });
 			return;
 		}
 
-		if (invitingTeam) {
+		if (invitingTeam && orgSession.memberships.length > 0) {
 			const selectedMembership = orgSession.memberships.find(
 				(membership) => membership.org_id === orgSession.selectedOrgId
 			);
@@ -174,7 +228,7 @@
 				});
 				// postAuthDestination only returns known internal routes.
 				// eslint-disable-next-line svelte/no-navigation-without-resolve
-				void goto(destination);
+				void goto(destination, { replaceState: true });
 				return;
 			}
 		}
@@ -186,17 +240,17 @@
 			});
 			// postAuthDestination only returns known internal routes.
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			void goto(destination);
+			void goto(destination, { replaceState: true });
 			return;
 		}
 
 		if (requiresSelectedOrg(path) && !orgSession.selectedOrgId) {
-			void goto(resolve('/select-org'));
+			void goto(resolve('/select-org'), { replaceState: true });
 		}
 	});
 </script>
 
-{#if auth.enabled && auth.ready && auth.session && !membershipsReady}
+{#if auth.enabled && auth.ready && auth.session && (!membershipsReady || isPostAuthRedirectPath(page.url.pathname))}
 	<p class="p-6 text-sm text-muted-foreground">Loading workspace…</p>
 {:else if membershipsError && auth.session && isAuthPublicPath(page.url.pathname) === false}
 	<div class="mx-auto max-w-lg space-y-3 p-6">

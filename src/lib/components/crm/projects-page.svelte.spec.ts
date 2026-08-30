@@ -70,6 +70,7 @@ function sampleClient() {
 		primary_email: null,
 		phone: null,
 		tax_identifier: null,
+		tax_exempt: false,
 		registration_number: null,
 		default_currency: 'GBP',
 		payment_terms_days: null,
@@ -139,7 +140,7 @@ function organisationsListBody() {
 }
 
 describe('ProjectsPage integration', () => {
-	it('lists projects with X-Org-Id and creates with required client_id', async () => {
+	it('lists projects with X-Org-Id and creates an internal project by default', async () => {
 		const seenOrgHeaders: string[] = [];
 		let createBody: unknown;
 
@@ -160,7 +161,9 @@ describe('ProjectsPage integration', () => {
 						data: sampleProject({
 							id: '22222222-3333-4444-8555-666666666666',
 							name: 'Warehouse rollout',
-							status: 'planning'
+							status: 'planning',
+							client_id: null,
+							client_label: 'Internal'
 						})
 					},
 					status: 201
@@ -180,7 +183,7 @@ describe('ProjectsPage integration', () => {
 
 		await expect.poll(() => createBody).toMatchObject({
 			name: 'Warehouse rollout',
-			client_id: CLIENT_ID,
+			client_id: null,
 			status: 'planning'
 		});
 	});

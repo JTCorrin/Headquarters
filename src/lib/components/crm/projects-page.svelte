@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		emptyProjectFormData,
 		membershipFromCreateResult,
@@ -76,19 +76,9 @@
 	const boardProjects = $derived(rows.map(toProjectBoardCard));
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isPreconditionFailed) {
-				return error.message || 'Project changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			conflictMessage: 'Project changed elsewhere — reload and try again.'
+		});
 	}
 
 	interface RequestEpoch {
@@ -122,9 +112,7 @@
 	}
 
 	function resetCreateForm() {
-		const next = emptyProjectFormData();
-		if (clients[0]) next.clientId = clients[0].id;
-		projectForm.form.set(next);
+		projectForm.form.set(emptyProjectFormData());
 	}
 
 	async function loadAll() {
@@ -156,13 +144,9 @@
 				.filter((p) => p.status !== 'archived')
 				.map(toProjectListItem);
 			clients = clientRows.data.map((c) => ({ id: c.id, name: c.name }));
-			const currentForm = get(projectForm.form);
-			if (!currentForm.clientId && clients[0]) {
-				projectForm.form.set({ ...currentForm, clientId: clients[0].id });
-			}
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No projects yet — create one attached to a client.' }
+					? { kind: 'empty', message: 'No projects yet — create an internal project or attach one to a client.' }
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;

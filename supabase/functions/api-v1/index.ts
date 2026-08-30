@@ -14,8 +14,9 @@ import { handleContacts } from './contacts.ts'
 import { handleDocuments } from './documents.ts'
 import { ApiError, apiPath, errorResponse, jsonResponse, parseLimit, parseUuid } from './http.ts'
 import { handleAiSuggestions } from './ai-suggestions.ts'
-import { handleEmailMessages } from './email-messages.ts'
+import { composeEntityEmailMessage, handleEmailMessages } from './email-messages.ts'
 import { handleIntegrations } from './integrations.ts'
+import { handleOrgInvoiceEmail } from './org-invoice-email.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
@@ -31,12 +32,18 @@ import { handlePlaybooks } from './playbooks.ts'
 import { handleMailbox, listEntityEmailMessages, listMyEmailMessages } from './mailbox.ts'
 import { handleNotifications } from './notifications.ts'
 import { handleOrgMembers } from './org-members.ts'
+import { handleDashboardSummary } from './dashboard.ts'
 import { handleAuditEvents } from './audit-events.ts'
 import {
   acceptInvitation,
   handleOrganisationAccess,
 } from './organisation-access.ts'
-import { handleOrganisationConfiguration, handleOrganisations } from './organisations.ts'
+import {
+  handleOrganisationBranding,
+  handleOrganisationConfiguration,
+  handleOrganisationLogo,
+  handleOrganisations,
+} from './organisations.ts'
 import { handleProductCategories } from './product-categories.ts'
 import { handleProducts } from './products.ts'
 import { handleProfilePreferences } from './profile-preferences.ts'
@@ -335,6 +342,39 @@ async function routeOrgScoped(
     );
   }
 
+  if (
+    path === "/api/v1/organisation/invoice-email" ||
+    path === "/api/v1/organisation/invoice-email/test"
+  ) {
+    return await handleOrgInvoiceEmail(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    );
+  }
+
+  if (path === "/api/v1/organisation/branding") {
+    return await handleOrganisationBranding(req, db, path, orgId, requestId);
+  }
+
+  if (
+    path === "/api/v1/organisation/logo" ||
+    path === "/api/v1/organisation/logo/upload-intent" ||
+    path === "/api/v1/organisation/logo/finalize"
+  ) {
+    return await handleOrganisationLogo(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    );
+  }
+
   if (path === "/api/v1/me/mailbox/sync") {
     return await handleEmailMessages(
       req,
@@ -373,6 +413,17 @@ async function routeOrgScoped(
 
   if (path === "/api/v1/me/org-members") {
     return await handleOrgMembers(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    );
+  }
+
+  if (path === "/api/v1/dashboard/summary") {
+    return await handleDashboardSummary(
       req,
       db,
       path,
@@ -488,13 +539,6 @@ async function routeOrgScoped(
         "Billing members cannot access entity email",
       );
     }
-    if (req.method !== "GET") {
-      throw new ApiError(
-        405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for entity email",
-      );
-    }
     // Path segment is plural; stub expects singular entity type.
     const entityTypeByResource = {
       contacts: "contact",
@@ -506,6 +550,24 @@ async function routeOrgScoped(
     const entityType = entityTypeByResource[resource];
     if (!entityType) {
       throw new ApiError(404, "NOT_FOUND", "Route not found");
+    }
+    if (req.method === "POST") {
+      return await composeEntityEmailMessage(
+        req,
+        db,
+        orgId,
+        entityType,
+        entityEmailMatch[2],
+        membership.role,
+        requestId,
+      );
+    }
+    if (req.method !== "GET") {
+      throw new ApiError(
+        405,
+        "METHOD_NOT_ALLOWED",
+        "Method not allowed for entity email",
+      );
     }
     return await listEntityEmailMessages(
       db,
@@ -687,7 +749,16 @@ async function routeOrgScoped(
 
   if (path === "/api/v1/payments" || path.startsWith("/api/v1/payments/")) {
     assertCanAccessPayments(membership.role, req.method);
-    return await handlePayments(req, db, path, orgId, requestId);
+    return await handlePayments(
+      req,
+      db,
+      path,
+      orgId,
+      requestId,
+      actorType === "api_key" && req.method === "POST"
+        ? requireUserId(userId)
+        : null,
+    );
   }
 
   if (path === "/api/v1/timeline-events") {

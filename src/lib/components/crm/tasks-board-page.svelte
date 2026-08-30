@@ -1,5 +1,6 @@
 <script lang="ts">
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import TasksBoard, { type TaskBoardCard } from './tasks-board.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -15,11 +16,15 @@
 	let { orgName, navGroups, tasks, class: className }: TasksBoardPageProps = $props();
 </script>
 
-<div class={cn('bg-background text-foreground flex h-full min-h-[720px]', className)}>
-	<AppNav {orgName} groups={navGroups} class="shrink-0" />
-
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	showNav
+	showTrigger
+	class={cn('h-full min-h-[720px]', className)}
+>
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
-		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
+		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0">
 				<PageHeader title="Tasks board">
 					{#snippet actions()}
@@ -31,4 +36,4 @@
 			<TasksBoard {tasks} class="min-h-0 flex-1" />
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

@@ -3,13 +3,14 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		roleFromMemberships,
 		lineItemRowsToQuoteLineInputs,
 		membershipFromCreateResult,
 		quoteStatusLabel,
 		toCatalogProductOption,
+		toOrganisationBrandingResource,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toQuoteFormData,
@@ -22,6 +23,7 @@
 		loadEntityTimeline
 	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
+	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
@@ -29,7 +31,11 @@
 		lineItemFormSchema,
 		type CatalogProductOption
 	} from '$lib/schemas/line-item.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import {
 		quoteFormSchema,
 		type QuoteClientOption,
@@ -50,6 +56,7 @@
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onConverted?: (invoiceId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -61,6 +68,7 @@
 		onMissingOrg,
 		onSwitchNavigate,
 		onConverted,
+		onDeleted,
 		onLogout,
 		class: className
 	}: QuotePageProps = $props();
@@ -73,21 +81,13 @@
 	let taxRates = $state<ApiTaxRate[]>([]);
 	let lines = $state<LineItemRow[]>([]);
 	let timelineEvents = $state<TimelineEvent[]>([]);
+	let orgLogoDataUrl = $state<string | undefined>(undefined);
+	let orgAddressLines = $state<string[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
-
-	function emptyLineForm() {
-		return {
-			productId: '',
-			description: '',
-			qty: '1',
-			unitPrice: '0',
-			taxRatePercent: defaultTaxRatePercentString(taxRates)
-		};
-	}
 
 	const quoteForm = superForm(
 		defaults(
@@ -96,6 +96,7 @@
 				clientName: '',
 				title: '',
 				currency: 'GBP' as const,
+				discount: '',
 				status: 'draft' as const,
 				recipients: []
 			},
@@ -109,6 +110,19 @@
 			resetForm: false
 		}
 	);
+
+	function emptyLineForm() {
+		const clientId = get(quoteForm.form).clientId;
+		const taxExempt = clientOptions.find((c) => c.id === clientId)?.taxExempt ?? false;
+		return {
+			productId: '',
+			description: '',
+			qty: '1',
+			unitPrice: '0',
+			discountPercent: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates, { taxExempt })
+		};
+	}
 
 	const lineForm = superForm(defaults(emptyLineForm(), zod4(lineItemFormSchema)), {
 		validators: zod4(lineItemFormSchema),
@@ -135,20 +149,10 @@
 	const canConvert = $derived(quote?.status === 'accepted');
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Quote not found.';
-			if (error.isPreconditionFailed) {
-				return error.message || 'Quote changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Quote not found.',
+			conflictMessage: 'Quote changed elsewhere — reload and try again.'
+		});
 	}
 
 	interface RequestEpoch {
@@ -192,6 +196,8 @@
 		clientOptions = [];
 		contactOptions = [];
 		products = [];
+		orgLogoDataUrl = undefined;
+		orgAddressLines = [];
 		viewState = { kind: 'loading' };
 	}
 
@@ -234,18 +240,27 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, contacts, catalog, rates] = await Promise.all([
+			const [result, clients, contacts, catalog, rates, branding] = await Promise.all([
 				api.quotes.get(quoteId),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
 				api.products.list({ limit: 100, status: 'active' }),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.organisationConfig.getBranding()
 			]);
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
 			applyDocument(result.data);
-			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			const brandingResource = toOrganisationBrandingResource(branding);
+			orgAddressLines = formatOrgLetterheadLines(brandingResource);
+			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
+			if (isStale(epoch)) return;
+			clientOptions = clients.data.map((c) => ({
+				id: c.id,
+				name: c.name,
+				taxExempt: Boolean(c.tax_exempt)
+			}));
 			const options: QuoteContactOption[] = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
@@ -458,6 +473,26 @@
 		await runLifecycle('accept', canAccept, 'Could not accept quote — try again.');
 	}
 
+	async function onDelete() {
+		if (!quote || !canSend || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this draft quote? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		actionPending = true;
+		try {
+			await api.quotes.delete(quote.id, quote.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete quote — try again.')
+			};
+		} finally {
+			actionPending = false;
+		}
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'quote', quoteId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
@@ -530,13 +565,20 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if viewState.kind !== 'ready' && !quote}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{:else if quote}
+					{#if viewState.kind === 'validation' || viewState.kind === 'conflict'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<QuoteDetailPage
 						{orgName}
+						{orgLogoDataUrl}
+						{orgAddressLines}
 						{navGroups}
 						title="{quote.number} · {quote.title}"
 						status={quoteStatusLabel(quote.status)}
@@ -568,6 +610,7 @@
 						onReject={onReject}
 						onAccept={onAccept}
 						onConvert={onConvert}
+						onDelete={canSend && canMutateCrmRecords(role) ? onDelete : undefined}
 						{onTimelineAdd}
 						showNav={false}
 						class="min-h-0 flex-1"

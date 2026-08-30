@@ -4,6 +4,7 @@
  */
 
 import { assertSafeOutboundHost, isSyntheticImapHost, withImapTimeout } from './imap-inbound.ts'
+import { buildXoauth2SaslString } from './mailbox-oauth.ts'
 
 export type SmtpSecurity = 'tls' | 'starttls' | 'none'
 
@@ -18,17 +19,31 @@ export class SmtpSendError extends Error {
   }
 }
 
+export type SmtpAuth =
+  | { type: 'password'; username: string; password: string }
+  | { type: 'xoauth2'; username: string; accessToken: string }
+
+export type SmtpAttachment = {
+  filename: string
+  contentType: string
+  bytes: Uint8Array
+}
+
 export type SmtpSendOptions = {
   host: string
   port: number
   security: SmtpSecurity
-  username: string
-  password: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  username?: string
+  /** @deprecated Prefer `auth`. Kept for password-only callers. */
+  password?: string
+  auth?: SmtpAuth
   from: string
   to: string
   subject: string
   bodyText: string
   bodyHtml?: string | null
+  attachments?: SmtpAttachment[]
   inReplyTo?: string | null
   references?: string | null
   messageId: string
@@ -78,11 +93,70 @@ function encodeBase64(value: string): string {
   return btoa(String.fromCharCode(...new TextEncoder().encode(value)))
 }
 
+function encodeBase64Bytes(bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!)
+  }
+  return btoa(binary)
+}
+
+function wrapBase64(value: string): string {
+  const lines: string[] = []
+  for (let i = 0; i < value.length; i += 76) {
+    lines.push(value.slice(i, i + 76))
+  }
+  return lines.join('\r\n')
+}
+
+function escapeMimeFilename(filename: string): string {
+  return filename.replace(/["\\]/g, '\\$&')
+}
+
 function encodeHeaderUtf8(value: string): string {
   // ASCII-safe path: leave alone when no high bytes.
   if (/^[\x20-\x7E]*$/.test(value)) return value
   const b64 = encodeBase64(value)
   return `=?UTF-8?B?${b64}?=`
+}
+
+function buildMimeBodyPart(options: {
+  bodyText: string
+  bodyHtml?: string | null
+}): { contentType: string; body: string } {
+  const text = options.bodyText ?? ''
+  const html = options.bodyHtml?.trim()
+  if (html) {
+    const boundary = `crm-alt-${crypto.randomUUID()}`
+    const parts: string[] = [
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      text.replace(/\r?\n/g, '\r\n'),
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      html.replace(/\r?\n/g, '\r\n'),
+      `--${boundary}--`,
+    ]
+    return {
+      contentType: `multipart/alternative; boundary="${boundary}"`,
+      body: parts.join('\r\n'),
+    }
+  }
+  return {
+    contentType: 'text/plain; charset=utf-8',
+    body: [
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      text.replace(/\r?\n/g, '\r\n'),
+    ].join('\r\n'),
+  }
 }
 
 export function buildMimeMessage(options: {
@@ -91,6 +165,7 @@ export function buildMimeMessage(options: {
   subject: string
   bodyText: string
   bodyHtml?: string | null
+  attachments?: SmtpAttachment[]
   messageId: string
   inReplyTo?: string | null
   references?: string | null
@@ -115,36 +190,37 @@ export function buildMimeMessage(options: {
     lines.push(`References: ${formatMessageIdHeader(references)}`)
   }
 
-  const text = options.bodyText ?? ''
-  const html = options.bodyHtml?.trim()
-  if (html) {
-    const boundary = `crm-bound-${crypto.randomUUID()}`
-    lines.push(
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      '',
-    )
-    lines.push(`--${boundary}`)
-    lines.push(
-      'Content-Type: text/plain; charset=utf-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-    )
-    lines.push(text.replace(/\r?\n/g, '\r\n'))
-    lines.push(`--${boundary}`)
-    lines.push(
-      'Content-Type: text/html; charset=utf-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-    )
-    lines.push(html.replace(/\r?\n/g, '\r\n'))
-    lines.push(`--${boundary}--`)
+  const attachments = options.attachments ?? []
+  const bodyPart = buildMimeBodyPart({
+    bodyText: options.bodyText,
+    bodyHtml: options.bodyHtml,
+  })
+
+  if (attachments.length > 0) {
+    const mixedBoundary = `crm-mixed-${crypto.randomUUID()}`
+    lines.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`, '')
+    lines.push(`--${mixedBoundary}`)
+    if (bodyPart.contentType.startsWith('multipart/alternative')) {
+      lines.push(bodyPart.body)
+    } else {
+      lines.push(bodyPart.body)
+    }
+    for (const attachment of attachments) {
+      const filename = escapeMimeFilename(attachment.filename.trim() || 'attachment')
+      lines.push(`--${mixedBoundary}`)
+      lines.push(
+        `Content-Type: ${attachment.contentType}; name="${filename}"`,
+        'Content-Transfer-Encoding: base64',
+        `Content-Disposition: attachment; filename="${filename}"`,
+        '',
+        wrapBase64(encodeBase64Bytes(attachment.bytes)),
+      )
+    }
+    lines.push(`--${mixedBoundary}--`)
+  } else if (bodyPart.contentType.startsWith('multipart/alternative')) {
+    lines.push(bodyPart.body)
   } else {
-    lines.push(
-      'Content-Type: text/plain; charset=utf-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-    )
-    lines.push(text.replace(/\r?\n/g, '\r\n'))
+    lines.push(bodyPart.body)
   }
 
   // SMTP DATA body must end with CRLF before the terminating ".".
@@ -350,6 +426,31 @@ async function smtpAuthLogin(
   await session.expect([235], 'SMTP AUTH password')
 }
 
+async function smtpAuthXoauth2(
+  session: SmtpSession,
+  username: string,
+  accessToken: string,
+): Promise<void> {
+  const sasl = buildXoauth2SaslString(username, accessToken)
+  await session.writeLine(`AUTH XOAUTH2 ${sasl}`)
+  await session.expect([235], 'SMTP AUTH XOAUTH2')
+}
+
+function resolveSmtpAuth(options: SmtpSendOptions): SmtpAuth | null {
+  if (options.auth) return options.auth
+  if (options.username || options.password) {
+    if (!options.username || !options.password) {
+      throw new SmtpSendError(
+        'smtp_auth_incomplete',
+        'SMTP username and password must both be configured',
+        'auth',
+      )
+    }
+    return { type: 'password', username: options.username, password: options.password }
+  }
+  return null
+}
+
 /**
  * Deliver one message via SMTP. Synthetic `*.example.test` hosts short-circuit
  * without opening a socket (staging/Deno proofs).
@@ -384,15 +485,11 @@ export async function sendSmtpMail(
   try {
     await session.writeLine('EHLO crm.local')
     await session.expect([250], 'SMTP EHLO')
-    if (options.username || options.password) {
-      if (!options.username || !options.password) {
-        throw new SmtpSendError(
-          'smtp_auth_incomplete',
-          'SMTP username and password must both be configured',
-          'auth',
-        )
-      }
-      await smtpAuthLogin(session, options.username, options.password)
+    const auth = resolveSmtpAuth(options)
+    if (auth?.type === 'password') {
+      await smtpAuthLogin(session, auth.username, auth.password)
+    } else if (auth?.type === 'xoauth2') {
+      await smtpAuthXoauth2(session, auth.username, auth.accessToken)
     }
 
     await session.writeLine(`MAIL FROM:<${options.from}>`)
@@ -408,6 +505,7 @@ export async function sendSmtpMail(
       subject: options.subject,
       bodyText: options.bodyText,
       bodyHtml: options.bodyHtml,
+      attachments: options.attachments,
       messageId: options.messageId,
       inReplyTo: options.inReplyTo,
       references: options.references,

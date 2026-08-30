@@ -1,11 +1,16 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		aiSuggestionText,
 		roleFromMemberships,
 		contactLifecycleLabel,
 		membershipFromCreateResult,
+		toContactFormData,
+		toContactUpdateBody,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
@@ -15,13 +20,16 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import { contactFormSchema, type ContactFormData } from '$lib/schemas/contact.js';
+	import type { LeadClientOption } from '$lib/schemas/lead.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -36,6 +44,7 @@
 		contactId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -46,6 +55,7 @@
 		contactId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onDeleted,
 		onLogout,
 		class: className
 	}: ContactPageProps = $props();
@@ -58,14 +68,32 @@
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+	let editDrawerOpen = $state(false);
+	let clientOptions = $state<LeadClientOption[]>([]);
+
+	const emptyContactForm = (): ContactFormData => ({
+		name: '',
+		email: '',
+		phone: '',
+		company: '',
+		title: '',
+		status: 'active',
+		clientId: ''
+	});
+
+	const contactForm = superForm(defaults(emptyContactForm(), zod4(contactFormSchema)), {
+		validators: zod4(contactFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Contacts', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -90,13 +118,7 @@
 	});
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Contact not found.';
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, { notFoundMessage: 'Contact not found.' });
 	}
 
 	interface RequestEpoch {
@@ -138,6 +160,8 @@
 		emailTab = emptyEntityEmailTabState();
 		timelineEvents = [];
 		sharingId = null;
+		clientOptions = [];
+		editDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
 
@@ -160,10 +184,21 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const result = await api.contacts.get(contactId);
+			const [result, clientsListed] = await Promise.all([
+				api.contacts.get(contactId),
+				api.clients.list({ limit: 100 })
+			]);
 			if (isStale(epoch)) return;
 
 			contact = result.data;
+			contactForm.form.set(toContactFormData(result.data, result.data.client_id));
+			clientOptions = clientsListed.data
+				.filter((c) => c.status !== 'archived')
+				.map((c) => ({
+					id: c.id,
+					name: c.name,
+					defaultCurrency: c.default_currency
+				}));
 			viewState = { kind: 'ready' };
 
 			const [tab, timeline] = await Promise.all([
@@ -193,6 +228,49 @@
 		}
 	}
 
+	async function onSaveContact(): Promise<boolean> {
+		if (!contact) return false;
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.contacts.update(
+				contact.id,
+				toContactUpdateBody(get(contactForm.form)),
+				contact.version
+			);
+			if (isStale(epoch)) return false;
+			contact = updated;
+			contactForm.form.set(toContactFormData(updated, updated.client_id));
+			editDrawerOpen = false;
+			viewState = { kind: 'ready' };
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not save contact — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
+	async function onDelete() {
+		if (!contact || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this contact? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.contacts.delete(contact.id, contact.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete contact — try again.')
+			};
+		}
+	}
+
 	async function onAddToTimeline(payload: { messageId: string }) {
 		sharingId = payload.messageId;
 		try {
@@ -216,15 +294,42 @@
 		emailTab = await loadEntityEmailTab(api, 'contact', contactId);
 	}
 
+	async function onSendNew(payload: { to: string; subject: string; body: string }) {
+		await api.emailMessages.sendForEntity('contact', contactId, {
+			to: payload.to,
+			subject: payload.subject,
+			body_text: payload.body
+		});
+		emailTab = await loadEntityEmailTab(api, 'contact', contactId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'contact', contactId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
-	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+	async function onDraftResponse(payload: {
+		messageId: string;
+		tone: 'warm' | 'neutral' | 'firm';
+	}) {
 		const suggestion = await api.emailMessages.generateDraft({
 			email_message_id: payload.messageId,
 			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onDraftCompose(payload: {
+		tone: 'warm' | 'neutral' | 'firm';
+		subject: string;
+		to: string;
+	}) {
+		void payload.to;
+		const suggestion = await api.emailMessages.generateComposeDraft({
+			entity_type: 'contact',
+			entity_id: contactId,
+			variant: payload.tone,
+			subject: payload.subject
 		});
 		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
 	}
@@ -285,11 +390,16 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if !contact}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
-				{:else if contact}
+				{:else}
+					{#if viewState.kind === 'validation'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<ContactProfilePage
 						{orgName}
 						{navGroups}
@@ -301,21 +411,29 @@
 							: (contact.job_title ?? undefined)}
 						{contactFields}
 						{companyFields}
+						{contactForm}
+						{clientOptions}
+						bind:editDrawerOpen
 						bind:timelineEvents
 						emailMessages={emailTab.messages}
 						emailEmptyState={emailTab.emptyState}
 						mailboxConnected={emailTab.mailboxConnected}
 						aiProviderConnected={emailTab.aiProviderConnected}
 						smtpReady={emailTab.smtpReady}
+						emailDefaultTo={contact.primary_email ?? ''}
 						{role}
 						{sharingId}
 						documentsApi={api}
 						documentsEntityId={contact.id}
 						documentsReloadKey={session.cacheGeneration}
+						onValidSubmit={onSaveContact}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
+						{onSendNew}
 						{onDraftResponse}
+						{onDraftCompose}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						showNav={false}
@@ -327,7 +445,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="contact-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening contacts.
 		</p>
 	</div>

@@ -3,13 +3,14 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		aiSuggestionText,
 		roleFromMemberships,
 		clientStatusLabel,
 		membershipFromCreateResult,
 		toClientFormData,
+		toClientRelatedContacts,
 		toClientUpdateBody,
 		toEntityProject,
 		toOrganisationCreateBody,
@@ -23,14 +24,15 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { clientFormSchema, type ClientFormData } from '$lib/schemas/client.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { InfoCardField } from './info-card.svelte';
 	import type { MoneySummaryItem } from './money-summary.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -46,6 +48,7 @@
 		clientId: string;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -56,6 +59,7 @@
 		clientId,
 		onMissingOrg,
 		onSwitchNavigate,
+		onDeleted,
 		onLogout,
 		class: className
 	}: ClientPageProps = $props();
@@ -78,8 +82,10 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',
+		taxExempt: false,
 		registrationNumber: '',
 		defaultCurrency: 'GBP',
 		paymentTermsDays: '',
@@ -96,12 +102,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Clients', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -112,6 +116,7 @@
 					{ label: 'Industry', value: client.industry ?? '—' },
 					{ label: 'Website', value: client.website_url ?? '—' },
 					{ label: 'Primary email', value: client.primary_email ?? '—' },
+					{ label: 'Email domain', value: client.email_domain ?? '—' },
 					{ label: 'Phone', value: client.phone ?? '—' },
 					{ label: 'Notes', value: client.notes ?? '—' }
 				]
@@ -124,28 +129,20 @@
 					{ label: 'Default currency', value: client.default_currency ?? '—' },
 					{
 						label: 'Payment terms (days)',
-						value:
-							client.payment_terms_days == null ? '—' : String(client.payment_terms_days)
+						value: client.payment_terms_days == null ? '—' : String(client.payment_terms_days)
 					},
 					{ label: 'Tax identifier', value: client.tax_identifier ?? '—' },
+					{ label: 'VAT exempt', value: client.tax_exempt ? 'Yes' : 'No' },
 					{ label: 'Registration number', value: client.registration_number ?? '—' },
 					{ label: 'Renewal on', value: client.renewal_on ?? '—' }
 				]
 			: []
 	);
 
+	const relatedContacts = $derived(toClientRelatedContacts(client?.contacts));
+
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Client not found.';
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, { notFoundMessage: 'Client not found.' });
 	}
 
 	interface RequestEpoch {
@@ -277,15 +274,42 @@
 		emailTab = await loadEntityEmailTab(api, 'client', clientId);
 	}
 
+	async function onSendNew(payload: { to: string; subject: string; body: string }) {
+		await api.emailMessages.sendForEntity('client', clientId, {
+			to: payload.to,
+			subject: payload.subject,
+			body_text: payload.body
+		});
+		emailTab = await loadEntityEmailTab(api, 'client', clientId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'client', clientId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
-	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+	async function onDraftResponse(payload: {
+		messageId: string;
+		tone: 'warm' | 'neutral' | 'firm';
+	}) {
 		const suggestion = await api.emailMessages.generateDraft({
 			email_message_id: payload.messageId,
 			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onDraftCompose(payload: {
+		tone: 'warm' | 'neutral' | 'firm';
+		subject: string;
+		to: string;
+	}) {
+		void payload.to;
+		const suggestion = await api.emailMessages.generateComposeDraft({
+			entity_type: 'client',
+			entity_id: clientId,
+			variant: payload.tone,
+			subject: payload.subject
 		});
 		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
 	}
@@ -321,6 +345,23 @@
 				fields: isApiClientError(error) ? error.fields : undefined
 			};
 			return false;
+		}
+	}
+
+	async function onDelete() {
+		if (!client || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this client? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.clients.delete(client.id, client.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete client — try again.')
+			};
 		}
 	}
 
@@ -372,11 +413,16 @@
 			{onValidCreate}
 		>
 			<div class="flex min-h-0 flex-1 flex-col">
-				{#if viewState.kind !== 'ready'}
+				{#if viewState.kind !== 'ready' && !client}
 					<div class="px-6 pt-6 md:px-8">
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{:else if client}
+					{#if viewState.kind === 'validation' || viewState.kind === 'conflict'}
+						<div class="px-6 pt-6 md:px-8">
+							<ResourceStateBanner state={viewState} onReload={loadAll} />
+						</div>
+					{/if}
 					<ClientProfilePage
 						{orgName}
 						{navGroups}
@@ -386,6 +432,7 @@
 						subtitle={client.industry ?? undefined}
 						{companyFields}
 						{billingFields}
+						{relatedContacts}
 						{clientForm}
 						bind:editDrawerOpen
 						{viewState}
@@ -395,6 +442,7 @@
 						mailboxConnected={emailTab.mailboxConnected}
 						aiProviderConnected={emailTab.aiProviderConnected}
 						smtpReady={emailTab.smtpReady}
+						emailDefaultTo={client.primary_email ?? ''}
 						{role}
 						{sharingId}
 						documentsApi={api}
@@ -406,10 +454,13 @@
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
+						{onSendNew}
 						{onDraftResponse}
+						{onDraftCompose}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						onValidSubmit={onSaveClient}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						onReload={loadAll}
 						showNav={false}
 						class="min-h-0 flex-1"
@@ -420,7 +471,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="client-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening clients.
 		</p>
 	</div>

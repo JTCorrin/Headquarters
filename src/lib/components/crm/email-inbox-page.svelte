@@ -1,10 +1,14 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
 	import {
 		aiSuggestionText,
 		membershipFromCreateResult,
 		roleFromMemberships,
+		toLeadCreateBody,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
@@ -17,14 +21,21 @@
 		loadPersonalEmailInbox,
 		type PersonalEmailInboxState
 	} from '$lib/crm/personal-email-inbox.js';
+	import { resolveLeadCurrency } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { describeMailboxSyncResult } from '$lib/schemas/mailbox.js';
+	import {
+		leadFormSchema,
+		type LeadClientOption,
+		type LeadFormData
+	} from '$lib/schemas/lead.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import EntityEmailInbox from './entity-email-inbox.svelte';
+	import LeadFormDrawer from './lead-form-drawer.svelte';
 	import PageHeader from './page-header.svelte';
 	import ResourceStateBanner from './resource-state-banner.svelte';
 
@@ -39,6 +50,8 @@
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
+		/** After creating a lead from an inbox message, navigate to the lead. */
+		onLeadCreated?: (leadId: string) => void;
 		class?: string;
 	}
 
@@ -49,6 +62,7 @@
 		onMissingOrg,
 		onSwitchNavigate,
 		onLogout,
+		onLeadCreated,
 		class: className
 	}: EmailInboxPageProps = $props();
 
@@ -61,6 +75,32 @@
 	let busy = $state(false);
 	let syncPending = $state(false);
 	let syncFeedback = $state<string | null>(null);
+	let leadDrawerOpen = $state(false);
+	let clientOptions = $state<LeadClientOption[]>([]);
+	let orgCurrency = $state<string | null>(null);
+
+	const emptyLeadForm = (currency = 'GBP'): LeadFormData => ({
+		name: '',
+		companyName: '',
+		primaryEmail: '',
+		clientId: '',
+		stage: 'new',
+		valueAmount: '',
+		currency,
+		probabilityPercent: '',
+		source: '',
+		expectedCloseOn: '',
+		lostReason: '',
+		notes: ''
+	});
+
+	const leadForm = superForm(defaults(emptyLeadForm(), zod4(leadFormSchema)), {
+		validators: zod4(leadFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	$effect(() => {
 		pendingMessageId = initialMessageId ?? null;
@@ -77,18 +117,6 @@
 	const navGroups = $derived(appNavGroups('Email', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
-	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
-	}
 
 	interface RequestEpoch {
 		orgId: string | null;
@@ -116,7 +144,17 @@
 	function resetOrgScopedState() {
 		inbox = emptyPersonalEmailInboxState();
 		selectedId = undefined;
+		clientOptions = [];
+		orgCurrency = null;
+		leadDrawerOpen = false;
 		viewState = { kind: 'loading' };
+	}
+
+	function leadNameFromSender(fromName: string | null, fromAddress: string): string {
+		const named = fromName?.trim();
+		if (named) return named;
+		const local = fromAddress.split('@')[0]?.trim();
+		return local || fromAddress;
 	}
 
 	async function loadAll(opts?: { quiet?: boolean }) {
@@ -144,6 +182,23 @@
 			const next = await loadPersonalEmailInbox(api);
 			if (isStale(epoch)) return;
 			inbox = next;
+
+			if (!quiet) {
+				const [clientsListed, config] = await Promise.all([
+					api.clients.list({ limit: 100 }),
+					api.organisationConfig.get()
+				]);
+				if (isStale(epoch)) return;
+				orgCurrency = config.default_currency ?? null;
+				clientOptions = clientsListed.data
+					.filter((c) => c.status !== 'archived')
+					.map((c) => ({
+						id: c.id,
+						name: c.name,
+						defaultCurrency: c.default_currency
+					}));
+			}
+
 			const ids = next.messages.map((m) => m.id);
 			const deepLinkId = pendingMessageId;
 			if (deepLinkId && ids.includes(deepLinkId)) {
@@ -229,6 +284,43 @@
 		await api.emailMessages.discardDraft(payload.suggestionId);
 	}
 
+	function onCreateLeadFromEmail(payload: {
+		messageId: string;
+		fromAddress: string;
+		fromName: string | null;
+		subject: string;
+	}) {
+		const currency = resolveLeadCurrency({ orgCurrency });
+		leadForm.form.set({
+			...emptyLeadForm(currency),
+			name: leadNameFromSender(payload.fromName, payload.fromAddress),
+			primaryEmail: payload.fromAddress,
+			source: 'Email',
+			stage: 'new'
+		});
+		leadDrawerOpen = true;
+	}
+
+	async function onCreateLead(): Promise<boolean> {
+		const epoch = captureEpoch();
+		try {
+			const created = await api.leads.create(toLeadCreateBody(get(leadForm.form)));
+			if (isStale(epoch)) return false;
+			leadForm.form.set(emptyLeadForm(resolveLeadCurrency({ orgCurrency })));
+			leadDrawerOpen = false;
+			onLeadCreated?.(created.id);
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not create lead — try again.'),
+				fields: isApiClientError(error) ? error.fields : undefined
+			};
+			return false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -290,7 +382,7 @@
 						<ResourceStateBanner state={viewState} onReload={loadAll} />
 					</div>
 				{:else}
-					<div class="flex min-h-0 flex-1 flex-col px-6 py-6 md:px-8">
+					<div class="flex min-h-0 flex-1 flex-col px-4 py-6 sm:px-6 md:px-8">
 						{#if viewState.kind === 'validation'}
 							<div class="mb-4">
 								<ResourceStateBanner state={viewState} onReload={loadAll} />
@@ -337,11 +429,23 @@
 							bind:selectedId
 							{role}
 							canAddToTimeline={false}
+							canCreateLead={true}
+							onCreateLead={onCreateLeadFromEmail}
 							{onSendReply}
 							{onDraftResponse}
 							{onUseSuggestion}
 							{onDiscardSuggestion}
 							class="mt-6 min-h-0 flex-1"
+						/>
+						<LeadFormDrawer
+							bind:open={leadDrawerOpen}
+							form={leadForm}
+							{clientOptions}
+							{orgCurrency}
+							showTrigger={false}
+							title="New lead from email"
+							description="Prefills the sender name and email. Adjust pipeline fields before saving."
+							onValidSubmit={onCreateLead}
 						/>
 					</div>
 				{/if}

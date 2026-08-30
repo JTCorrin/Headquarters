@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		emptyRecurringInvoiceFormData,
 		membershipFromCreateResult,
@@ -77,16 +77,6 @@
 	let lineDrawerOpen = $state(false);
 	/** When set, line drawer updates this index instead of appending. */
 	let lineEditIndex = $state<number | null>(null);
-
-	function emptyRecurringLineForm(): RecurringLineFormData {
-		return {
-			productId: '',
-			descriptionTemplate: '',
-			qty: '1',
-			unitPrice: '0',
-			taxRatePercent: defaultTaxRatePercentString(taxRates)
-		};
-	}
 
 	const LINE_API_TO_FORM: Record<string, keyof RecurringLineFormData> = {
 		quantity: 'qty',
@@ -179,6 +169,18 @@
 		}
 	);
 
+	function emptyRecurringLineForm(): RecurringLineFormData {
+		const clientId = get(scheduleForm.form).clientId;
+		const taxExempt = clientOptions.find((c) => c.id === clientId)?.taxExempt ?? false;
+		return {
+			productId: '',
+			descriptionTemplate: '',
+			qty: '1',
+			unitPrice: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates, { taxExempt })
+		};
+	}
+
 	const lineForm = superForm(defaults(emptyRecurringLineForm(), zod4(recurringLineFormSchema)), {
 		validators: zod4(recurringLineFormSchema),
 		SPA: true,
@@ -226,20 +228,11 @@
 	});
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Schedule not found.';
-			if (error.isPreconditionFailed) {
-				return error.message || 'Schedule changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				// Prefer Superforms field placement — do not join opaque banners.
-				return error.message || fallback;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Schedule not found.',
+			conflictMessage: 'Schedule changed elsewhere — reload and try again.',
+			ignoreValidationFields: true
+		});
 	}
 
 	interface RequestEpoch {
@@ -346,7 +339,11 @@
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
-			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			clientOptions = clients.data.map((c) => ({
+				id: c.id,
+				name: c.name,
+				taxExempt: Boolean(c.tax_exempt)
+			}));
 			contactOptions = contacts.data.map((c) => ({
 				id: c.id,
 				label: c.display_name || c.primary_email || c.id,
@@ -599,6 +596,19 @@
 						onResume={() => runLifecycle((v) => api.recurringInvoiceSchedules.resume(scheduleId, v))}
 						onCancel={() => runLifecycle((v) => api.recurringInvoiceSchedules.cancel(scheduleId, v))}
 						onRunNow={onRunNow}
+						onRetryDelivery={async (runId) => {
+							actionPending = true;
+							actionError = null;
+							try {
+								await api.recurringInvoiceSchedules.retryDelivery(scheduleId, runId);
+								const epoch = captureEpoch();
+								await loadRuns(epoch);
+							} catch (error) {
+								actionError = userMessage(error, 'Could not retry delivery.');
+							} finally {
+								actionPending = false;
+							}
+						}}
 						onDelete={onDelete}
 						onReload={loadAll}
 						showNav={false}

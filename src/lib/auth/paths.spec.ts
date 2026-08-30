@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
 	isAuthPublicPath,
 	isOnboardingPath,
+	isPostAuthRedirectPath,
+	isPostOrgCreateLandingPath,
+	isPostSignupLandingPath,
 	postAuthDestination,
 	requiresSelectedOrg
 } from './paths.js';
@@ -14,7 +17,20 @@ describe('auth paths', () => {
 		expect(isAuthPublicPath('/forgot-password')).toBe(true);
 		expect(isAuthPublicPath('/org/config')).toBe(false);
 		expect(isOnboardingPath('/onboarding/create-org')).toBe(true);
-		expect(isOnboardingPath('/onboarding/invite-team')).toBe(false);
+		expect(isOnboardingPath('/onboarding/invite-team')).toBe(true);
+		expect(isOnboardingPath('/onboarding/connect')).toBe(false);
+	});
+
+	it('redirects signed-in users off auth public pages except password update and invite accept', () => {
+		expect(isPostAuthRedirectPath('/login')).toBe(true);
+		expect(isPostAuthRedirectPath('/signup')).toBe(true);
+		expect(isPostAuthRedirectPath('/forgot-password')).toBe(true);
+		expect(isPostAuthRedirectPath('/check-email')).toBe(true);
+		expect(isPostAuthRedirectPath('/auth/callback')).toBe(true);
+		expect(isPostAuthRedirectPath('/update-password')).toBe(false);
+		expect(isPostAuthRedirectPath('/invite/accept')).toBe(false);
+		expect(isPostAuthRedirectPath('/onboarding/create-org')).toBe(false);
+		expect(isPostAuthRedirectPath('/')).toBe(false);
 	});
 
 	it('requires selected org for org-scoped app routes', () => {
@@ -73,5 +89,23 @@ describe('auth paths', () => {
 				selectedOrgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 			})
 		).toBe('/');
+	});
+
+	it('treats create-org as signup success and invite-team as org-create success', () => {
+		expect(isPostSignupLandingPath('/onboarding/create-org')).toBe(true);
+		expect(isPostSignupLandingPath('/select-org')).toBe(true);
+		expect(isPostSignupLandingPath('/')).toBe(true);
+		expect(isPostSignupLandingPath('/signup')).toBe(false);
+		expect(isPostSignupLandingPath('/check-email')).toBe(false);
+		expect(isPostSignupLandingPath('/onboarding/invite-team')).toBe(false);
+
+		expect(isPostOrgCreateLandingPath('/onboarding/invite-team')).toBe(true);
+		expect(isPostOrgCreateLandingPath('/')).toBe(true);
+		expect(isPostOrgCreateLandingPath('/org/config')).toBe(true);
+		expect(isPostOrgCreateLandingPath('/contacts')).toBe(true);
+		expect(isPostOrgCreateLandingPath('/select-org')).toBe(true);
+		expect(isPostOrgCreateLandingPath('/onboarding/create-org')).toBe(false);
+		expect(isPostOrgCreateLandingPath('/login')).toBe(false);
+		expect(isPostOrgCreateLandingPath('/signup')).toBe(false);
 	});
 });

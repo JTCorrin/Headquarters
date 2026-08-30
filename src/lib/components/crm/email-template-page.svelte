@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
 		roleFromMemberships,
@@ -19,7 +19,11 @@
 		emailTemplateFormSchema,
 		type EmailTemplateFormData
 	} from '$lib/schemas/email-template.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import EmailTemplateEditorPage from './email-template-editor-page.svelte';
@@ -34,6 +38,7 @@
 		onSwitchNavigate?: (orgId: string) => void;
 		onLogout?: () => void | Promise<void>;
 		onSaved?: (id: string) => void;
+		onDeleted?: () => void;
 		onBack?: () => void;
 		class?: string;
 	}
@@ -46,6 +51,7 @@
 		onSwitchNavigate,
 		onLogout,
 		onSaved,
+		onDeleted,
 		onBack,
 		class: className
 	}: EmailTemplatePageProps = $props();
@@ -88,19 +94,9 @@
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isPreconditionFailed) {
-				return 'This template changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			conflictMessage: 'This template changed elsewhere — reload and try again.'
+		});
 	}
 
 	interface RequestEpoch {
@@ -236,6 +232,23 @@
 		}
 	}
 
+	async function onDelete() {
+		if (isNew || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this template? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.emailTemplates.delete(templateId, version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete template — try again.')
+			};
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -298,6 +311,7 @@
 						{viewState}
 						onReload={loadAll}
 						onValidSubmit={onSaveTemplate}
+						onDelete={!isNew && canMutateCrmRecords(role) ? onDelete : undefined}
 						{onBack}
 						showNav={false}
 						class="min-h-0 flex-1"

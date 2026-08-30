@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		roleFromMemberships,
 		billStatusLabel,
@@ -13,6 +13,7 @@
 		toBillLineInput,
 		toBillUpdateBody,
 		toCatalogProductOption,
+		toOrganisationBrandingResource,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toPaymentCreateBody,
@@ -33,6 +34,7 @@
 	import type { DocumentPreviewState } from '$lib/api/v1/document-workspace-controller.svelte.js';
 	import { isInlineDocumentPreview } from '$lib/api/v1/document-workspace-controller.svelte.js';
 	import { centsToAmountString } from '$lib/money.js';
+	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
@@ -89,6 +91,8 @@
 	let timelineEvents = $state<TimelineEvent[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
+	let orgLogoDataUrl = $state<string | undefined>(undefined);
+	let orgAddressLines = $state<string[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -146,7 +150,10 @@
 	);
 
 	const lineForm = superForm(
-		defaults({ productId: '', description: '', qty: '1', unitPrice: '0' }, zod4(lineItemFormSchema)),
+		defaults(
+			{ productId: '', description: '', qty: '1', unitPrice: '0', discountPercent: '0' },
+			zod4(lineItemFormSchema)
+		),
 		{
 			validators: zod4(lineItemFormSchema),
 			SPA: true,
@@ -230,20 +237,10 @@
 	});
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Bill not found.';
-			if (error.isPreconditionFailed) {
-				return error.message || 'Bill changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Bill not found.',
+			conflictMessage: 'Bill changed elsewhere — reload and try again.'
+		});
 	}
 
 	interface RequestEpoch {
@@ -289,6 +286,8 @@
 		products = [];
 		taxRates = [];
 		savedFingerprint = '';
+		orgLogoDataUrl = undefined;
+		orgAddressLines = [];
 		paymentDrawerOpen = false;
 		sourceAttachment = null;
 		sourceAttachmentPending = false;
@@ -377,16 +376,21 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, vendors, catalog, rates] = await Promise.all([
+			const [result, vendors, catalog, rates, branding] = await Promise.all([
 				api.bills.get(billId),
 				api.vendors.list({ limit: 100 }),
 				api.products.list({ limit: 100, status: 'active' }),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.organisationConfig.getBranding()
 			]);
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
 			applyDocument(result.data);
+			const brandingResource = toOrganisationBrandingResource(branding);
+			orgAddressLines = formatOrgLetterheadLines(brandingResource);
+			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
+			if (isStale(epoch)) return;
 			vendorOptions = vendors.data.map((v) => ({
 				id: v.id,
 				name: v.name,
@@ -501,7 +505,13 @@
 			);
 			if (isStale(epoch)) return false;
 			applyDocument(updated);
-			lineForm.form.set({ productId: '', description: '', qty: '1', unitPrice: '0' });
+			lineForm.form.set({
+				productId: '',
+				description: '',
+				qty: '1',
+				unitPrice: '0',
+				discountPercent: '0'
+			});
 			lineDrawerOpen = false;
 			viewState = { kind: 'ready' };
 			return true;
@@ -937,6 +947,8 @@
 				{:else if bill}
 					<BillDetailPage
 						{orgName}
+						{orgLogoDataUrl}
+						{orgAddressLines}
 						{navGroups}
 						title={bill.number}
 						status={billStatusLabel(bill.status)}

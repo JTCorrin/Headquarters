@@ -1,7 +1,7 @@
 <script module>
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import ClientsListPageStoryHost from '$lib/components/crm/clients-list-page.story-host.svelte';
-	import { navGroupsWithActive } from './story-fixtures.js';
+	import { navGroupsWithActive, storyViewport } from './story-fixtures.js';
 
 	const rows = [
 		{
@@ -10,7 +10,11 @@
 			status: 'Active',
 			owner: 'Joe',
 			openInvoices: '£4,200',
-			pipeline: '£18k'
+			pipeline: '£18k',
+			people: [
+				{ id: 'c1', name: 'Ava Chen' },
+				{ id: 'c2', name: 'Northwind Billing' }
+			]
 		},
 		{
 			id: '2',
@@ -18,7 +22,8 @@
 			status: 'Prospect',
 			owner: 'Maya',
 			openInvoices: '—',
-			pipeline: '£12k'
+			pipeline: '£12k',
+			people: [{ id: 'c3', name: 'Priya Shah' }]
 		},
 		{
 			id: '3',
@@ -26,7 +31,8 @@
 			status: 'At risk',
 			owner: 'Joe',
 			openInvoices: '£6,500',
-			pipeline: '£12k'
+			pipeline: '£12k',
+			people: []
 		}
 	];
 
@@ -44,6 +50,30 @@
 </script>
 
 <Story name="Default">
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Desktop" globals={storyViewport.desktop}>
+	{#snippet template(args)}
+		{@const props =
+			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (
+				args
+			)}
+		<div class="h-screen">
+			<ClientsListPageStoryHost {...props} />
+		</div>
+	{/snippet}
+</Story>
+
+<Story name="Mobile" globals={storyViewport.mobile}>
 	{#snippet template(args)}
 		{@const props =
 			/** @type {import('$lib/components/crm/clients-list-page.story-host.svelte').ClientsListPageStoryHostProps} */ (

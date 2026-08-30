@@ -70,8 +70,14 @@ export interface MailboxAccountResource {
 	/** True when a password/secret is stored — never echo the secret itself. */
 	credentials_configured: boolean;
 	status: MailboxStatus;
+	auth_mode: 'password' | 'oauth';
+	oauth_provider: 'microsoft' | 'google' | null;
 	last_checked_at: string | null;
 	last_error_code: string | null;
+	syncIntervalMinutes: number;
+	sync_catchup_complete?: boolean;
+	sync_high_uid?: number | null;
+	sync_low_uid?: number | null;
 }
 
 export interface MailboxPresetDefaults {
@@ -96,7 +102,7 @@ export const mailboxPresetDefaults: Record<MailboxPreset, MailboxPresetDefaults>
 		imapHost: 'outlook.office365.com',
 		imapPort: '993',
 		imapSecurity: 'tls',
-		smtpHost: 'smtp.office365.com',
+		smtpHost: 'smtp-mail.outlook.com',
 		smtpPort: '587',
 		smtpSecurity: 'starttls'
 	},
@@ -145,7 +151,7 @@ export function humanizeMailboxSyncError(
 		case 'authentication_failed':
 		case 'imap_auth_failed':
 		case 'smtp_auth_failed':
-			return 'Sign-in failed — check the email address and password (or app password).';
+			return 'Sign-in failed — reconnect your Microsoft/Google account, or check the password (or app password).';
 		case 'connection_failed':
 		case 'imap_connection_failed':
 		case 'smtp_connection_failed':
@@ -168,7 +174,7 @@ export function humanizeMailboxSyncError(
 		case 'quota_exceeded':
 			return 'The mail provider rejected the request (quota or rate limit). Try again later.';
 		case 'credentials_missing':
-			return 'Mailbox credentials are missing — save a password, then try Sync again.';
+			return 'Mailbox credentials are missing — connect your account or save a password, then try Sync again.';
 		case 'lease_error':
 		case 'not_claimed':
 			return 'Another sync is already running — wait a moment and try again.';
@@ -183,15 +189,23 @@ export function describeMailboxSyncResult(result: {
 	error_code: string | null;
 	message?: string | null;
 	step?: string | null;
+	catchup_complete?: boolean;
 }): string {
 	const hint = humanizeMailboxSyncError(result.error_code, {
 		message: result.message,
 		step: result.step
 	});
 	if (result.ingested > 0) {
-		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${hint ? ` ${hint}` : ''}`;
+		const more =
+			result.catchup_complete === false
+				? ' Catch-up continues — sync again (or wait for the next automatic sync) to pull older mail.'
+				: '';
+		return `Synced ${result.ingested} message${result.ingested === 1 ? '' : 's'}.${more}${hint ? ` ${hint}` : ''}`;
 	}
 	if (result.ok) {
+		if (result.catchup_complete === false) {
+			return hint ?? 'Sync completed this batch — older mail is still catching up.';
+		}
 		return hint ?? 'Sync completed — no new messages.';
 	}
 	return hint ?? 'Sync failed — try again or check mailbox settings.';
@@ -205,8 +219,14 @@ export function formatMailboxLastChecked(iso: string | null | undefined): string
 }
 
 export function mailboxFormFromResource(resource: MailboxAccountResource): MailboxFormData {
+	const preset =
+		resource.oauth_provider === 'microsoft'
+			? 'outlook'
+			: resource.oauth_provider === 'google'
+				? 'gmail'
+				: 'custom';
 	return {
-		preset: 'custom',
+		preset,
 		emailAddress: resource.email_address,
 		username: resource.username,
 		password: '',

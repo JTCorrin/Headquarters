@@ -9,7 +9,12 @@ import {
   setOpenSmtpConnectionForTests,
   SmtpSendError,
 } from '../_shared/smtp-outbound.ts'
-import { emailReplyIdempotencyPayload, validateReplyBody } from './email-messages.ts'
+import {
+  emailComposeIdempotencyPayload,
+  emailReplyIdempotencyPayload,
+  validateComposeBody,
+  validateReplyBody,
+} from './email-messages.ts'
 import { ApiError } from './http.ts'
 import { hashIdempotencyRequest } from './idempotency.ts'
 
@@ -63,6 +68,90 @@ Deno.test('validateReplyBody requires body_text and rejects extras', () => {
   )
 })
 
+Deno.test('validateComposeBody requires subject and body_text', () => {
+  assertEquals(
+    validateComposeBody({
+      to: 'peer@example.test',
+      subject: 'Hello',
+      body_text: 'hi',
+      body_html: null,
+    }),
+    {
+      to: 'peer@example.test',
+      subject: 'Hello',
+      body_text: 'hi',
+      body_html: null,
+      allow_external_recipients: false,
+    },
+  )
+  assertEquals(
+    validateComposeBody({ subject: 'Hello', body_text: 'hi' }).to,
+    null,
+  )
+  assertEquals(
+    validateComposeBody({
+      to: 'peer@example.test',
+      subject: 'Hello',
+      body_text: 'hi',
+      allow_external_recipients: true,
+    }).allow_external_recipients,
+    true,
+  )
+  assertThrows(
+    () => validateComposeBody({ subject: 'Hello', body_text: 'hi', to: 'not-an-email' }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateComposeBody({
+        subject: 'Hello',
+        body_text: 'hi',
+        to: 'peer@example.test\u0000',
+      }),
+    ApiError,
+  )
+  assertThrows(() => validateComposeBody({ body_text: 'hi' }), ApiError)
+  assertThrows(
+    () => validateComposeBody({ to: 'a@b.co', subject: 'Hi', body_text: 'x', cc: [] }),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateComposeBody({
+        to: 'a@b.co',
+        subject: 'Hi',
+        body_text: 'x',
+        allow_external_recipients: 'yes',
+      }),
+    ApiError,
+  )
+})
+
+Deno.test('email compose idempotency hash is stable for same payload', async () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  const body = {
+    to: 'peer@example.test',
+    subject: 'Hello',
+    body_text: 'thanks',
+    body_html: null,
+  }
+  const route = `/api/v1/clients/${id}/email-messages`
+  const a = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload('client', id, body),
+  )
+  const b = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload('client', id, body),
+  )
+  assertEquals(a, b)
+  const c = await hashIdempotencyRequest(
+    route,
+    emailComposeIdempotencyPayload('client', id, { ...body, subject: 'Other' }),
+  )
+  assertEquals(a === c, false)
+})
+
 Deno.test('email reply idempotency hash is stable for same payload', async () => {
   const id = '11111111-1111-4111-8111-111111111111'
   const body = { body_text: 'thanks', body_html: null }
@@ -96,6 +185,59 @@ Deno.test('sendSmtpMail short-circuits synthetic hosts without opening sockets',
     })
     assertEquals(result.synthetic, true)
     assertEquals(result.message_id, '<crm-outbound-synth@example.test>')
+  } finally {
+    setOpenSmtpConnectionForTests(null)
+  }
+})
+
+Deno.test('buildMimeMessage attaches PDF as multipart/mixed base64', () => {
+  const pdf = new TextEncoder().encode('%PDF-1.4 test')
+  const mime = buildMimeMessage({
+    from: 'billing@example.test',
+    to: 'client@example.test',
+    subject: 'Invoice INV-1',
+    bodyText: 'Please see attached.',
+    messageId: '<crm-outbound-inv@example.test>',
+    date: new Date('2026-08-14T12:00:00Z'),
+    attachments: [
+      {
+        filename: 'invoice-INV-1.pdf',
+        contentType: 'application/pdf',
+        bytes: pdf,
+      },
+    ],
+  })
+  assertEquals(mime.includes('multipart/mixed'), true)
+  assertEquals(mime.includes('Content-Disposition: attachment; filename="invoice-INV-1.pdf"'), true)
+  assertEquals(mime.includes('Content-Transfer-Encoding: base64'), true)
+  assertEquals(mime.includes('Please see attached.'), true)
+})
+
+Deno.test('sendSmtpMail with attachment still short-circuits synthetic hosts', async () => {
+  setOpenSmtpConnectionForTests(() => {
+    throw new Error('should not open SMTP for synthetic host')
+  })
+  try {
+    const result = await sendSmtpMail({
+      host: 'smtp.example.test',
+      port: 465,
+      security: 'tls',
+      username: 'billing@example.test',
+      password: 'secret',
+      from: 'billing@example.test',
+      to: 'client@example.test',
+      subject: 'Invoice',
+      bodyText: 'attached',
+      messageId: '<crm-outbound-attach@example.test>',
+      attachments: [
+        {
+          filename: 'invoice.pdf',
+          contentType: 'application/pdf',
+          bytes: new Uint8Array([1, 2, 3]),
+        },
+      ],
+    })
+    assertEquals(result.synthetic, true)
   } finally {
     setOpenSmtpConnectionForTests(null)
   }

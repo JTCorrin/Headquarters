@@ -13,6 +13,7 @@ import {
 import { amountStringToCents, centsToAmountString } from '$lib/money.js';
 import type {
 	MembershipRole,
+	OrganisationBrandingResource,
 	OrganisationConfigData,
 	OrganisationConfigResource,
 	OrganisationCreateData,
@@ -72,6 +73,8 @@ import type {
 	ApiEmailTemplateUpdateBody,
 	ApiClient,
 	ApiClientCreateBody,
+	ApiClientLinkedContact,
+	ApiClientContactRole,
 	ApiClientUpdateBody,
 	ApiContact,
 	ApiContactCreateBody,
@@ -96,6 +99,7 @@ import type {
 	ApiCalendarConnection,
 	ApiMailboxAccount,
 	ApiMailboxPutBody,
+	ApiOrganisationBranding,
 	ApiOrganisationConfiguration,
 	ApiOrganisationCreateBody,
 	ApiOrganisationCreateResult,
@@ -156,12 +160,16 @@ import type {
 	MeetingFormData,
 	MeetingListItem
 } from '$lib/schemas/meeting.js';
-import type {
-	ProjectCardFormData,
-	ProjectFormData,
-	ProjectListItem
+import {
+	INTERNAL_PROJECT_CLIENT_ID,
+	isInternalProjectClientId,
+	projectBoardStatuses,
+	projectClientDisplayName,
+	projectFormStatuses,
+	type ProjectCardFormData,
+	type ProjectFormData,
+	type ProjectListItem
 } from '$lib/schemas/project.js';
-import { projectBoardStatuses, projectFormStatuses } from '$lib/schemas/project.js';
 import type { InfoCardField } from '$lib/components/crm/info-card.svelte';
 import type { DashboardMeeting } from '$lib/components/crm/dashboard-page.svelte';
 import type { EntityProject } from '$lib/components/crm/entity-projects.svelte';
@@ -175,7 +183,7 @@ export function toOrgMembershipSummary(
 		org_id: row.organisation.id,
 		org_name: row.organisation.name,
 		org_slug: row.organisation.slug,
-		logo_url: row.organisation.logo_path,
+		logo_url: row.organisation.logo_url ?? null,
 		role: row.membership.role,
 		membership_id: row.membership.id,
 		theme_default: row.organisation.theme_default ?? 'system'
@@ -189,7 +197,7 @@ export function membershipFromCreateResult(
 		org_id: result.organisation.id,
 		org_name: result.organisation.name,
 		org_slug: result.organisation.slug,
-		logo_url: result.organisation.logo_path,
+		logo_url: result.organisation.logo_url ?? null,
 		role: result.membership.role,
 		membership_id: result.membership.id,
 		theme_default: result.organisation.theme_default ?? 'system'
@@ -217,6 +225,19 @@ export function toOrganisationConfigResource(
 		version: config.version,
 		name: config.name,
 		slug: config.slug,
+		legal_name: config.legal_name,
+		logo_path: config.logo_path,
+		logo_url: config.logo_url ?? null,
+		billing_email: config.billing_email,
+		phone: config.phone,
+		website_url: config.website_url,
+		tax_identifier: config.tax_identifier,
+		registration_number: config.registration_number,
+		address_line1: config.address_line1 ?? null,
+		address_line2: config.address_line2 ?? null,
+		city: config.city ?? null,
+		region: config.region ?? null,
+		postal_code: config.postal_code ?? null,
 		timezone: config.timezone,
 		default_currency: config.default_currency,
 		locale: config.locale,
@@ -229,6 +250,19 @@ export function toOrganisationConfigFormData(
 	config: ApiOrganisationConfiguration
 ): OrganisationConfigData {
 	return {
+		name: config.name,
+		legalName: config.legal_name ?? '',
+		phone: config.phone ?? '',
+		billingEmail: config.billing_email ?? '',
+		websiteUrl: config.website_url ?? '',
+		taxIdentifier: config.tax_identifier ?? '',
+		registrationNumber: config.registration_number ?? '',
+		addressLine1: config.address_line1 ?? '',
+		addressLine2: config.address_line2 ?? '',
+		city: config.city ?? '',
+		region: config.region ?? '',
+		postalCode: config.postal_code ?? '',
+		country: config.country_code,
 		timezone: config.timezone,
 		currency: config.default_currency,
 		locale: config.locale,
@@ -237,11 +271,49 @@ export function toOrganisationConfigFormData(
 }
 
 export function toOrganisationConfigPatch(data: OrganisationConfigData) {
+	const emptyToNull = (value: string) => (value.trim() ? value.trim() : null);
 	return {
+		name: data.name.trim(),
+		legal_name: emptyToNull(data.legalName),
+		phone: emptyToNull(data.phone),
+		billing_email: emptyToNull(data.billingEmail)?.toLowerCase() ?? null,
+		website_url: emptyToNull(data.websiteUrl),
+		tax_identifier: emptyToNull(data.taxIdentifier),
+		registration_number: emptyToNull(data.registrationNumber),
+		address_line1: emptyToNull(data.addressLine1),
+		address_line2: emptyToNull(data.addressLine2),
+		city: emptyToNull(data.city),
+		region: emptyToNull(data.region),
+		postal_code: emptyToNull(data.postalCode),
+		country_code: data.country,
 		timezone: data.timezone,
 		default_currency: data.currency,
 		locale: data.locale,
 		theme_default: data.themeDefault
+	};
+}
+
+export function toOrganisationBrandingResource(
+	branding: ApiOrganisationBranding
+): OrganisationBrandingResource {
+	return {
+		id: branding.id,
+		version: branding.version,
+		name: branding.name,
+		legal_name: branding.legal_name,
+		logo_path: branding.logo_path,
+		logo_url: branding.logo_url,
+		billing_email: branding.billing_email,
+		phone: branding.phone,
+		website_url: branding.website_url,
+		tax_identifier: branding.tax_identifier,
+		registration_number: branding.registration_number,
+		address_line1: branding.address_line1,
+		address_line2: branding.address_line2,
+		city: branding.city,
+		region: branding.region,
+		postal_code: branding.postal_code,
+		country_code: branding.country_code
 	};
 }
 
@@ -444,6 +516,7 @@ export function toQuoteFormData(
 		clientName: partyNameFromSnapshot(quote.party_snapshot) || clientNameFallback,
 		title: quote.title,
 		currency,
+		discount: centsToAmountString(quote.discount_cents) || '',
 		status,
 		recipients: recipientsFromDocument(quote)
 	};
@@ -454,6 +527,7 @@ export function toQuoteCreateBody(data: QuoteFormData): ApiQuoteCreateBody {
 		title: data.title.trim(),
 		client_id: data.clientId,
 		currency: data.currency,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients),
 		lines: []
 	};
@@ -464,6 +538,7 @@ export function toQuoteUpdateBody(data: QuoteFormData): ApiQuoteUpdateBody {
 		title: data.title.trim(),
 		client_id: data.clientId,
 		currency: data.currency,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients)
 	};
 }
@@ -555,18 +630,27 @@ function lineTaxRatePercent(data: LineItemFormData): number | undefined {
 	return Number.isFinite(value) ? value : undefined;
 }
 
+function lineDiscountPercent(data: LineItemFormData): number {
+	const raw = data.discountPercent?.trim();
+	if (!raw) return 0;
+	const value = Number(raw);
+	return Number.isFinite(value) ? value : 0;
+}
+
 export function toQuoteLineInput(data: LineItemFormData, position?: number): ApiQuoteLineInput {
 	const quantity = Number(data.qty);
 	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
 	const productId = data.productId?.trim();
 	const taxRatePercent = lineTaxRatePercent(data);
 	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
+	const discount_percent = lineDiscountPercent(data);
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			discount_percent,
 			...tax,
 			...(position === undefined ? {} : { position })
 		};
@@ -576,6 +660,7 @@ export function toQuoteLineInput(data: LineItemFormData, position?: number): Api
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		discount_percent,
 		...tax,
 		...(position === undefined ? {} : { position })
 	};
@@ -611,9 +696,7 @@ export function lineItemRowsToQuoteLineInputs(
 					unit_price_cents: unitPriceCents,
 					position: index
 				};
-		if (line.discountPercent !== undefined) {
-			input.discount_percent = line.discountPercent;
-		}
+		input.discount_percent = line.discountPercent ?? 0;
 		if (line.taxRatePercent !== undefined) {
 			input.tax_rate_percent = line.taxRatePercent;
 		}
@@ -625,13 +708,32 @@ export function invoiceStatusLabel(status: ApiInvoice['status']): string {
 	return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+/** True when `dueOn` is a calendar date strictly before UTC today. */
+export function isDueOnBeforeToday(dueOn: string | null | undefined, now = new Date()): boolean {
+	if (!dueOn) return false;
+	const dueDay = dueOn.slice(0, 10);
+	if (!dueDay) return false;
+	return dueDay < now.toISOString().slice(0, 10);
+}
+
+function invoiceListStatus(invoice: ApiInvoice, now = new Date()): string {
+	if (
+		(invoice.status === 'sent' || invoice.status === 'partial') &&
+		invoice.balance_due_cents > 0 &&
+		isDueOnBeforeToday(invoice.due_on, now)
+	) {
+		return 'Overdue';
+	}
+	return invoiceStatusLabel(invoice.status);
+}
+
 export function toInvoiceListItem(invoice: ApiInvoice): InvoiceListItem {
 	return {
 		id: invoice.id,
 		number: invoice.number,
 		client: partyNameFromSnapshot(invoice.party_snapshot),
 		total: formatMoney(invoice.total_cents, invoice.currency),
-		status: invoiceStatusLabel(invoice.status),
+		status: invoiceListStatus(invoice),
 		dueOn: invoice.due_on
 	};
 }
@@ -659,6 +761,7 @@ export function toInvoiceFormData(
 		issueOn: invoice.issue_on,
 		dueOn: invoice.due_on,
 		purchaseOrderNumber: invoice.purchase_order_number ?? '',
+		discount: centsToAmountString(invoice.discount_cents) || '',
 		status,
 		quoteId: invoice.quote_id ?? '',
 		recipients: recipientsFromDocument(invoice)
@@ -672,6 +775,7 @@ export function toInvoiceCreateBody(data: InvoiceFormData): ApiInvoiceCreateBody
 		issue_on: data.issueOn,
 		due_on: data.dueOn,
 		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients),
 		lines: []
 	};
@@ -684,6 +788,7 @@ export function toInvoiceUpdateBody(data: InvoiceFormData): ApiInvoiceUpdateBody
 		issue_on: data.issueOn,
 		due_on: data.dueOn,
 		purchase_order_number: data.purchaseOrderNumber?.trim() || null,
+		discount_cents: amountStringToCents(data.discount?.trim() || '') ?? 0,
 		...recipientsWritableFields(data.recipients)
 	};
 }
@@ -694,12 +799,14 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 	const productId = data.productId?.trim();
 	const taxRatePercent = lineTaxRatePercent(data);
 	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
+	const discount_percent = lineDiscountPercent(data);
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			discount_percent,
 			...tax,
 			...(position === undefined ? {} : { position })
 		};
@@ -709,6 +816,7 @@ export function toInvoiceLineInput(data: LineItemFormData, position?: number): A
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		discount_percent,
 		...tax,
 		...(position === undefined ? {} : { position })
 	};
@@ -745,9 +853,7 @@ export function lineItemRowsToInvoiceLineInputs(
 					unit_price_cents: unitPriceCents,
 					position: index
 				};
-		if (line.discountPercent !== undefined) {
-			input.discount_percent = line.discountPercent;
-		}
+		input.discount_percent = line.discountPercent ?? 0;
 		if (line.taxRatePercent !== undefined) {
 			input.tax_rate_percent = line.taxRatePercent;
 		}
@@ -759,13 +865,24 @@ export function billStatusLabel(status: ApiBill['status']): string {
 	return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function billListStatus(bill: ApiBill, now = new Date()): string {
+	if (
+		(bill.status === 'received' || bill.status === 'scheduled' || bill.status === 'partial') &&
+		bill.balance_due_cents > 0 &&
+		isDueOnBeforeToday(bill.due_on, now)
+	) {
+		return 'Overdue';
+	}
+	return billStatusLabel(bill.status);
+}
+
 export function toBillListItem(bill: ApiBill): BillListItem {
 	return {
 		id: bill.id,
 		number: bill.number,
 		vendor: partyNameFromSnapshot(bill.party_snapshot),
 		total: formatMoney(bill.total_cents, bill.currency),
-		status: billStatusLabel(bill.status),
+		status: billListStatus(bill),
 		dueOn: bill.due_on
 	};
 }
@@ -832,12 +949,17 @@ export function toBillLineInput(data: LineItemFormData, position?: number): ApiB
 	const quantity = Number(data.qty);
 	const unitPriceCents = amountStringToCents(data.unitPrice) ?? 0;
 	const productId = data.productId?.trim();
+	const taxRatePercent = lineTaxRatePercent(data);
+	const tax = taxRatePercent === undefined ? {} : { tax_rate_percent: taxRatePercent };
+	const discount_percent = lineDiscountPercent(data);
 	if (productId) {
 		return {
 			product_id: productId,
 			quantity,
 			description: data.description.trim(),
 			unit_price_cents: unitPriceCents,
+			discount_percent,
+			...tax,
 			...(position === undefined ? {} : { position })
 		};
 	}
@@ -846,6 +968,8 @@ export function toBillLineInput(data: LineItemFormData, position?: number): ApiB
 		description: data.description.trim(),
 		quantity,
 		unit_price_cents: unitPriceCents,
+		discount_percent,
+		...tax,
 		...(position === undefined ? {} : { position })
 	};
 }
@@ -880,9 +1004,7 @@ export function lineItemRowsToBillLineInputs(
 					unit_price_cents: unitPriceCents,
 					position: index
 				};
-		if (line.discountPercent !== undefined) {
-			input.discount_percent = line.discountPercent;
-		}
+		input.discount_percent = line.discountPercent ?? 0;
 		if (line.taxRatePercent !== undefined) {
 			input.tax_rate_percent = line.taxRatePercent;
 		}
@@ -909,6 +1031,27 @@ export function clientStatusLabel(status: ApiClient['status']): string {
 		.join(' ');
 }
 
+export function clientContactRoleLabel(role: ApiClientContactRole): string {
+	return role
+		.split('_')
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(' ');
+}
+
+export function toClientRelatedContacts(contacts: ApiClientLinkedContact[] | undefined): Array<{
+	id: string;
+	name: string;
+	role: string;
+	email: string;
+}> {
+	return (contacts ?? []).map((person) => ({
+		id: person.id,
+		name: person.display_name,
+		role: clientContactRoleLabel(person.role),
+		email: person.primary_email ?? '—'
+	}));
+}
+
 export function toClientRow(client: ApiClient): ClientRow {
 	return {
 		id: client.id,
@@ -916,7 +1059,11 @@ export function toClientRow(client: ApiClient): ClientRow {
 		status: clientStatusLabel(client.status),
 		owner: undefined,
 		openInvoices: '—',
-		pipeline: '—'
+		pipeline: '—',
+		people: (client.contacts ?? []).map((person) => ({
+			id: person.id,
+			name: person.display_name
+		}))
 	};
 }
 
@@ -931,6 +1078,8 @@ export function toClientResource(client: ApiClient): ClientResource {
 		primary_email: client.primary_email,
 		phone: client.phone,
 		tax_identifier: client.tax_identifier,
+		tax_exempt: Boolean(client.tax_exempt),
+		email_domain: client.email_domain,
 		registration_number: client.registration_number,
 		default_currency: client.default_currency,
 		payment_terms_days: client.payment_terms_days,
@@ -948,8 +1097,10 @@ export function toClientFormData(client: ApiClient): ClientFormData {
 		websiteUrl: client.website_url ?? '',
 		industry: client.industry ?? '',
 		primaryEmail: client.primary_email ?? '',
+		emailDomain: client.email_domain ?? '',
 		phone: client.phone ?? '',
 		taxIdentifier: client.tax_identifier ?? '',
+		taxExempt: Boolean(client.tax_exempt),
 		registrationNumber: client.registration_number ?? '',
 		defaultCurrency: client.default_currency ?? '',
 		paymentTermsDays:
@@ -970,8 +1121,10 @@ export function toClientCreateBody(data: ClientFormData): ApiClientCreateBody {
 		website_url: emptyToNull(data.websiteUrl),
 		industry: emptyToNull(data.industry),
 		primary_email: emptyToNull(data.primaryEmail),
+		email_domain: emptyToNull(data.emailDomain),
 		phone: emptyToNull(data.phone),
 		tax_identifier: emptyToNull(data.taxIdentifier),
+		tax_exempt: Boolean(data.taxExempt),
 		registration_number: emptyToNull(data.registrationNumber),
 		default_currency: emptyToNull(data.defaultCurrency),
 		payment_terms_days: paymentTerms,
@@ -1009,6 +1162,7 @@ export function toLeadResource(lead: ApiLead): LeadResource {
 		version: lead.version,
 		name: lead.name,
 		company_name: lead.company_name,
+		primary_email: lead.primary_email,
 		stage: lead.stage,
 		value_cents: lead.value_cents,
 		currency: lead.currency,
@@ -1032,6 +1186,7 @@ export function toLeadFormData(lead: ApiLead): LeadFormData {
 	return {
 		name: lead.name,
 		companyName: lead.company_name ?? '',
+		primaryEmail: lead.primary_email ?? '',
 		clientId: lead.client_id ?? '',
 		stage,
 		valueAmount: centsToAmountString(lead.value_cents),
@@ -1057,6 +1212,7 @@ export function toLeadCreateBody(data: LeadFormData): ApiLeadCreateBody {
 	return {
 		name: data.name.trim(),
 		company_name: emptyToNull(data.companyName),
+		primary_email: emptyToNull(data.primaryEmail),
 		client_id: emptyToNull(data.clientId),
 		stage: data.stage,
 		value_cents: valueCents,
@@ -1099,8 +1255,17 @@ export function toMailboxAccountResource(
 		smtp_security: account.smtp_security,
 		credentials_configured: account.credentials_configured,
 		status: account.status,
+		auth_mode: account.auth_mode === 'oauth' ? 'oauth' : 'password',
+		oauth_provider:
+			account.oauth_provider === 'microsoft' || account.oauth_provider === 'google'
+				? account.oauth_provider
+				: null,
 		last_checked_at: account.last_checked_at,
-		last_error_code: account.last_error_code
+		last_error_code: account.last_error_code,
+		syncIntervalMinutes: account.sync_interval_minutes ?? 5,
+		sync_catchup_complete: account.sync_catchup_complete,
+		sync_high_uid: account.sync_high_uid ?? null,
+		sync_low_uid: account.sync_low_uid ?? null
 	};
 }
 
@@ -1423,14 +1588,25 @@ export function toTaskUpdateBody(data: TaskFormData): ApiTaskUpdateBody {
 
 export function toEntityEmailMessage(row: ApiEmailMessage): EmailMessage {
 	const occurred = row.direction === 'outbound' ? row.sent_at : row.received_at;
+	const fromName = row.from_name?.trim() || null;
 	return {
 		id: row.id,
 		direction: row.direction === 'outbound' ? 'out' : 'in',
-		from: row.from_name?.trim() || row.from_address,
+		from: fromName || row.from_address,
+		fromAddress: row.from_address,
+		fromName,
 		to: firstAddress(row.to_addresses),
 		subject: row.subject || '(no subject)',
 		preview: row.preview_text || row.body_text?.slice(0, 160) || '',
 		body: row.body_text || '',
+		bodyHtml: row.body_html ?? null,
+		attachments: Array.isArray(row.attachments)
+			? row.attachments.map((a) => ({
+					filename: a.filename,
+					contentType: a.content_type,
+					inline: Boolean(a.inline)
+				}))
+			: [],
 		occurredAt: occurred ? new Date(occurred).toLocaleString() : '',
 		unread: row.unread
 	};
@@ -1765,11 +1941,12 @@ export function toRecurringInvoiceRunListItem(
 		id: run.id,
 		scheduledFor: formatNextRunAt(run.scheduled_for),
 		trigger: run.trigger.replace('_', ' '),
-		status: run.status.replace(/_/g, ' '),
+		status: run.status,
 		periodStart: run.period_start,
 		periodEnd: run.period_end,
 		invoiceId: linked?.id ?? run.invoice_id ?? null,
-		invoiceNumber: linked?.number ?? run.invoice_number ?? null
+		invoiceNumber: linked?.number ?? run.invoice_number ?? null,
+		errorMessage: run.error_message
 	};
 }
 
@@ -2091,6 +2268,27 @@ export function canGenerateMeetingSummary(meeting: ApiMeetingDocument): boolean 
 	return meeting.transcript_status === 'ready';
 }
 
+/** Completed meetings stay open for wrap-up accept; cancelled meetings do not. */
+export function canAcceptMeetingTaskProposals(status: ApiMeetingStatus): boolean {
+	return status !== 'cancelled';
+}
+
+const MEETING_CANCELLED_ACCEPT_MESSAGE =
+	'This meeting was cancelled, so follow-up tasks cannot be accepted.';
+
+/** Map accept-proposal 409 copy (including the legacy SQL phrase) to a human sentence. */
+export function meetingAcceptProposalUserMessage(errorMessage: string | undefined): string | null {
+	const lower = (errorMessage ?? '').toLowerCase();
+	if (!lower) return null;
+	if (lower.includes('was cancelled') && lower.includes('cannot be accepted')) {
+		return MEETING_CANCELLED_ACCEPT_MESSAGE;
+	}
+	if (lower.includes('meeting is not open for accept')) {
+		return MEETING_CANCELLED_ACCEPT_MESSAGE;
+	}
+	return null;
+}
+
 export function formatMeetingWhen(
 	startsAt: string,
 	endsAt: string,
@@ -2314,7 +2512,7 @@ export function projectStatusLabel(status: ApiProjectStatus): string {
 export function emptyProjectFormData(): ProjectFormData {
 	return {
 		name: '',
-		clientId: '',
+		clientId: INTERNAL_PROJECT_CLIENT_ID,
 		description: '',
 		status: 'planning'
 	};
@@ -2328,15 +2526,20 @@ export function toProjectFormData(project: ApiProject): ProjectFormData {
 		: 'planning';
 	return {
 		name: project.name,
-		clientId: project.client_id,
+		clientId: project.client_id ?? INTERNAL_PROJECT_CLIENT_ID,
 		description: project.description ?? '',
 		status
 	};
 }
 
+function projectClientIdToApi(clientId: string): string | null {
+	const trimmed = clientId.trim();
+	return isInternalProjectClientId(trimmed) ? null : trimmed;
+}
+
 export function toProjectCreateBody(data: ProjectFormData): ApiProjectCreateBody {
 	return {
-		client_id: data.clientId.trim(),
+		client_id: projectClientIdToApi(data.clientId),
 		name: data.name.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
 		status: data.status === 'archived' ? 'planning' : data.status
@@ -2345,7 +2548,7 @@ export function toProjectCreateBody(data: ProjectFormData): ApiProjectCreateBody
 
 export function toProjectUpdateBody(data: ProjectFormData): ApiProjectUpdateBody {
 	return {
-		client_id: data.clientId.trim(),
+		client_id: projectClientIdToApi(data.clientId),
 		name: data.name.trim(),
 		description: data.description?.trim() ? data.description.trim() : null,
 		status: data.status
@@ -2392,8 +2595,8 @@ export function toProjectListItem(project: ApiProject): ProjectListItem {
 	return {
 		id: project.id,
 		name: project.name,
-		clientId: project.client_id,
-		clientName: project.client_label?.trim() || 'Client',
+		clientId: project.client_id ?? INTERNAL_PROJECT_CLIENT_ID,
+		clientName: projectClientDisplayName(project),
 		cardCount,
 		stage: status,
 		version: project.version,

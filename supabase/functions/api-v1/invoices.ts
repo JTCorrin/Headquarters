@@ -41,6 +41,9 @@ const HEADER_WRITABLE = new Set([
   'recipients',
 ])
 
+/** Allowed on create only — document number is immutable after insert. */
+const CREATE_ONLY_WRITABLE = new Set(['number'])
+
 const LINE_WRITABLE = new Set([
   'product_id',
   'description',
@@ -79,6 +82,7 @@ type InvoiceHeaderInput = {
   notes?: string | null
   internal_notes?: string | null
   recipients?: RecipientInput[]
+  number?: string
 }
 
 type InvoiceCreate = InvoiceHeaderInput & {
@@ -214,6 +218,7 @@ function validateInvoiceLine(
     }
   }
 
+  // When omitted, RPC inherits product tax then org default (explicit 0 stays zero-rated).
   let taxRate: number | undefined
   if ('tax_rate_percent' in body) {
     const value = body.tax_rate_percent
@@ -296,7 +301,18 @@ export function validateInvoiceBody(
   const defaultCurrency = options.defaultCurrency ?? 'GBP'
 
   for (const key of Object.keys(body)) {
-    if (!HEADER_WRITABLE.has(key)) fields[key] = 'Field is not writable'
+    if (HEADER_WRITABLE.has(key)) continue
+    if (!partial && CREATE_ONLY_WRITABLE.has(key)) continue
+    fields[key] = 'Field is not writable'
+  }
+
+  if (!partial && 'number' in body) {
+    const value = body.number
+    if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > 64) {
+      fields.number = 'Must be a string between 1 and 64 characters'
+    } else {
+      output.number = value.trim()
+    }
   }
 
   if (!partial || 'client_id' in body) {
@@ -416,6 +432,7 @@ export function validateInvoiceBody(
       client_id: output.client_id as string,
       currency: output.currency as string,
       lines: output.lines ?? [],
+      ...(output.number !== undefined ? { number: output.number } : {}),
       ...(output.contact_id !== undefined ? { contact_id: output.contact_id } : {}),
       ...(output.owner_membership_id !== undefined
         ? { owner_membership_id: output.owner_membership_id }
@@ -450,6 +467,32 @@ function validateVoidBody(body: Record<string, unknown>): string {
     })
   }
   return value.trim()
+}
+
+/** Optional send body: `{ sent_at?: ISO timestamptz }` for migration overrides. */
+export function validateSendInvoiceBody(
+  body: Record<string, unknown>,
+): { sent_at?: string } {
+  const fields: Record<string, string> = {}
+  for (const key of Object.keys(body)) {
+    if (key !== 'sent_at') fields[key] = 'Field is not writable'
+  }
+
+  let sentAt: string | undefined
+  if ('sent_at' in body) {
+    const value = body.sent_at
+    if (typeof value !== 'string' || !isStrictIsoTimestamp(value)) {
+      fields.sent_at = 'Must be a strict ISO-8601 timestamptz'
+    } else {
+      sentAt = value
+    }
+  }
+
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Invoice send validation failed', fields)
+  }
+
+  return sentAt !== undefined ? { sent_at: sentAt } : {}
 }
 
 function encodeCursor(row: InvoiceCursor): string {
@@ -756,13 +799,23 @@ async function sendInvoiceRoute(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
   const rawKey = parseIdempotencyKey(req)
   const route = `/api/v1/invoices/${invoiceId}/send`
+  const contentType = req.headers.get('content-type') ?? ''
+  let sendBody: { sent_at?: string } = {}
+  if (contentType.toLowerCase().includes('application/json')) {
+    const raw = await jsonBody(req)
+    sendBody = validateSendInvoiceBody(raw)
+  }
   const requestHash = await hashIdempotencyRequest(
     route,
-    invoiceLifecycleIdempotencyPayload(invoiceId),
+    invoiceLifecycleIdempotencyPayload(
+      invoiceId,
+      sendBody.sent_at !== undefined ? { sent_at: sendBody.sent_at } : {},
+    ),
   )
   const keyHash = await sha256Hex(rawKey)
 
@@ -773,6 +826,8 @@ async function sendInvoiceRoute(
     p_idempotency_key_hash: keyHash,
     p_request_hash: requestHash,
     p_route: route,
+    ...(sendBody.sent_at !== undefined ? { p_sent_at: sendBody.sent_at } : {}),
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -780,7 +835,8 @@ async function sendInvoiceRoute(
     throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice send returned an unexpected payload')
   }
   const envelope = data as IdempotencyEnvelope
-  if (envelope.replay !== true) {
+  // API-key path: status-only send (no client email). Skip playbooks to avoid outbound mail.
+  if (envelope.replay !== true && !actorUserId) {
     await dispatchPlaybookTriggersSafe({
       orgId,
       triggerKind: 'invoice.sent',
@@ -798,6 +854,7 @@ async function voidInvoiceRoute(
   orgId: string,
   invoiceId: string,
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   const version = parseVersion(req)
   const voidReason = validateVoidBody(await jsonBody(req))
@@ -817,6 +874,7 @@ async function voidInvoiceRoute(
     p_idempotency_key_hash: keyHash,
     p_request_hash: requestHash,
     p_route: route,
+    ...(actorUserId ? { p_actor_id: actorUserId } : {}),
   })
 
   if (error) throw databaseError(error, requestId)
@@ -899,12 +957,16 @@ export function handleInvoices(
   const action = itemMatch[2]
 
   if (action === 'send') {
-    if (req.method === 'POST') return sendInvoiceRoute(req, db, orgId, invoiceId, requestId)
+    if (req.method === 'POST') {
+      return sendInvoiceRoute(req, db, orgId, invoiceId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice send')
   }
 
   if (action === 'void') {
-    if (req.method === 'POST') return voidInvoiceRoute(req, db, orgId, invoiceId, requestId)
+    if (req.method === 'POST') {
+      return voidInvoiceRoute(req, db, orgId, invoiceId, requestId, actorUserId)
+    }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice void')
   }
 

@@ -1,11 +1,16 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { get } from 'svelte/store';
+	import { defaults, superForm } from 'sveltekit-superforms';
+	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
 	import {
 		roleFromMemberships,
 		toAiIntegrationResource,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
+	import type { ApiOrgInvoiceEmailAccount } from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
@@ -21,6 +26,14 @@
 		canAccessOrgConfigRoutes,
 		type MembershipRole
 	} from '$lib/schemas/organisation.js';
+	import {
+		emptyOrgInvoiceEmailFormData,
+		orgInvoiceEmailFormFromResource,
+		orgInvoiceEmailFormSchema,
+		toOrgInvoiceEmailPutBody,
+		type OrgInvoiceEmailAccountResource,
+		type OrgInvoiceEmailTestFeedback
+	} from '$lib/schemas/org-invoice-email.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import OrgIntegrationsPage, { type AiModelCatalogs } from './org-integrations-page.svelte';
@@ -53,9 +66,21 @@
 	let promptsBusy = $state(false);
 	let promptsError = $state<string | null>(null);
 	let connectError = $state<string | null>(null);
+	let invoiceEmailAccount = $state<OrgInvoiceEmailAccountResource | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
+
+	const invoiceEmailForm = superForm(
+		defaults(emptyOrgInvoiceEmailFormData('custom'), zod4(orgInvoiceEmailFormSchema)),
+		{
+			validators: zod4(orgInvoiceEmailFormSchema),
+			SPA: true,
+			warnings: { duplicateId: false },
+			applyAction: false,
+			resetForm: false
+		}
+	);
 
 	const role = $derived(
 		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
@@ -91,17 +116,36 @@
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
 	}
 
-	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+
+	function toOrgInvoiceEmailAccountResource(
+		account: ApiOrgInvoiceEmailAccount
+	): OrgInvoiceEmailAccountResource {
+		return {
+			id: account.id,
+			org_id: account.org_id,
+			from_address: account.from_address,
+			from_name: account.from_name,
+			reply_to: account.reply_to,
+			smtp_host: account.smtp_host,
+			smtp_port: account.smtp_port,
+			smtp_security: account.smtp_security,
+			username: account.username,
+			status: account.status,
+			subject_template: account.subject_template,
+			body_template: account.body_template,
+			credentials_configured: account.credentials_configured,
+			credentials_updated_at: account.credentials_updated_at,
+			last_tested_at: account.last_tested_at,
+			last_error_code: account.last_error_code,
+			last_error_message: account.last_error_message,
+			version: account.version
+		};
+	}
+
+	function applyInvoiceEmailFormFromServer(account: OrgInvoiceEmailAccountResource | null) {
+		invoiceEmailForm.form.set(
+			account ? orgInvoiceEmailFormFromResource(account) : emptyOrgInvoiceEmailFormData('custom')
+		);
 	}
 
 	function emptyIntegrations(): AiIntegrationResource[] {
@@ -185,9 +229,10 @@
 				return;
 			}
 
-			const [rows, promptBundle] = await Promise.all([
+			const [rows, promptBundle, invoiceEmail] = await Promise.all([
 				api.integrations.list(),
-				api.integrations.getAiPrompts()
+				api.integrations.getAiPrompts(),
+				api.orgInvoiceEmail.get()
 			]);
 			if (isStale(epoch)) return;
 			const mapped = rows.map(toAiIntegrationResource);
@@ -205,6 +250,10 @@
 			promptDefaults = { ...DEFAULT_AI_PROMPTS, ...promptBundle.defaults };
 			prompts = { ...promptDefaults, ...promptBundle.effective };
 			promptsError = null;
+			invoiceEmailAccount = invoiceEmail
+				? toOrgInvoiceEmailAccountResource(invoiceEmail)
+				: null;
+			applyInvoiceEmailFormFromServer(invoiceEmailAccount);
 			viewState = { kind: 'ready' };
 			void loadConnectedModelCatalogs(integrations, epoch);
 		} catch (error) {
@@ -212,6 +261,8 @@
 			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				integrations = emptyIntegrations();
 				modelCatalogs = {};
+				invoiceEmailAccount = null;
+				applyInvoiceEmailFormFromServer(null);
 				viewState = { kind: 'ready' };
 				return;
 			}
@@ -345,10 +396,87 @@
 		}
 	}
 
+	async function onInvoiceEmailSubmit(): Promise<boolean | void> {
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.orgInvoiceEmail.put(
+				toOrgInvoiceEmailPutBody(get(invoiceEmailForm.form))
+			);
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			invoiceEmailAccount = toOrgInvoiceEmailAccountResource(updated);
+			applyInvoiceEmailFormFromServer(invoiceEmailAccount);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not save invoice email settings.')
+			};
+			return false;
+		}
+	}
+
+	async function onInvoiceEmailTest(): Promise<OrgInvoiceEmailTestFeedback | false> {
+		const epoch = captureEpoch();
+		try {
+			const result = await api.orgInvoiceEmail.test();
+			if (isStale(epoch)) return false;
+			if (!result.ok) {
+				return {
+					ok: false,
+					message: result.message?.trim() || result.error_code || 'Invoice email test failed.'
+				};
+			}
+			void loadAll();
+			return {
+				ok: true,
+				message: result.message?.trim() || 'Connection successful.'
+			};
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			return {
+				ok: false,
+				message: userMessage(error, 'Invoice email test failed.')
+			};
+		}
+	}
+
+	async function onInvoiceEmailDisconnect(): Promise<boolean | void> {
+		const epoch = captureEpoch();
+		try {
+			await api.orgInvoiceEmail.disconnect();
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			invoiceEmailAccount = null;
+			applyInvoiceEmailFormFromServer(null);
+			viewState = { kind: 'ready' };
+		} catch (error) {
+			if (isStale(epoch)) {
+				void loadAll();
+				return false;
+			}
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not disconnect invoice email.')
+			};
+			return false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
 		integrations = [];
+		invoiceEmailAccount = null;
+		applyInvoiceEmailFormFromServer(null);
 		viewState = { kind: 'loading' };
 		session.selectOrg(orgId);
 		onSwitchNavigate?.(orgId);
@@ -380,7 +508,9 @@
 					<p class="text-destructive text-sm" role="alert">
 						Organisation Integrations are available to Owners only.
 					</p>
-					<a class="text-sm font-medium underline underline-offset-2" href="/settings">Open My settings</a>
+					<a class="text-sm font-medium underline underline-offset-2" href={resolve('/settings')}
+						>Open My settings</a
+					>
 				</div>
 			{:else}
 				<OrgIntegrationsPage
@@ -395,6 +525,8 @@
 					{promptDefaults}
 					{promptsBusy}
 					{promptsError}
+					{invoiceEmailAccount}
+					{invoiceEmailForm}
 					{viewState}
 					{connectError}
 					onReload={loadAll}
@@ -402,6 +534,9 @@
 					{onDisconnect}
 					{onSelectModel}
 					{onSavePrompts}
+					{onInvoiceEmailSubmit}
+					{onInvoiceEmailTest}
+					{onInvoiceEmailDisconnect}
 					showNav={false}
 				/>
 			{/if}

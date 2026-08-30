@@ -6,6 +6,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/home/deploy/apps/headquarters}"
 REPO_URL="${REPO_URL:-https://forge.purecambo.org/joe/crm-project.git}"
 BRANCH="${BRANCH:-staging}"
+DEPLOY_SHA="${DEPLOY_SHA:-}"
 APP_HOST="${APP_HOST:-192.168.5.136}"
 APP_PORT="${APP_PORT:-4173}"
 # Same-origin SvelteKit proxy serves `/api/v1/*` on :APP_PORT. Leave empty unless
@@ -43,6 +44,14 @@ else
 	fi
 	mv "$new_dir" "$APP_DIR"
 	rm -rf "$old_dir"
+fi
+
+if [[ -n "$DEPLOY_SHA" ]]; then
+	# Pin the deployment to the workflow revision. A newer staging push may
+	# otherwise move origin/staging while this job is waiting for a runner.
+	git -C "$APP_DIR" cat-file -e "${DEPLOY_SHA}^{commit}"
+	git -C "$APP_DIR" checkout -f -B "$BRANCH" "$DEPLOY_SHA"
+	git -C "$APP_DIR" reset --hard "$DEPLOY_SHA"
 fi
 
 cd "$APP_DIR"
@@ -91,9 +100,21 @@ text = re.sub(
 # Local config enables email confirmations; staging E2E needs immediate JWTs.
 # Only the email section uses `true` — SMS stays false.
 text = text.replace("enable_confirmations = true", "enable_confirmations = false", 1)
+# Deploy smoke proofs create many fresh users immediately before Playwright.
+# Keep this staging-only allowance above their combined five-minute request count.
+text = re.sub(
+    r"^sign_in_sign_ups = \d+",
+    "sign_in_sign_ups = 100",
+    text,
+    count=1,
+    flags=re.M,
+)
 
 path.write_text(text)
-print(f"patched auth site_url/redirects for {origin}; email confirmations disabled")
+print(
+    f"patched auth site_url/redirects for {origin}; "
+    "email confirmations disabled; sign-in/signup limit=100"
+)
 PY
 fi
 
@@ -107,6 +128,13 @@ if [[ ! -s "$RECURRING_SECRET_FILE" ]]; then
 	log "generated RECURRING_INVOICES_CRON_SECRET at ${RECURRING_SECRET_FILE}"
 fi
 RECURRING_INVOICES_CRON_SECRET="$(tr -d '[:space:]' <"$RECURRING_SECRET_FILE")"
+MAILBOX_SECRET_FILE="${STAGING_SECRETS_DIR}/mailbox-sync-secret"
+if [[ ! -s "$MAILBOX_SECRET_FILE" ]]; then
+	openssl rand -hex 32 >"$MAILBOX_SECRET_FILE"
+	chmod 600 "$MAILBOX_SECRET_FILE"
+	log "generated MAILBOX_SYNC_SECRET at ${MAILBOX_SECRET_FILE}"
+fi
+MAILBOX_SYNC_SECRET="$(tr -d '[:space:]' <"$MAILBOX_SECRET_FILE")"
 
 # Edge secrets load from supabase/functions/.env (CLI default), not supabase/.env.
 # api-v1 defaults to `*` when unset; pin staging origin explicitly.
@@ -116,6 +144,7 @@ cat > supabase/functions/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 # Mirror for any tooling that still reads the repo-root supabase/.env.
@@ -123,6 +152,7 @@ cat > supabase/.env <<EOF
 API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 
@@ -171,6 +201,7 @@ API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 cat > supabase/.env <<EOF
@@ -178,6 +209,7 @@ API_CORS_ORIGIN=${STAGING_ORIGIN}
 PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
+MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 log "wrote PUBLIC_SUPABASE_URL + APP_BASE_URL into supabase/functions/.env"
@@ -541,6 +573,36 @@ if command -v crontab >/dev/null 2>&1; then
 	fi
 else
 	log "crontab not available — skipping recurring invoices schedule install"
+fi
+
+# Mailbox due-list cron (every minute). SQL decides which mailbox intervals are due.
+# curl reads the secret-bearing header from stdin so it is not exposed via argv/ps.
+MAILBOX_CRON_WRAPPER="${STAGING_SECRETS_DIR}/run-mailbox-sync-cron.sh"
+cat >"$MAILBOX_CRON_WRAPPER" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+SECRET=\$(tr -d '[:space:]' <"${MAILBOX_SECRET_FILE}")
+curl -fsS --config - <<CURL_CONFIG
+request = "POST"
+header = "x-mailbox-sync-secret: \${SECRET}"
+url = "http://127.0.0.1:54321/functions/v1/mailbox-sync"
+CURL_CONFIG
+EOF
+chmod 700 "$MAILBOX_CRON_WRAPPER"
+MAILBOX_CRON_LINE="* * * * * ${MAILBOX_CRON_WRAPPER} >>${STAGING_SECRETS_DIR}/mailbox-sync-cron.log 2>&1"
+if command -v crontab >/dev/null 2>&1; then
+	existing="$(crontab -l 2>/dev/null || true)"
+	filtered="$(printf '%s\n' "$existing" | awk '!/run-mailbox-sync-cron\\.sh/')"
+	printf '%s\n%s\n' "$filtered" "$MAILBOX_CRON_LINE" | crontab -
+	log "installed mailbox sync cron (every minute → mailbox-sync; SQL due-list controls intervals)"
+	# Immediate non-fatal tick verifies the wrapper without delaying until the next minute.
+	if "$MAILBOX_CRON_WRAPPER" >>"${STAGING_SECRETS_DIR}/mailbox-sync-cron.log" 2>&1; then
+		log "mailbox sync cron tick ok"
+	else
+		log "mailbox sync cron tick failed (non-fatal — check mailbox-sync-cron.log)"
+	fi
+else
+	log "crontab not available — skipping mailbox sync schedule install"
 fi
 
 log "done"

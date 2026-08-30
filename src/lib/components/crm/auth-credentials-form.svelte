@@ -13,6 +13,8 @@
 		submitLabel: string;
 		errorMessage?: string | null;
 		showDisplayName?: boolean;
+		/** When set, email is prefilled and not editable. */
+		emailLocked?: boolean;
 		/** HTML autocomplete for the password field. */
 		passwordAutocomplete?: 'current-password' | 'new-password';
 		class?: string;
@@ -24,6 +26,7 @@
 		submitLabel,
 		errorMessage = null,
 		showDisplayName = false,
+		emailLocked = false,
 		passwordAutocomplete = 'current-password',
 		class: className,
 		onValidSubmit
@@ -93,6 +96,7 @@
 			name="email"
 			type="email"
 			autocomplete="email"
+			readonly={emailLocked}
 			bind:value={$formData.email}
 			aria-invalid={!!$errors.email}
 			data-testid="auth-email"

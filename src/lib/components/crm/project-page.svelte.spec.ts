@@ -166,6 +166,7 @@ function sampleClient() {
 		primary_email: null,
 		phone: null,
 		tax_identifier: null,
+		tax_exempt: false,
 		registration_number: null,
 		default_currency: 'GBP',
 		payment_terms_days: null,
@@ -198,6 +199,32 @@ describe('ProjectPage integration', () => {
 		await expect.element(page.getByText('Draft kickoff agenda')).toBeInTheDocument();
 		await expect.element(page.getByText('Northwind', { exact: true })).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: 'Add card' })).toBeInTheDocument();
+	});
+
+	it('shows Internal without a client link for unattached projects', async () => {
+		const session = sessionForOrg();
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			[`GET /api/v1/projects/${PROJECT_ID}`]: async () => ({
+				body: {
+					data: sampleProject({
+						client_id: null,
+						client_label: 'Internal',
+						name: 'Ops handbook'
+					})
+				}
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(ProjectPage, { api, session, projectId: PROJECT_ID });
+
+		await expect.element(page.getByText('Ops handbook')).toBeInTheDocument();
+		await expect.element(page.getByText('Internal', { exact: true })).toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: 'Open client' })).not.toBeInTheDocument();
 	});
 
 	it('edits project with archive status and creates a titled card', async () => {

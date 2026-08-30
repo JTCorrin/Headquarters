@@ -29,6 +29,7 @@ function sampleClient(overrides: Record<string, unknown> = {}) {
 		primary_email: 'billing@northwind.com',
 		phone: null,
 		tax_identifier: null,
+		tax_exempt: false,
 		registration_number: null,
 		default_currency: 'GBP',
 		payment_terms_days: 30,
@@ -53,6 +54,51 @@ function memoryStorage(seed: Record<string, string> = {}) {
 		}
 	};
 }
+
+describe('ClientPage related contacts', () => {
+	it('renders linked people from the client payload and navigates to contacts', async () => {
+		const CONTACT_ID = '22222222-3333-4444-8555-666666666666';
+		const session = createOrgSession({
+			storage: memoryStorage({ 'hq.selected-org-id': ORG_A }),
+			initialOrgId: ORG_A,
+			initialMemberships: [
+				{
+					org_id: ORG_A,
+					org_name: 'Corrin Data',
+					org_slug: 'corrin-data',
+					logo_url: null,
+					role: 'owner',
+					theme_default: 'system'
+				}
+			]
+		});
+
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/clients/${CLIENT_ID}`]: async () => ({
+				body: {
+					data: sampleClient({
+						contacts: [
+							{
+								id: CONTACT_ID,
+								display_name: 'Ava Chen',
+								primary_email: 'ava@northwind.com',
+								role: 'primary',
+								is_primary: true
+							}
+						]
+					})
+				}
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(ClientPage, { api, session, clientId: CLIENT_ID });
+
+		await expect.element(page.getByRole('heading', { name: 'Northwind' })).toBeInTheDocument();
+		const link = page.getByRole('link', { name: 'Ava Chen' });
+		await expect.element(link).toHaveAttribute('href', `/contacts/${CONTACT_ID}`);
+	});
+});
 
 describe('ClientPage money tab', () => {
 	it('loads quotes, invoices, and payments with client_id and links document rows', async () => {

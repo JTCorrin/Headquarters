@@ -14,9 +14,11 @@ export { createLeadsEndpoints } from './leads.js';
 export { createMailboxEndpoints } from './mailbox.js';
 export { createCalendarEndpoints } from './calendar.js';
 export { createNotificationsEndpoints } from './notifications.js';
+export { createDashboardEndpoints } from './dashboard.js';
 export { createOrgMembersEndpoints } from './org-members.js';
 export { createOrganisationAccessEndpoints } from './organisation-access.js';
 export { createOrganisationConfigEndpoints } from './organisation-config.js';
+export { createOrgInvoiceEmailEndpoints } from './org-invoice-email.js';
 export { createOrganisationsEndpoints } from './organisations.js';
 export { createPaymentsEndpoints } from './payments.js';
 export { createProductCategoriesEndpoints } from './product-categories.js';
@@ -35,6 +37,7 @@ export type {
 	BillsEndpoints,
 	ClientsEndpoints,
 	ContactsEndpoints,
+	DashboardEndpoints,
 	DocumentsEndpoints,
 	EmailMessagesEndpoints,
 	EmailTemplatesEndpoints,
@@ -48,6 +51,7 @@ export type {
 	MeetingsEndpoints,
 	ProjectsEndpoints,
 	OrganisationConfigEndpoints,
+	OrgInvoiceEmailEndpoints,
 	OrganisationAccessEndpoints,
 	OrganisationsEndpoints,
 	OrgMembersEndpoints,

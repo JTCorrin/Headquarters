@@ -3,7 +3,11 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import {
+		isApiClientError,
+		userMessage as sharedUserMessage,
+		type ApiClientError
+	} from '$lib/api/v1/errors.js';
 	import {
 		emptyProjectCardFormData,
 		emptyProjectFormData,
@@ -27,7 +31,8 @@
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import {
 		projectCardFormSchema,
-		projectFormSchema
+		projectFormSchema,
+		projectClientDisplayName
 	} from '$lib/schemas/project.js';
 	import type { ProjectCardBoardMove, ProjectWorkCard } from './project-workspace-board.svelte';
 	import type { ProjectClientOption } from './project-form.svelte';
@@ -102,28 +107,24 @@
 	const navGroups = $derived(appNavGroups('Projects', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const projectName = $derived(project?.name ?? 'Project');
-	const clientName = $derived(project?.client_label?.trim() || 'Client');
-	const clientHref = $derived(project ? `/clients/${project.client_id}` : undefined);
+	const clientName = $derived(project ? projectClientDisplayName(project) : 'Client');
+	const clientHref = $derived(
+		project?.client_id ? `/clients/${project.client_id}` : undefined
+	);
 	const status = $derived(project ? projectStatusLabel(project.status) : 'Planning');
 	const columns = $derived(project ? workspaceColumnsFromProject(project) : []);
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
+		const custom = (error: ApiClientError): string | null => {
 			if (error.isPreconditionFailed) {
 				return error.message || 'Changed elsewhere — reload and try again.';
 			}
 			if (error.status === 404 || error.code === 'NOT_FOUND') {
 				return error.message || 'Project not found.';
 			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+			return null;
+		};
+		return sharedUserMessage(error, fallback, { customMessage: custom });
 	}
 
 	interface RequestEpoch {
@@ -527,7 +528,7 @@
 						showTrigger={false}
 						allowArchived={true}
 						title="Edit project"
-						description="Update name, status (including archive), or client attachment. Uses If-Match."
+						description="Update name, status (including archive), or whether this is internal or attached to a client. Uses If-Match."
 						submitLabel="Save changes"
 						onValidSubmit={onValidEdit}
 					/>

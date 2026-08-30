@@ -14,6 +14,7 @@
 		{
 			name: '',
 			companyName: '',
+			primaryEmail: '',
 			clientId: '',
 			stage: 'new',
 			valueAmount: '',

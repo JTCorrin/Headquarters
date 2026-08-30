@@ -8,8 +8,11 @@ export const AUTH_PUBLIC_PATHS = new Set([
 	'/invite/accept'
 ]);
 
-/** Onboarding routes for signed-in users with zero memberships. */
-export const AUTH_ONBOARDING_PATHS = new Set(['/onboarding/create-org']);
+/** Onboarding routes that must not bounce to create-org while memberships catch up. */
+export const AUTH_ONBOARDING_PATHS = new Set([
+	'/onboarding/create-org',
+	'/onboarding/invite-team'
+]);
 
 export function isAuthPublicPath(pathname: string): boolean {
 	return (
@@ -17,6 +20,14 @@ export function isAuthPublicPath(pathname: string): boolean {
 		pathname === '/update-password' ||
 		pathname.startsWith('/auth/')
 	);
+}
+
+/**
+ * Signed-in users on these routes should be sent to postAuthDestination
+ * (keep update-password and invite accept reachable while authenticated).
+ */
+export function isPostAuthRedirectPath(pathname: string): boolean {
+	return isAuthPublicPath(pathname) && pathname !== '/update-password' && pathname !== '/invite/accept';
 }
 
 export function isOnboardingPath(pathname: string): boolean {
@@ -63,4 +74,26 @@ export function postAuthDestination(options: {
 	if (options.membershipCount === 1) return '/select-org';
 	if (options.selectedOrgId) return '/';
 	return '/select-org';
+}
+
+/**
+ * Email/password signup with confirmations off. `/check-email` means
+ * confirmations are still on and is not success.
+ */
+export function isPostSignupLandingPath(pathname: string): boolean {
+	return pathname === '/onboarding/create-org' || pathname === '/select-org' || pathname === '/';
+}
+
+/**
+ * After the first organisation is created the app goes to invite-team.
+ * Home, org config, and contacts are also success (skip / layout fallback).
+ */
+export function isPostOrgCreateLandingPath(pathname: string): boolean {
+	return (
+		pathname === '/onboarding/invite-team' ||
+		pathname === '/' ||
+		pathname === '/select-org' ||
+		pathname === '/org/config' ||
+		pathname === '/contacts'
+	);
 }

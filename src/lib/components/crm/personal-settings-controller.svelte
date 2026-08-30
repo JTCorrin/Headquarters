@@ -4,7 +4,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
 		roleFromMemberships,
@@ -79,6 +79,7 @@
 	let caldavConnection = $state<CalendarConnectionResource>(emptyCalendarConnection());
 	let calendarConnectError = $state<string | null>(null);
 	let caldavConnectError = $state<string | null>(null);
+	let mailboxOAuthError = $state<string | null>(null);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
@@ -122,21 +123,7 @@
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.isValidationError) {
-				if (error.fields) {
-					const keyed = Object.entries(error.fields)
-						.map(([field, message]) => `${field}: ${message}`)
-						.join(' · ');
-					return keyed || error.message;
-				}
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, { keyedValidationFields: true });
 	}
 
 	interface RequestEpoch {
@@ -391,6 +378,24 @@
 		}
 	}
 
+	async function onSaveMailboxSyncInterval(
+		minutes: number
+	): Promise<MailboxTestFeedback | false> {
+		const epoch = captureEpoch();
+		try {
+			const updated = await api.mailbox.updateSyncInterval(minutes);
+			if (isStale(epoch)) return false;
+			mailboxAccount = toMailboxAccountResource(updated);
+			return { ok: true, message: 'Sync interval saved.' };
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			return {
+				ok: false,
+				message: userMessage(error, 'Could not save sync interval.')
+			};
+		}
+	}
+
 	async function onDisconnectMailbox() {
 		const epoch = captureEpoch();
 		try {
@@ -412,6 +417,28 @@
 				kind: 'validation',
 				message: userMessage(error, 'Could not disconnect mailbox.')
 			};
+			return false;
+		}
+	}
+
+	async function onConnectMailboxOAuth(provider: 'microsoft' | 'google') {
+		const epoch = captureEpoch();
+		mailboxOAuthError = null;
+		try {
+			const start = await api.mailbox.startOAuth(provider);
+			if (isStale(epoch)) return false;
+			const redirectUrl = start?.url?.trim() ?? '';
+			if (!redirectUrl) {
+				mailboxOAuthError = 'Mailbox OAuth start did not return a redirect URL.';
+				return false;
+			}
+			if (browser) {
+				window.location.assign(redirectUrl);
+			}
+			return true;
+		} catch (error) {
+			if (isStale(epoch)) return false;
+			mailboxOAuthError = userMessage(error, 'Could not start mailbox connect.');
 			return false;
 		}
 	}
@@ -617,7 +644,10 @@
 				{onSaveMailbox}
 				{onTestMailbox}
 				{onSyncMailbox}
+				{onSaveMailboxSyncInterval}
 				{onDisconnectMailbox}
+				{onConnectMailboxOAuth}
+				{mailboxOAuthError}
 				{onConnectCalendar}
 				{onDisconnectCalendar}
 				{onSaveCaldav}

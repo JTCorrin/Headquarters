@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		membershipFromCreateResult,
 		toOrganisationCreateBody,
@@ -17,6 +17,7 @@
 	import PageHeader from './page-header.svelte';
 	import OrganisationCreateDrawer from './organisation-create-drawer.svelte';
 	import StatusBadge from './status-badge.svelte';
+	import OrgLogoMark from './org-logo-mark.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
 	} from './resource-state-banner.svelte';
@@ -60,16 +61,9 @@
 	);
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return 'You do not have access to that organisation.';
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			forbiddenMessage: 'You do not have access to that organisation.'
+		});
 	}
 
 	async function loadMemberships() {
@@ -149,6 +143,7 @@
 						disabled={selectingId === membership.org_id}
 						onclick={() => selectOrg(membership.org_id)}
 					>
+						<OrgLogoMark name={membership.org_name} logoUrl={membership.logo_url} />
 						<span class="min-w-0 flex-1 truncate font-medium">{membership.org_name}</span>
 						<span class="text-muted-foreground truncate text-sm">{membership.org_slug}</span>
 						<StatusBadge status={roleLabel(membership.role)} class="shrink-0" />

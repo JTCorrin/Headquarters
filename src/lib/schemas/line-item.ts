@@ -5,6 +5,14 @@ export const lineItemFormSchema = z.object({
 	description: z.string().min(1, 'Description is required').max(200),
 	qty: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Enter a quantity'),
 	unitPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Use a number like 12.50'),
+	discountPercent: z
+		.string()
+		.optional()
+		.or(z.literal(''))
+		.refine(
+			(v) => v === undefined || v === '' || (/^\d+(\.\d{1,4})?$/.test(v) && Number(v) <= 100),
+			'Discount must be between 0 and 100'
+		),
 	taxRatePercent: z
 		.string()
 		.optional()
@@ -28,10 +36,12 @@ export interface CatalogProductOption {
 	taxRateId?: string | null;
 }
 
-/** Org default active tax rate %, or `'0'` when none. */
+/** Org default active tax rate %, or `'0'` when none / client is VAT-exempt. */
 export function defaultTaxRatePercentString(
-	rates: { rate_percent: number; is_default: boolean; active: boolean; deleted_at?: string | null }[]
+	rates: { rate_percent: number; is_default: boolean; active: boolean; deleted_at?: string | null }[],
+	options?: { taxExempt?: boolean }
 ): string {
+	if (options?.taxExempt) return '0';
 	const active = rates.filter((r) => r.active && !r.deleted_at);
 	const def = active.find((r) => r.is_default);
 	if (def) return String(def.rate_percent);

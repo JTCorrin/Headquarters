@@ -15,7 +15,8 @@
 		type CaldavTestFeedback,
 		type CalendarConnectionResource
 	} from '$lib/schemas/calendar-connection.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
 	import ResourceStateBanner, {
@@ -57,7 +58,14 @@
 			| false
 			| void
 			| Promise<MailboxTestFeedback | false | void>;
+		onSaveMailboxSyncInterval?: (
+			minutes: number
+		) => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
+		onConnectMailboxOAuth?: (
+			provider: 'microsoft' | 'google'
+		) => boolean | void | Promise<boolean | void>;
+		mailboxOAuthError?: string | null;
 		onConnectCalendar?: () => boolean | void | Promise<boolean | void>;
 		onDisconnectCalendar?: () => boolean | void | Promise<boolean | void>;
 		onSaveCaldav?: () => boolean | void | Promise<boolean | void>;
@@ -97,7 +105,10 @@
 		onSaveMailbox,
 		onTestMailbox,
 		onSyncMailbox,
+		onSaveMailboxSyncInterval,
 		onDisconnectMailbox,
+		onConnectMailboxOAuth,
+		mailboxOAuthError = null,
 		onConnectCalendar,
 		onDisconnectCalendar,
 		onSaveCaldav,
@@ -134,19 +145,19 @@
 	);
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-8 px-6 py-6 md:px-8">
+		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Organisation · Settings"
 				title="My settings"
@@ -191,9 +202,12 @@
 								<ProfileMailboxForm
 									form={mailboxForm}
 									account={mailboxAccount}
+									oauthError={mailboxOAuthError}
 									onValidSubmit={onSaveMailbox}
+									onConnectOAuth={onConnectMailboxOAuth}
 									onTest={onTestMailbox}
 									onSync={onSyncMailbox}
+									onSaveSyncInterval={onSaveMailboxSyncInterval}
 									onDisconnect={onDisconnectMailbox}
 								/>
 							</section>
@@ -250,4 +264,4 @@
 			{/if}
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

@@ -7,6 +7,8 @@
 		org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
 		org_name: 'Corrin Data',
 		org_slug: 'corrin-data',
+		logo_url:
+			'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%232563eb"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="white" font-family="sans-serif">C</text></svg>',
 		role: 'owner',
 		theme_default: 'system'
 	} satisfies OrgMembershipSummary;

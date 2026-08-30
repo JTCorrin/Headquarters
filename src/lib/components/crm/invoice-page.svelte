@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		roleFromMemberships,
 		invoiceStatusLabel,
@@ -13,6 +13,7 @@
 		toInvoiceFormData,
 		toInvoiceLineInput,
 		toInvoiceUpdateBody,
+		toOrganisationBrandingResource,
 		toOrganisationCreateBody,
 		toOrgMembershipSummary,
 		toPaymentCreateBody,
@@ -24,6 +25,7 @@
 		loadEntityTimeline
 	} from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
+	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import {
@@ -82,22 +84,14 @@
 	let timelineEvents = $state<TimelineEvent[]>([]);
 	let paymentRows = $state<PaymentListItem[]>([]);
 	let savedFingerprint = $state('');
+	let orgLogoDataUrl = $state<string | undefined>(undefined);
+	let orgAddressLines = $state<string[]>([]);
 	let switchError = $state<string | null>(null);
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let actionPending = $state(false);
 	let lineDrawerOpen = $state(false);
 	let paymentDrawerOpen = $state(false);
-
-	function emptyLineForm() {
-		return {
-			productId: '',
-			description: '',
-			qty: '1',
-			unitPrice: '0',
-			taxRatePercent: defaultTaxRatePercentString(taxRates)
-		};
-	}
 
 	function todayIso(): string {
 		return new Date().toISOString().slice(0, 10);
@@ -120,6 +114,7 @@
 				issueOn: '',
 				dueOn: '',
 				purchaseOrderNumber: '',
+				discount: '',
 				status: 'draft' as const,
 				quoteId: '',
 				recipients: []
@@ -134,6 +129,19 @@
 			resetForm: false
 		}
 	);
+
+	function emptyLineForm() {
+		const clientId = get(invoiceForm.form).clientId;
+		const taxExempt = clientOptions.find((c) => c.id === clientId)?.taxExempt ?? false;
+		return {
+			productId: '',
+			description: '',
+			qty: '1',
+			unitPrice: '0',
+			discountPercent: '0',
+			taxRatePercent: defaultTaxRatePercentString(taxRates, { taxExempt })
+		};
+	}
 
 	const lineForm = superForm(defaults(emptyLineForm(), zod4(lineItemFormSchema)), {
 		validators: zod4(lineItemFormSchema),
@@ -193,6 +201,7 @@
 			issueOn: form.issueOn,
 			dueOn: form.dueOn,
 			purchaseOrderNumber: form.purchaseOrderNumber,
+			discount: form.discount ?? '',
 			lines: rowLines.map((line) => ({
 				id: line.id,
 				productId: line.productId ?? null,
@@ -211,20 +220,10 @@
 	});
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Invoice not found.';
-			if (error.isPreconditionFailed) {
-				return error.message || 'Invoice changed elsewhere — reload and try again.';
-			}
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Invoice not found.',
+			conflictMessage: 'Invoice changed elsewhere — reload and try again.'
+		});
 	}
 
 	interface RequestEpoch {
@@ -270,6 +269,8 @@
 		contactOptions = [];
 		products = [];
 		savedFingerprint = '';
+		orgLogoDataUrl = undefined;
+		orgAddressLines = [];
 		paymentDrawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
@@ -341,18 +342,27 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [result, clients, contacts, catalog, rates] = await Promise.all([
+			const [result, clients, contacts, catalog, rates, branding] = await Promise.all([
 				api.invoices.get(invoiceId),
 				api.clients.list({ limit: 100 }),
 				api.contacts.list({ limit: 100 }),
 				api.products.list({ limit: 100, status: 'active' }),
-				api.taxRates.list({ limit: 100 })
+				api.taxRates.list({ limit: 100 }),
+				api.organisationConfig.getBranding()
 			]);
 			if (isStale(epoch)) return;
 
 			taxRates = rates;
 			applyDocument(result.data);
-			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
+			const brandingResource = toOrganisationBrandingResource(branding);
+			orgAddressLines = formatOrgLetterheadLines(brandingResource);
+			orgLogoDataUrl = await loadOrgLogoDataUrl(brandingResource.logo_url);
+			if (isStale(epoch)) return;
+			clientOptions = clients.data.map((c) => ({
+				id: c.id,
+				name: c.name,
+				taxExempt: Boolean(c.tax_exempt)
+			}));
 			products = catalog.data.map((p) => toCatalogProductOption(p, taxRates));
 			lineForm.form.set(emptyLineForm());
 
@@ -762,6 +772,8 @@
 				{:else if invoice}
 					<InvoiceDetailPage
 						{orgName}
+						{orgLogoDataUrl}
+						{orgAddressLines}
 						{navGroups}
 						title={invoice.number}
 						status={invoiceStatusLabel(invoice.status)}

@@ -4,7 +4,8 @@
 	import type { QuoteContactOption, QuoteFormData } from '$lib/schemas/quote.js';
 	import { attentionLineFromRecipients } from '$lib/schemas/document-recipients.js';
 	import type { CatalogProductOption, LineItemFormData } from '$lib/schemas/line-item.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import QuoteForm from './quote-form.svelte';
 	import LineItemFormDrawer from './line-item-form-drawer.svelte';
@@ -22,6 +23,8 @@
 
 	export interface QuoteDetailPageProps {
 		orgName: string;
+		orgLogoDataUrl?: string;
+		orgAddressLines?: string[];
 		navGroups: AppNavGroup[];
 		title: string;
 		status: string;
@@ -51,6 +54,7 @@
 		onReject?: () => void | Promise<void>;
 		onAccept?: () => void | Promise<void>;
 		onConvert?: () => void | Promise<void>;
+		onDelete?: () => void | Promise<void>;
 		onSaveQuote?: () => boolean | void | Promise<boolean | void>;
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		clientOptions?: import('$lib/schemas/quote.js').QuoteClientOption[];
@@ -63,6 +67,8 @@
 
 	let {
 		orgName,
+		orgLogoDataUrl,
+		orgAddressLines = [],
 		navGroups,
 		title,
 		status = 'Draft',
@@ -86,6 +92,7 @@
 		onReject,
 		onAccept,
 		onConvert,
+		onDelete,
 		onSaveQuote,
 		onTimelineAdd,
 		clientOptions = [],
@@ -96,6 +103,9 @@
 	}: QuoteDetailPageProps = $props();
 
 	const formData = fromStore(quoteForm.form);
+	const clientTaxExempt = $derived(
+		clientOptions.find((c) => c.id === formData.current.clientId)?.taxExempt ?? false
+	);
 
 	const attentionLine = $derived(
 		attentionLineFromRecipients(formData.current.recipients, contactOptions)
@@ -105,6 +115,8 @@
 		buildMoneyDocumentDef({
 			kind: 'quote',
 			orgName,
+			orgLogoDataUrl,
+			orgAddressLines,
 			partyLabel: 'Bill to',
 			partyName: formData.current.clientName,
 			attentionLine,
@@ -139,19 +151,19 @@
 	);
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="h-full shrink-0 self-stretch" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
+		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
 				breadcrumb="Accounting / Quotes"
 				{title}
@@ -216,6 +228,18 @@
 							Convert to invoice
 						</Button>
 					{/if}
+					{#if onDelete}
+						<Button
+							size="sm"
+							type="button"
+							variant="outline"
+							disabled={actionPending}
+							data-testid="quote-delete"
+							onclick={() => void onDelete?.()}
+						>
+							Delete draft
+						</Button>
+					{/if}
 				{/snippet}
 			</PageHeader>
 
@@ -247,6 +271,7 @@
 									bind:open={lineDrawerOpen}
 									form={lineForm}
 									{products}
+									{clientTaxExempt}
 									onValidSubmit={onAddLine}
 								>
 									{#snippet trigger()}
@@ -280,4 +305,4 @@
 			</div>
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

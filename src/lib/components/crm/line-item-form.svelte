@@ -11,6 +11,8 @@
 	export interface LineItemFormProps {
 		form: SuperForm<LineItemFormData>;
 		products?: CatalogProductOption[];
+		/** When true, product tax rates do not overwrite the line tax field. */
+		clientTaxExempt?: boolean;
 		submitLabel?: string;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -19,6 +21,7 @@
 	let {
 		form,
 		products = [],
+		clientTaxExempt = false,
 		submitLabel = 'Add line',
 		class: className,
 		onValidSubmit
@@ -52,7 +55,7 @@
 		if (!match) return;
 		$formData.description = match.name;
 		$formData.unitPrice = match.unitPrice;
-		if (match.taxRatePercent != null && match.taxRatePercent !== '') {
+		if (!clientTaxExempt && match.taxRatePercent != null && match.taxRatePercent !== '') {
 			$formData.taxRatePercent = match.taxRatePercent;
 		}
 		if (!$formData.qty) $formData.qty = '1';
@@ -118,7 +121,7 @@
 		{#if $errors.description}<p class="text-destructive text-xs">{$errors.description}</p>{/if}
 	</div>
 
-	<div class="grid gap-4 sm:grid-cols-3">
+	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<div class="space-y-2">
 			<Label for="line-qty">Qty</Label>
 			<Input id="line-qty" name="qty" bind:value={$formData.qty} placeholder="1" />
@@ -133,6 +136,20 @@
 				placeholder="4200.00"
 			/>
 			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
+		</div>
+		<div class="space-y-2">
+			<Label for="line-discount">Discount %</Label>
+			<Input
+				id="line-discount"
+				name="discountPercent"
+				bind:value={$formData.discountPercent}
+				placeholder="0"
+				aria-invalid={!!$errors.discountPercent}
+				data-testid="line-discount"
+			/>
+			{#if $errors.discountPercent}
+				<p class="text-destructive text-xs">{$errors.discountPercent}</p>
+			{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="line-tax">Tax %</Label>

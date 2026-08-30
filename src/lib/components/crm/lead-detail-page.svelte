@@ -8,7 +8,8 @@
 	} from '$lib/schemas/lead.js';
 	import type { ClientResource } from '$lib/schemas/client.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
 	import LeadForm from './lead-form.svelte';
@@ -55,10 +56,13 @@
 		role?: MembershipRole;
 		mailSettingsHref?: string;
 		sharingId?: string | null;
+		/** Prefill for new-email To (lead primary_email). */
+		emailDefaultTo?: string;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
 		onSave?: () => boolean | void | Promise<boolean | void>;
+		onDelete?: () => void;
 		onConvert?: () => void;
 		onOpenClient?: (clientId: string) => void;
 		onCreateClient?: () => void;
@@ -66,9 +70,15 @@
 		onTimelineAdd?: (event: TimelineComposerSubmit) => void | Promise<void>;
 		onAddToTimeline?: (payload: { messageId: string }) => void | Promise<void>;
 		onSendReply?: (payload: { messageId: string; body: string }) => void | Promise<void>;
+		onSendNew?: (payload: { to: string; subject: string; body: string }) => void | Promise<void>;
 		onDraftResponse?: (payload: {
 			messageId: string;
 			tone: 'warm' | 'neutral' | 'firm';
+		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
+		onDraftCompose?: (payload: {
+			tone: 'warm' | 'neutral' | 'firm';
+			subject: string;
+			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
 		onUseSuggestion?: (payload: {
 			suggestionId?: string;
@@ -99,9 +109,11 @@
 		role = 'member',
 		mailSettingsHref = '/settings#mail',
 		sharingId = null,
+		emailDefaultTo = '',
 		showNav = true,
 		class: className,
 		onSave,
+		onDelete,
 		onConvert,
 		onOpenClient,
 		onCreateClient,
@@ -109,7 +121,9 @@
 		onTimelineAdd,
 		onAddToTimeline,
 		onSendReply,
+		onSendNew,
 		onDraftResponse,
+		onDraftCompose,
 		onUseSuggestion,
 		onDiscardSuggestion
 	}: LeadDetailPageProps = $props();
@@ -124,21 +138,29 @@
 		{ id: 'details', label: 'Details' },
 		{ id: 'email', label: 'Email' }
 	];
+
+	let activeTab = $state('details');
+	let composingNew = $state(false);
+
+	function handleEmailClick() {
+		activeTab = 'email';
+		composingNew = true;
+	}
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="shrink-0" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="flex min-h-0 flex-1 flex-col gap-6 px-6 py-6 md:px-8">
+		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0 space-y-6">
 				<PageHeader
 					breadcrumb="Leads"
@@ -149,6 +171,17 @@
 						: 'Lead workspace'}
 				>
 					{#snippet actions()}
+						{#if lead}
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								data-testid="lead-email-action"
+								onclick={handleEmailClick}
+							>
+								Email
+							</Button>
+						{/if}
 						{#if lead && !isWon}
 							<Button
 								type="button"
@@ -167,6 +200,17 @@
 								onclick={() => lead?.client_id && onOpenClient?.(lead.client_id)}
 							>
 								Open client
+							</Button>
+						{/if}
+						{#if onDelete}
+							<Button
+								type="button"
+								size="sm"
+								variant="outline"
+								data-testid="lead-delete"
+								onclick={() => onDelete?.()}
+							>
+								Delete
 							</Button>
 						{/if}
 					{/snippet}
@@ -199,7 +243,7 @@
 			</div>
 
 			{#if lead && viewState.kind === 'ready'}
-				<ProfileTabs {tabs}>
+				<ProfileTabs {tabs} bind:value={activeTab}>
 					{#snippet children({ active })}
 						{#if active === 'details'}
 							<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
@@ -221,6 +265,7 @@
 											fields={[
 												{ label: 'Name', value: lead.name },
 												{ label: 'Company', value: lead.company_name ?? '—' },
+												{ label: 'Email', value: lead.primary_email ?? '—' },
 												{
 													label: 'Value',
 													value:
@@ -273,9 +318,13 @@
 								{smtpReady}
 								{mailSettingsHref}
 								{sharingId}
+								defaultTo={emailDefaultTo}
+								bind:composingNew
 								{onAddToTimeline}
 								{onSendReply}
+								{onSendNew}
 								{onDraftResponse}
+								{onDraftCompose}
 								{onUseSuggestion}
 								{onDiscardSuggestion}
 								{role}
@@ -287,7 +336,7 @@
 			{/if}
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>
 
 {#if lead}
 	<ConvertLeadDialog

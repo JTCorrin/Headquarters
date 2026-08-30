@@ -4,6 +4,11 @@ export function selectedOrgStorageKey(userId?: string | null): string {
 	return userId ? `${SELECTED_ORG_STORAGE_KEY}:${userId}` : SELECTED_ORG_STORAGE_KEY;
 }
 
+/** True for the legacy unscoped key or `hq.selected-org-id:<userId>`. */
+export function isSelectedOrgStorageKey(key: string): boolean {
+	return key === SELECTED_ORG_STORAGE_KEY || key.startsWith(`${SELECTED_ORG_STORAGE_KEY}:`);
+}
+
 export interface StorageLike {
 	getItem(key: string): string | null;
 	setItem(key: string, value: string): void;

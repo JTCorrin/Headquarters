@@ -27,7 +27,7 @@
 		clients = [],
 		open = $bindable(false),
 		title = 'New project',
-		description = 'Projects attach to a client and open as their own kanban workspace.',
+		description = 'Projects can be internal or attached to a client, and open as their own kanban workspace.',
 		submitLabel = 'Save project',
 		triggerLabel = 'New project',
 		showTrigger = true,

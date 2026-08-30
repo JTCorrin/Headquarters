@@ -1,7 +1,12 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ProjectFormData } from '$lib/schemas/project.js';
-	import AppNav, { type AppNavGroup } from './app-nav.svelte';
+	import {
+		INTERNAL_PROJECT_CLIENT_ID,
+		INTERNAL_PROJECT_LABEL,
+		type ProjectFormData
+	} from '$lib/schemas/project.js';
+	import { type AppNavGroup } from './app-nav.svelte';
+	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProjectsBoard, {
 		type ProjectBoardMove,
@@ -42,6 +47,10 @@
 		onValidSubmit
 	}: ProjectsBoardPageProps = $props();
 
+	const filterOptions = $derived([
+		{ id: INTERNAL_PROJECT_CLIENT_ID, name: INTERNAL_PROJECT_LABEL },
+		...clients
+	]);
 	const filtered = $derived(
 		clientFilter === 'all'
 			? projects
@@ -49,19 +58,19 @@
 	);
 </script>
 
-<div
+<AppSidebarFrame
+	{orgName}
+	groups={navGroups}
+	{showNav}
+	showTrigger={showNav}
 	class={cn(
-		'bg-background text-foreground flex',
 		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
 		className
 	)}
 >
-	{#if showNav}
-		<AppNav {orgName} groups={navGroups} class="shrink-0" />
-	{/if}
 
 	<main class="flex min-w-0 flex-1 flex-col">
-		<div class="space-y-6 px-6 py-6 md:px-8">
+		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader title="Projects">
 				{#snippet actions()}
 					<ProjectFormDrawer
@@ -75,7 +84,7 @@
 
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="text-muted-foreground text-xs font-medium tracking-wide uppercase"
-					>Client</span
+					>Attach to</span
 				>
 				<button
 					type="button"
@@ -89,7 +98,7 @@
 				>
 					All
 				</button>
-				{#each clients as client (client.id)}
+				{#each filterOptions as client (client.id)}
 					<button
 						type="button"
 						class={cn(
@@ -113,4 +122,4 @@
 			/>
 		</div>
 	</main>
-</div>
+</AppSidebarFrame>

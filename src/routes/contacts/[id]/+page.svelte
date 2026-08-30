@@ -28,6 +28,9 @@
 		onSwitchNavigate={() => {
 			void goto('/contacts');
 		}}
+		onDeleted={() => {
+			void goto('/contacts');
+		}}
 		onLogout={handleLogout}
 	/>
 {/if}

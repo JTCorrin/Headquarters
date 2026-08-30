@@ -3,7 +3,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
 		aiSuggestionText,
 		roleFromMemberships,
@@ -23,10 +23,7 @@
 		loadEntityEmailTab,
 		type EntityEmailTabState
 	} from '$lib/crm/entity-email-tab.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { resolveLeadCurrency } from '$lib/money.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
@@ -38,7 +35,11 @@
 		type LeadFormData,
 		type LeadResource
 	} from '$lib/schemas/lead.js';
-	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
+	import {
+		canMutateCrmRecords,
+		type MembershipRole,
+		type OrganisationCreateData
+	} from '$lib/schemas/organisation.js';
 	import type { LeadConvertResult } from './lead-detail-page.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -55,6 +56,7 @@
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
 		onOpenClient?: (clientId: string) => void;
+		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
 	}
@@ -66,6 +68,7 @@
 		onMissingOrg,
 		onSwitchNavigate,
 		onOpenClient,
+		onDeleted,
 		onLogout,
 		class: className
 	}: LeadPageProps = $props();
@@ -88,6 +91,7 @@
 	const emptyLeadForm = (currency = 'GBP'): LeadFormData => ({
 		name: '',
 		companyName: '',
+		primaryEmail: '',
 		clientId: '',
 		stage: 'new',
 		valueAmount: '',
@@ -105,8 +109,10 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',
+		taxExempt: false,
 		registrationNumber: '',
 		defaultCurrency: '',
 		paymentTermsDays: '',
@@ -142,29 +148,17 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Leads', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const leadResource = $derived<LeadResource | null>(lead ? toLeadResource(lead) : null);
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') return 'Lead not found.';
-			if (error.isValidationError) {
-				if (error.fields) return Object.values(error.fields).join(' · ') || error.message;
-				return error.message;
-			}
-			return error.message || fallback;
-		}
-		return fallback;
+		return sharedUserMessage(error, fallback, { notFoundMessage: 'Lead not found.' });
 	}
 
 	interface RequestEpoch {
@@ -302,15 +296,42 @@
 		emailTab = await loadEntityEmailTab(api, 'lead', leadId);
 	}
 
+	async function onSendNew(payload: { to: string; subject: string; body: string }) {
+		await api.emailMessages.sendForEntity('lead', leadId, {
+			to: payload.to,
+			subject: payload.subject,
+			body_text: payload.body
+		});
+		emailTab = await loadEntityEmailTab(api, 'lead', leadId);
+	}
+
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'lead', leadId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
 	}
 
-	async function onDraftResponse(payload: { messageId: string; tone: 'warm' | 'neutral' | 'firm' }) {
+	async function onDraftResponse(payload: {
+		messageId: string;
+		tone: 'warm' | 'neutral' | 'firm';
+	}) {
 		const suggestion = await api.emailMessages.generateDraft({
 			email_message_id: payload.messageId,
 			variant: payload.tone
+		});
+		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
+	}
+
+	async function onDraftCompose(payload: {
+		tone: 'warm' | 'neutral' | 'firm';
+		subject: string;
+		to: string;
+	}) {
+		void payload.to;
+		const suggestion = await api.emailMessages.generateComposeDraft({
+			entity_type: 'lead',
+			entity_id: leadId,
+			variant: payload.tone,
+			subject: payload.subject
 		});
 		return { suggestionId: suggestion.id, suggestionText: aiSuggestionText(suggestion) };
 	}
@@ -375,6 +396,23 @@
 			};
 		} finally {
 			converting = false;
+		}
+	}
+
+	async function onDelete() {
+		if (!lead || !canMutateCrmRecords(role)) return;
+		if (!window.confirm('Delete this lead? This cannot be undone.')) return;
+		const epoch = captureEpoch();
+		try {
+			await api.leads.delete(lead.id, lead.version);
+			if (isStale(epoch)) return;
+			onDeleted?.();
+		} catch (error) {
+			if (isStale(epoch)) return;
+			viewState = {
+				kind: 'validation',
+				message: userMessage(error, 'Could not delete lead — try again.')
+			};
 		}
 	}
 
@@ -482,15 +520,19 @@
 						mailboxConnected={emailTab.mailboxConnected}
 						aiProviderConnected={emailTab.aiProviderConnected}
 						smtpReady={emailTab.smtpReady}
+						emailDefaultTo={leadResource.primary_email ?? ''}
 						{role}
 						{sharingId}
 						{onTimelineAdd}
 						{onAddToTimeline}
 						{onSendReply}
+						{onSendNew}
 						{onDraftResponse}
+						{onDraftCompose}
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						{onSave}
+						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						{onConvert}
 						{onOpenClient}
 						onCreateClient={() => {
@@ -518,7 +560,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="lead-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening leads.
 		</p>
 	</div>

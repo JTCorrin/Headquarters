@@ -3,11 +3,13 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
-	import { isApiClientError } from '$lib/api/v1/errors.js';
+	import { isApiClientError, userMessage as sharedUserMessage } from '$lib/api/v1/errors.js';
 	import {
+		canAcceptMeetingTaskProposals,
 		canGenerateMeetingSummary,
 		emptyMeetingFormData,
 		formatMeetingWhen,
+		meetingAcceptProposalUserMessage,
 		meetingStatusLabel,
 		meetingSummaryStatusLabel,
 		meetingTranscriptPlainText,
@@ -75,12 +77,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Meetings', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -91,9 +91,7 @@
 		meeting ? formatMeetingWhen(meeting.starts_at, meeting.ends_at, meeting.timezone) : '—'
 	);
 	const relatedTo = $derived(
-		meeting?.related_entity_label?.trim() ||
-			meeting?.related_entity_type ||
-			'No related record'
+		meeting?.related_entity_label?.trim() || meeting?.related_entity_type || 'No related record'
 	);
 	const scheduleFields = $derived.by((): InfoCardField[] => {
 		if (!meeting) return [];
@@ -139,18 +137,15 @@
 				: undefined
 	);
 	const generateEnabled = $derived(meeting ? canGenerateMeetingSummary(meeting) : false);
+	const canAcceptProposals = $derived(
+		meeting ? canAcceptMeetingTaskProposals(meeting.status) : false
+	);
 
 	function userMessage(error: unknown, fallback: string): string {
-		if (isApiClientError(error)) {
-			if (error.isNetworkError) return 'Network error — check your connection and retry.';
-			if (error.isForbidden) return error.message || 'You do not have permission for this action.';
-			if (error.status === 404 || error.code === 'NOT_FOUND') {
-				return error.message || 'Meeting not found.';
-			}
-			return error.message || fallback;
-		}
-		if (error instanceof Error && error.message) return error.message;
-		return fallback;
+		return sharedUserMessage(error, fallback, {
+			notFoundMessage: 'Meeting not found.',
+			customMessage: (apiError) => meetingAcceptProposalUserMessage(apiError.message)
+		});
 	}
 
 	interface RequestEpoch {
@@ -228,10 +223,7 @@
 				viewState = { kind: 'forbidden', message: userMessage(error, 'Forbidden') };
 				return;
 			}
-			if (
-				isApiClientError(error) &&
-				(error.status === 404 || error.code === 'NOT_FOUND')
-			) {
+			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'validation', message: userMessage(error, 'Meeting not found.') };
 				return;
 			}
@@ -314,16 +306,12 @@
 	}
 
 	async function onAcceptTask(proposalId: string) {
-		if (!meeting) return;
+		if (!meeting || !canAcceptMeetingTaskProposals(meeting.status)) return;
 		const epoch = captureEpoch();
 		actionBusy = true;
 		actionError = null;
 		try {
-			const next = await api.meetings.acceptTaskProposal(
-				meeting.id,
-				proposalId,
-				meeting.version
-			);
+			const next = await api.meetings.acceptTaskProposal(meeting.id, proposalId, meeting.version);
 			if (isStale(epoch)) return;
 			meeting = next;
 		} catch (error) {
@@ -340,11 +328,7 @@
 		actionBusy = true;
 		actionError = null;
 		try {
-			const next = await api.meetings.dismissTaskProposal(
-				meeting.id,
-				proposalId,
-				meeting.version
-			);
+			const next = await api.meetings.dismissTaskProposal(meeting.id, proposalId, meeting.version);
 			if (isStale(epoch)) return;
 			meeting = next;
 		} catch (error) {
@@ -415,7 +399,7 @@
 	}
 
 	async function onAcceptAllTasks() {
-		if (!meeting) return;
+		if (!meeting || !canAcceptMeetingTaskProposals(meeting.status)) return;
 		const open = (meeting.task_proposals ?? []).filter((p) => p.status === 'proposed');
 		if (open.length === 0) return;
 
@@ -425,11 +409,7 @@
 		try {
 			let current = meeting;
 			for (const proposal of open) {
-				current = await api.meetings.acceptTaskProposal(
-					current.id,
-					proposal.id,
-					current.version
-				);
+				current = await api.meetings.acceptTaskProposal(current.id, proposal.id, current.version);
 				if (isStale(epoch)) return;
 			}
 			meeting = current;
@@ -455,7 +435,7 @@
 			bind:this={fileInput}
 			type="file"
 			class="sr-only"
-			accept=".txt,.md,.markdown,.vtt,.pdf,text/plain,text/markdown,text/vtt,application/pdf"
+			accept=".vtt,text/vtt"
 			data-testid="meeting-transcript-file"
 			onchange={onTranscriptFileSelected}
 		/>
@@ -498,9 +478,9 @@
 						showNav={false}
 						{onUploadTranscript}
 						{onGenerateSummary}
-						{onAcceptTask}
+						onAcceptTask={canAcceptProposals ? onAcceptTask : undefined}
 						{onDismissTask}
-						{onAcceptAllTasks}
+						onAcceptAllTasks={canAcceptProposals ? onAcceptAllTasks : undefined}
 						{onEdit}
 						{onDelete}
 						class="min-h-0 flex-1"
@@ -521,7 +501,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="meeting-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening meetings.
 		</p>
 	</div>

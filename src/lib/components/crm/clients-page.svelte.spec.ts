@@ -26,6 +26,7 @@ function sampleClient(overrides: Record<string, unknown> = {}) {
 		primary_email: 'billing@northwind.com',
 		phone: null,
 		tax_identifier: null,
+		tax_exempt: false,
 		registration_number: null,
 		default_currency: 'GBP',
 		payment_terms_days: 30,
@@ -74,7 +75,24 @@ describe('ClientsPage integration', () => {
 		const fetchMock = createMockFetch({
 			'GET /api/v1/clients': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
-				return { body: { data: [sampleClient()], meta: { next_cursor: null } } };
+				return {
+					body: {
+						data: [
+							sampleClient({
+								contacts: [
+									{
+										id: '22222222-3333-4444-8555-666666666666',
+										display_name: 'Ava Chen',
+										primary_email: 'ava@northwind.com',
+										role: 'primary',
+										is_primary: true
+									}
+								]
+							})
+						],
+						meta: { next_cursor: null }
+					}
+				};
 			},
 			'POST /api/v1/clients': async (request) => {
 				seenOrgHeaders.push(request.headers.get('x-org-id') ?? '');
@@ -96,6 +114,11 @@ describe('ClientsPage integration', () => {
 
 		await expect.element(page.getByRole('link', { name: 'Northwind' })).toBeInTheDocument();
 		expect(seenOrgHeaders[0]).toBe(ORG_A);
+
+		const personLink = page.getByRole('link', { name: 'Ava Chen' });
+		await expect
+			.element(personLink)
+			.toHaveAttribute('href', '/contacts/22222222-3333-4444-8555-666666666666');
 
 		await page.getByRole('button', { name: 'New client' }).click();
 		await page.getByLabelText('Name').fill('Adventure Works');

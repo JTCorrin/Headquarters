@@ -34,14 +34,16 @@
 	async function handleSubmit(): Promise<boolean> {
 		formError = null;
 		const data = get(credentialsForm.form);
+		const destination = next;
 		const result = await auth.signIn(data.email, data.password);
 		if (result.error) {
 			formError = result.error;
 			return false;
 		}
-		// `next` is runtime data, but safeNextPath has restricted it to this origin.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		void goto(next);
+		// Superforms SPA submit can ignore layout `goto` until this callback returns
+		// (signup navigates here for the same reason). Overlay still hides this page
+		// so it cannot stack under org setup; replaceState avoids a login history entry.
+		await goto(resolve(destination as '/'), { replaceState: true });
 		return true;
 	}
 </script>

@@ -6,6 +6,12 @@ import type {
 } from '$lib/components/crm/entity-documents.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
+export const storyViewport = {
+	mobile: { viewport: { value: 'mobile', isRotated: false } },
+	tablet: { viewport: { value: 'tablet', isRotated: false } },
+	desktop: { viewport: { value: 'desktop', isRotated: false } }
+};
+
 export function navGroupsWithActive(
 	activeLabel: string,
 	role: 'owner' | 'admin' | 'member' | 'billing' | 'readonly' = 'owner'
@@ -238,7 +244,9 @@ export const sampleEmailMessages: EmailMessage[] = [
 	{
 		id: 'e1',
 		direction: 'in',
-		from: 'ava@northwind.com',
+		from: 'Ava Chen',
+		fromAddress: 'ava@northwind.com',
+		fromName: 'Ava Chen',
 		to: 'joe@acme.org',
 		subject: 'Re: Q2 retainer kickoff',
 		preview: 'Thanks — can we move the kickoff to Thursday morning?',
@@ -250,6 +258,8 @@ export const sampleEmailMessages: EmailMessage[] = [
 		id: 'e2',
 		direction: 'out',
 		from: 'joe@acme.org',
+		fromAddress: 'joe@acme.org',
+		fromName: null,
 		to: 'ava@northwind.com',
 		subject: 'Q2 retainer kickoff',
 		preview: 'Sharing the kickoff pack and next steps for the retainer.',
@@ -260,6 +270,8 @@ export const sampleEmailMessages: EmailMessage[] = [
 		id: 'e3',
 		direction: 'in',
 		from: 'billing@northwind.com',
+		fromAddress: 'billing@northwind.com',
+		fromName: null,
 		to: 'joe@acme.org',
 		subject: 'Invoice #881 payment confirmation',
 		preview: 'Payment of £4,200 received. Receipt attached.',

@@ -76,11 +76,11 @@ export interface RecurringInvoiceListItem {
 export interface RecurringInvoiceClientOption {
 	id: string;
 	name: string;
+	taxExempt?: boolean;
 }
 
 export type RecurringInvoiceContactOption = DocumentContactOption;
 
-/** Run history row for detail page. */
 export interface RecurringInvoiceRunListItem {
 	id: string;
 	scheduledFor: string;
@@ -90,4 +90,20 @@ export interface RecurringInvoiceRunListItem {
 	periodEnd: string;
 	invoiceId: string | null;
 	invoiceNumber: string | null;
+	errorMessage?: string | null;
+}
+
+export function formatRecurringRunStatus(status: string): string {
+	switch (status) {
+		case 'delivery_pending':
+			return 'Delivery pending';
+		case 'delivery_failed':
+			return 'Delivery failed';
+		case 'delivery_unknown':
+			return 'Delivery unknown';
+		case 'generation_failed':
+			return 'Generation failed';
+		default:
+			return status.replaceAll('_', ' ');
+	}
 }

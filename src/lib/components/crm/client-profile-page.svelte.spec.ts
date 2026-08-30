@@ -19,17 +19,16 @@ describe('ClientProfilePage actions', () => {
 			showNav: false
 		});
 
-		await expect.element(page.getByRole('tab', { name: 'Details' })).toHaveAttribute(
-			'data-state',
-			'active'
-		);
+		await expect
+			.element(page.getByRole('tab', { name: 'Details' }))
+			.toHaveAttribute('data-state', 'active');
 
 		await page.getByTestId('client-email-action').click();
 
-		await expect.element(page.getByRole('tab', { name: 'Email' })).toHaveAttribute(
-			'data-state',
-			'active'
-		);
+		await expect
+			.element(page.getByRole('tab', { name: 'Email' }))
+			.toHaveAttribute('data-state', 'active');
+		await expect.element(page.getByTestId('email-compose-to')).toBeInTheDocument();
 	});
 
 	it('links New quote to quotes create with this client preselected', async () => {
@@ -45,14 +44,11 @@ describe('ClientProfilePage actions', () => {
 		});
 
 		const link = page.getByTestId('client-new-quote-action');
-		await expect.element(link).toHaveAttribute(
-			'href',
-			`/quotes?client_id=${CLIENT_ID}&new=1`
-		);
+		await expect.element(link).toHaveAttribute('href', `/quotes?client_id=${CLIENT_ID}&new=1`);
 	});
 
-	it('invokes onNewQuote when provided instead of using href', async () => {
-		const onNewQuote = vi.fn();
+	it('links related contacts from the Details tab', async () => {
+		const CONTACT_ID = '22222222-3333-4444-8555-666666666666';
 		render(ClientProfilePage, {
 			orgName: 'Corrin Data',
 			navGroups: navGroupsWithActive('Clients'),
@@ -61,11 +57,19 @@ describe('ClientProfilePage actions', () => {
 			status: 'Active',
 			companyFields: [{ label: 'Industry', value: 'Logistics' }],
 			clientId: CLIENT_ID,
-			onNewQuote,
+			relatedContacts: [
+				{
+					id: CONTACT_ID,
+					name: 'Ava Chen',
+					role: 'Primary',
+					email: 'ava@northwind.com'
+				}
+			],
 			showNav: false
 		});
 
-		await page.getByTestId('client-new-quote-action').click();
-		expect(onNewQuote).toHaveBeenCalledOnce();
+		const link = page.getByRole('link', { name: 'Ava Chen' });
+		await expect.element(link).toHaveAttribute('href', `/contacts/${CONTACT_ID}`);
+		await expect.element(page.getByText('ava@northwind.com')).toBeInTheDocument();
 	});
 });
