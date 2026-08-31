@@ -131,7 +131,14 @@ export function createAuthSession(options: CreateAuthSessionOptions): AuthSessio
 		},
 		async signIn(email, password) {
 			if (!client) return { error: 'Auth is not configured' };
-			const { error } = await client.auth.signInWithPassword({ email, password });
+			const { data, error } = await client.auth.signInWithPassword({ email, password });
+			// Apply the grant immediately so layout gates see a session even if
+			// onAuthStateChange is delivered on a later microtask.
+			if (!error && data.session) {
+				lastAuthEvent = 'SIGNED_IN';
+				session = data.session;
+				ready = true;
+			}
 			return { error: error ? authErrorMessage(error, 'Could not sign in') : null };
 		},
 		async signInWithOAuth(provider, redirectTo) {

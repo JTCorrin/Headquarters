@@ -9,7 +9,7 @@ function mockClient() {
 			data: { subscription: { unsubscribe: vi.fn() } }
 		}),
 		signUp: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-		signInWithPassword: vi.fn().mockResolvedValue({ error: null }),
+		signInWithPassword: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
 		signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
 		signInWithSSO: vi.fn().mockResolvedValue({ error: null }),
 		resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
@@ -141,6 +141,23 @@ describe('auth session', () => {
 
 		expect(session.accessToken).toBe('validated-token');
 		expect(session.user?.id).toBe('user-1');
+		expect(session.ready).toBe(true);
+	});
+
+	it('applies the password grant session before onAuthStateChange', async () => {
+		const { auth, client } = mockClient();
+		const granted = {
+			access_token: 'grant-token',
+			user: { id: 'user-1' }
+		} as Session;
+		auth.signInWithPassword.mockResolvedValue({ data: { session: granted }, error: null });
+		const session = createAuthSession({ client, initialSession: null });
+
+		await expect(session.signIn('person@example.test', 'long-password')).resolves.toEqual({
+			error: null
+		});
+		expect(session.accessToken).toBe('grant-token');
+		expect(session.lastAuthEvent).toBe('SIGNED_IN');
 		expect(session.ready).toBe(true);
 	});
 
