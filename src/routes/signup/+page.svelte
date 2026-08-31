@@ -171,11 +171,14 @@
 			const query = `email=${encodeURIComponent(data.email)}${
 				next === '/' ? '' : `&next=${encodeURIComponent(next)}`
 			}`;
+			// Stays in the auth-public flow; soft goto is fine for check-email.
 			await goto(resolve(`/check-email?${query}`), { replaceState: true });
 			return true;
 		}
 		const destination = next === '/' ? '/onboarding/create-org' : next;
-		await goto(resolve(destination as '/'), { replaceState: true });
+		// Soft goto raced AuthSessionLayout's overlay and left signup stacked under the
+		// app until refresh. Full assign (like logout) remounts cleanly.
+		window.location.assign(resolve(destination as '/'));
 		return true;
 	}
 </script>
