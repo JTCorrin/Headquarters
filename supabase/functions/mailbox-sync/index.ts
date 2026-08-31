@@ -14,17 +14,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const auth = authorizeCronRequest(req, {
-    envSecret: Deno.env.get("MAILBOX_SYNC_SECRET"),
-    headerName: "x-mailbox-sync-secret",
-    missingConfigLog: "MAILBOX_SYNC_SECRET is not configured; refusing to run",
-  });
-  if (!auth.ok) {
-    return new Response(JSON.stringify({ error: auth.error }), {
-      status: auth.status,
-    });
-  }
-
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) {
@@ -36,6 +25,36 @@ Deno.serve(async (req) => {
   const service = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const auth = authorizeCronRequest(req, {
+    envSecret: Deno.env.get("MAILBOX_SYNC_SECRET"),
+    headerName: "x-mailbox-sync-secret",
+    serviceRoleKey: key,
+    missingConfigLog:
+      "MAILBOX_SYNC_SECRET and SUPABASE_SERVICE_ROLE_KEY are unset; refusing to run",
+  });
+  if (!auth.ok) {
+    // Hosted pg_cron sends the vault secret; accept when RPC confirms it.
+    const supplied = req.headers.get("x-mailbox-sync-secret")?.trim() ?? "";
+    let vaultOk = false;
+    if (supplied) {
+      const { data, error } = await service.rpc("verify_mailbox_sync_secret", {
+        p_supplied: supplied,
+      });
+      if (error) {
+        console.error("verify_mailbox_sync_secret failed", {
+          code: error.code,
+        });
+      } else {
+        vaultOk = data === true;
+      }
+    }
+    if (!vaultOk) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+      });
+    }
+  }
 
   const { data, error } = await service.rpc("list_mailboxes_due_for_sync", {
     p_limit: 20,

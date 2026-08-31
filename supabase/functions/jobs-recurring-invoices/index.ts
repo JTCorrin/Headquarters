@@ -262,8 +262,9 @@ Deno.serve(async (req) => {
   const auth = authorizeCronRequest(req, {
     envSecret: Deno.env.get("RECURRING_INVOICES_CRON_SECRET"),
     headerName: "x-recurring-invoices-cron-secret",
+    serviceRoleKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
     missingConfigLog:
-      "RECURRING_INVOICES_CRON_SECRET is not configured; refusing to run",
+      "RECURRING_INVOICES_CRON_SECRET and SUPABASE_SERVICE_ROLE_KEY are unset; refusing to run",
   });
   if (!auth.ok) {
     return new Response(JSON.stringify({ error: auth.error }), {
