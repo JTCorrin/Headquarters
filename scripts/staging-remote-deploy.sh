@@ -156,7 +156,28 @@ MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 
+# hosted_subscriptions was renamed 20260829190000 → 20260829175735 so the
+# filename matches the version id production recorded via MCP. Staging DBs that
+# applied the old filename still list 20260829190000 in schema_migrations, which
+# makes `migration up` / `supabase start` fail with "Remote migration versions
+# not found in local migrations directory".
+repair_renamed_hosted_subscriptions_migration() {
+	# Works when the local DB is reachable (full stack up, or DB container only).
+	local list
+	list="$(supabase migration list --local 2>/dev/null || true)"
+	if ! printf '%s\n' "$list" | grep -Eq '(^|[[:space:]])20260829190000([[:space:]]|$)'; then
+		return 0
+	fi
+	log "repairing renamed migration 20260829190000 → 20260829175735"
+	supabase migration repair --local --status reverted 20260829190000
+	if ! printf '%s\n' "$list" | grep -Eq '(^|[[:space:]])20260829175735([[:space:]]|$)'; then
+		# Identical SQL already applied under the old version id — do not re-run.
+		supabase migration repair --local --status applied 20260829175735
+	fi
+}
+
 log "starting Supabase (migrations apply on first start)"
+repair_renamed_hosted_subscriptions_migration
 if supabase status >/dev/null 2>&1; then
 	# Already running — apply any new migrations from this SHA (do not wipe data).
 	supabase migration up
@@ -177,7 +198,11 @@ if supabase status >/dev/null 2>&1; then
 		fi
 	fi
 else
-	supabase start
+	if ! supabase start; then
+		# Persistent volumes can still carry the renamed version id; repair and retry.
+		repair_renamed_hosted_subscriptions_migration
+		supabase start
+	fi
 fi
 
 status_json="$(supabase status -o json)"
