@@ -1,1435 +1,1428 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../_shared/database.ts";
-import { handleClients } from "./clients.ts";
-import { handleContacts } from "./contacts.ts";
-import { ApiError, errorResponse, jsonResponse, parseUuid } from "./http.ts";
-import { handleInvoices } from "./invoices.ts";
-import { handleLeads } from "./leads.ts";
-import { handleMeetings } from "./meetings.ts";
-import { handlePayments } from "./payments.ts";
-import { handleProductCategories } from "./product-categories.ts";
-import { handleProducts } from "./products.ts";
-import { handleProjects } from "./projects.ts";
-import { handleQuotes } from "./quotes.ts";
-import { handleTasks } from "./tasks.ts";
-import { handleTimelineEvents } from "./timeline-events.ts";
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../_shared/database.ts'
+import { handleClients } from './clients.ts'
+import { handleContacts } from './contacts.ts'
+import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import { handleInvoices } from './invoices.ts'
+import { handleLeads } from './leads.ts'
+import { handleMeetings } from './meetings.ts'
+import { handlePayments } from './payments.ts'
+import { handleProductCategories } from './product-categories.ts'
+import { handleProducts } from './products.ts'
+import { handleProjects } from './projects.ts'
+import { handleQuotes } from './quotes.ts'
+import { handleTasks } from './tasks.ts'
+import { handleTimelineEvents } from './timeline-events.ts'
 
-type MembershipRole =
-  Database["public"]["Tables"]["memberships"]["Row"]["role"];
+type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
 export type McpAuth = {
-  db: SupabaseClient<Database>;
-  userId: string | null;
-  membership: { id: string; role: MembershipRole };
-  orgId: string;
-  actorType: "api_key";
-  apiKeyId: string;
-};
+  db: SupabaseClient<Database>
+  userId: string | null
+  membership: { id: string; role: MembershipRole }
+  orgId: string
+  actorType: 'api_key'
+  apiKeyId: string
+}
 
-type JsonRpcId = string | number | null;
+type JsonRpcId = string | number | null
 
 type JsonRpcRequest = {
-  jsonrpc?: string;
-  id?: JsonRpcId;
-  method?: string;
-  params?: unknown;
-};
+  jsonrpc?: string
+  id?: JsonRpcId
+  method?: string
+  params?: unknown
+}
 
 type ToolDef = {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-};
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+}
 
 const SERVER_INFO = {
-  name: "headquarters-crm",
-  version: "1.0.0",
-};
+  name: 'headquarters-crm',
+  version: '1.0.0',
+}
 
-const PROTOCOL_VERSION = "2025-03-26";
+const PROTOCOL_VERSION = '2025-03-26'
 
 const TOOLS: ToolDef[] = [
   {
-    name: "list_contacts",
-    description: "List contacts in the organisation pinned to the API key.",
+    name: 'list_contacts',
+    description: 'List contacts in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        lifecycle_status: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        lifecycle_status: { type: 'string' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_contact",
-    description: "Get a contact by id.",
+    name: 'get_contact',
+    description: 'Get a contact by id.',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_contact",
-    description: "Create a contact (same validation as POST /api/v1/contacts).",
+    name: 'create_contact',
+    description: 'Create a contact (same validation as POST /api/v1/contacts).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        display_name: { type: "string" },
-        first_name: { type: ["string", "null"] },
-        last_name: { type: ["string", "null"] },
-        primary_email: { type: ["string", "null"] },
-        primary_phone: { type: ["string", "null"] },
-        job_title: { type: ["string", "null"] },
-        company_name: { type: ["string", "null"] },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
+        display_name: { type: 'string' },
+        first_name: { type: ['string', 'null'] },
+        last_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        primary_phone: { type: ['string', 'null'] },
+        job_title: { type: ['string', 'null'] },
+        company_name: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
         lifecycle_status: {
-          type: "string",
-          enum: ["active", "inactive", "archived"],
+          type: 'string',
+          enum: ['active', 'inactive', 'archived'],
         },
-        source: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
-        client_id: { type: ["string", "null"], format: "uuid" },
+        source: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
       },
-      required: ["display_name"],
+      required: ['display_name'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_contact",
+    name: 'update_contact',
     description:
-      "Update a contact (same validation as PATCH /api/v1/contacts/{id}). Requires version for If-Match.",
+      'Update a contact (same validation as PATCH /api/v1/contacts/{id}). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        display_name: { type: "string" },
-        first_name: { type: ["string", "null"] },
-        last_name: { type: ["string", "null"] },
-        primary_email: { type: ["string", "null"] },
-        primary_phone: { type: ["string", "null"] },
-        job_title: { type: ["string", "null"] },
-        company_name: { type: ["string", "null"] },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        display_name: { type: 'string' },
+        first_name: { type: ['string', 'null'] },
+        last_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        primary_phone: { type: ['string', 'null'] },
+        job_title: { type: ['string', 'null'] },
+        company_name: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
         lifecycle_status: {
-          type: "string",
-          enum: ["active", "inactive", "archived"],
+          type: 'string',
+          enum: ['active', 'inactive', 'archived'],
         },
-        source: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
-        client_id: { type: ["string", "null"], format: "uuid" },
+        source: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_clients",
-    description: "List clients in the organisation pinned to the API key.",
+    name: 'list_clients',
+    description: 'List clients in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        status: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_client",
-    description: "Get a client by id.",
+    name: 'get_client',
+    description: 'Get a client by id.',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_client",
-    description: "Create a client (same validation as POST /api/v1/clients).",
+    name: 'create_client',
+    description: 'Create a client (same validation as POST /api/v1/clients).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        name: { type: "string" },
+        name: { type: 'string' },
         status: {
-          type: "string",
-          enum: ["prospect", "active", "on_hold", "inactive", "archived"],
+          type: 'string',
+          enum: ['prospect', 'active', 'on_hold', 'inactive', 'archived'],
         },
-        website_url: { type: ["string", "null"] },
-        industry: { type: ["string", "null"] },
-        primary_email: { type: ["string", "null"] },
-        phone: { type: ["string", "null"] },
-        tax_identifier: { type: ["string", "null"] },
-        tax_exempt: { type: "boolean" },
-        email_domain: { type: ["string", "null"] },
-        registration_number: { type: ["string", "null"] },
-        default_currency: { type: ["string", "null"] },
-        payment_terms_days: { type: ["integer", "null"], minimum: 0 },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        renewal_on: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
+        website_url: { type: ['string', 'null'] },
+        industry: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        phone: { type: ['string', 'null'] },
+        tax_identifier: { type: ['string', 'null'] },
+        tax_exempt: { type: 'boolean' },
+        email_domain: { type: ['string', 'null'] },
+        registration_number: { type: ['string', 'null'] },
+        default_currency: { type: ['string', 'null'] },
+        payment_terms_days: { type: ['integer', 'null'], minimum: 0 },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        renewal_on: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
       },
-      required: ["name"],
+      required: ['name'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_client",
+    name: 'update_client',
     description:
-      "Update a client (same validation as PATCH /api/v1/clients/{id}). Requires version for If-Match.",
+      'Update a client (same validation as PATCH /api/v1/clients/{id}). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        name: { type: "string" },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string' },
         status: {
-          type: "string",
-          enum: ["prospect", "active", "on_hold", "inactive", "archived"],
+          type: 'string',
+          enum: ['prospect', 'active', 'on_hold', 'inactive', 'archived'],
         },
-        website_url: { type: ["string", "null"] },
-        industry: { type: ["string", "null"] },
-        primary_email: { type: ["string", "null"] },
-        phone: { type: ["string", "null"] },
-        tax_identifier: { type: ["string", "null"] },
-        tax_exempt: { type: "boolean" },
-        email_domain: { type: ["string", "null"] },
-        registration_number: { type: ["string", "null"] },
-        default_currency: { type: ["string", "null"] },
-        payment_terms_days: { type: ["integer", "null"], minimum: 0 },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        renewal_on: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
+        website_url: { type: ['string', 'null'] },
+        industry: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        phone: { type: ['string', 'null'] },
+        tax_identifier: { type: ['string', 'null'] },
+        tax_exempt: { type: 'boolean' },
+        email_domain: { type: ['string', 'null'] },
+        registration_number: { type: ['string', 'null'] },
+        default_currency: { type: ['string', 'null'] },
+        payment_terms_days: { type: ['integer', 'null'], minimum: 0 },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        renewal_on: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_leads",
-    description: "List leads in the organisation pinned to the API key.",
+    name: 'list_leads',
+    description: 'List leads in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        stage: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        stage: { type: 'string' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_lead",
-    description: "Get a lead by id.",
+    name: 'get_lead',
+    description: 'Get a lead by id.',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_lead",
-    description:
-      "Create a lead (same validation as POST /api/v1/leads). Not for convert/won.",
+    name: 'create_lead',
+    description: 'Create a lead (same validation as POST /api/v1/leads). Not for convert/won.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        name: { type: "string" },
-        company_name: { type: ["string", "null"] },
-        primary_email: { type: ["string", "null"] },
-        contact_id: { type: ["string", "null"], format: "uuid" },
-        client_id: { type: ["string", "null"], format: "uuid" },
+        name: { type: 'string' },
+        company_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
         stage: {
-          type: "string",
-          enum: ["new", "qualified", "proposal", "lost"],
+          type: 'string',
+          enum: ['new', 'qualified', 'proposal', 'lost'],
         },
-        value_cents: { type: ["integer", "null"], minimum: 0 },
-        currency: { type: "string" },
+        value_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
         probability_percent: {
-          type: ["integer", "null"],
+          type: ['integer', 'null'],
           minimum: 0,
           maximum: 100,
         },
-        source: { type: ["string", "null"] },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        expected_close_on: { type: ["string", "null"] },
-        lost_reason: { type: ["string", "null"] },
-        position: { type: "number" },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
+        source: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        expected_close_on: { type: ['string', 'null'] },
+        lost_reason: { type: ['string', 'null'] },
+        position: { type: 'number' },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
       },
-      required: ["name"],
+      required: ['name'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_lead",
+    name: 'update_lead',
     description:
-      "Update a lead (same validation as PATCH /api/v1/leads/{id}). Requires version for If-Match. Use HTTP convert to mark won.",
+      'Update a lead (same validation as PATCH /api/v1/leads/{id}). Requires version for If-Match. Use HTTP convert to mark won.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        name: { type: "string" },
-        company_name: { type: ["string", "null"] },
-        primary_email: { type: ["string", "null"] },
-        contact_id: { type: ["string", "null"], format: "uuid" },
-        client_id: { type: ["string", "null"], format: "uuid" },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string' },
+        company_name: { type: ['string', 'null'] },
+        primary_email: { type: ['string', 'null'] },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
         stage: {
-          type: "string",
-          enum: ["new", "qualified", "proposal", "lost"],
+          type: 'string',
+          enum: ['new', 'qualified', 'proposal', 'lost'],
         },
-        value_cents: { type: ["integer", "null"], minimum: 0 },
-        currency: { type: "string" },
+        value_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
         probability_percent: {
-          type: ["integer", "null"],
+          type: ['integer', 'null'],
           minimum: 0,
           maximum: 100,
         },
-        source: { type: ["string", "null"] },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        expected_close_on: { type: ["string", "null"] },
-        lost_reason: { type: ["string", "null"] },
-        position: { type: "number" },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
+        source: { type: ['string', 'null'] },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        expected_close_on: { type: ['string', 'null'] },
+        lost_reason: { type: ['string', 'null'] },
+        position: { type: 'number' },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_tasks",
-    description: "List tasks in the organisation pinned to the API key.",
+    name: 'list_tasks',
+    description: 'List tasks in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        status: { type: "string" },
-        assignee: { type: "string", enum: ["me"] },
-        entity_type: { type: "string" },
-        entity_id: { type: "string", format: "uuid" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string' },
+        assignee: { type: 'string', enum: ['me'] },
+        entity_type: { type: 'string' },
+        entity_id: { type: 'string', format: 'uuid' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_task",
-    description: "Get a task by id.",
+    name: 'get_task',
+    description: 'Get a task by id.',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_task",
+    name: 'create_task',
     description:
-      "Create a task assigned to an org membership (same validation as POST /api/v1/tasks). assignee_membership_id is required — MCP tasks cannot be unassigned.",
+      'Create a task assigned to an org membership (same validation as POST /api/v1/tasks). assignee_membership_id is required — MCP tasks cannot be unassigned.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        title: { type: "string" },
-        description: { type: "string" },
-        priority: { type: "string", enum: ["p1", "p2", "p3", "p4"] },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        priority: { type: 'string', enum: ['p1', 'p2', 'p3', 'p4'] },
         status: {
-          type: "string",
-          enum: ["open", "in_progress", "blocked", "done", "cancelled"],
+          type: 'string',
+          enum: ['open', 'in_progress', 'blocked', 'done', 'cancelled'],
         },
-        assignee_membership_id: { type: "string", format: "uuid" },
-        due_at: { type: ["string", "null"] },
+        assignee_membership_id: { type: 'string', format: 'uuid' },
+        due_at: { type: ['string', 'null'] },
         entity_type: {
-          type: ["string", "null"],
-          enum: ["contact", "lead", "client", "project", null],
+          type: ['string', 'null'],
+          enum: ['contact', 'lead', 'client', 'project', null],
         },
-        entity_id: { type: ["string", "null"], format: "uuid" },
+        entity_id: { type: ['string', 'null'], format: 'uuid' },
         source: {
-          type: "string",
-          enum: ["manual", "meeting", "email", "workflow", "agent"],
+          type: 'string',
+          enum: ['manual', 'meeting', 'email', 'workflow', 'agent'],
         },
       },
-      required: ["title", "assignee_membership_id"],
+      required: ['title', 'assignee_membership_id'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_task",
+    name: 'update_task',
     description:
-      "Update a task (same validation as PATCH /api/v1/tasks/{id}). Requires version for If-Match.",
+      'Update a task (same validation as PATCH /api/v1/tasks/{id}). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        title: { type: "string" },
-        description: { type: "string" },
-        priority: { type: "string", enum: ["p1", "p2", "p3", "p4"] },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        priority: { type: 'string', enum: ['p1', 'p2', 'p3', 'p4'] },
         status: {
-          type: "string",
-          enum: ["open", "in_progress", "blocked", "done", "cancelled"],
+          type: 'string',
+          enum: ['open', 'in_progress', 'blocked', 'done', 'cancelled'],
         },
-        assignee_membership_id: { type: ["string", "null"], format: "uuid" },
-        due_at: { type: ["string", "null"] },
+        assignee_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        due_at: { type: ['string', 'null'] },
         entity_type: {
-          type: ["string", "null"],
-          enum: ["contact", "lead", "client", "project", null],
+          type: ['string', 'null'],
+          enum: ['contact', 'lead', 'client', 'project', null],
         },
-        entity_id: { type: ["string", "null"], format: "uuid" },
-        blocked_reason: { type: ["string", "null"] },
+        entity_id: { type: ['string', 'null'], format: 'uuid' },
+        blocked_reason: { type: ['string', 'null'] },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "add_timeline_note",
-    description:
-      "Add a timeline note on a contact, lead, client, quote, invoice, or bill.",
+    name: 'add_timeline_note',
+    description: 'Add a timeline note on a contact, lead, client, quote, invoice, or bill.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
         entity_type: {
-          type: "string",
-          enum: ["contact", "lead", "client", "quote", "invoice", "bill"],
+          type: 'string',
+          enum: ['contact', 'lead', 'client', 'quote', 'invoice', 'bill'],
         },
-        entity_id: { type: "string", format: "uuid" },
-        title: { type: "string" },
-        body: { type: "string" },
+        entity_id: { type: 'string', format: 'uuid' },
+        title: { type: 'string' },
+        body: { type: 'string' },
         kind: {
-          type: "string",
+          type: 'string',
           enum: [
-            "note",
-            "email",
-            "call",
-            "payment",
-            "document",
-            "status",
-            "meeting",
-            "task",
+            'note',
+            'email',
+            'call',
+            'payment',
+            'document',
+            'status',
+            'meeting',
+            'task',
           ],
         },
-        payload: { type: "object" },
+        payload: { type: 'object' },
       },
-      required: ["entity_type", "entity_id", "title"],
+      required: ['entity_type', 'entity_id', 'title'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_projects",
-    description: "List projects in the organisation pinned to the API key.",
+    name: 'list_projects',
+    description: 'List projects in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        status: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_project",
-    description: "Get a project by id (includes columns/cards).",
+    name: 'get_project',
+    description: 'Get a project by id (includes columns/cards).',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_project",
+    name: 'create_project',
     description:
-      "Create a project with default board columns (same validation as POST /api/v1/projects). Omit client_id or pass null for an internal project.",
+      'Create a project with default board columns (same validation as POST /api/v1/projects). Omit client_id or pass null for an internal project.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        client_id: { type: ["string", "null"], format: "uuid" },
-        name: { type: "string" },
-        description: { type: ["string", "null"] },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        name: { type: 'string' },
+        description: { type: ['string', 'null'] },
         status: {
-          type: "string",
-          enum: ["planning", "active", "blocked", "done", "archived"],
+          type: 'string',
+          enum: ['planning', 'active', 'blocked', 'done', 'archived'],
         },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        starts_on: { type: ["string", "null"] },
-        due_on: { type: ["string", "null"] },
-        completed_at: { type: ["string", "null"] },
-        position: { type: "number" },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        starts_on: { type: ['string', 'null'] },
+        due_on: { type: ['string', 'null'] },
+        completed_at: { type: ['string', 'null'] },
+        position: { type: 'number' },
       },
-      required: ["name"],
+      required: ['name'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_project",
+    name: 'update_project',
     description:
-      "Update a project (same validation as PATCH /api/v1/projects/{id}). Requires version for If-Match. Pass client_id null to mark the project internal.",
+      'Update a project (same validation as PATCH /api/v1/projects/{id}). Requires version for If-Match. Pass client_id null to mark the project internal.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        client_id: { type: ["string", "null"], format: "uuid" },
-        name: { type: "string" },
-        description: { type: ["string", "null"] },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        name: { type: 'string' },
+        description: { type: ['string', 'null'] },
         status: {
-          type: "string",
-          enum: ["planning", "active", "blocked", "done", "archived"],
+          type: 'string',
+          enum: ['planning', 'active', 'blocked', 'done', 'archived'],
         },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        starts_on: { type: ["string", "null"] },
-        due_on: { type: ["string", "null"] },
-        completed_at: { type: ["string", "null"] },
-        position: { type: "number" },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        starts_on: { type: ['string', 'null'] },
+        due_on: { type: ['string', 'null'] },
+        completed_at: { type: ['string', 'null'] },
+        position: { type: 'number' },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_card",
+    name: 'create_card',
     description:
-      "Create a project board card (same validation as POST /api/v1/projects/{project_id}/cards). column_id is required — call get_project first to read column UUIDs. MCP cards cannot omit column_id (HTTP may still default to backlog).",
+      'Create a project board card (same validation as POST /api/v1/projects/{project_id}/cards). column_id is required — call get_project first to read column UUIDs. MCP cards cannot omit column_id (HTTP may still default to backlog).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        project_id: { type: "string", format: "uuid" },
-        column_id: { type: "string", format: "uuid" },
-        title: { type: "string" },
-        description: { type: ["string", "null"] },
-        assignee_membership_id: { type: ["string", "null"], format: "uuid" },
-        due_at: { type: ["string", "null"] },
+        project_id: { type: 'string', format: 'uuid' },
+        column_id: { type: 'string', format: 'uuid' },
+        title: { type: 'string' },
+        description: { type: ['string', 'null'] },
+        assignee_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        due_at: { type: ['string', 'null'] },
       },
-      required: ["project_id", "column_id", "title"],
+      required: ['project_id', 'column_id', 'title'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_card",
+    name: 'update_card',
     description:
-      "Update a project board card (same validation as PATCH /api/v1/projects/{project_id}/cards/{id}). Requires version for If-Match. Move between columns with column_id and optional position.",
+      'Update a project board card (same validation as PATCH /api/v1/projects/{project_id}/cards/{id}). Requires version for If-Match. Move between columns with column_id and optional position.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        project_id: { type: "string", format: "uuid" },
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        title: { type: "string" },
-        description: { type: ["string", "null"] },
-        assignee_membership_id: { type: ["string", "null"], format: "uuid" },
-        due_at: { type: ["string", "null"] },
-        column_id: { type: "string", format: "uuid" },
-        position: { type: "number" },
-        completed_at: { type: ["string", "null"] },
+        project_id: { type: 'string', format: 'uuid' },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        title: { type: 'string' },
+        description: { type: ['string', 'null'] },
+        assignee_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        due_at: { type: ['string', 'null'] },
+        column_id: { type: 'string', format: 'uuid' },
+        position: { type: 'number' },
+        completed_at: { type: ['string', 'null'] },
       },
-      required: ["project_id", "id", "version"],
+      required: ['project_id', 'id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "delete_card",
+    name: 'delete_card',
     description:
-      "Soft-delete a project board card (same as DELETE /api/v1/projects/{project_id}/cards/{id}). Requires version for If-Match.",
+      'Soft-delete a project board card (same as DELETE /api/v1/projects/{project_id}/cards/{id}). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        project_id: { type: "string", format: "uuid" },
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
+        project_id: { type: 'string', format: 'uuid' },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
       },
-      required: ["project_id", "id", "version"],
+      required: ['project_id', 'id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_meetings",
-    description: "List meetings in the organisation pinned to the API key.",
+    name: 'list_meetings',
+    description: 'List meetings in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        status: { type: "string" },
-        upcoming: { type: "boolean" },
-        starts_after: { type: "string" },
-        starts_before: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string' },
+        upcoming: { type: 'boolean' },
+        starts_after: { type: 'string' },
+        starts_before: { type: 'string' },
         entity_type: {
-          type: "string",
-          enum: ["client", "contact", "lead", "project"],
+          type: 'string',
+          enum: ['client', 'contact', 'lead', 'project'],
         },
-        entity_id: { type: "string", format: "uuid" },
+        entity_id: { type: 'string', format: 'uuid' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_meeting",
-    description:
-      "Get a meeting by id (includes attendees/transcript/proposals).",
+    name: 'get_meeting',
+    description: 'Get a meeting by id (includes attendees/transcript/proposals).',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_meeting",
-    description: "Create a meeting (same validation as POST /api/v1/meetings).",
+    name: 'create_meeting',
+    description: 'Create a meeting (same validation as POST /api/v1/meetings).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        title: { type: "string" },
+        title: { type: 'string' },
         status: {
-          type: "string",
-          enum: ["scheduled", "in_progress", "completed", "cancelled"],
+          type: 'string',
+          enum: ['scheduled', 'in_progress', 'completed', 'cancelled'],
         },
-        starts_at: { type: "string" },
-        ends_at: { type: "string" },
-        timezone: { type: "string" },
-        location: { type: ["string", "null"] },
-        meeting_url: { type: ["string", "null"] },
-        organiser_membership_id: { type: ["string", "null"], format: "uuid" },
+        starts_at: { type: 'string' },
+        ends_at: { type: 'string' },
+        timezone: { type: 'string' },
+        location: { type: ['string', 'null'] },
+        meeting_url: { type: ['string', 'null'] },
+        organiser_membership_id: { type: ['string', 'null'], format: 'uuid' },
         related_entity_type: {
-          type: ["string", "null"],
-          enum: ["client", "contact", "lead", "project", null],
+          type: ['string', 'null'],
+          enum: ['client', 'contact', 'lead', 'project', null],
         },
-        related_entity_id: { type: ["string", "null"], format: "uuid" },
-        metadata: { type: "object" },
+        related_entity_id: { type: ['string', 'null'], format: 'uuid' },
+        metadata: { type: 'object' },
         attendees: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              email: { type: "string" },
-              name: { type: ["string", "null"] },
-              contact_id: { type: ["string", "null"], format: "uuid" },
-              membership_id: { type: ["string", "null"], format: "uuid" },
-              organiser: { type: "boolean" },
+              email: { type: 'string' },
+              name: { type: ['string', 'null'] },
+              contact_id: { type: ['string', 'null'], format: 'uuid' },
+              membership_id: { type: ['string', 'null'], format: 'uuid' },
+              organiser: { type: 'boolean' },
               response_status: {
-                type: ["string", "null"],
+                type: ['string', 'null'],
                 enum: [
-                  "needs_action",
-                  "accepted",
-                  "declined",
-                  "tentative",
+                  'needs_action',
+                  'accepted',
+                  'declined',
+                  'tentative',
                   null,
                 ],
               },
-              attended: { type: ["boolean", "null"] },
+              attended: { type: ['boolean', 'null'] },
             },
-            required: ["email"],
+            required: ['email'],
             additionalProperties: false,
           },
         },
       },
-      required: ["title", "starts_at", "ends_at"],
+      required: ['title', 'starts_at', 'ends_at'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_meeting",
+    name: 'update_meeting',
     description:
-      "Update a meeting (same validation as PATCH /api/v1/meetings/{id}). Requires version for If-Match.",
+      'Update a meeting (same validation as PATCH /api/v1/meetings/{id}). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        title: { type: "string" },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        title: { type: 'string' },
         status: {
-          type: "string",
-          enum: ["scheduled", "in_progress", "completed", "cancelled"],
+          type: 'string',
+          enum: ['scheduled', 'in_progress', 'completed', 'cancelled'],
         },
-        starts_at: { type: "string" },
-        ends_at: { type: "string" },
-        timezone: { type: "string" },
-        location: { type: ["string", "null"] },
-        meeting_url: { type: ["string", "null"] },
-        organiser_membership_id: { type: ["string", "null"], format: "uuid" },
+        starts_at: { type: 'string' },
+        ends_at: { type: 'string' },
+        timezone: { type: 'string' },
+        location: { type: ['string', 'null'] },
+        meeting_url: { type: ['string', 'null'] },
+        organiser_membership_id: { type: ['string', 'null'], format: 'uuid' },
         related_entity_type: {
-          type: ["string", "null"],
-          enum: ["client", "contact", "lead", "project", null],
+          type: ['string', 'null'],
+          enum: ['client', 'contact', 'lead', 'project', null],
         },
-        related_entity_id: { type: ["string", "null"], format: "uuid" },
-        metadata: { type: "object" },
+        related_entity_id: { type: ['string', 'null'], format: 'uuid' },
+        metadata: { type: 'object' },
         attendees: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              email: { type: "string" },
-              name: { type: ["string", "null"] },
-              contact_id: { type: ["string", "null"], format: "uuid" },
-              membership_id: { type: ["string", "null"], format: "uuid" },
-              organiser: { type: "boolean" },
+              email: { type: 'string' },
+              name: { type: ['string', 'null'] },
+              contact_id: { type: ['string', 'null'], format: 'uuid' },
+              membership_id: { type: ['string', 'null'], format: 'uuid' },
+              organiser: { type: 'boolean' },
               response_status: {
-                type: ["string", "null"],
+                type: ['string', 'null'],
                 enum: [
-                  "needs_action",
-                  "accepted",
-                  "declined",
-                  "tentative",
+                  'needs_action',
+                  'accepted',
+                  'declined',
+                  'tentative',
                   null,
                 ],
               },
-              attended: { type: ["boolean", "null"] },
+              attended: { type: ['boolean', 'null'] },
             },
-            required: ["email"],
+            required: ['email'],
             additionalProperties: false,
           },
         },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_quotes",
-    description: "List quotes in the organisation pinned to the API key.",
+    name: 'list_quotes',
+    description: 'List quotes in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
         status: {
-          type: "string",
-          enum: ["draft", "sent", "accepted", "rejected", "expired", "void"],
+          type: 'string',
+          enum: ['draft', 'sent', 'accepted', 'rejected', 'expired', 'void'],
         },
-        client_id: { type: "string", format: "uuid" },
+        client_id: { type: 'string', format: 'uuid' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_quote",
-    description: "Get a quote document by id (header + lines).",
+    name: 'get_quote',
+    description: 'Get a quote document by id (header + lines).',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_quote",
+    name: 'create_quote',
     description:
-      "Create a draft quote (same validation as POST /api/v1/quotes). Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated. Use send_quote / accept_quote / reject_quote for lifecycle transitions.",
+      'Create a draft quote (same validation as POST /api/v1/quotes). Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated. Use send_quote / accept_quote / reject_quote for lifecycle transitions.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        title: { type: "string" },
-        client_id: { type: ["string", "null"], format: "uuid" },
-        lead_id: { type: ["string", "null"], format: "uuid" },
-        contact_id: { type: ["string", "null"], format: "uuid" },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        currency: { type: "string" },
-        issue_on: { type: "string" },
-        valid_until: { type: ["string", "null"] },
-        discount_cents: { type: "integer", minimum: 0 },
-        terms: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        internal_notes: { type: ["string", "null"] },
+        title: { type: 'string' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        lead_id: { type: ['string', 'null'], format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        valid_until: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
         lines: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              product_id: { type: ["string", "null"], format: "uuid" },
-              description: { type: "string" },
-              quantity: { type: "number" },
-              unit_price_cents: { type: "integer" },
-              discount_percent: { type: "number" },
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
               tax_rate_percent: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Omit to inherit product tax rate, else org default. Send 0 for zero-rated.",
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
               },
-              position: { type: "number" },
+              position: { type: 'number' },
             },
             additionalProperties: false,
           },
         },
       },
-      required: ["title"],
+      required: ['title'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_quote",
+    name: 'update_quote',
     description:
-      "Update a draft quote (same validation as PATCH /api/v1/quotes/{id}). Requires version for If-Match. Drafts only. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated.",
+      'Update a draft quote (same validation as PATCH /api/v1/quotes/{id}). Requires version for If-Match. Drafts only. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        title: { type: "string" },
-        client_id: { type: ["string", "null"], format: "uuid" },
-        lead_id: { type: ["string", "null"], format: "uuid" },
-        contact_id: { type: ["string", "null"], format: "uuid" },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        currency: { type: "string" },
-        issue_on: { type: "string" },
-        valid_until: { type: ["string", "null"] },
-        discount_cents: { type: "integer", minimum: 0 },
-        terms: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        internal_notes: { type: ["string", "null"] },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        title: { type: 'string' },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        lead_id: { type: ['string', 'null'], format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        valid_until: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
         lines: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              product_id: { type: ["string", "null"], format: "uuid" },
-              description: { type: "string" },
-              quantity: { type: "number" },
-              unit_price_cents: { type: "integer" },
-              discount_percent: { type: "number" },
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
               tax_rate_percent: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Omit to inherit product tax rate, else org default. Send 0 for zero-rated.",
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
               },
-              position: { type: "number" },
+              position: { type: 'number' },
             },
             additionalProperties: false,
           },
         },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "send_quote",
+    name: 'send_quote',
     description:
-      "Mark a draft quote as sent (POST /api/v1/quotes/{id}/send). Requires version for If-Match.",
+      'Mark a draft quote as sent (POST /api/v1/quotes/{id}/send). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "accept_quote",
+    name: 'accept_quote',
     description:
-      "Accept a sent quote (POST /api/v1/quotes/{id}/accept). Requires version for If-Match. Optional idempotency_key for safe retries.",
+      'Accept a sent quote (POST /api/v1/quotes/{id}/accept). Requires version for If-Match. Optional idempotency_key for safe retries.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "reject_quote",
+    name: 'reject_quote',
     description:
-      "Reject a sent quote (POST /api/v1/quotes/{id}/reject). Requires version for If-Match.",
+      'Reject a sent quote (POST /api/v1/quotes/{id}/reject). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_invoices",
-    description: "List invoices in the organisation pinned to the API key.",
+    name: 'list_invoices',
+    description: 'List invoices in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
         status: {
-          type: "string",
-          enum: ["draft", "sent", "partial", "paid", "void"],
+          type: 'string',
+          enum: ['draft', 'sent', 'partial', 'paid', 'void'],
         },
-        client_id: { type: "string", format: "uuid" },
+        client_id: { type: 'string', format: 'uuid' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_invoice",
-    description: "Get an invoice document by id (header + lines).",
+    name: 'get_invoice',
+    description: 'Get an invoice document by id (header + lines).',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_invoice",
+    name: 'create_invoice',
     description:
-      "Create a draft invoice (same validation as POST /api/v1/invoices). Optional number for migration; otherwise auto-allocated. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated. Use send_invoice / void_invoice / create_invoice_from_quote for lifecycle transitions.",
+      'Create a draft invoice (same validation as POST /api/v1/invoices). Optional number for migration; otherwise auto-allocated. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated. Use send_invoice / void_invoice / create_invoice_from_quote for lifecycle transitions.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        client_id: { type: "string", format: "uuid" },
-        number: { type: "string", minLength: 1, maxLength: 64 },
-        contact_id: { type: ["string", "null"], format: "uuid" },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        currency: { type: "string" },
-        issue_on: { type: "string" },
-        due_on: { type: ["string", "null"] },
-        purchase_order_number: { type: ["string", "null"] },
-        discount_cents: { type: "integer", minimum: 0 },
-        payment_terms: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        internal_notes: { type: ["string", "null"] },
+        client_id: { type: 'string', format: 'uuid' },
+        number: { type: 'string', minLength: 1, maxLength: 64 },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        due_on: { type: ['string', 'null'] },
+        purchase_order_number: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        payment_terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
         lines: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              product_id: { type: ["string", "null"], format: "uuid" },
-              description: { type: "string" },
-              quantity: { type: "number" },
-              unit_price_cents: { type: "integer" },
-              discount_percent: { type: "number" },
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
               tax_rate_percent: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Omit to inherit product tax rate, else org default. Send 0 for zero-rated.",
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
               },
-              position: { type: "number" },
+              position: { type: 'number' },
             },
             additionalProperties: false,
           },
         },
       },
-      required: ["client_id"],
+      required: ['client_id'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_invoice",
+    name: 'update_invoice',
     description:
-      "Update a draft invoice (same validation as PATCH /api/v1/invoices/{id}). Requires version for If-Match. Drafts only. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated.",
+      'Update a draft invoice (same validation as PATCH /api/v1/invoices/{id}). Requires version for If-Match. Drafts only. Line tax: omit tax_rate_percent to inherit product tax then org default; send 0 for zero-rated.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        client_id: { type: "string", format: "uuid" },
-        contact_id: { type: ["string", "null"], format: "uuid" },
-        owner_membership_id: { type: ["string", "null"], format: "uuid" },
-        currency: { type: "string" },
-        issue_on: { type: "string" },
-        due_on: { type: ["string", "null"] },
-        purchase_order_number: { type: ["string", "null"] },
-        discount_cents: { type: "integer", minimum: 0 },
-        payment_terms: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        internal_notes: { type: ["string", "null"] },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        client_id: { type: 'string', format: 'uuid' },
+        contact_id: { type: ['string', 'null'], format: 'uuid' },
+        owner_membership_id: { type: ['string', 'null'], format: 'uuid' },
+        currency: { type: 'string' },
+        issue_on: { type: 'string' },
+        due_on: { type: ['string', 'null'] },
+        purchase_order_number: { type: ['string', 'null'] },
+        discount_cents: { type: 'integer', minimum: 0 },
+        payment_terms: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        internal_notes: { type: ['string', 'null'] },
         lines: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              product_id: { type: ["string", "null"], format: "uuid" },
-              description: { type: "string" },
-              quantity: { type: "number" },
-              unit_price_cents: { type: "integer" },
-              discount_percent: { type: "number" },
+              product_id: { type: ['string', 'null'], format: 'uuid' },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit_price_cents: { type: 'integer' },
+              discount_percent: { type: 'number' },
               tax_rate_percent: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Omit to inherit product tax rate, else org default. Send 0 for zero-rated.",
+                  'Omit to inherit product tax rate, else org default. Send 0 for zero-rated.',
               },
-              position: { type: "number" },
+              position: { type: 'number' },
             },
             additionalProperties: false,
           },
         },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "send_invoice",
+    name: 'send_invoice',
     description:
-      "Mark a draft invoice as sent (POST /api/v1/invoices/{id}/send). Requires version for If-Match. Optional sent_at (ISO timestamptz) for migration; optional idempotency_key for safe retries.",
+      'Mark a draft invoice as sent (POST /api/v1/invoices/{id}/send). Requires version for If-Match. Optional sent_at (ISO timestamptz) for migration; optional idempotency_key for safe retries.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        sent_at: { type: "string" },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        sent_at: { type: 'string' },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "void_invoice",
+    name: 'void_invoice',
     description:
-      "Void an invoice (POST /api/v1/invoices/{id}/void). Requires version for If-Match and void_reason. Optional idempotency_key for safe retries.",
+      'Void an invoice (POST /api/v1/invoices/{id}/void). Requires version for If-Match and void_reason. Optional idempotency_key for safe retries.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        void_reason: { type: "string", minLength: 1, maxLength: 2000 },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        void_reason: { type: 'string', minLength: 1, maxLength: 2000 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["id", "version", "void_reason"],
+      required: ['id', 'version', 'void_reason'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_invoice_from_quote",
-    description:
-      "Create an invoice from an accepted quote (POST /api/v1/invoices/from-quote).",
+    name: 'create_invoice_from_quote',
+    description: 'Create an invoice from an accepted quote (POST /api/v1/invoices/from-quote).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        quote_id: { type: "string", format: "uuid" },
+        quote_id: { type: 'string', format: 'uuid' },
       },
-      required: ["quote_id"],
+      required: ['quote_id'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_payments",
-    description: "List payments in the organisation pinned to the API key.",
+    name: 'list_payments',
+    description: 'List payments in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        direction: { type: "string", enum: ["inbound", "outbound"] },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        direction: { type: 'string', enum: ['inbound', 'outbound'] },
         status: {
-          type: "string",
+          type: 'string',
           enum: [
-            "pending",
-            "completed",
-            "unallocated",
-            "part_allocated",
-            "allocated",
-            "refunded",
-            "reversed",
-            "failed",
+            'pending',
+            'completed',
+            'unallocated',
+            'part_allocated',
+            'allocated',
+            'refunded',
+            'reversed',
+            'failed',
           ],
         },
-        client_id: { type: "string", format: "uuid" },
-        vendor_id: { type: "string", format: "uuid" },
-        invoice_id: { type: "string", format: "uuid" },
-        bill_id: { type: "string", format: "uuid" },
+        client_id: { type: 'string', format: 'uuid' },
+        vendor_id: { type: 'string', format: 'uuid' },
+        invoice_id: { type: 'string', format: 'uuid' },
+        bill_id: { type: 'string', format: 'uuid' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_payment",
-    description: "Get a payment document by id (header + allocations).",
+    name: 'get_payment',
+    description: 'Get a payment document by id (header + allocations).',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_payment",
+    name: 'create_payment',
     description:
-      "Create a payment (POST /api/v1/payments). Optional allocations at create. Optional idempotency_key for safe retries.",
+      'Create a payment (POST /api/v1/payments). Optional allocations at create. Optional idempotency_key for safe retries.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        direction: { type: "string", enum: ["inbound", "outbound"] },
-        client_id: { type: ["string", "null"], format: "uuid" },
-        vendor_id: { type: ["string", "null"], format: "uuid" },
-        amount_cents: { type: "integer", minimum: 1 },
-        currency: { type: "string" },
+        direction: { type: 'string', enum: ['inbound', 'outbound'] },
+        client_id: { type: ['string', 'null'], format: 'uuid' },
+        vendor_id: { type: ['string', 'null'], format: 'uuid' },
+        amount_cents: { type: 'integer', minimum: 1 },
+        currency: { type: 'string' },
         method: {
-          type: "string",
-          enum: ["bank", "card", "cash", "stripe", "other"],
+          type: 'string',
+          enum: ['bank', 'card', 'cash', 'stripe', 'other'],
         },
-        occurred_on: { type: "string" },
-        reference: { type: ["string", "null"] },
-        provider: { type: "string" },
-        provider_payment_id: { type: ["string", "null"] },
-        notes: { type: ["string", "null"] },
-        metadata: { type: "object" },
+        occurred_on: { type: 'string' },
+        reference: { type: ['string', 'null'] },
+        provider: { type: 'string' },
+        provider_payment_id: { type: ['string', 'null'] },
+        notes: { type: ['string', 'null'] },
+        metadata: { type: 'object' },
         allocations: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              invoice_id: { type: "string", format: "uuid" },
-              bill_id: { type: "string", format: "uuid" },
-              amount_cents: { type: "integer", minimum: 1 },
+              invoice_id: { type: 'string', format: 'uuid' },
+              bill_id: { type: 'string', format: 'uuid' },
+              amount_cents: { type: 'integer', minimum: 1 },
             },
             additionalProperties: false,
           },
         },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["direction", "amount_cents", "currency", "method"],
+      required: ['direction', 'amount_cents', 'currency', 'method'],
       additionalProperties: false,
     },
   },
   {
-    name: "allocate_payment",
+    name: 'allocate_payment',
     description:
-      "Allocate a payment to invoices/bills (POST /api/v1/payments/{id}/allocate). Requires version for If-Match. Optional idempotency_key.",
+      'Allocate a payment to invoices/bills (POST /api/v1/payments/{id}/allocate). Requires version for If-Match. Optional idempotency_key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
         allocations: {
-          type: "array",
+          type: 'array',
           minItems: 1,
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              invoice_id: { type: "string", format: "uuid" },
-              bill_id: { type: "string", format: "uuid" },
-              amount_cents: { type: "integer", minimum: 1 },
+              invoice_id: { type: 'string', format: 'uuid' },
+              bill_id: { type: 'string', format: 'uuid' },
+              amount_cents: { type: 'integer', minimum: 1 },
             },
             additionalProperties: false,
           },
         },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["id", "version", "allocations"],
+      required: ['id', 'version', 'allocations'],
       additionalProperties: false,
     },
   },
   {
-    name: "reverse_payment",
+    name: 'reverse_payment',
     description:
-      "Reverse a payment (POST /api/v1/payments/{id}/reverse). Requires version for If-Match and reason. Optional idempotency_key.",
+      'Reverse a payment (POST /api/v1/payments/{id}/reverse). Requires version for If-Match and reason. Optional idempotency_key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        reason: { type: "string", minLength: 1, maxLength: 2000 },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        reason: { type: 'string', minLength: 1, maxLength: 2000 },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["id", "version", "reason"],
+      required: ['id', 'version', 'reason'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_products",
-    description: "List products in the organisation pinned to the API key.",
+    name: 'list_products',
+    description: 'List products in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
-        status: { type: "string", enum: ["active", "archived"] },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'archived'] },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_product",
-    description: "Get a product by id.",
+    name: 'get_product',
+    description: 'Get a product by id.',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_product",
-    description: "Create a product (same validation as POST /api/v1/products).",
+    name: 'create_product',
+    description: 'Create a product (same validation as POST /api/v1/products).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        sku: { type: "string", minLength: 1, maxLength: 64 },
-        name: { type: "string", minLength: 1, maxLength: 160 },
-        unit_price_cents: { type: "integer", minimum: 0 },
-        description: { type: ["string", "null"] },
-        category_id: { type: ["string", "null"], format: "uuid" },
-        product_type: { type: "string", enum: ["product", "service"] },
-        unit_name: { type: ["string", "null"] },
-        cost_price_cents: { type: ["integer", "null"], minimum: 0 },
-        currency: { type: "string" },
-        tax_rate_id: { type: ["string", "null"], format: "uuid" },
-        track_stock: { type: "boolean" },
-        low_stock_at: { type: ["number", "null"] },
-        status: { type: "string", enum: ["active", "archived"] },
-        metadata: { type: "object" },
+        sku: { type: 'string', minLength: 1, maxLength: 64 },
+        name: { type: 'string', minLength: 1, maxLength: 160 },
+        unit_price_cents: { type: 'integer', minimum: 0 },
+        description: { type: ['string', 'null'] },
+        category_id: { type: ['string', 'null'], format: 'uuid' },
+        product_type: { type: 'string', enum: ['product', 'service'] },
+        unit_name: { type: ['string', 'null'] },
+        cost_price_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
+        tax_rate_id: { type: ['string', 'null'], format: 'uuid' },
+        track_stock: { type: 'boolean' },
+        low_stock_at: { type: ['number', 'null'] },
+        status: { type: 'string', enum: ['active', 'archived'] },
+        metadata: { type: 'object' },
       },
-      required: ["sku", "name", "unit_price_cents"],
+      required: ['sku', 'name', 'unit_price_cents'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_product",
+    name: 'update_product',
     description:
-      "Update a product (same validation as PATCH /api/v1/products/{id}). Requires version for If-Match. Stock is not writable — use adjust_product_stock.",
+      'Update a product (same validation as PATCH /api/v1/products/{id}). Requires version for If-Match. Stock is not writable — use adjust_product_stock.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        sku: { type: "string", minLength: 1, maxLength: 64 },
-        name: { type: "string", minLength: 1, maxLength: 160 },
-        unit_price_cents: { type: "integer", minimum: 0 },
-        description: { type: ["string", "null"] },
-        category_id: { type: ["string", "null"], format: "uuid" },
-        product_type: { type: "string", enum: ["product", "service"] },
-        unit_name: { type: ["string", "null"] },
-        cost_price_cents: { type: ["integer", "null"], minimum: 0 },
-        currency: { type: "string" },
-        tax_rate_id: { type: ["string", "null"], format: "uuid" },
-        track_stock: { type: "boolean" },
-        low_stock_at: { type: ["number", "null"] },
-        status: { type: "string", enum: ["active", "archived"] },
-        metadata: { type: "object" },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        sku: { type: 'string', minLength: 1, maxLength: 64 },
+        name: { type: 'string', minLength: 1, maxLength: 160 },
+        unit_price_cents: { type: 'integer', minimum: 0 },
+        description: { type: ['string', 'null'] },
+        category_id: { type: ['string', 'null'], format: 'uuid' },
+        product_type: { type: 'string', enum: ['product', 'service'] },
+        unit_name: { type: ['string', 'null'] },
+        cost_price_cents: { type: ['integer', 'null'], minimum: 0 },
+        currency: { type: 'string' },
+        tax_rate_id: { type: ['string', 'null'], format: 'uuid' },
+        track_stock: { type: 'boolean' },
+        low_stock_at: { type: ['number', 'null'] },
+        status: { type: 'string', enum: ['active', 'archived'] },
+        metadata: { type: 'object' },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
   {
-    name: "adjust_product_stock",
+    name: 'adjust_product_stock',
     description:
-      "Adjust product stock (POST /api/v1/products/{id}/adjust-stock). Optional idempotency_key for safe retries.",
+      'Adjust product stock (POST /api/v1/products/{id}/adjust-stock). Optional idempotency_key for safe retries.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        quantity_delta: { type: "number" },
+        id: { type: 'string', format: 'uuid' },
+        quantity_delta: { type: 'number' },
         reason: {
-          type: "string",
-          enum: ["opening", "adjustment", "invoice", "return", "void"],
+          type: 'string',
+          enum: ['opening', 'adjustment', 'invoice', 'return', 'void'],
         },
-        note: { type: ["string", "null"] },
-        occurred_at: { type: "string" },
-        idempotency_key: { type: "string", minLength: 1, maxLength: 256 },
+        note: { type: ['string', 'null'] },
+        occurred_at: { type: 'string' },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
       },
-      required: ["id", "quantity_delta"],
+      required: ['id', 'quantity_delta'],
       additionalProperties: false,
     },
   },
   {
-    name: "list_product_categories",
-    description:
-      "List product categories in the organisation pinned to the API key.",
+    name: 'list_product_categories',
+    description: 'List product categories in the organisation pinned to the API key.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        limit: { type: "integer", minimum: 1, maximum: 100 },
-        cursor: { type: "string" },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        cursor: { type: 'string' },
       },
       additionalProperties: false,
     },
   },
   {
-    name: "get_product_category",
-    description: "Get a product category by id.",
+    name: 'get_product_category',
+    description: 'Get a product category by id.',
     inputSchema: {
-      type: "object",
-      properties: { id: { type: "string", format: "uuid" } },
-      required: ["id"],
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
   {
-    name: "create_product_category",
-    description:
-      "Create a product category (same validation as POST /api/v1/product-categories).",
+    name: 'create_product_category',
+    description: 'Create a product category (same validation as POST /api/v1/product-categories).',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        name: { type: "string", minLength: 1, maxLength: 120 },
-        description: { type: ["string", "null"] },
-        position: { type: "integer" },
+        name: { type: 'string', minLength: 1, maxLength: 120 },
+        description: { type: ['string', 'null'] },
+        position: { type: 'integer' },
       },
-      required: ["name"],
+      required: ['name'],
       additionalProperties: false,
     },
   },
   {
-    name: "update_product_category",
+    name: 'update_product_category',
     description:
-      "Update a product category (same validation as PATCH /api/v1/product-categories/{id}). Requires version for If-Match.",
+      'Update a product category (same validation as PATCH /api/v1/product-categories/{id}). Requires version for If-Match.',
     inputSchema: {
-      type: "object",
+      type: 'object',
       properties: {
-        id: { type: "string", format: "uuid" },
-        version: { type: "integer", minimum: 1 },
-        name: { type: "string", minLength: 1, maxLength: 120 },
-        description: { type: ["string", "null"] },
-        position: { type: "integer" },
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string', minLength: 1, maxLength: 120 },
+        description: { type: ['string', 'null'] },
+        position: { type: 'integer' },
       },
-      required: ["id", "version"],
+      required: ['id', 'version'],
       additionalProperties: false,
     },
   },
-];
+]
 
 export function listMcpTools(): ToolDef[] {
-  return TOOLS;
+  return TOOLS
 }
 
 export function parseJsonRpcRequest(value: unknown): JsonRpcRequest {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new ApiError(
       400,
-      "BAD_REQUEST",
-      "MCP body must be a JSON-RPC object",
-    );
+      'BAD_REQUEST',
+      'MCP body must be a JSON-RPC object',
+    )
   }
-  const body = value as Record<string, unknown>;
-  if (body.jsonrpc !== undefined && body.jsonrpc !== "2.0") {
-    throw new ApiError(400, "BAD_REQUEST", 'jsonrpc must be "2.0"');
+  const body = value as Record<string, unknown>
+  if (body.jsonrpc !== undefined && body.jsonrpc !== '2.0') {
+    throw new ApiError(400, 'BAD_REQUEST', 'jsonrpc must be "2.0"')
   }
-  if (body.method !== undefined && typeof body.method !== "string") {
-    throw new ApiError(400, "BAD_REQUEST", "method must be a string");
+  if (body.method !== undefined && typeof body.method !== 'string') {
+    throw new ApiError(400, 'BAD_REQUEST', 'method must be a string')
   }
-  return body as JsonRpcRequest;
+  return body as JsonRpcRequest
 }
 
 function asArgs(params: unknown): Record<string, unknown> {
-  if (params === undefined || params === null) return {};
-  if (typeof params !== "object" || Array.isArray(params)) {
-    throw new ApiError(400, "BAD_REQUEST", "params must be an object");
+  if (params === undefined || params === null) return {}
+  if (typeof params !== 'object' || Array.isArray(params)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'params must be an object')
   }
-  const record = params as Record<string, unknown>;
-  const argumentsValue = record.arguments;
-  if (argumentsValue === undefined) return record;
+  const record = params as Record<string, unknown>
+  const argumentsValue = record.arguments
+  if (argumentsValue === undefined) return record
   if (
     argumentsValue === null ||
-    typeof argumentsValue !== "object" ||
+    typeof argumentsValue !== 'object' ||
     Array.isArray(argumentsValue)
   ) {
     throw new ApiError(
       400,
-      "BAD_REQUEST",
-      "params.arguments must be an object",
-    );
+      'BAD_REQUEST',
+      'params.arguments must be an object',
+    )
   }
-  return argumentsValue as Record<string, unknown>;
+  return argumentsValue as Record<string, unknown>
 }
 
 function toolName(params: unknown): string {
-  if (!params || typeof params !== "object" || Array.isArray(params)) {
-    throw new ApiError(400, "BAD_REQUEST", "params must include name");
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    throw new ApiError(400, 'BAD_REQUEST', 'params must include name')
   }
-  const name = (params as Record<string, unknown>).name;
-  if (typeof name !== "string" || name.length < 1) {
+  const name = (params as Record<string, unknown>).name
+  if (typeof name !== 'string' || name.length < 1) {
     throw new ApiError(
       400,
-      "BAD_REQUEST",
-      "params.name must be a non-empty string",
-    );
+      'BAD_REQUEST',
+      'params.name must be a non-empty string',
+    )
   }
-  return name;
+  return name
 }
 
 function requireString(args: Record<string, unknown>, field: string): string {
-  const value = args[field];
-  if (typeof value !== "string" || value.length < 1) {
-    throw new ApiError(400, "VALIDATION_ERROR", `${field} is required`, {
-      [field]: "Required",
-    });
+  const value = args[field]
+  if (typeof value !== 'string' || value.length < 1) {
+    throw new ApiError(400, 'VALIDATION_ERROR', `${field} is required`, {
+      [field]: 'Required',
+    })
   }
-  return value;
+  return value
 }
 
 /** MCP create_task gate: assignee is required (HTTP may still create unassigned). */
 export function requireCreateTaskAssignee(
   args: Record<string, unknown>,
 ): string {
-  const value = args.assignee_membership_id;
+  const value = args.assignee_membership_id
   if (value === undefined || value === null) {
     throw new ApiError(
       400,
-      "VALIDATION_ERROR",
-      "assignee_membership_id is required",
+      'VALIDATION_ERROR',
+      'assignee_membership_id is required',
       {
-        assignee_membership_id: "Required",
+        assignee_membership_id: 'Required',
       },
-    );
+    )
   }
-  if (typeof value !== "string" || value.trim().length < 1) {
+  if (typeof value !== 'string' || value.trim().length < 1) {
     throw new ApiError(
       400,
-      "VALIDATION_ERROR",
-      "assignee_membership_id is required",
+      'VALIDATION_ERROR',
+      'assignee_membership_id is required',
       {
-        assignee_membership_id: "Required",
+        assignee_membership_id: 'Required',
       },
-    );
+    )
   }
-  return parseUuid(value, "assignee_membership_id");
+  return parseUuid(value, 'assignee_membership_id')
 }
 
 function requireVersion(args: Record<string, unknown>): number {
-  const version = args.version;
+  const version = args.version
   if (
-    typeof version !== "number" || !Number.isInteger(version) || version < 1
+    typeof version !== 'number' || !Number.isInteger(version) || version < 1
   ) {
     throw new ApiError(
       400,
-      "VALIDATION_ERROR",
-      "version must be a positive integer",
+      'VALIDATION_ERROR',
+      'version must be a positive integer',
       {
-        version: "Required positive integer",
+        version: 'Required positive integer',
       },
-    );
+    )
   }
-  return version;
+  return version
 }
 
 /** Prefer caller-supplied key for retries; otherwise mint one (matches web client). */
 function resolveIdempotencyKey(args: Record<string, unknown>): string {
-  const provided = args.idempotency_key;
-  if (typeof provided === "string" && provided.trim()) {
-    return provided.trim();
+  const provided = args.idempotency_key
+  if (typeof provided === 'string' && provided.trim()) {
+    return provided.trim()
   }
-  return crypto.randomUUID();
+  return crypto.randomUUID()
 }
 
 function optionalQuery(args: Record<string, unknown>, keys: string[]): string {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams()
   for (const key of keys) {
-    const value = args[key];
-    if (value === undefined || value === null) continue;
-    params.set(key, String(value));
+    const value = args[key]
+    if (value === undefined || value === null) continue
+    params.set(key, String(value))
   }
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
 }
 
 function syntheticRequest(
@@ -1439,162 +1432,162 @@ function syntheticRequest(
   extraHeaders?: Record<string, string>,
 ): Request {
   const headers = new Headers({
-    "content-type": "application/json",
+    'content-type': 'application/json',
     ...(extraHeaders ?? {}),
-  });
+  })
   return new Request(`http://mcp.local${pathWithQuery}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  })
 }
 
 function assertCanAccessContacts(role: MembershipRole, method: string): void {
-  if (role === "billing") {
+  if (role === 'billing') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members cannot access contacts",
-    );
+      'FORBIDDEN',
+      'Billing members cannot access contacts',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify contacts",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify contacts',
+    )
   }
 }
 
 function assertCanAccessPipeline(
   role: MembershipRole,
   method: string,
-  resource: "leads" | "clients",
+  resource: 'leads' | 'clients',
 ): void {
-  if (resource === "leads" && role === "billing") {
-    throw new ApiError(403, "FORBIDDEN", "Billing members cannot access leads");
+  if (resource === 'leads' && role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access leads')
   }
-  if (resource === "clients" && role === "billing" && method !== "GET") {
+  if (resource === 'clients' && role === 'billing' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members can only read clients",
-    );
+      'FORBIDDEN',
+      'Billing members can only read clients',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
+      'FORBIDDEN',
       `Readonly members cannot modify ${resource}`,
-    );
+    )
   }
 }
 
 function assertCanAccessTasks(role: MembershipRole, method: string): void {
-  if (role === "billing") {
-    throw new ApiError(403, "FORBIDDEN", "Billing members cannot access tasks");
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access tasks')
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify tasks",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify tasks',
+    )
   }
 }
 
 function assertCanAccessProjects(role: MembershipRole, method: string): void {
-  if (role === "billing") {
+  if (role === 'billing') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members cannot access projects",
-    );
+      'FORBIDDEN',
+      'Billing members cannot access projects',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify projects",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify projects',
+    )
   }
 }
 
 function assertCanAccessMeetings(role: MembershipRole, method: string): void {
-  if (role === "billing") {
+  if (role === 'billing') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members cannot access meetings",
-    );
+      'FORBIDDEN',
+      'Billing members cannot access meetings',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify meetings",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify meetings',
+    )
   }
 }
 
 function assertCanAccessQuotes(role: MembershipRole, method: string): void {
-  if (role === "billing") {
+  if (role === 'billing') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members cannot access quotes",
-    );
+      'FORBIDDEN',
+      'Billing members cannot access quotes',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify quotes",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify quotes',
+    )
   }
 }
 
 function assertCanAccessInvoices(role: MembershipRole, method: string): void {
-  if (role === "billing" && method !== "GET") {
+  if (role === 'billing' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members can only read invoices",
-    );
+      'FORBIDDEN',
+      'Billing members can only read invoices',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify invoices",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify invoices',
+    )
   }
 }
 
 function assertCanAccessPayments(role: MembershipRole, method: string): void {
-  if (role === "billing" && method !== "GET") {
+  if (role === 'billing' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members can only read payments",
-    );
+      'FORBIDDEN',
+      'Billing members can only read payments',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify payments",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify payments',
+    )
   }
 }
 
 function assertCanAccessCatalog(role: MembershipRole, method: string): void {
-  if ((role === "billing" || role === "readonly") && method !== "GET") {
+  if ((role === 'billing' || role === 'readonly') && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "This membership cannot modify the product catalog",
-    );
+      'FORBIDDEN',
+      'This membership cannot modify the product catalog',
+    )
   }
 }
 
@@ -1602,50 +1595,50 @@ function requireUserBackedActor(userId: string | null): string {
   if (!userId) {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "This route requires a user-backed actor (JWT or API key with created_by)",
-    );
+      'FORBIDDEN',
+      'This route requires a user-backed actor (JWT or API key with created_by)',
+    )
   }
-  return userId;
+  return userId
 }
 
 async function responsePayload(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text) return null;
+  const text = await response.text()
+  if (!text) return null
   try {
-    return JSON.parse(text);
+    return JSON.parse(text)
   } catch {
-    return { raw: text };
+    return { raw: text }
   }
 }
 
 async function toolResultFromHttp(
   response: Response,
 ): Promise<Record<string, unknown>> {
-  const payload = await responsePayload(response);
+  const payload = await responsePayload(response)
   if (response.ok) {
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(payload, null, 2),
         },
       ],
       structuredContent: payload,
       isError: false,
-    };
+    }
   }
 
   return {
     content: [
       {
-        type: "text",
+        type: 'text',
         text: JSON.stringify(payload, null, 2),
       },
     ],
     structuredContent: payload,
     isError: true,
-  };
+  }
 }
 
 /**
@@ -1664,17 +1657,17 @@ export function mcpToolFailureResult(
       ...(error.fields ? { fields: error.fields } : {}),
       request_id: requestId,
     },
-  };
+  }
   return {
     content: [
       {
-        type: "text",
+        type: 'text',
         text: JSON.stringify(payload, null, 2),
       },
     ],
     structuredContent: payload,
     isError: true,
-  };
+  }
 }
 
 export async function callTool(
@@ -1683,257 +1676,251 @@ export async function callTool(
   args: Record<string, unknown>,
   requestId: string,
 ): Promise<Record<string, unknown>> {
-  const { db, orgId, membership } = auth;
+  const { db, orgId, membership } = auth
 
   switch (name) {
-    case "list_contacts": {
-      assertCanAccessContacts(membership.role, "GET");
-      const path = `/api/v1/contacts${
-        optionalQuery(args, ["limit", "cursor", "lifecycle_status"])
-      }`;
+    case 'list_contacts': {
+      assertCanAccessContacts(membership.role, 'GET')
+      const path = `/api/v1/contacts${optionalQuery(args, ['limit', 'cursor', 'lifecycle_status'])}`
       const response = await handleContacts(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/contacts",
+        '/api/v1/contacts',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_contact": {
-      assertCanAccessContacts(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/contacts/${id}`;
+    case 'get_contact': {
+      assertCanAccessContacts(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/contacts/${id}`
       const response = await handleContacts(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_contact": {
-      assertCanAccessContacts(membership.role, "POST");
+    case 'create_contact': {
+      assertCanAccessContacts(membership.role, 'POST')
       if (!auth.userId) {
         throw new ApiError(
           403,
-          "FORBIDDEN",
-          "This route requires a user-backed actor (JWT or API key with created_by)",
-        );
+          'FORBIDDEN',
+          'This route requires a user-backed actor (JWT or API key with created_by)',
+        )
       }
       const response = await handleContacts(
-        syntheticRequest("POST", "/api/v1/contacts", args),
+        syntheticRequest('POST', '/api/v1/contacts', args),
         db,
-        "/api/v1/contacts",
+        '/api/v1/contacts',
         orgId,
         requestId,
         auth.userId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_contact": {
-      assertCanAccessContacts(membership.role, "PATCH");
+    case 'update_contact': {
+      assertCanAccessContacts(membership.role, 'PATCH')
       if (!auth.userId) {
         throw new ApiError(
           403,
-          "FORBIDDEN",
-          "This route requires a user-backed actor (JWT or API key with created_by)",
-        );
+          'FORBIDDEN',
+          'This route requires a user-backed actor (JWT or API key with created_by)',
+        )
       }
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/contacts/${id}`;
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/contacts/${id}`
       const response = await handleContacts(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
         auth.userId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_clients": {
-      assertCanAccessPipeline(membership.role, "GET", "clients");
-      const path = `/api/v1/clients${
-        optionalQuery(args, ["limit", "cursor", "status"])
-      }`;
+    case 'list_clients': {
+      assertCanAccessPipeline(membership.role, 'GET', 'clients')
+      const path = `/api/v1/clients${optionalQuery(args, ['limit', 'cursor', 'status'])}`
       const response = await handleClients(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/clients",
+        '/api/v1/clients',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_client": {
-      assertCanAccessPipeline(membership.role, "GET", "clients");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/clients/${id}`;
+    case 'get_client': {
+      assertCanAccessPipeline(membership.role, 'GET', 'clients')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/clients/${id}`
       const response = await handleClients(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_client": {
-      assertCanAccessPipeline(membership.role, "POST", "clients");
+    case 'create_client': {
+      assertCanAccessPipeline(membership.role, 'POST', 'clients')
       const response = await handleClients(
-        syntheticRequest("POST", "/api/v1/clients", args),
+        syntheticRequest('POST', '/api/v1/clients', args),
         db,
-        "/api/v1/clients",
+        '/api/v1/clients',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_client": {
-      assertCanAccessPipeline(membership.role, "PATCH", "clients");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/clients/${id}`;
+    case 'update_client': {
+      assertCanAccessPipeline(membership.role, 'PATCH', 'clients')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/clients/${id}`
       const response = await handleClients(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_leads": {
-      assertCanAccessPipeline(membership.role, "GET", "leads");
-      const path = `/api/v1/leads${
-        optionalQuery(args, ["limit", "cursor", "stage"])
-      }`;
+    case 'list_leads': {
+      assertCanAccessPipeline(membership.role, 'GET', 'leads')
+      const path = `/api/v1/leads${optionalQuery(args, ['limit', 'cursor', 'stage'])}`
       const response = await handleLeads(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/leads",
+        '/api/v1/leads',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_lead": {
-      assertCanAccessPipeline(membership.role, "GET", "leads");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/leads/${id}`;
+    case 'get_lead': {
+      assertCanAccessPipeline(membership.role, 'GET', 'leads')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/leads/${id}`
       const response = await handleLeads(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_lead": {
-      assertCanAccessPipeline(membership.role, "POST", "leads");
+    case 'create_lead': {
+      assertCanAccessPipeline(membership.role, 'POST', 'leads')
       const response = await handleLeads(
-        syntheticRequest("POST", "/api/v1/leads", args),
+        syntheticRequest('POST', '/api/v1/leads', args),
         db,
-        "/api/v1/leads",
+        '/api/v1/leads',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_lead": {
-      assertCanAccessPipeline(membership.role, "PATCH", "leads");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/leads/${id}`;
+    case 'update_lead': {
+      assertCanAccessPipeline(membership.role, 'PATCH', 'leads')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/leads/${id}`
       const response = await handleLeads(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_tasks": {
-      assertCanAccessTasks(membership.role, "GET");
+    case 'list_tasks': {
+      assertCanAccessTasks(membership.role, 'GET')
       const path = `/api/v1/tasks${
         optionalQuery(args, [
-          "limit",
-          "cursor",
-          "status",
-          "assignee",
-          "entity_type",
-          "entity_id",
+          'limit',
+          'cursor',
+          'status',
+          'assignee',
+          'entity_type',
+          'entity_id',
         ])
-      }`;
+      }`
       const response = await handleTasks(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/tasks",
+        '/api/v1/tasks',
         orgId,
         membership.role,
         membership.id,
         requestId,
-        { actorType: "api_key", apiKeyId: auth.apiKeyId },
-      );
-      return await toolResultFromHttp(response);
+        { actorType: 'api_key', apiKeyId: auth.apiKeyId },
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_task": {
-      assertCanAccessTasks(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/tasks/${id}`;
+    case 'get_task': {
+      assertCanAccessTasks(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/tasks/${id}`
       const response = await handleTasks(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         membership.role,
         membership.id,
         requestId,
-        { actorType: "api_key", apiKeyId: auth.apiKeyId },
-      );
-      return await toolResultFromHttp(response);
+        { actorType: 'api_key', apiKeyId: auth.apiKeyId },
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_task": {
-      assertCanAccessTasks(membership.role, "POST");
-      const assigneeMembershipId = requireCreateTaskAssignee(args);
+    case 'create_task': {
+      assertCanAccessTasks(membership.role, 'POST')
+      const assigneeMembershipId = requireCreateTaskAssignee(args)
       const response = await handleTasks(
-        syntheticRequest("POST", "/api/v1/tasks", {
+        syntheticRequest('POST', '/api/v1/tasks', {
           ...args,
           assignee_membership_id: assigneeMembershipId,
         }),
         db,
-        "/api/v1/tasks",
+        '/api/v1/tasks',
         orgId,
         membership.role,
         membership.id,
         requestId,
-        { actorType: "api_key", apiKeyId: auth.apiKeyId },
-      );
-      return await toolResultFromHttp(response);
+        { actorType: 'api_key', apiKeyId: auth.apiKeyId },
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_task": {
-      assertCanAccessTasks(membership.role, "PATCH");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/tasks/${id}`;
+    case 'update_task': {
+      assertCanAccessTasks(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/tasks/${id}`
       const response = await handleTasks(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
@@ -1941,200 +1928,198 @@ export async function callTool(
         membership.role,
         membership.id,
         requestId,
-        { actorType: "api_key", apiKeyId: auth.apiKeyId },
-      );
-      return await toolResultFromHttp(response);
+        { actorType: 'api_key', apiKeyId: auth.apiKeyId },
+      )
+      return await toolResultFromHttp(response)
     }
-    case "add_timeline_note": {
-      const entityType = requireString(args, "entity_type");
-      const entityId = parseUuid(requireString(args, "entity_id"), "entity_id");
-      const title = requireString(args, "title");
-      const path = `/api/v1/entities/${entityType}/${entityId}/timeline-events`;
+    case 'add_timeline_note': {
+      const entityType = requireString(args, 'entity_type')
+      const entityId = parseUuid(requireString(args, 'entity_id'), 'entity_id')
+      const title = requireString(args, 'title')
+      const path = `/api/v1/entities/${entityType}/${entityId}/timeline-events`
       const body = {
         title,
-        ...(typeof args.body === "string" ? { body: args.body } : {}),
-        ...(typeof args.kind === "string" ? { kind: args.kind } : {}),
-        ...(args.payload && typeof args.payload === "object" &&
+        ...(typeof args.body === 'string' ? { body: args.body } : {}),
+        ...(typeof args.kind === 'string' ? { kind: args.kind } : {}),
+        ...(args.payload && typeof args.payload === 'object' &&
             !Array.isArray(args.payload)
           ? { payload: args.payload }
           : {}),
-      };
+      }
       const response = await handleTimelineEvents(
-        syntheticRequest("POST", path, body),
+        syntheticRequest('POST', path, body),
         db,
         path,
         orgId,
         membership.role,
         auth.userId,
         requestId,
-        { actorType: "api_key", apiKeyId: auth.apiKeyId },
-      );
-      return await toolResultFromHttp(response);
+        { actorType: 'api_key', apiKeyId: auth.apiKeyId },
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_projects": {
-      assertCanAccessProjects(membership.role, "GET");
-      const path = `/api/v1/projects${
-        optionalQuery(args, ["limit", "cursor", "status"])
-      }`;
+    case 'list_projects': {
+      assertCanAccessProjects(membership.role, 'GET')
+      const path = `/api/v1/projects${optionalQuery(args, ['limit', 'cursor', 'status'])}`
       const response = await handleProjects(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/projects",
+        '/api/v1/projects',
         orgId,
         membership.role,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_project": {
-      assertCanAccessProjects(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/projects/${id}`;
+    case 'get_project': {
+      assertCanAccessProjects(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/projects/${id}`
       const response = await handleProjects(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         membership.role,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_project": {
-      assertCanAccessProjects(membership.role, "POST");
-      const actorUserId = requireUserBackedActor(auth.userId);
+    case 'create_project': {
+      assertCanAccessProjects(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
       const response = await handleProjects(
-        syntheticRequest("POST", "/api/v1/projects", args),
+        syntheticRequest('POST', '/api/v1/projects', args),
         db,
-        "/api/v1/projects",
+        '/api/v1/projects',
         orgId,
         membership.role,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_project": {
-      assertCanAccessProjects(membership.role, "PATCH");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/projects/${id}`;
+    case 'update_project': {
+      assertCanAccessProjects(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/projects/${id}`
       const response = await handleProjects(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         membership.role,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_card": {
-      assertCanAccessProjects(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
+    case 'create_card': {
+      assertCanAccessProjects(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
       const projectId = parseUuid(
-        requireString(args, "project_id"),
-        "project_id",
-      );
-      parseUuid(requireString(args, "column_id"), "column_id");
-      requireString(args, "title");
-      const { project_id: _projectId, ...body } = args;
-      const path = `/api/v1/projects/${projectId}/cards`;
+        requireString(args, 'project_id'),
+        'project_id',
+      )
+      parseUuid(requireString(args, 'column_id'), 'column_id')
+      requireString(args, 'title')
+      const { project_id: _projectId, ...body } = args
+      const path = `/api/v1/projects/${projectId}/cards`
       const response = await handleProjects(
-        syntheticRequest("POST", path, body),
+        syntheticRequest('POST', path, body),
         db,
         path,
         orgId,
         membership.role,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_card": {
-      assertCanAccessProjects(membership.role, "PATCH");
-      requireUserBackedActor(auth.userId);
+    case 'update_card': {
+      assertCanAccessProjects(membership.role, 'PATCH')
+      requireUserBackedActor(auth.userId)
       const projectId = parseUuid(
-        requireString(args, "project_id"),
-        "project_id",
-      );
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
+        requireString(args, 'project_id'),
+        'project_id',
+      )
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
       const {
         project_id: _projectId,
         id: _id,
         version: _version,
         ...patch
-      } = args;
-      const path = `/api/v1/projects/${projectId}/cards/${id}`;
+      } = args
+      const path = `/api/v1/projects/${projectId}/cards/${id}`
       const response = await handleProjects(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         membership.role,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "delete_card": {
-      assertCanAccessProjects(membership.role, "DELETE");
-      requireUserBackedActor(auth.userId);
+    case 'delete_card': {
+      assertCanAccessProjects(membership.role, 'DELETE')
+      requireUserBackedActor(auth.userId)
       const projectId = parseUuid(
-        requireString(args, "project_id"),
-        "project_id",
-      );
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const path = `/api/v1/projects/${projectId}/cards/${id}`;
+        requireString(args, 'project_id'),
+        'project_id',
+      )
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/projects/${projectId}/cards/${id}`
       const response = await handleProjects(
-        syntheticRequest("DELETE", path, undefined, {
-          "if-match": `"${version}"`,
+        syntheticRequest('DELETE', path, undefined, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         membership.role,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_meetings": {
-      assertCanAccessMeetings(membership.role, "GET");
+    case 'list_meetings': {
+      assertCanAccessMeetings(membership.role, 'GET')
       const path = `/api/v1/meetings${
         optionalQuery(args, [
-          "limit",
-          "cursor",
-          "status",
-          "upcoming",
-          "starts_after",
-          "starts_before",
-          "entity_type",
-          "entity_id",
+          'limit',
+          'cursor',
+          'status',
+          'upcoming',
+          'starts_after',
+          'starts_before',
+          'entity_type',
+          'entity_id',
         ])
-      }`;
+      }`
       const response = await handleMeetings(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/meetings",
+        '/api/v1/meetings',
         orgId,
         membership.role,
         requestId,
         requireUserBackedActor(auth.userId),
         membership.id,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_meeting": {
-      assertCanAccessMeetings(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/meetings/${id}`;
+    case 'get_meeting': {
+      assertCanAccessMeetings(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/meetings/${id}`
       const response = await handleMeetings(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
@@ -2142,34 +2127,34 @@ export async function callTool(
         requestId,
         requireUserBackedActor(auth.userId),
         membership.id,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_meeting": {
-      assertCanAccessMeetings(membership.role, "POST");
-      const actorUserId = requireUserBackedActor(auth.userId);
+    case 'create_meeting': {
+      assertCanAccessMeetings(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
       const response = await handleMeetings(
-        syntheticRequest("POST", "/api/v1/meetings", args),
+        syntheticRequest('POST', '/api/v1/meetings', args),
         db,
-        "/api/v1/meetings",
+        '/api/v1/meetings',
         orgId,
         membership.role,
         requestId,
         actorUserId,
         membership.id,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_meeting": {
-      assertCanAccessMeetings(membership.role, "PATCH");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/meetings/${id}`;
+    case 'update_meeting': {
+      assertCanAccessMeetings(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/meetings/${id}`
       const response = await handleMeetings(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
@@ -2178,477 +2163,472 @@ export async function callTool(
         requestId,
         actorUserId,
         membership.id,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_quotes": {
-      assertCanAccessQuotes(membership.role, "GET");
+    case 'list_quotes': {
+      assertCanAccessQuotes(membership.role, 'GET')
       const path = `/api/v1/quotes${
-        optionalQuery(args, ["limit", "cursor", "status", "client_id"])
-      }`;
+        optionalQuery(args, ['limit', 'cursor', 'status', 'client_id'])
+      }`
       const response = await handleQuotes(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/quotes",
+        '/api/v1/quotes',
         orgId,
         requestId,
         requireUserBackedActor(auth.userId),
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_quote": {
-      assertCanAccessQuotes(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/quotes/${id}`;
+    case 'get_quote': {
+      assertCanAccessQuotes(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/quotes/${id}`
       const response = await handleQuotes(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
         requireUserBackedActor(auth.userId),
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_quote": {
-      assertCanAccessQuotes(membership.role, "POST");
-      const actorUserId = requireUserBackedActor(auth.userId);
+    case 'create_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
       const response = await handleQuotes(
-        syntheticRequest("POST", "/api/v1/quotes", args),
+        syntheticRequest('POST', '/api/v1/quotes', args),
         db,
-        "/api/v1/quotes",
+        '/api/v1/quotes',
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_quote": {
-      assertCanAccessQuotes(membership.role, "PATCH");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/quotes/${id}`;
+    case 'update_quote': {
+      assertCanAccessQuotes(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/quotes/${id}`
       const response = await handleQuotes(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "send_quote": {
-      assertCanAccessQuotes(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const path = `/api/v1/quotes/${id}/send`;
+    case 'send_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/quotes/${id}/send`
       const response = await handleQuotes(
-        syntheticRequest("POST", path, {}, {
-          "if-match": `"${version}"`,
+        syntheticRequest('POST', path, {}, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "accept_quote": {
-      assertCanAccessQuotes(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const path = `/api/v1/quotes/${id}/accept`;
+    case 'accept_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/quotes/${id}/accept`
       const response = await handleQuotes(
-        syntheticRequest("POST", path, {}, {
-          "if-match": `"${version}"`,
-          "idempotency-key": resolveIdempotencyKey(args),
+        syntheticRequest('POST', path, {}, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "reject_quote": {
-      assertCanAccessQuotes(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const path = `/api/v1/quotes/${id}/reject`;
+    case 'reject_quote': {
+      assertCanAccessQuotes(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/quotes/${id}/reject`
       const response = await handleQuotes(
-        syntheticRequest("POST", path, {}, {
-          "if-match": `"${version}"`,
+        syntheticRequest('POST', path, {}, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_invoices": {
-      assertCanAccessInvoices(membership.role, "GET");
+    case 'list_invoices': {
+      assertCanAccessInvoices(membership.role, 'GET')
       const path = `/api/v1/invoices${
-        optionalQuery(args, ["limit", "cursor", "status", "client_id"])
-      }`;
+        optionalQuery(args, ['limit', 'cursor', 'status', 'client_id'])
+      }`
       const response = await handleInvoices(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/invoices",
+        '/api/v1/invoices',
         orgId,
         requestId,
         requireUserBackedActor(auth.userId),
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_invoice": {
-      assertCanAccessInvoices(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/invoices/${id}`;
+    case 'get_invoice': {
+      assertCanAccessInvoices(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/invoices/${id}`
       const response = await handleInvoices(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
         requireUserBackedActor(auth.userId),
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_invoice": {
-      assertCanAccessInvoices(membership.role, "POST");
-      const actorUserId = requireUserBackedActor(auth.userId);
+    case 'create_invoice': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
       const response = await handleInvoices(
-        syntheticRequest("POST", "/api/v1/invoices", args),
+        syntheticRequest('POST', '/api/v1/invoices', args),
         db,
-        "/api/v1/invoices",
+        '/api/v1/invoices',
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_invoice": {
-      assertCanAccessInvoices(membership.role, "PATCH");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/invoices/${id}`;
+    case 'update_invoice': {
+      assertCanAccessInvoices(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/invoices/${id}`
       const response = await handleInvoices(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "send_invoice": {
-      assertCanAccessInvoices(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const path = `/api/v1/invoices/${id}/send`;
-      const body: Record<string, unknown> = {};
-      if (typeof args.sent_at === "string") body.sent_at = args.sent_at;
+    case 'send_invoice': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/invoices/${id}/send`
+      const body: Record<string, unknown> = {}
+      if (typeof args.sent_at === 'string') body.sent_at = args.sent_at
       const response = await handleInvoices(
-        syntheticRequest("POST", path, body, {
-          "if-match": `"${version}"`,
-          "idempotency-key": resolveIdempotencyKey(args),
+        syntheticRequest('POST', path, body, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "void_invoice": {
-      assertCanAccessInvoices(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const voidReason = requireString(args, "void_reason");
-      const path = `/api/v1/invoices/${id}/void`;
+    case 'void_invoice': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const voidReason = requireString(args, 'void_reason')
+      const path = `/api/v1/invoices/${id}/void`
       const response = await handleInvoices(
         syntheticRequest(
-          "POST",
+          'POST',
           path,
           { void_reason: voidReason },
           {
-            "if-match": `"${version}"`,
-            "idempotency-key": resolveIdempotencyKey(args),
+            'if-match': `"${version}"`,
+            'idempotency-key': resolveIdempotencyKey(args),
           },
         ),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_invoice_from_quote": {
-      assertCanAccessInvoices(membership.role, "POST");
-      requireUserBackedActor(auth.userId);
-      const quoteId = parseUuid(requireString(args, "quote_id"), "quote_id");
+    case 'create_invoice_from_quote': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const quoteId = parseUuid(requireString(args, 'quote_id'), 'quote_id')
       const response = await handleInvoices(
-        syntheticRequest("POST", "/api/v1/invoices/from-quote", {
+        syntheticRequest('POST', '/api/v1/invoices/from-quote', {
           quote_id: quoteId,
         }),
         db,
-        "/api/v1/invoices/from-quote",
+        '/api/v1/invoices/from-quote',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_payments": {
-      assertCanAccessPayments(membership.role, "GET");
+    case 'list_payments': {
+      assertCanAccessPayments(membership.role, 'GET')
       const path = `/api/v1/payments${
         optionalQuery(args, [
-          "limit",
-          "cursor",
-          "direction",
-          "status",
-          "client_id",
-          "vendor_id",
-          "invoice_id",
-          "bill_id",
+          'limit',
+          'cursor',
+          'direction',
+          'status',
+          'client_id',
+          'vendor_id',
+          'invoice_id',
+          'bill_id',
         ])
-      }`;
+      }`
       const response = await handlePayments(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/payments",
+        '/api/v1/payments',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_payment": {
-      assertCanAccessPayments(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/payments/${id}`;
+    case 'get_payment': {
+      assertCanAccessPayments(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/payments/${id}`
       const response = await handlePayments(
-        syntheticRequest("GET", path),
-        db,
-        path,
-        orgId,
-        requestId,
-      );
-      return await toolResultFromHttp(response);
-    }
-    case "create_payment": {
-      assertCanAccessPayments(membership.role, "POST");
-      const { idempotency_key: _ik, ...body } = args;
-      const response = await handlePayments(
-        syntheticRequest("POST", "/api/v1/payments", body, {
-          "idempotency-key": resolveIdempotencyKey(args),
-        }),
-        db,
-        "/api/v1/payments",
-        orgId,
-        requestId,
-      );
-      return await toolResultFromHttp(response);
-    }
-    case "allocate_payment": {
-      assertCanAccessPayments(membership.role, "POST");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, idempotency_key: _ik, ...body } =
-        args;
-      const path = `/api/v1/payments/${id}/allocate`;
-      const response = await handlePayments(
-        syntheticRequest("POST", path, body, {
-          "if-match": `"${version}"`,
-          "idempotency-key": resolveIdempotencyKey(args),
-        }),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "reverse_payment": {
-      assertCanAccessPayments(membership.role, "POST");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const reason = requireString(args, "reason");
-      const path = `/api/v1/payments/${id}/reverse`;
+    case 'create_payment': {
+      assertCanAccessPayments(membership.role, 'POST')
+      const { idempotency_key: _ik, ...body } = args
+      const response = await handlePayments(
+        syntheticRequest('POST', '/api/v1/payments', body, {
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        '/api/v1/payments',
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'allocate_payment': {
+      assertCanAccessPayments(membership.role, 'POST')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, idempotency_key: _ik, ...body } = args
+      const path = `/api/v1/payments/${id}/allocate`
+      const response = await handlePayments(
+        syntheticRequest('POST', path, body, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'reverse_payment': {
+      assertCanAccessPayments(membership.role, 'POST')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const reason = requireString(args, 'reason')
+      const path = `/api/v1/payments/${id}/reverse`
       const response = await handlePayments(
         syntheticRequest(
-          "POST",
+          'POST',
           path,
           { reason },
           {
-            "if-match": `"${version}"`,
-            "idempotency-key": resolveIdempotencyKey(args),
+            'if-match': `"${version}"`,
+            'idempotency-key': resolveIdempotencyKey(args),
           },
         ),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_products": {
-      assertCanAccessCatalog(membership.role, "GET");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const path = `/api/v1/products${
-        optionalQuery(args, ["limit", "cursor", "status"])
-      }`;
+    case 'list_products': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const path = `/api/v1/products${optionalQuery(args, ['limit', 'cursor', 'status'])}`
       const response = await handleProducts(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/products",
+        '/api/v1/products',
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_product": {
-      assertCanAccessCatalog(membership.role, "GET");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/products/${id}`;
+    case 'get_product': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/products/${id}`
       const response = await handleProducts(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_product": {
-      assertCanAccessCatalog(membership.role, "POST");
-      const actorUserId = requireUserBackedActor(auth.userId);
+    case 'create_product': {
+      assertCanAccessCatalog(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
       const response = await handleProducts(
-        syntheticRequest("POST", "/api/v1/products", args),
+        syntheticRequest('POST', '/api/v1/products', args),
         db,
-        "/api/v1/products",
+        '/api/v1/products',
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_product": {
-      assertCanAccessCatalog(membership.role, "PATCH");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/products/${id}`;
+    case 'update_product': {
+      assertCanAccessCatalog(membership.role, 'PATCH')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/products/${id}`
       const response = await handleProducts(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "adjust_product_stock": {
-      assertCanAccessCatalog(membership.role, "POST");
-      const actorUserId = requireUserBackedActor(auth.userId);
-      const id = parseUuid(requireString(args, "id"), "id");
-      const { id: _id, idempotency_key: _ik, ...body } = args;
-      const path = `/api/v1/products/${id}/adjust-stock`;
+    case 'adjust_product_stock': {
+      assertCanAccessCatalog(membership.role, 'POST')
+      const actorUserId = requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const { id: _id, idempotency_key: _ik, ...body } = args
+      const path = `/api/v1/products/${id}/adjust-stock`
       const response = await handleProducts(
-        syntheticRequest("POST", path, body, {
-          "idempotency-key": resolveIdempotencyKey(args),
+        syntheticRequest('POST', path, body, {
+          'idempotency-key': resolveIdempotencyKey(args),
         }),
         db,
         path,
         orgId,
         requestId,
         actorUserId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "list_product_categories": {
-      assertCanAccessCatalog(membership.role, "GET");
-      const path = `/api/v1/product-categories${
-        optionalQuery(args, ["limit", "cursor"])
-      }`;
+    case 'list_product_categories': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const path = `/api/v1/product-categories${optionalQuery(args, ['limit', 'cursor'])}`
       const response = await handleProductCategories(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
-        "/api/v1/product-categories",
+        '/api/v1/product-categories',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "get_product_category": {
-      assertCanAccessCatalog(membership.role, "GET");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const path = `/api/v1/product-categories/${id}`;
+    case 'get_product_category': {
+      assertCanAccessCatalog(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/product-categories/${id}`
       const response = await handleProductCategories(
-        syntheticRequest("GET", path),
+        syntheticRequest('GET', path),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "create_product_category": {
-      assertCanAccessCatalog(membership.role, "POST");
+    case 'create_product_category': {
+      assertCanAccessCatalog(membership.role, 'POST')
       const response = await handleProductCategories(
-        syntheticRequest("POST", "/api/v1/product-categories", args),
+        syntheticRequest('POST', '/api/v1/product-categories', args),
         db,
-        "/api/v1/product-categories",
+        '/api/v1/product-categories',
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
-    case "update_product_category": {
-      assertCanAccessCatalog(membership.role, "PATCH");
-      const id = parseUuid(requireString(args, "id"), "id");
-      const version = requireVersion(args);
-      const { id: _id, version: _version, ...patch } = args;
-      const path = `/api/v1/product-categories/${id}`;
+    case 'update_product_category': {
+      assertCanAccessCatalog(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/product-categories/${id}`
       const response = await handleProductCategories(
-        syntheticRequest("PATCH", path, patch, {
-          "if-match": `"${version}"`,
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
         }),
         db,
         path,
         orgId,
         requestId,
-      );
-      return await toolResultFromHttp(response);
+      )
+      return await toolResultFromHttp(response)
     }
     default:
-      throw new ApiError(404, "NOT_FOUND", `Unknown tool: ${name}`);
+      throw new ApiError(404, 'NOT_FOUND', `Unknown tool: ${name}`)
   }
 }
 
 function rpcResult(id: JsonRpcId | undefined, result: unknown): unknown {
-  return { jsonrpc: "2.0", id: id ?? null, result };
+  return { jsonrpc: '2.0', id: id ?? null, result }
 }
 
 function rpcError(
@@ -2658,14 +2638,14 @@ function rpcError(
   data?: unknown,
 ): unknown {
   return {
-    jsonrpc: "2.0",
+    jsonrpc: '2.0',
     id: id ?? null,
     error: {
       code,
       message,
       ...(data === undefined ? {} : { data }),
     },
-  };
+  }
 }
 
 function apiErrorToRpc(id: JsonRpcId | undefined, error: ApiError): unknown {
@@ -2681,11 +2661,11 @@ function apiErrorToRpc(id: JsonRpcId | undefined, error: ApiError): unknown {
     ? -32009
     : error.status === 422 || error.status === 400
     ? -32602
-    : -32000;
+    : -32000
   return rpcError(id, code, error.message, {
     api_code: error.code,
     ...(error.fields ? { fields: error.fields } : {}),
-  });
+  })
 }
 
 async function dispatchJsonRpc(
@@ -2693,31 +2673,29 @@ async function dispatchJsonRpc(
   message: JsonRpcRequest,
   requestId: string,
 ): Promise<{ body: unknown; status: number } | null> {
-  const method = message.method;
+  const method = message.method
   if (!method) {
     return {
       status: 200,
-      body: rpcError(message.id, -32600, "Invalid Request: method is required"),
-    };
+      body: rpcError(message.id, -32600, 'Invalid Request: method is required'),
+    }
   }
 
   // Notifications have no id — acknowledge with empty success (no JSON-RPC body).
-  const isNotification = message.id === undefined;
+  const isNotification = message.id === undefined
 
   if (
-    method === "notifications/initialized" ||
-    method === "notifications/cancelled"
+    method === 'notifications/initialized' ||
+    method === 'notifications/cancelled'
   ) {
-    return isNotification
-      ? null
-      : { status: 200, body: rpcResult(message.id, {}) };
+    return isNotification ? null : { status: 200, body: rpcResult(message.id, {}) }
   }
 
-  if (method === "ping") {
-    return { status: 200, body: rpcResult(message.id, {}) };
+  if (method === 'ping') {
+    return { status: 200, body: rpcResult(message.id, {}) }
   }
 
-  if (method === "initialize") {
+  if (method === 'initialize') {
     return {
       status: 200,
       body: rpcResult(message.id, {
@@ -2725,27 +2703,27 @@ async function dispatchJsonRpc(
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
       }),
-    };
+    }
   }
 
-  if (method === "tools/list") {
+  if (method === 'tools/list') {
     return {
       status: 200,
       body: rpcResult(message.id, { tools: TOOLS }),
-    };
+    }
   }
 
-  if (method === "tools/call") {
-    const name = toolName(message.params);
-    const args = asArgs(message.params);
-    const result = await callTool(auth, name, args, requestId);
-    return { status: 200, body: rpcResult(message.id, result) };
+  if (method === 'tools/call') {
+    const name = toolName(message.params)
+    const args = asArgs(message.params)
+    const result = await callTool(auth, name, args, requestId)
+    return { status: 200, body: rpcResult(message.id, result) }
   }
 
   return {
     status: 200,
     body: rpcError(message.id, -32601, `Method not found: ${method}`),
-  };
+  }
 }
 
 export async function handleMcp(
@@ -2753,87 +2731,86 @@ export async function handleMcp(
   auth: McpAuth,
   requestId: string,
 ): Promise<Response> {
-  if (req.method === "GET") {
+  if (req.method === 'GET') {
     // Streamable HTTP without sessions: no long-lived SSE in v1.
     return jsonResponse(
       {
         error: {
-          code: "METHOD_NOT_ALLOWED",
-          message:
-            "MCP v1 accepts POST JSON-RPC only (initialize, tools/list, tools/call)",
+          code: 'METHOD_NOT_ALLOWED',
+          message: 'MCP v1 accepts POST JSON-RPC only (initialize, tools/list, tools/call)',
           request_id: requestId,
         },
       },
       405,
       requestId,
-    );
+    )
   }
 
-  if (req.method !== "POST") {
-    throw new ApiError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+  if (req.method !== 'POST') {
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
   }
 
-  const contentType = req.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().includes("application/json")) {
+  const contentType = req.headers.get('content-type') ?? ''
+  if (!contentType.toLowerCase().includes('application/json')) {
     throw new ApiError(
       415,
-      "UNSUPPORTED_MEDIA_TYPE",
-      "Content-Type must be application/json",
-    );
+      'UNSUPPORTED_MEDIA_TYPE',
+      'Content-Type must be application/json',
+    )
   }
 
-  let parsed: unknown;
+  let parsed: unknown
   try {
-    parsed = await req.json();
+    parsed = await req.json()
   } catch {
-    throw new ApiError(400, "BAD_REQUEST", "Request body must be valid JSON");
+    throw new ApiError(400, 'BAD_REQUEST', 'Request body must be valid JSON')
   }
 
-  const message = parseJsonRpcRequest(parsed);
-  const headerMethod = req.headers.get("mcp-method");
+  const message = parseJsonRpcRequest(parsed)
+  const headerMethod = req.headers.get('mcp-method')
   if (headerMethod && message.method && headerMethod !== message.method) {
     throw new ApiError(
       400,
-      "BAD_REQUEST",
-      "Mcp-Method header does not match JSON-RPC method",
-    );
+      'BAD_REQUEST',
+      'Mcp-Method header does not match JSON-RPC method',
+    )
   }
-  if (message.method === "tools/call") {
-    const headerName = req.headers.get("mcp-name");
+  if (message.method === 'tools/call') {
+    const headerName = req.headers.get('mcp-name')
     try {
-      const name = toolName(message.params);
+      const name = toolName(message.params)
       if (headerName && headerName !== name) {
         throw new ApiError(
           400,
-          "BAD_REQUEST",
-          "Mcp-Name header does not match params.name",
-        );
+          'BAD_REQUEST',
+          'Mcp-Name header does not match params.name',
+        )
       }
     } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw error;
+      if (error instanceof ApiError) throw error
+      throw error
     }
   }
 
   try {
-    const dispatched = await dispatchJsonRpc(auth, message, requestId);
+    const dispatched = await dispatchJsonRpc(auth, message, requestId)
     if (dispatched === null) {
       return new Response(null, {
         status: 202,
-        headers: { "x-request-id": requestId },
-      });
+        headers: { 'x-request-id': requestId },
+      })
     }
-    return jsonResponse(dispatched.body, dispatched.status, requestId);
+    return jsonResponse(dispatched.body, dispatched.status, requestId)
   } catch (error) {
     if (error instanceof ApiError) {
       // tools/call: never return non-2xx — Cursor Streamable HTTP maps that to
       // transport_error and fails the MCP connection (seen on If-Match 412).
-      if (message.method === "tools/call") {
+      if (message.method === 'tools/call') {
         return jsonResponse(
           rpcResult(message.id, mcpToolFailureResult(error, requestId)),
           200,
           requestId,
-        );
+        )
       }
       // Other JSON-RPC methods: keep protocol-ish statuses as JSON-RPC errors.
       if (
@@ -2844,10 +2821,10 @@ export async function handleMcp(
         error.status === 409 ||
         error.status === 412
       ) {
-        return jsonResponse(apiErrorToRpc(message.id, error), 200, requestId);
+        return jsonResponse(apiErrorToRpc(message.id, error), 200, requestId)
       }
-      return errorResponse(error, requestId);
+      return errorResponse(error, requestId)
     }
-    throw error;
+    throw error
   }
 }
