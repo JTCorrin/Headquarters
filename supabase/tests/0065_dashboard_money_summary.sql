@@ -100,10 +100,10 @@ with created as (
 )
 update _dash_fixture set other_org_id = created.id from created;
 
-insert into public.document_sequences (org_id, document_type, prefix, next_number, pad_length)
+insert into public.document_sequences (org_id, document_type, prefix, next_number, padding)
 select org_id, 'invoice', 'INV-', 1, 4 from _dash_fixture;
 
-insert into public.document_sequences (org_id, document_type, prefix, next_number, pad_length)
+insert into public.document_sequences (org_id, document_type, prefix, next_number, padding)
 select org_id, 'quote', 'Q-', 1, 4 from _dash_fixture;
 
 insert into public.memberships (org_id, user_id, role, status)

@@ -1051,13 +1051,16 @@ select ok(
 
 reset role;
 
+-- Lifecycle probes earlier switched this quote to USD; keep the untaxed product
+-- in the same currency so the org-default tax assertion is not masked by a
+-- currency mismatch.
 with created_untaxed as (
   insert into public.products (
     org_id, sku, name, product_type, unit_price_cents, currency,
     tax_rate_id, track_stock, status
   )
   select
-    org_id, 'NO-TAX', 'Untaxed service', 'service', 10000, 'GBP',
+    org_id, 'NO-TAX', 'Untaxed service', 'service', 10000, 'USD',
     null, false, 'active'
   from _quotes_fixture
   returning id

@@ -5,7 +5,7 @@ select plan(9);
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.send_invoice(uuid, uuid, integer, timestamptz)',
+    'public.send_invoice(uuid, uuid, integer, timestamptz, uuid)',
     'execute'
   ),
   'authenticated users can execute send_invoice with optional sent_at'

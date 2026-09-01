@@ -5,7 +5,7 @@ select plan(8);
 select ok(
   has_function_privilege(
     'service_role',
-    'public.read_mailbox_sync_credentials(uuid)',
+    'public.read_mailbox_sync_credentials(uuid, uuid)',
     'execute'
   ),
   'service_role can execute read_mailbox_sync_credentials'
@@ -14,7 +14,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'authenticated',
-    'public.read_mailbox_sync_credentials(uuid)',
+    'public.read_mailbox_sync_credentials(uuid, uuid)',
     'execute'
   ),
   'authenticated cannot execute read_mailbox_sync_credentials'
@@ -63,7 +63,7 @@ select ok(
       and prosrc like '%smtp_port%'
       and prosrc like '%smtp_security%'
     from pg_proc
-    where oid = 'public.read_mailbox_sync_credentials(uuid)'::regprocedure
+    where oid = 'public.read_mailbox_sync_credentials(uuid, uuid)'::regprocedure
   ),
   'read_mailbox_sync_credentials returns smtp_* fields'
 );
