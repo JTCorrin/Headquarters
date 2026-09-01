@@ -13,8 +13,8 @@ import {
   buildMailboxAuthUrl,
   exchangeMailboxAuthCode,
   isMailboxOAuthStubMode,
-  mailboxPresetHosts,
   type MailboxOAuthProvider,
+  mailboxPresetHosts,
   randomOAuthState,
   serializeMailboxTokenBlob,
 } from '../_shared/mailbox-oauth.ts'
@@ -625,7 +625,9 @@ async function oauthStart(
     throw new ApiError(
       503,
       'INTERNAL_ERROR',
-      `${provider === 'microsoft' ? 'Microsoft' : 'Google'} mailbox OAuth is not configured on this environment`,
+      `${
+        provider === 'microsoft' ? 'Microsoft' : 'Google'
+      } mailbox OAuth is not configured on this environment`,
     )
   }
 }
