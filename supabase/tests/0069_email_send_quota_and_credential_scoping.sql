@@ -406,7 +406,11 @@ select throws_ok(
 );
 
 -- 9. Credential read is org-scoped for user-backed callers.
+-- reset role alone leaves prior JWT claim GUCs in place; clear them explicitly.
 reset role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claim.role', '', true);
+select set_config('request.jwt.claims', '', true);
 set local role authenticated;
 
 select throws_ok(
