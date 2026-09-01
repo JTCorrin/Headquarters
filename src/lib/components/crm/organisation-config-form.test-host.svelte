@@ -17,6 +17,19 @@
 	const form = superForm(
 		defaults(
 			{
+				name: 'Corrin Data',
+				legalName: '',
+				phone: '',
+				billingEmail: '',
+				websiteUrl: '',
+				taxIdentifier: '',
+				registrationNumber: '',
+				addressLine1: '',
+				addressLine2: '',
+				city: '',
+				region: '',
+				postalCode: '',
+				country: 'GB',
 				timezone: 'Europe/London',
 				currency: 'GBP',
 				locale: 'en-GB',
