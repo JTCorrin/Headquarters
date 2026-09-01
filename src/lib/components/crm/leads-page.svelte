@@ -4,6 +4,7 @@
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
+	import type { ApiLeadWritableStage } from '$lib/api/v1/types.js';
 	import {
 		roleFromMemberships,
 		membershipFromCreateResult,
@@ -278,7 +279,10 @@
 		try {
 			const updated = await api.leads.update(
 				move.id,
-				{ stage: move.stage, position: move.position },
+				{
+					stage: move.stage as ApiLeadWritableStage,
+					position: move.position
+				},
 				target.version
 			);
 			if (isStale(epoch)) return;

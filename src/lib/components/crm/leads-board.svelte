@@ -125,13 +125,14 @@
 
 	function handleInit(api: KanbanInstanceApi) {
 		api.intercept('move-card', (ev) => {
-			const stage = String(ev.column ?? '');
+			const move = ev as MoveCardEvent;
+			const stage = String(move.column ?? '');
 			if (stage === 'won') {
 				onMoveBlocked?.('Won is convert-only — use Convert lead on the detail page.');
 				remountKey += 1;
 				return false;
 			}
-			const moving = resolveLeadId(ev.id);
+			const moving = resolveLeadId(move.id);
 			const current = moving ? leads.find((l) => l.id === moving) : null;
 			if (current?.stage === 'won') {
 				onMoveBlocked?.('Converted (won) leads stay in Won — edit the client instead.');

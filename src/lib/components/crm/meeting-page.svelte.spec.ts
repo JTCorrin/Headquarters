@@ -3,6 +3,7 @@ import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import { createApiV1Client } from '$lib/api/v1/client.js';
 import { createMockFetch } from '$lib/api/v1/mock-fetch.js';
+import type { ApiMeetingDocument, ApiMeetingTaskProposal } from '$lib/api/v1/types.js';
 import { createOrgSession } from '$lib/org/session.svelte.js';
 import MeetingPage from './meeting-page.svelte';
 
@@ -62,7 +63,7 @@ function sampleProposal(
 	};
 }
 
-function sampleMeeting(overrides: Record<string, unknown> = {}) {
+function sampleMeeting(overrides: Partial<ApiMeetingDocument> = {}): ApiMeetingDocument {
 	return {
 		id: MEETING_ID,
 		org_id: ORG_A,
@@ -234,12 +235,12 @@ describe('MeetingPage integration', () => {
 				request
 			) => {
 				expect(request.headers.get('if-match')).toBe('"3"');
-				const proposals = (meetingState.task_proposals as Array<Record<string, unknown>>).map(
-					(proposal) =>
+				const proposals = (meetingState.task_proposals ?? []).map(
+					(proposal: ApiMeetingTaskProposal) =>
 						proposal.id === PROPOSAL_ID
 							? {
 									...proposal,
-									status: 'accepted',
+									status: 'accepted' as const,
 									accepted_task_id: 'task-1',
 									decided_at: '2026-01-01T00:02:00Z'
 								}
@@ -252,12 +253,12 @@ describe('MeetingPage integration', () => {
 				request
 			) => {
 				expect(request.headers.get('if-match')).toBe('"4"');
-				const proposals = (meetingState.task_proposals as Array<Record<string, unknown>>).map(
-					(proposal) =>
+				const proposals = (meetingState.task_proposals ?? []).map(
+					(proposal: ApiMeetingTaskProposal) =>
 						proposal.id === PROPOSAL_ID_2
 							? {
 									...proposal,
-									status: 'dismissed',
+									status: 'dismissed' as const,
 									decided_at: '2026-01-01T00:03:00Z'
 								}
 							: proposal

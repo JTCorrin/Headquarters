@@ -12,7 +12,8 @@
 	import {
 		emptyMailboxFormData,
 		mailboxFormSchema,
-		type MailboxAccountResource
+		type MailboxAccountResource,
+		type MailboxTestFeedback
 	} from '$lib/schemas/mailbox.js';
 	import SettingsConfigPage from './settings-config-page.svelte';
 	import type { AppNavGroup } from './app-nav.svelte';
@@ -38,7 +39,11 @@
 		onSaveConfig?: () => boolean | void | Promise<boolean | void>;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
-		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
+		onTestMailbox?: () =>
+			| MailboxTestFeedback
+			| false
+			| void
+			| Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		onSaveTaxRate?: () => boolean | void | Promise<boolean | void>;
 		onSetDefaultTaxRate?: (taxRateId: string) => void;

@@ -1,6 +1,7 @@
-<script module>
+<script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import MeetingsListPage from '$lib/components/crm/meetings-list-page.svelte';
+	import type { MeetingListItem } from '$lib/schemas/meeting.js';
 	import { navGroupsWithActive } from './story-fixtures.js';
 
 	const rows = [
@@ -64,7 +65,7 @@
 			calendarProvider: null,
 			externalEventId: null
 		}
-	];
+	] satisfies MeetingListItem[];
 
 	const { Story } = defineMeta({
 		title: 'Headquarters/Pages/MeetingsList',

@@ -52,7 +52,7 @@ describe('DataTableShell', () => {
 	});
 	it('sorts by name when header clicked', async () => {
 		render(DataTableShell, {
-			columns: contactColumns,
+			columns: contactColumns as ColumnDef<unknown, unknown>[],
 			data: rows,
 			filterColumn: 'name',
 			filterPlaceholder: 'Filter contacts…',
@@ -67,7 +67,7 @@ describe('DataTableShell', () => {
 
 	it('filters by name', async () => {
 		render(DataTableShell, {
-			columns: contactColumns,
+			columns: contactColumns as ColumnDef<unknown, unknown>[],
 			data: rows,
 			filterColumn: 'name',
 			filterPlaceholder: 'Filter contacts…',
@@ -81,7 +81,7 @@ describe('DataTableShell', () => {
 
 	it('hides selection chrome when columns have no select column', async () => {
 		render(DataTableShell, {
-			columns: contactColumns,
+			columns: contactColumns as ColumnDef<unknown, unknown>[],
 			data: rows,
 			filterColumn: 'name',
 			pageSize: 8
@@ -93,7 +93,7 @@ describe('DataTableShell', () => {
 
 	it('selects a row via checkbox when a select column is present', async () => {
 		render(DataTableShell, {
-			columns: selectableColumns,
+			columns: selectableColumns as ColumnDef<unknown, unknown>[],
 			data: rows,
 			filterColumn: 'name',
 			pageSize: 8
@@ -110,7 +110,7 @@ describe('DataTableShell', () => {
 			.toBe(true);
 
 		render(DataTableShell, {
-			columns: contactColumns,
+			columns: contactColumns as ColumnDef<unknown, unknown>[],
 			data: rows,
 			filterColumn: 'name',
 			pageSize: 8
@@ -123,7 +123,7 @@ describe('DataTableShell', () => {
 
 	it('filters by a single status facet', async () => {
 		render(DataTableShell, {
-			columns: contactColumns,
+			columns: contactColumns as ColumnDef<unknown, unknown>[],
 			data: rows,
 			filterColumn: 'name',
 			pageSize: 8,
@@ -159,7 +159,7 @@ describe('DataTableShell', () => {
 		];
 
 		render(DataTableShell, {
-			columns: contactColumns,
+			columns: contactColumns as ColumnDef<unknown, unknown>[],
 			data: invoiceRows,
 			filterColumn: 'name',
 			pageSize: 8,

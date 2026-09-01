@@ -353,10 +353,10 @@ async function openSmtpConnection(
   const deadline = Date.now() + Math.max(1, connectTimeoutMs)
   const remaining = () => Math.max(1, deadline - Date.now())
 
-	// Trusted system mail may target private infra (e.g. Mailpit). User mailboxes never set this.
-	const target = allowPrivateHost
-		? { hostname: host.trim(), connectHost: host.trim() }
-		: await assertSafeOutboundHost(host)
+  // Trusted system mail may target private infra (e.g. Mailpit). User mailboxes never set this.
+  const target = allowPrivateHost
+    ? { hostname: host.trim(), connectHost: host.trim() }
+    : await assertSafeOutboundHost(host)
 
   try {
     const plain = await withImapTimeout(
