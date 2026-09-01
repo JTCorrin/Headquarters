@@ -1205,8 +1205,8 @@ async function postMailboxSync(
   for (
     let attempt = 1;
     attempt < maxAttempts &&
-      !result.ok &&
-      (result.error_code === 'lease_held' || result.error_code === 'not_claimed');
+    !result.ok &&
+    (result.error_code === 'lease_held' || result.error_code === 'not_claimed');
     attempt++
   ) {
     await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
