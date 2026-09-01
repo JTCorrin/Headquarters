@@ -73,6 +73,16 @@ describe('mailbox schema', () => {
 		);
 	});
 
+	it('humanizes lease_held as another sync in progress', () => {
+		expect(humanizeMailboxSyncError('lease_held')).toMatch(/already running/i);
+		expect(humanizeMailboxSyncError('lease_held')).toBe(
+			humanizeMailboxSyncError('not_claimed')
+		);
+		expect(describeMailboxSyncResult({ ok: false, ingested: 0, error_code: 'lease_held' })).toMatch(
+			/already running/i
+		);
+	});
+
 	it('prefers Sync API timeout message, else includes step', () => {
 		expect(
 			humanizeMailboxSyncError('timeout', {
