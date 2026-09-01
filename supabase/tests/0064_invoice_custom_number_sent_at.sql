@@ -129,6 +129,8 @@ select is(
   'custom number is stored as provided'
 );
 
+-- document_sequences is not selectable by authenticated.
+reset role;
 select is(
   (
     select next_number
@@ -139,6 +141,9 @@ select is(
   101::bigint,
   'custom INV-0100 bumps invoice sequence next_number to 101'
 );
+
+select pg_temp.as_user((select owner_id from _inv_migrate_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$
