@@ -17,6 +17,9 @@ export const billFormSchema = z.object({
 export type BillFormSchema = typeof billFormSchema;
 export type BillFormData = z.infer<typeof billFormSchema>;
 
+/** Re-export for bill forms/pickers that import vendor options from this module. */
+export type { BillVendorOption } from './vendor.js';
+
 /** Row shape for the bills data table (UI-facing). */
 export interface BillListItem {
 	id: string;

@@ -218,8 +218,8 @@ describe('LeadsPage integration', () => {
 		await page.getByTestId(`lead-move-up-${LEAD_B}`).click();
 
 		await expect.poll(() => patchCount).toBe(1);
-		expect(lastPatch?.ifMatch).toBe('"2"');
-		expect(lastPatch?.body).toMatchObject({
+		await expect.poll(() => lastPatch?.ifMatch).toBe('"2"');
+		await expect.poll(() => lastPatch?.body).toMatchObject({
 			stage: 'new',
 			position: expect.any(Number)
 		});
