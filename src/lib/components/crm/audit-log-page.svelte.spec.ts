@@ -68,7 +68,7 @@ describe('AuditLogPage integration', () => {
 		});
 
 		const fetchMock = createMockFetch({
-			'GET /api/v1/organisations': () => membershipPayload('owner'),
+			'GET /api/v1/organisations': () => ({ body: membershipPayload('owner') }),
 			'GET /api/v1/audit-events': (request) => {
 				seenOrgHeaders.push(request.headers.get('X-Org-Id') ?? '');
 				expect(new URL(request.url).searchParams.get('limit')).toBe('100');

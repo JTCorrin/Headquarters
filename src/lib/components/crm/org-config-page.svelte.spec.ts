@@ -59,7 +59,7 @@ function memberships() {
 					timezone: 'Europe/London',
 					locale: 'en-GB',
 					country_code: 'GB',
-					theme_default: 'system'
+					theme_default: 'system' as const
 				}
 			},
 			{
@@ -78,7 +78,7 @@ function memberships() {
 					timezone: 'UTC',
 					locale: 'en-US',
 					country_code: 'US',
-					theme_default: 'dark'
+					theme_default: 'dark' as const
 				}
 			}
 		]

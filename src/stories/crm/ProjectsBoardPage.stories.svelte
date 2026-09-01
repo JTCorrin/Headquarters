@@ -1,6 +1,7 @@
-<script module>
+<script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import ProjectsBoardPage from '$lib/components/crm/projects-board-page.svelte';
+	import type { ProjectCard } from '$lib/components/crm/projects-board.svelte';
 
 	const { Story } = defineMeta({
 		title: 'Headquarters/Pages/ProjectsBoard',
@@ -82,7 +83,7 @@
 			version: 1,
 			position: 1
 		}
-	];
+	] satisfies ProjectCard[];
 </script>
 
 <script lang="ts">

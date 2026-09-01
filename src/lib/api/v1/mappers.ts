@@ -2154,7 +2154,8 @@ export function toTimelineEventCreateBody(
 		.filter((m) => m.membership_id && m.display_name)
 		.slice(0, 20);
 	return {
-		kind: submit.kind,
+		// API rejects system-only kinds such as `conversion` on create.
+		kind: submit.kind === 'conversion' ? undefined : submit.kind,
 		title: submit.title,
 		body: submit.body.trim() ? submit.body : null,
 		payload: {

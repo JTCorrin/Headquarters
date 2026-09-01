@@ -1,106 +1,105 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@supabase/supabase-js";
-import type { Database, Json } from "../_shared/database.ts";
-import { resolveMailboxAuth } from "../_shared/mailbox-credentials.ts";
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+import type { Database, Json } from '../_shared/database.ts'
+import { resolveMailboxAuth } from '../_shared/mailbox-credentials.ts'
 import {
+  type MailboxSmtpSender,
   parseSmtpSecurity,
   resolveAppBaseUrl,
   sendMailboxInvitationEmail,
-  type MailboxSmtpSender,
-} from "../_shared/system-email.ts";
-import { sha256Hex } from "./api-keys.ts";
-import { ApiError, jsonBody, jsonResponse, parseUuid } from "./http.ts";
+} from '../_shared/system-email.ts'
+import { sha256Hex } from './api-keys.ts'
+import { ApiError, jsonBody, jsonResponse, parseUuid } from './http.ts'
 
-type DatabaseClient = SupabaseClient<Database>;
-type MembershipRole =
-  Database["public"]["Tables"]["memberships"]["Row"]["role"];
-type InvitationRole = Exclude<MembershipRole, "owner">;
+type DatabaseClient = SupabaseClient<Database>
+type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
+type InvitationRole = Exclude<MembershipRole, 'owner'>
 
 const INVITATION_ROLES = new Set<InvitationRole>([
-  "admin",
-  "member",
-  "billing",
-  "readonly",
-]);
-const MEMBER_STATUSES = new Set(["active", "suspended"]);
+  'admin',
+  'member',
+  'billing',
+  'readonly',
+])
+const MEMBER_STATUSES = new Set(['active', 'suspended'])
 
 const MAILBOX_REQUIRED_MESSAGE =
-  "Configure your personal mailbox SMTP under My settings → Mail before sending invitations.";
+  'Configure your personal mailbox SMTP under My settings → Mail before sending invitations.'
 
 function serviceRoleClient(): SupabaseClient<Database> {
-  const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !key) {
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "Service credentials are unavailable",
-    );
+      'INTERNAL_ERROR',
+      'Service credentials are unavailable',
+    )
   }
   return createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  })
 }
 
 async function requireInviterMailboxSmtp(
   db: DatabaseClient,
   orgId: string,
 ): Promise<MailboxSmtpSender> {
-  const { data: mailbox, error } = await db.rpc("get_mailbox_account", {
+  const { data: mailbox, error } = await db.rpc('get_mailbox_account', {
     p_org_id: orgId,
-  });
+  })
   if (error) {
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "Could not load mailbox settings",
-    );
+      'INTERNAL_ERROR',
+      'Could not load mailbox settings',
+    )
   }
-  const row = mailbox as Record<string, unknown> | null;
+  const row = mailbox as Record<string, unknown> | null
   if (
     !row ||
     row.credentials_configured !== true ||
-    typeof row.id !== "string" ||
-    typeof row.smtp_host !== "string" ||
+    typeof row.id !== 'string' ||
+    typeof row.smtp_host !== 'string' ||
     !String(row.smtp_host).trim() ||
-    typeof row.email_address !== "string" ||
+    typeof row.email_address !== 'string' ||
     !String(row.email_address).trim()
   ) {
-    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
-      mailbox: "Personal mailbox SMTP is required",
-    });
+    throw new ApiError(422, 'VALIDATION_ERROR', MAILBOX_REQUIRED_MESSAGE, {
+      mailbox: 'Personal mailbox SMTP is required',
+    })
   }
-  const port = Number(row.smtp_port);
+  const port = Number(row.smtp_port)
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
-      smtp_port: "Mailbox SMTP port is incomplete",
-    });
+    throw new ApiError(422, 'VALIDATION_ERROR', MAILBOX_REQUIRED_MESSAGE, {
+      smtp_port: 'Mailbox SMTP port is incomplete',
+    })
   }
 
-  let security: ReturnType<typeof parseSmtpSecurity>;
+  let security: ReturnType<typeof parseSmtpSecurity>
   try {
-    security = parseSmtpSecurity(row.smtp_security);
+    security = parseSmtpSecurity(row.smtp_security)
   } catch {
-    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
-      smtp_security: "Mailbox SMTP security is incomplete",
-    });
+    throw new ApiError(422, 'VALIDATION_ERROR', MAILBOX_REQUIRED_MESSAGE, {
+      smtp_security: 'Mailbox SMTP security is incomplete',
+    })
   }
 
-  const service = serviceRoleClient();
-  let resolved;
+  const service = serviceRoleClient()
+  let resolved
   try {
-    resolved = await resolveMailboxAuth(service, row.id);
+    resolved = await resolveMailboxAuth(service, row.id)
   } catch {
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "Could not read mailbox credentials",
-    );
+      'INTERNAL_ERROR',
+      'Could not read mailbox credentials',
+    )
   }
   if (!resolved) {
-    throw new ApiError(422, "VALIDATION_ERROR", MAILBOX_REQUIRED_MESSAGE, {
-      mailbox: "Mailbox credentials are required",
-    });
+    throw new ApiError(422, 'VALIDATION_ERROR', MAILBOX_REQUIRED_MESSAGE, {
+      mailbox: 'Mailbox credentials are required',
+    })
   }
 
   return {
@@ -110,111 +109,107 @@ async function requireInviterMailboxSmtp(
     security,
     auth: resolved.smtpAuth,
     from: String(row.email_address).trim(),
-  };
+  }
 }
 
 function databaseError(
   error: { code?: string; message?: string },
   requestId: string,
 ): ApiError {
-  const message = error.message?.toLowerCase() ?? "";
-  if (error.code === "42501" || message.includes("forbidden")) {
+  const message = error.message?.toLowerCase() ?? ''
+  if (error.code === '42501' || message.includes('forbidden')) {
     return new ApiError(
       403,
-      "FORBIDDEN",
-      error.message ?? "Organisation access is forbidden",
-    );
+      'FORBIDDEN',
+      error.message ?? 'Organisation access is forbidden',
+    )
   }
   if (
-    error.code === "P0002" || message.includes("not found") ||
-    message.includes("expired")
+    error.code === 'P0002' || message.includes('not found') ||
+    message.includes('expired')
   ) {
     return new ApiError(
       404,
-      "NOT_FOUND",
-      error.message ?? "Resource not found",
-    );
+      'NOT_FOUND',
+      error.message ?? 'Resource not found',
+    )
   }
-  if (error.code === "23505") {
+  if (error.code === '23505') {
     return new ApiError(
       409,
-      "CONFLICT",
-      error.message ?? "The operation conflicts with existing data",
-    );
+      'CONFLICT',
+      error.message ?? 'The operation conflicts with existing data',
+    )
   }
   if (
-    error.code === "22023" || error.code === "23514" ||
-    message.includes("invalid")
+    error.code === '22023' || error.code === '23514' ||
+    message.includes('invalid')
   ) {
     return new ApiError(
       422,
-      "VALIDATION_ERROR",
-      error.message ?? "Validation failed",
-    );
+      'VALIDATION_ERROR',
+      error.message ?? 'Validation failed',
+    )
   }
-  console.error("Organisation access operation failed", {
+  console.error('Organisation access operation failed', {
     request_id: requestId,
-    code: error.code ?? "unknown",
-  });
+    code: error.code ?? 'unknown',
+  })
   return new ApiError(
     500,
-    "INTERNAL_ERROR",
-    "The organisation access operation failed",
-  );
+    'INTERNAL_ERROR',
+    'The organisation access operation failed',
+  )
 }
 
 function randomInvitationToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return `crm_inv_${
-    [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("")
-  }`;
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return `crm_inv_${[...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
 function invitationInput(body: Record<string, unknown>): {
-  email: string;
-  role: InvitationRole;
-  expires_at: string;
+  email: string
+  role: InvitationRole
+  expires_at: string
 } {
-  const fields: Record<string, string> = {};
-  const writable = new Set(["email", "role", "expires_at"]);
+  const fields: Record<string, string> = {}
+  const writable = new Set(['email', 'role', 'expires_at'])
   for (const key of Object.keys(body)) {
-    if (!writable.has(key)) fields[key] = "Unknown field";
+    if (!writable.has(key)) fields[key] = 'Unknown field'
   }
-  const email = typeof body.email === "string"
-    ? body.email.trim().toLowerCase()
-    : "";
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320) {
-    fields.email = "Must be a valid email address";
+    fields.email = 'Must be a valid email address'
   }
-  const role = body.role;
+  const role = body.role
   if (
-    typeof role !== "string" || !INVITATION_ROLES.has(role as InvitationRole)
+    typeof role !== 'string' || !INVITATION_ROLES.has(role as InvitationRole)
   ) {
-    fields.role = "Must be admin, member, billing, or readonly";
+    fields.role = 'Must be admin, member, billing, or readonly'
   }
-  let expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  if ("expires_at" in body) {
+  let expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  if ('expires_at' in body) {
     if (
-      typeof body.expires_at !== "string" ||
+      typeof body.expires_at !== 'string' ||
       Number.isNaN(Date.parse(body.expires_at))
     ) {
-      fields.expires_at = "Must be a future ISO-8601 timestamp";
+      fields.expires_at = 'Must be a future ISO-8601 timestamp'
     } else {
-      expiresAt = new Date(body.expires_at).toISOString();
+      expiresAt = new Date(body.expires_at).toISOString()
       if (Date.parse(expiresAt) <= Date.now()) {
-        fields.expires_at = "Must be in the future";
+        fields.expires_at = 'Must be in the future'
       }
     }
   }
   if (Object.keys(fields).length > 0) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "Invitation validation failed",
+      'VALIDATION_ERROR',
+      'Invitation validation failed',
       fields,
-    );
+    )
   }
-  return { email, role: role as InvitationRole, expires_at: expiresAt };
+  return { email, role: role as InvitationRole, expires_at: expiresAt }
 }
 
 async function createInvitation(
@@ -223,75 +218,73 @@ async function createInvitation(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const input = invitationInput(await jsonBody(req));
-  const mailbox = await requireInviterMailboxSmtp(db, orgId);
-  let appBaseUrl: string;
+  const input = invitationInput(await jsonBody(req))
+  const mailbox = await requireInviterMailboxSmtp(db, orgId)
+  let appBaseUrl: string
   try {
-    appBaseUrl = resolveAppBaseUrl(req);
+    appBaseUrl = resolveAppBaseUrl(req)
   } catch {
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "APP_BASE_URL is not configured for invitation links",
-    );
+      'INTERNAL_ERROR',
+      'APP_BASE_URL is not configured for invitation links',
+    )
   }
 
-  const token = randomInvitationToken();
-  const tokenHash = await sha256Hex(token);
-  const { data, error } = await db.rpc("create_organisation_invitation", {
+  const token = randomInvitationToken()
+  const tokenHash = await sha256Hex(token)
+  const { data, error } = await db.rpc('create_organisation_invitation', {
     p_org_id: orgId,
     p_email: input.email,
     p_role: input.role,
     p_token_hash: tokenHash,
     p_expires_at: input.expires_at,
-  });
-  if (error) throw databaseError(error, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
 
   const [{ data: organisation }, { data: profile }] = await Promise.all([
-    db.from("organisations").select("name").eq("id", orgId).single(),
-    db.from("profiles").select("display_name").eq(
-      "id",
+    db.from('organisations').select('name').eq('id', orgId).single(),
+    db.from('profiles').select('display_name').eq(
+      'id',
       (data as { invited_by: string }).invited_by,
     )
       .single(),
-  ]);
+  ])
   try {
     await sendMailboxInvitationEmail(
       {
         to: input.email,
-        organisationName: organisation?.name ?? "your organisation",
-        inviterName: profile?.display_name ?? "An administrator",
+        organisationName: organisation?.name ?? 'your organisation',
+        inviterName: profile?.display_name ?? 'An administrator',
         role: input.role,
         token,
         expiresAt: input.expires_at,
       },
       mailbox,
       appBaseUrl,
-    );
+    )
   } catch (emailError) {
-    const invitationId = (data as { id?: string } | null)?.id;
+    const invitationId = (data as { id?: string } | null)?.id
     if (invitationId) {
-      await db.rpc("revoke_organisation_invitation", {
+      await db.rpc('revoke_organisation_invitation', {
         p_org_id: orgId,
         p_invitation_id: invitationId,
-      });
+      })
     }
-    const detail = emailError instanceof Error
-      ? emailError.message
-      : "unknown";
-    console.error("Mailbox invitation email failed", {
+    const detail = emailError instanceof Error ? emailError.message : 'unknown'
+    console.error('Mailbox invitation email failed', {
       request_id: requestId,
       mailbox_id: mailbox.mailboxId,
       error: detail,
-    });
+    })
     throw new ApiError(
       502,
-      "UPSTREAM_ERROR",
-      "Invitation email could not be delivered via your mailbox SMTP",
-    );
+      'UPSTREAM_ERROR',
+      'Invitation email could not be delivered via your mailbox SMTP',
+    )
   }
 
-  return jsonResponse({ data }, 201, requestId);
+  return jsonResponse({ data }, 201, requestId)
 }
 
 async function acceptInvitation(
@@ -299,61 +292,61 @@ async function acceptInvitation(
   db: DatabaseClient,
   requestId: string,
 ): Promise<Response> {
-  const body = await jsonBody(req);
+  const body = await jsonBody(req)
   if (
-    Object.keys(body).some((key) => key !== "token") ||
-    typeof body.token !== "string" ||
+    Object.keys(body).some((key) => key !== 'token') ||
+    typeof body.token !== 'string' ||
     !/^crm_inv_[0-9a-f]{64}$/.test(body.token)
   ) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "A valid invitation token is required",
+      'VALIDATION_ERROR',
+      'A valid invitation token is required',
       {
-        token: "Must be an invitation token",
+        token: 'Must be an invitation token',
       },
-    );
+    )
   }
-  const { data, error } = await db.rpc("accept_organisation_invitation", {
+  const { data, error } = await db.rpc('accept_organisation_invitation', {
     p_token_hash: await sha256Hex(body.token),
-  });
-  if (error) throw databaseError(error, requestId);
-  return jsonResponse({ data }, 200, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
+  return jsonResponse({ data }, 200, requestId)
 }
 
 function memberPatch(body: Record<string, unknown>): {
-  role: InvitationRole | null;
-  status: "active" | "suspended" | null;
+  role: InvitationRole | null
+  status: 'active' | 'suspended' | null
 } {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = {}
   for (const key of Object.keys(body)) {
-    if (key !== "role" && key !== "status") fields[key] = "Unknown field";
+    if (key !== 'role' && key !== 'status') fields[key] = 'Unknown field'
   }
-  let role: InvitationRole | null = null;
-  let status: "active" | "suspended" | null = null;
-  if ("role" in body) {
+  let role: InvitationRole | null = null
+  let status: 'active' | 'suspended' | null = null
+  if ('role' in body) {
     if (
-      typeof body.role !== "string" ||
+      typeof body.role !== 'string' ||
       !INVITATION_ROLES.has(body.role as InvitationRole)
     ) {
-      fields.role = "Must be admin, member, billing, or readonly";
-    } else role = body.role as InvitationRole;
+      fields.role = 'Must be admin, member, billing, or readonly'
+    } else role = body.role as InvitationRole
   }
-  if ("status" in body) {
-    if (typeof body.status !== "string" || !MEMBER_STATUSES.has(body.status)) {
-      fields.status = "Must be active or suspended";
-    } else status = body.status as "active" | "suspended";
+  if ('status' in body) {
+    if (typeof body.status !== 'string' || !MEMBER_STATUSES.has(body.status)) {
+      fields.status = 'Must be active or suspended'
+    } else status = body.status as 'active' | 'suspended'
   }
-  if (role === null && status === null) fields._ = "Role or status is required";
+  if (role === null && status === null) fields._ = 'Role or status is required'
   if (Object.keys(fields).length > 0) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "Member validation failed",
+      'VALIDATION_ERROR',
+      'Member validation failed',
       fields,
-    );
+    )
   }
-  return { role, status };
+  return { role, status }
 }
 
 export async function handleOrganisationAccess(
@@ -364,119 +357,119 @@ export async function handleOrganisationAccess(
   actorRole: MembershipRole,
   requestId: string,
 ): Promise<Response> {
-  if (actorRole !== "owner" && actorRole !== "admin") {
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Only owners and admins can manage organisation access",
-    );
+      'FORBIDDEN',
+      'Only owners and admins can manage organisation access',
+    )
   }
-  if (path === "/api/v1/organisation/invitations") {
-    if (req.method === "GET") {
-      const { data, error } = await db.rpc("list_organisation_invitations", {
+  if (path === '/api/v1/organisation/invitations') {
+    if (req.method === 'GET') {
+      const { data, error } = await db.rpc('list_organisation_invitations', {
         p_org_id: orgId,
-      });
-      if (error) throw databaseError(error, requestId);
-      return jsonResponse({ data: (data ?? []) as Json }, 200, requestId);
+      })
+      if (error) throw databaseError(error, requestId)
+      return jsonResponse({ data: (data ?? []) as Json }, 200, requestId)
     }
-    if (req.method === "POST") {
-      return await createInvitation(req, db, orgId, requestId);
+    if (req.method === 'POST') {
+      return await createInvitation(req, db, orgId, requestId)
     }
     throw new ApiError(
       405,
-      "METHOD_NOT_ALLOWED",
-      "Method not allowed for invitations",
-    );
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for invitations',
+    )
   }
 
   const invitationMatch = path.match(
     /^\/api\/v1\/organisation\/invitations\/([0-9a-f-]{36})$/i,
-  );
+  )
   if (invitationMatch) {
-    if (req.method !== "DELETE") {
+    if (req.method !== 'DELETE') {
       throw new ApiError(
         405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for invitation",
-      );
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for invitation',
+      )
     }
-    const { data, error } = await db.rpc("revoke_organisation_invitation", {
+    const { data, error } = await db.rpc('revoke_organisation_invitation', {
       p_org_id: orgId,
-      p_invitation_id: parseUuid(invitationMatch[1], "id"),
-    });
-    if (error) throw databaseError(error, requestId);
-    return jsonResponse({ data }, 200, requestId);
+      p_invitation_id: parseUuid(invitationMatch[1], 'id'),
+    })
+    if (error) throw databaseError(error, requestId)
+    return jsonResponse({ data }, 200, requestId)
   }
 
-  if (path === "/api/v1/organisation/members") {
-    if (req.method !== "GET") {
+  if (path === '/api/v1/organisation/members') {
+    if (req.method !== 'GET') {
       throw new ApiError(
         405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for members",
-      );
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for members',
+      )
     }
-    const { data, error } = await db.rpc("list_organisation_members", {
+    const { data, error } = await db.rpc('list_organisation_members', {
       p_org_id: orgId,
-    });
-    if (error) throw databaseError(error, requestId);
-    return jsonResponse({ data: (data ?? []) as Json }, 200, requestId);
+    })
+    if (error) throw databaseError(error, requestId)
+    return jsonResponse({ data: (data ?? []) as Json }, 200, requestId)
   }
 
   const transferMatch = path.match(
     /^\/api\/v1\/organisation\/members\/([0-9a-f-]{36})\/transfer-ownership$/i,
-  );
+  )
   if (transferMatch) {
-    if (req.method !== "POST") {
+    if (req.method !== 'POST') {
       throw new ApiError(
         405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for ownership transfer",
-      );
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for ownership transfer',
+      )
     }
-    const { data, error } = await db.rpc("transfer_organisation_ownership", {
+    const { data, error } = await db.rpc('transfer_organisation_ownership', {
       p_org_id: orgId,
-      p_target_membership_id: parseUuid(transferMatch[1], "id"),
-    });
-    if (error) throw databaseError(error, requestId);
-    return jsonResponse({ data }, 200, requestId);
+      p_target_membership_id: parseUuid(transferMatch[1], 'id'),
+    })
+    if (error) throw databaseError(error, requestId)
+    return jsonResponse({ data }, 200, requestId)
   }
 
   const memberMatch = path.match(
     /^\/api\/v1\/organisation\/members\/([0-9a-f-]{36})$/i,
-  );
+  )
   if (memberMatch) {
-    const membershipId = parseUuid(memberMatch[1], "id");
-    if (req.method === "PATCH") {
-      const input = memberPatch(await jsonBody(req));
-      const { data, error } = await db.rpc("update_organisation_member", {
+    const membershipId = parseUuid(memberMatch[1], 'id')
+    if (req.method === 'PATCH') {
+      const input = memberPatch(await jsonBody(req))
+      const { data, error } = await db.rpc('update_organisation_member', {
         p_org_id: orgId,
         p_membership_id: membershipId,
         p_role: input.role,
         p_status: input.status,
-      });
-      if (error) throw databaseError(error, requestId);
-      return jsonResponse({ data }, 200, requestId);
+      })
+      if (error) throw databaseError(error, requestId)
+      return jsonResponse({ data }, 200, requestId)
     }
-    if (req.method === "DELETE") {
-      const { error } = await db.rpc("remove_organisation_member", {
+    if (req.method === 'DELETE') {
+      const { error } = await db.rpc('remove_organisation_member', {
         p_org_id: orgId,
         p_membership_id: membershipId,
-      });
-      if (error) throw databaseError(error, requestId);
+      })
+      if (error) throw databaseError(error, requestId)
       return new Response(null, {
         status: 204,
-        headers: { "x-request-id": requestId },
-      });
+        headers: { 'x-request-id': requestId },
+      })
     }
     throw new ApiError(
       405,
-      "METHOD_NOT_ALLOWED",
-      "Method not allowed for member",
-    );
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for member',
+    )
   }
 
-  throw new ApiError(404, "NOT_FOUND", "Route not found");
+  throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 }
 
-export { acceptInvitation };
+export { acceptInvitation }

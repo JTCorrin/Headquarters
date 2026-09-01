@@ -112,7 +112,7 @@ describe('LeadsBoard card moves', () => {
 describe('LeadsBoard column affordances', () => {
 	it('keeps empty columns tall enough for drop targets and expand controls clickable', async () => {
 		render(LeadsBoard, {
-			leads: leads.filter((lead) => lead.stage !== 'qualified')
+			leads: leads.filter((lead) => lead.stage !== 'proposal')
 		});
 
 		const board = page.getByTestId('leads-board').element() as HTMLElement;
