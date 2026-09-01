@@ -1,5 +1,8 @@
 name: E2E Staging (Playwright)
 
+# Manual re-run of the Playwright CRM suite against deployed staging.
+# The same suite also runs automatically after Staging Deploy.
+
 on:
   workflow_dispatch:
 

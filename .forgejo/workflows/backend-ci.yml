@@ -1,5 +1,8 @@
 name: Backend CI
 
+# PR gate for Deno + pgTAP + db lint. Staging push re-runs this suite in
+# `.forgejo/workflows/staging-deploy.yml` alongside deploy + Playwright.
+
 on:
   pull_request:
     branches: [dev, main]
