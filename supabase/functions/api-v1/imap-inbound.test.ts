@@ -225,6 +225,11 @@ Deno.test('safeMailboxSyncFailureMessage keeps select/search/fetch distinct', ()
     ),
     true,
   )
+  assertEquals(
+    safeMailboxSyncFailureMessage('lease_held').message.includes('already running'),
+    true,
+  )
+  assertEquals(safeMailboxSyncFailureMessage('lease_held').step, 'lease')
 })
 
 Deno.test('withImapTimeout FETCH label sets step fetch', async () => {
