@@ -177,15 +177,23 @@ select is(
 );
 
 -- 2. Finish consumes one quota unit for the mailbox.
+-- Quota counters are revoked from authenticated; inspect them as the table owner.
+reset role;
 select is(
-  (
-    select sent_count from public.email_send_quota_usage
-    where mailbox_account_id = (select mailbox_id from _esq_fixture)
-      and usage_date = (now() at time zone 'utc')::date
+  coalesce(
+    (
+      select sent_count from public.email_send_quota_usage
+      where mailbox_account_id = (select mailbox_id from _esq_fixture)
+        and usage_date = (now() at time zone 'utc')::date
+    ),
+    0
   ),
   0,
   'quota row not created before finish'
 );
+
+select pg_temp.as_user((select owner_id from _esq_fixture));
+set local role authenticated;
 
 select lives_ok(
   $$
@@ -206,6 +214,7 @@ select lives_ok(
   'finish_email_compose_idempotent records a sent compose'
 );
 
+reset role;
 select is(
   (
     select sent_count from public.email_send_quota_usage
@@ -215,6 +224,9 @@ select is(
   1,
   'finish consumes one quota unit on success'
 );
+
+select pg_temp.as_user((select owner_id from _esq_fixture));
+set local role authenticated;
 
 -- 3. Member (non-owner) may not opt into an external recipient.
 select pg_temp.as_user((select member_id from _esq_fixture));
@@ -327,6 +339,7 @@ select lives_ok(
   'reply finish records a sent reply'
 );
 
+reset role;
 select is(
   (
     select sent_count from public.email_send_quota_usage
@@ -342,6 +355,9 @@ update public.email_send_quota_usage
 set sent_count = (select limit_value from (select 200 as limit_value) limits)
 where mailbox_account_id = (select mailbox_id from _esq_fixture)
   and usage_date = (now() at time zone 'utc')::date;
+
+select pg_temp.as_user((select owner_id from _esq_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$

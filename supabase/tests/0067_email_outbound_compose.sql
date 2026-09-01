@@ -126,7 +126,7 @@ update _cec_fixture set client_id = created_client.id from created_client;
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.begin_email_compose_idempotent(uuid, text, uuid, text, text, text, integer)',
+    'public.begin_email_compose_idempotent(uuid, text, uuid, text, text, text, integer, text, boolean)',
     'execute'
   ),
   'authenticated can execute begin_email_compose_idempotent'
@@ -162,7 +162,7 @@ select ok(
 select ok(
   not has_function_privilege(
     'anon',
-    'public.begin_email_compose_idempotent(uuid, text, uuid, text, text, text, integer)',
+    'public.begin_email_compose_idempotent(uuid, text, uuid, text, text, text, integer, text, boolean)',
     'execute'
   ),
   'anon cannot execute begin_email_compose_idempotent'
