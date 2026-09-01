@@ -441,6 +441,7 @@ export function safeMailboxSyncFailureMessage(
       imap_host_blocked: 'connect',
       credentials_missing: 'credentials',
       lease_error: 'lease',
+      lease_held: 'lease',
       not_claimed: 'lease',
       timeout: null,
       sync_failed: 'sync',
@@ -462,6 +463,7 @@ export function safeMailboxSyncFailureMessage(
       'This mail host is not allowed — private, link-local, and metadata addresses are blocked.',
     credentials_missing: 'Mailbox credentials are missing — save a password, then try Sync again.',
     lease_error: 'Could not start sync — try again in a moment.',
+    lease_held: 'Another sync is already running — wait a moment and try again.',
     not_claimed: 'Another sync is already running — wait a moment and try again.',
     sync_failed: 'Mailbox sync failed — try again or check mailbox settings.',
   }

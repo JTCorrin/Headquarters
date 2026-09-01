@@ -176,6 +176,7 @@ export function humanizeMailboxSyncError(
 		case 'credentials_missing':
 			return 'Mailbox credentials are missing — connect your account or save a password, then try Sync again.';
 		case 'lease_error':
+		case 'lease_held':
 		case 'not_claimed':
 			return 'Another sync is already running — wait a moment and try again.';
 		default:
