@@ -81,6 +81,7 @@ function memoryStorage(seed: Record<string, string> = {}) {
 
 describe('PaymentsPage integration', () => {
 	it('lists payments with X-Org-Id and records an inbound payment', async () => {
+		await page.viewport(1280, 720);
 		const seenOrgHeaders: string[] = [];
 		let createBody: unknown;
 

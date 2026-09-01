@@ -24,6 +24,7 @@ function memoryStorage(seed: Record<string, string> = {}) {
 
 describe('EmailInboxPage integration', () => {
 	it('loads personal inbox via me/email-messages with X-Org-Id', async () => {
+		await page.viewport(1280, 800);
 		const seenPaths: string[] = [];
 		const seenOrgHeaders: string[] = [];
 
