@@ -17,6 +17,11 @@
 		position?: number;
 	}
 
+	export interface ProjectWorkColumn {
+		id: string;
+		label: string;
+	}
+
 	export interface ProjectCardBoardMove {
 		id: string;
 		columnId: string;

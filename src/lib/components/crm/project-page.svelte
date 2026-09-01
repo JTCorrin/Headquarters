@@ -298,10 +298,6 @@
 	async function onValidCardSubmit(): Promise<boolean> {
 		if (!project) return false;
 		const epoch = captureEpoch();
-		const body =
-			cardDrawerMode === 'create'
-				? toProjectCardCreateBody(get(cardForm.form))
-				: toProjectCardUpdateBody(get(cardForm.form));
 
 		try {
 			if (cardDrawerMode === 'create') {
@@ -309,7 +305,7 @@
 					project.columns.find((c) => c.key === 'backlog') ?? project.columns[0];
 				if (!backlog) return false;
 				const created = await api.projects.createCard(project.id, {
-					...body,
+					...toProjectCardCreateBody(get(cardForm.form)),
 					column_id: backlog.id
 				});
 				if (isStale(epoch)) return false;
@@ -322,7 +318,7 @@
 				const updated = await api.projects.updateCard(
 					project.id,
 					cardId,
-					body,
+					toProjectCardUpdateBody(get(cardForm.form)),
 					existing.version
 				);
 				if (isStale(epoch)) return false;

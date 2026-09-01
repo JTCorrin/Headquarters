@@ -831,7 +831,7 @@ describe('api mappers', () => {
 			status: 'active' as const,
 			metadata: {}
 		};
-		expect(() => [taxedProduct].map(toCatalogProductOption)).toThrow();
+		expect(() => [taxedProduct].map((p) => toCatalogProductOption(p))).toThrow();
 		expect(
 			[taxedProduct].map((p) =>
 				toCatalogProductOption(p, [

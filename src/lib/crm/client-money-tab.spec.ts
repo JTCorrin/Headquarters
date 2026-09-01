@@ -82,6 +82,8 @@ function invoice(overrides: Partial<ApiInvoice> = {}): ApiInvoice {
 		notes: null,
 		internal_notes: null,
 		sent_at: null,
+		viewed_at: null,
+		paid_at: null,
 		voided_at: null,
 		void_reason: null,
 		...overrides

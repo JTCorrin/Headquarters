@@ -59,7 +59,11 @@
 											aria-current={item.active ? 'page' : undefined}
 											{...props}
 											onclick={(event) => {
-												props.onclick?.(event);
+												const inherited =
+													typeof props.onclick === 'function'
+														? (props.onclick as (e: MouseEvent) => void)
+														: undefined;
+												inherited?.(event);
 												closeMobileNav();
 											}}
 										>
