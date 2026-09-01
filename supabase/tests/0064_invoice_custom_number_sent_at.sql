@@ -76,6 +76,9 @@ begin
   values ('Invoice Migrate Org', 'inv-migrate-' || substr(owner_id::text, 1, 8), 'GB', 'GBP')
   returning id into org_id;
 
+  insert into public.memberships (org_id, user_id, role, status)
+  values (org_id, owner_id, 'owner', 'active');
+
   insert into public.clients (org_id, name, status, primary_email)
   values (org_id, 'Migrate Client', 'active', 'client@migrate.test')
   returning id into client_id;
@@ -133,7 +136,7 @@ select is(
     where org_id = (select org_id from _inv_migrate_fixture)
       and document_type = 'invoice'
   ),
-  101,
+  101::bigint,
   'custom INV-0100 bumps invoice sequence next_number to 101'
 );
 

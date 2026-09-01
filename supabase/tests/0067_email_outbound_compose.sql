@@ -1,6 +1,6 @@
 begin;
 
-select plan(14);
+select plan(15);
 
 create temporary table _cec_fixture (
   owner_id uuid,

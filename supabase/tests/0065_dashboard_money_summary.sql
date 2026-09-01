@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(11);
 
 select ok(
   has_function_privilege(
@@ -141,7 +141,7 @@ select lives_ok(
       jsonb_build_object(
         'client_id', (select client_id from _dash_fixture),
         'currency', 'GBP',
-        'issue_on', (timezone('utc', now()))::date,
+        'issue_on', (timezone('utc', now()))::date - 20,
         'due_on', (timezone('utc', now()))::date - 15,
         'discount_cents', 0
       ),
