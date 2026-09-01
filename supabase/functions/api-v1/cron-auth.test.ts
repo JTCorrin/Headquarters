@@ -1,7 +1,7 @@
 import { assertEquals } from '@std/assert'
 import { authorizeCronRequest, routerAuthMode } from '../_shared/cron-auth.ts'
 
-Deno.test('authorizeCronRequest fails closed when secret env is missing', () => {
+Deno.test('authorizeCronRequest fails closed when secret env and service role are missing', () => {
   const result = authorizeCronRequest(
     new Request('http://local/cron', { method: 'POST' }),
     {
@@ -42,6 +42,51 @@ Deno.test('authorizeCronRequest accepts matching secret', () => {
     },
   )
   assertEquals(result, { ok: true })
+})
+
+Deno.test('authorizeCronRequest accepts service-role bearer when cron secret unset', () => {
+  const result = authorizeCronRequest(
+    new Request('http://local/cron', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer service-role-ok' },
+    }),
+    {
+      envSecret: undefined,
+      headerName: 'x-mailbox-sync-secret',
+      serviceRoleKey: 'service-role-ok',
+    },
+  )
+  assertEquals(result, { ok: true })
+})
+
+Deno.test('authorizeCronRequest accepts service-role bearer when cron secret is set but header missing', () => {
+  const result = authorizeCronRequest(
+    new Request('http://local/cron', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer service-role-ok' },
+    }),
+    {
+      envSecret: 'expected-secret',
+      headerName: 'x-mailbox-sync-secret',
+      serviceRoleKey: 'service-role-ok',
+    },
+  )
+  assertEquals(result, { ok: true })
+})
+
+Deno.test('authorizeCronRequest rejects wrong service-role bearer', () => {
+  const result = authorizeCronRequest(
+    new Request('http://local/cron', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer wrong' },
+    }),
+    {
+      envSecret: undefined,
+      headerName: 'x-mailbox-sync-secret',
+      serviceRoleKey: 'service-role-ok',
+    },
+  )
+  assertEquals(result, { ok: false, status: 401, error: 'UNAUTHORIZED' })
 })
 
 Deno.test('routerAuthMode routes crm_key_ bearer tokens to api_key', () => {

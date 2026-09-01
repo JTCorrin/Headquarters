@@ -831,7 +831,12 @@ describe('api mappers', () => {
 			status: 'active' as const,
 			metadata: {}
 		};
-		expect(() => [taxedProduct].map(toCatalogProductOption)).toThrow();
+		expect(() =>
+			[taxedProduct].map(
+				// Cast keeps svelte-check happy; runtime still receives (el, index, array).
+				toCatalogProductOption as (product: typeof taxedProduct) => unknown
+			)
+		).toThrow();
 		expect(
 			[taxedProduct].map((p) =>
 				toCatalogProductOption(p, [

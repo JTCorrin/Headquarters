@@ -9,7 +9,7 @@
 	}
 
 	export interface ProfileTabsProps {
-		tabs: ProfileTab[];
+		tabs: readonly ProfileTab[];
 		value?: string;
 		class?: string;
 		children?: Snippet<[{ active: string }]>;

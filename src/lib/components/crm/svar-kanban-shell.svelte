@@ -64,6 +64,16 @@
 
 	function handleInit(api: KanbanInstanceApi) {
 		onInit?.(api);
+		if (!onMoveCard) return;
+		api.on('move-card', (ev) => {
+			const move = ev as MoveCardEvent;
+			if (move.id == null) return;
+			onMoveCard({
+				id: move.id,
+				column: move.column,
+				before: move.before
+			});
+		});
 	}
 </script>
 
@@ -80,7 +90,6 @@
 					{cardContent}
 					{readonly}
 					init={handleInit}
-					onmovecard={onMoveCard}
 				/>
 			</div>
 		</WillowDark>
@@ -94,7 +103,6 @@
 					{cardContent}
 					{readonly}
 					init={handleInit}
-					onmovecard={onMoveCard}
 				/>
 			</div>
 		</Willow>

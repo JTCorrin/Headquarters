@@ -5,7 +5,7 @@ select plan(9);
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.send_invoice(uuid, uuid, integer, timestamptz)',
+    'public.send_invoice(uuid, uuid, integer, timestamptz, uuid)',
     'execute'
   ),
   'authenticated users can execute send_invoice with optional sent_at'
@@ -76,6 +76,9 @@ begin
   values ('Invoice Migrate Org', 'inv-migrate-' || substr(owner_id::text, 1, 8), 'GB', 'GBP')
   returning id into org_id;
 
+  insert into public.memberships (org_id, user_id, role, status)
+  values (org_id, owner_id, 'owner', 'active');
+
   insert into public.clients (org_id, name, status, primary_email)
   values (org_id, 'Migrate Client', 'active', 'client@migrate.test')
   returning id into client_id;
@@ -126,6 +129,8 @@ select is(
   'custom number is stored as provided'
 );
 
+-- document_sequences is not selectable by authenticated.
+reset role;
 select is(
   (
     select next_number
@@ -133,9 +138,12 @@ select is(
     where org_id = (select org_id from _inv_migrate_fixture)
       and document_type = 'invoice'
   ),
-  101,
+  101::bigint,
   'custom INV-0100 bumps invoice sequence next_number to 101'
 );
+
+select pg_temp.as_user((select owner_id from _inv_migrate_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$

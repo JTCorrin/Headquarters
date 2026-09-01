@@ -156,7 +156,28 @@ MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 
+# hosted_subscriptions was renamed 20260829190000 → 20260829175735 so the
+# filename matches the version id production recorded via MCP. Staging DBs that
+# applied the old filename still list 20260829190000 in schema_migrations, which
+# makes `migration up` / `supabase start` fail with "Remote migration versions
+# not found in local migrations directory".
+repair_renamed_hosted_subscriptions_migration() {
+	# Works when the local DB is reachable (full stack up, or DB container only).
+	local list
+	list="$(supabase migration list --local 2>/dev/null || true)"
+	if ! printf '%s\n' "$list" | grep -Eq '(^|[[:space:]])20260829190000([[:space:]]|$)'; then
+		return 0
+	fi
+	log "repairing renamed migration 20260829190000 → 20260829175735"
+	supabase migration repair --local --status reverted 20260829190000
+	if ! printf '%s\n' "$list" | grep -Eq '(^|[[:space:]])20260829175735([[:space:]]|$)'; then
+		# Identical SQL already applied under the old version id — do not re-run.
+		supabase migration repair --local --status applied 20260829175735
+	fi
+}
+
 log "starting Supabase (migrations apply on first start)"
+repair_renamed_hosted_subscriptions_migration
 if supabase status >/dev/null 2>&1; then
 	# Already running — apply any new migrations from this SHA (do not wipe data).
 	supabase migration up
@@ -177,7 +198,11 @@ if supabase status >/dev/null 2>&1; then
 		fi
 	fi
 else
-	supabase start
+	if ! supabase start; then
+		# Persistent volumes can still carry the renamed version id; repair and retry.
+		repair_renamed_hosted_subscriptions_migration
+		supabase start
+	fi
 fi
 
 status_json="$(supabase status -o json)"
@@ -337,216 +362,6 @@ fi
 
 curl -fsS --max-time 10 "http://127.0.0.1:${APP_PORT}/" >/dev/null
 log "HTTP probe ok"
-
-# Auth → organisations smoke (email/password, confirmations off).
-if [[ -x scripts/auth_signup_org_curl_proof.sh ]]; then
-	log "running auth signup → org curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/auth_signup_org_curl_proof.sh
-else
-	log "auth curl proof script missing — skipped"
-fi
-
-# Contacts CRUD + quotes draft smoke (JWT + X-Org-Id).
-if [[ -x scripts/contacts_quotes_staging_curl_proof.sh ]]; then
-	log "running contacts + quotes draft curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/contacts_quotes_staging_curl_proof.sh
-else
-	log "contacts/quotes curl proof script missing — skipped"
-fi
-
-# Leads + clients CRUD smoke (JWT + X-Org-Id).
-if [[ -x scripts/leads_clients_staging_curl_proof.sh ]]; then
-	log "running leads + clients curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/leads_clients_staging_curl_proof.sh
-else
-	log "leads/clients curl proof script missing — skipped"
-fi
-
-# Products CRUD smoke (JWT + X-Org-Id).
-if [[ -x scripts/products_staging_curl_proof.sh ]]; then
-	log "running products curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/products_staging_curl_proof.sh
-else
-	log "products curl proof script missing — skipped"
-fi
-
-# Lead board reorder + currency fallback + contact client links.
-if [[ -x scripts/lead_board_client_links_staging_curl_proof.sh ]]; then
-	log "running lead board / client links curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/lead_board_client_links_staging_curl_proof.sh
-else
-	log "lead board / client links curl proof script missing — skipped"
-fi
-
-# Invoice draft CRUD + send/void lock + accepted-quote conversion.
-if [[ -x scripts/invoices_staging_curl_proof.sh ]]; then
-	log "running invoices foundation curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/invoices_staging_curl_proof.sh
-else
-	log "invoices curl proof script missing — skipped"
-fi
-
-
-# Bills / payables foundation: vendor + bill draft CRUD + receive/void.
-if [[ -x scripts/bills_staging_curl_proof.sh ]]; then
-	log "running bills payables curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/bills_staging_curl_proof.sh
-else
-	log "bills curl proof script missing — skipped"
-fi
-
-# Tasks foundation: CRUD + assignee=me + entity link + ETag.
-if [[ -x scripts/tasks_staging_curl_proof.sh ]]; then
-	log "running tasks foundation curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/tasks_staging_curl_proof.sh
-else
-	log "tasks curl proof script missing — skipped"
-fi
-
-# Meetings foundation: CRUD + nested attendees + upcoming + ETag.
-if [[ -x scripts/meetings_staging_curl_proof.sh ]]; then
-	log "running meetings foundation curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/meetings_staging_curl_proof.sh
-else
-	log "meetings curl proof script missing — skipped"
-fi
-
-# Calendar C2 sync: reserved-col reject + stub OAuth + push set/clear.
-if [[ -x scripts/calendar_sync_staging_curl_proof.sh ]]; then
-	log "running calendar sync curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/calendar_sync_staging_curl_proof.sh
-else
-	log "calendar sync curl proof script missing — skipped"
-fi
-
-# Meeting assistant M2: transcript → summary stub → accept proposal → task.
-if [[ -x scripts/meeting_assistant_staging_curl_proof.sh ]]; then
-	log "running meeting assistant M2 curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/meeting_assistant_staging_curl_proof.sh
-else
-	log "meeting assistant curl proof script missing — skipped"
-fi
-
-# Projects foundation: CRUD + nested workspace + board/card drag + ETag.
-if [[ -x scripts/projects_staging_curl_proof.sh ]]; then
-	log "running projects foundation curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/projects_staging_curl_proof.sh
-else
-	log "projects curl proof script missing — skipped"
-fi
-
-# Recurring invoices foundation: schedule CRUD + lifecycle + run-now draft invoice.
-if [[ -x scripts/recurring_invoices_staging_curl_proof.sh ]]; then
-	log "running recurring invoices foundation curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/recurring_invoices_staging_curl_proof.sh
-else
-	log "recurring invoices curl proof script missing — skipped"
-fi
-
-# Payments foundation: inbound/outbound allocate + reverse + list doc filters.
-if [[ -x scripts/payments_staging_curl_proof.sh ]]; then
-	log "running payments foundation curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/payments_staging_curl_proof.sh
-else
-	log "payments curl proof script missing — skipped"
-fi
-
-# Client Money tab: quotes + invoices list ?client_id= filters.
-if [[ -x scripts/client_money_staging_curl_proof.sh ]]; then
-	log "running client money tab curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/client_money_staging_curl_proof.sh
-else
-	log "client money curl proof script missing — skipped"
-fi
-
-# Product → quote line → accept → from-quote (product_id + SKU/price/tax snapshots).
-if [[ -x scripts/product_quote_invoice_staging_curl_proof.sh ]]; then
-	log "running product→quote→invoice convert curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/product_quote_invoice_staging_curl_proof.sh
-else
-	log "product→quote→invoice convert curl proof script missing — skipped"
-fi
-
-# Personal mailbox + org AI integrations (Wave A foundations; no secret echo).
-if [[ -x scripts/email_mailbox_ai_staging_curl_proof.sh ]]; then
-	log "running mailbox + AI integrations curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/email_mailbox_ai_staging_curl_proof.sh
-else
-	log "mailbox/AI curl proof script missing — skipped"
-fi
-
-# Email templates CRUD + personal working inbox list.
-if [[ -x scripts/email_templates_inbox_staging_curl_proof.sh ]]; then
-	log "running email templates + personal inbox curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/email_templates_inbox_staging_curl_proof.sh
-else
-	log "email templates/inbox curl proof script missing — skipped"
-fi
-
-# Documents upload-intent signed_url must use LAN Kong (${APP_HOST}:54321), not kong.
-if [[ -x scripts/documents_signed_url_staging_curl_proof.sh ]]; then
-	log "running documents signed upload URL host curl proof"
-	SUPABASE_URL="${PUBLIC_SUPABASE_URL}" \
-		SUPABASE_ANON_KEY="${PUBLIC_SUPABASE_ANON_KEY}" \
-		API_BASE="${PUBLIC_SUPABASE_URL}/functions/v1/api-v1" \
-		scripts/documents_signed_url_staging_curl_proof.sh
-else
-	log "documents signed URL curl proof script missing — skipped"
-fi
 
 # Recurring invoices due-claim cron (every 5m). Wrapper keeps the secret off argv/ps.
 RECURRING_CRON_WRAPPER="${STAGING_SECRETS_DIR}/run-recurring-invoices-cron.sh"

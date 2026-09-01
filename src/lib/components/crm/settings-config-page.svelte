@@ -9,7 +9,7 @@
 		TaxRateResource
 	} from '$lib/schemas/organisation.js';
 	import { canMutateOrgConfig, roleLabel } from '$lib/schemas/organisation.js';
-	import type { MailboxAccountResource, MailboxFormData } from '$lib/schemas/mailbox.js';
+	import type { MailboxAccountResource, MailboxFormData, MailboxTestFeedback } from '$lib/schemas/mailbox.js';
 	import { type AppNavGroup } from './app-nav.svelte';
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
@@ -49,7 +49,11 @@
 		onRemoveLogo?: () => void | Promise<void>;
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
-		onTestMailbox?: () => boolean | void | Promise<boolean | void>;
+		onTestMailbox?: () =>
+			| MailboxTestFeedback
+			| false
+			| void
+			| Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		/**
 		 * Return `false` (or reject) to keep the tax drawer open after a failed save.

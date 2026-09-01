@@ -1,6 +1,6 @@
 begin;
 
-select plan(15);
+select plan(17);
 
 create temporary table _esq_fixture (
   owner_id uuid,
@@ -120,6 +120,21 @@ with created_mailbox as (
 )
 update _esq_fixture set mailbox_id = created_mailbox.id from created_mailbox;
 
+-- Member needs their own mailbox so recipient-policy checks run (compose resolves
+-- mailbox by caller membership before validating external recipients).
+insert into public.mailbox_accounts (
+  org_id, membership_id, email_address, from_name,
+  imap_host, imap_port, imap_security,
+  smtp_host, smtp_port, smtp_security,
+  username, status, created_by, updated_by
+)
+select
+  org_id, member_membership_id, 'esq-member@example.test', 'ESQ Member Mailer',
+  'imap.example.test', 993, 'tls',
+  'smtp.example.test', 587, 'starttls',
+  'esq-member@example.test', 'active', owner_id, owner_id
+from _esq_fixture;
+
 with created_client as (
   insert into public.clients (
     org_id, name, primary_email, status, created_by, updated_by
@@ -177,15 +192,23 @@ select is(
 );
 
 -- 2. Finish consumes one quota unit for the mailbox.
+-- Quota counters are revoked from authenticated; inspect them as the table owner.
+reset role;
 select is(
-  (
-    select sent_count from public.email_send_quota_usage
-    where mailbox_account_id = (select mailbox_id from _esq_fixture)
-      and usage_date = (now() at time zone 'utc')::date
+  coalesce(
+    (
+      select sent_count from public.email_send_quota_usage
+      where mailbox_account_id = (select mailbox_id from _esq_fixture)
+        and usage_date = (now() at time zone 'utc')::date
+    ),
+    0
   ),
   0,
   'quota row not created before finish'
 );
+
+select pg_temp.as_user((select owner_id from _esq_fixture));
+set local role authenticated;
 
 select lives_ok(
   $$
@@ -206,6 +229,7 @@ select lives_ok(
   'finish_email_compose_idempotent records a sent compose'
 );
 
+reset role;
 select is(
   (
     select sent_count from public.email_send_quota_usage
@@ -215,6 +239,9 @@ select is(
   1,
   'finish consumes one quota unit on success'
 );
+
+select pg_temp.as_user((select owner_id from _esq_fixture));
+set local role authenticated;
 
 -- 3. Member (non-owner) may not opt into an external recipient.
 select pg_temp.as_user((select member_id from _esq_fixture));
@@ -327,6 +354,7 @@ select lives_ok(
   'reply finish records a sent reply'
 );
 
+reset role;
 select is(
   (
     select sent_count from public.email_send_quota_usage
@@ -342,6 +370,9 @@ update public.email_send_quota_usage
 set sent_count = (select limit_value from (select 200 as limit_value) limits)
 where mailbox_account_id = (select mailbox_id from _esq_fixture)
   and usage_date = (now() at time zone 'utc')::date;
+
+select pg_temp.as_user((select owner_id from _esq_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$
@@ -375,6 +406,13 @@ select throws_ok(
 );
 
 -- 9. Credential read is org-scoped for user-backed callers.
+-- reset role alone leaves prior JWT claim GUCs in place; clear them explicitly.
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claim.role', '', true);
+select set_config('request.jwt.claims', '', true);
+set local role authenticated;
+
 select throws_ok(
   $$
     select public.read_mailbox_sync_credentials(
@@ -382,8 +420,8 @@ select throws_ok(
       (select org_id from _esq_fixture)
     )
   $$,
-  'P0002',
-  'Mailbox not found',
+  '42501',
+  'Authentication is required',
   'org-scoped credential read requires an authenticated caller'
 );
 

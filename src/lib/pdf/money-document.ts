@@ -19,7 +19,7 @@ export interface MoneyDocumentInput {
 	/** Preformatted letterhead lines (name, address, contact, tax). */
 	orgAddressLines?: string[];
 	partyLabel: string;
-	partyName: string;
+	partyName?: string;
 	/** Optional Attn line under the party name (billing + other recipients). */
 	attentionLine?: string;
 	documentNumber: string;
@@ -89,32 +89,38 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 	const tableBody: Content[][] = [
 		[
 			{ text: 'Description', style: 'tableHeader' },
-			{ text: 'Qty', style: 'tableHeader', alignment: 'right' },
-			{ text: 'Unit', style: 'tableHeader', alignment: 'right' },
-			{ text: 'Total', style: 'tableHeader', alignment: 'right' }
+			{ text: 'Qty', style: 'tableHeader', alignment: 'right' as const },
+			{ text: 'Unit', style: 'tableHeader', alignment: 'right' as const },
+			{ text: 'Total', style: 'tableHeader', alignment: 'right' as const }
 		],
-		...lines.map((row) => [
-			{
-				text: row.productSku ? `${row.description}\nSKU ${row.productSku}` : row.description,
-				style: 'tableCell'
-			},
-			{ text: row.qty, style: 'tableCell', alignment: 'right' },
-			{ text: money(Number(row.unitPrice) || 0, currency), style: 'tableCell', alignment: 'right' },
-			{ text: money(lineTotal(row), currency), style: 'tableCell', alignment: 'right' }
-		])
+		...lines.map(
+			(row): Content[] => [
+				{
+					text: row.productSku ? `${row.description}\nSKU ${row.productSku}` : row.description,
+					style: 'tableCell'
+				},
+				{ text: row.qty, style: 'tableCell', alignment: 'right' as const },
+				{
+					text: money(Number(row.unitPrice) || 0, currency),
+					style: 'tableCell',
+					alignment: 'right' as const
+				},
+				{ text: money(lineTotal(row), currency), style: 'tableCell', alignment: 'right' as const }
+			]
+		)
 	];
 
 	if (lines.length === 0) {
 		tableBody.push([
-			{ text: 'No line items yet', colSpan: 4, style: 'muted', italics: true },
-			{},
-			{},
-			{}
+			{ text: 'No line items yet', colSpan: 4, style: 'muted', italics: true } as Content,
+			{ text: '' },
+			{ text: '' },
+			{ text: '' }
 		]);
 	}
 
 	const leftBrand: Content[] = orgLogoDataUrl
-		? [{ image: 'orgLogo', width: 120, margin: [0, 0, 0, 4] }]
+		? [{ image: 'orgLogo', width: 120, margin: [0, 0, 0, 4] as [number, number, number, number] }]
 		: [{ text: orgName, style: 'org' }];
 
 	const rightAddress: Content[] =
@@ -136,20 +142,34 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 					{ width: '*', stack: leftBrand },
 					{
 						width: 'auto',
-						alignment: 'right',
+						alignment: 'right' as const,
 						stack: rightAddress
 					}
 				]
 			},
 			{
 				columns: [
-					[{ text: KIND_LABEL[kind], style: 'docKind', margin: [0, 16, 0, 0] }],
+					[
+						{
+							text: KIND_LABEL[kind],
+							style: 'docKind',
+							margin: [0, 16, 0, 0] as [number, number, number, number]
+						}
+					],
 					{
 						width: 'auto',
-						alignment: 'right',
+						alignment: 'right' as const,
 						stack: [
-							{ text: documentNumber || '—', style: 'docNumber', margin: [0, 16, 0, 0] },
-							{ text: status.toUpperCase(), style: 'status', margin: [0, 4, 0, 0] }
+							{
+								text: documentNumber || '—',
+								style: 'docNumber',
+								margin: [0, 16, 0, 0] as [number, number, number, number]
+							},
+							{
+								text: status.toUpperCase(),
+								style: 'status',
+								margin: [0, 4, 0, 0] as [number, number, number, number]
+							}
 						]
 					}
 				]
@@ -159,23 +179,49 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 					{
 						width: '*',
 						stack: [
-							{ text: partyLabel, style: 'label', margin: [0, 28, 0, 4] },
+							{
+								text: partyLabel,
+								style: 'label',
+								margin: [0, 28, 0, 4] as [number, number, number, number]
+							},
 							{ text: partyName || '—', style: 'party' },
 							...(attentionLine
-								? [{ text: attentionLine, style: 'muted', margin: [0, 2, 0, 0] }]
+								? [
+										{
+											text: attentionLine,
+											style: 'muted',
+											margin: [0, 2, 0, 0] as [number, number, number, number]
+										}
+									]
 								: []),
-							...(subtitle ? [{ text: subtitle, style: 'muted', margin: [0, 2, 0, 0] }] : [])
+							...(subtitle
+								? [
+										{
+											text: subtitle,
+											style: 'muted',
+											margin: [0, 2, 0, 0] as [number, number, number, number]
+										}
+									]
+								: [])
 						]
 					},
 					{
 						width: 'auto',
-						alignment: 'right',
+						alignment: 'right' as const,
 						stack: [
-							{ text: 'Issued', style: 'label', margin: [0, 28, 0, 4] },
+							{
+								text: 'Issued',
+								style: 'label',
+								margin: [0, 28, 0, 4] as [number, number, number, number]
+							},
 							{ text: issueDate || '—', style: 'meta' },
 							...(dueOn
 								? [
-										{ text: 'Due', style: 'label', margin: [0, 10, 0, 4] },
+										{
+											text: 'Due',
+											style: 'label',
+											margin: [0, 10, 0, 4] as [number, number, number, number]
+										},
 										{ text: dueOn, style: 'meta' }
 									]
 								: [])
@@ -198,7 +244,7 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 					paddingTop: () => 7,
 					paddingBottom: () => 7
 				},
-				margin: [0, 28, 0, 16]
+				margin: [0, 28, 0, 16] as [number, number, number, number]
 			},
 			{
 				columns: [
@@ -211,7 +257,7 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 									{ text: 'Subtotal', style: 'muted' },
 									{
 										text: money(summarySubtotal, currency),
-										alignment: 'right',
+										alignment: 'right' as const,
 										style: 'meta'
 									}
 								]
@@ -220,12 +266,16 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 								? [
 										{
 											columns: [
-												{ text: 'Discount', style: 'muted', margin: [0, 4, 0, 0] },
+												{
+													text: 'Discount',
+													style: 'muted',
+													margin: [0, 4, 0, 0] as [number, number, number, number]
+												},
 												{
 													text: `−${money(summaryDiscount, currency)}`,
 													alignment: 'right' as const,
 													style: 'meta',
-													margin: [0, 4, 0, 0]
+													margin: [0, 4, 0, 0] as [number, number, number, number]
 												}
 											]
 										}
@@ -235,12 +285,16 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 								? [
 										{
 											columns: [
-												{ text: 'Tax', style: 'muted', margin: [0, 4, 0, 0] },
+												{
+													text: 'Tax',
+													style: 'muted',
+													margin: [0, 4, 0, 0] as [number, number, number, number]
+												},
 												{
 													text: money(summaryTax, currency),
 													alignment: 'right' as const,
 													style: 'meta',
-													margin: [0, 4, 0, 0]
+													margin: [0, 4, 0, 0] as [number, number, number, number]
 												}
 											]
 										}
@@ -248,12 +302,16 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 								: []),
 							{
 								columns: [
-									{ text: 'Total', style: 'totalLabel', margin: [0, 8, 0, 0] },
+									{
+										text: 'Total',
+										style: 'totalLabel',
+										margin: [0, 8, 0, 0] as [number, number, number, number]
+									},
 									{
 										text: money(summaryTotal, currency),
-										alignment: 'right',
+										alignment: 'right' as const,
 										style: 'totalValue',
-										margin: [0, 8, 0, 0]
+										margin: [0, 8, 0, 0] as [number, number, number, number]
 									}
 								]
 							}
@@ -262,17 +320,21 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 				]
 			},
 			...(notes
-				? [
-						{ text: 'Notes', style: 'label', margin: [0, 28, 0, 4] },
+				? ([
+						{
+							text: 'Notes',
+							style: 'label',
+							margin: [0, 28, 0, 4] as [number, number, number, number]
+						},
 						{ text: notes, style: 'muted' }
-					]
-				: [
+					] satisfies Content[])
+				: ([
 						{
 							text: 'Live preview — edits to the form and lines update this document.',
 							style: 'muted',
-							margin: [0, 28, 0, 0]
+							margin: [0, 28, 0, 0] as [number, number, number, number]
 						}
-					])
+					] satisfies Content[]))
 		],
 		styles: {
 			org: { fontSize: 12, bold: true, color: '#18181b' },

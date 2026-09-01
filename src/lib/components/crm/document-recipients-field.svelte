@@ -34,6 +34,7 @@
 
 	let open = $state(false);
 	let search = $state('');
+	let inputValue = $state('');
 
 	const contactsForClient = $derived(
 		contactOptions.filter((c) => !c.clientId || !clientId || c.clientId === clientId)
@@ -46,6 +47,10 @@
 				c.label.toLowerCase().includes(search.trim().toLowerCase())
 		)
 	);
+
+	$effect(() => {
+		if (!open) inputValue = '';
+	});
 
 	function labelFor(contactId: string): string {
 		return (
@@ -130,7 +135,12 @@
 	{/if}
 
 	{#if !disabled && contactsForClient.length > 0 && recipients.length < 25}
-		<ComboboxPrimitive.Root type="single" bind:open onValueChange={addContact}>
+		<ComboboxPrimitive.Root
+			type="single"
+			bind:open
+			inputValue={inputValue}
+			onValueChange={addContact}
+		>
 			<div class="relative">
 				<ComboboxPrimitive.Input
 					{id}
@@ -139,14 +149,16 @@
 						'text-muted-foreground'
 					)}
 					placeholder="Add contact…"
-					value={open ? search : ''}
 					oninput={(e) => {
-						search = (e.currentTarget as HTMLInputElement).value;
+						const next = (e.currentTarget as HTMLInputElement).value;
+						search = next;
+						inputValue = next;
 						if (!open) open = true;
 					}}
 					onfocus={() => {
 						open = true;
 						search = '';
+						inputValue = '';
 					}}
 					data-testid="document-recipients-add"
 				/>

@@ -17,7 +17,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.create_payment(uuid, jsonb, jsonb)',
+    'public.create_payment(uuid, jsonb, jsonb, uuid)',
     'execute'
   ),
   'authenticated can execute create_payment'

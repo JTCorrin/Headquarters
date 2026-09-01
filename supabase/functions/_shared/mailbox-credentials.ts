@@ -6,9 +6,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ImapAuth } from './imap-inbound.ts'
 import {
   ensureMailboxAccessToken,
+  type MailboxOAuthProvider,
   parseMailboxTokenBlob,
   serializeMailboxTokenBlob,
-  type MailboxOAuthProvider,
 } from './mailbox-oauth.ts'
 import type { SmtpAuth } from './smtp-outbound.ts'
 
