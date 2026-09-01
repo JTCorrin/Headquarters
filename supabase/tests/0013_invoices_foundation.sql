@@ -64,7 +64,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.send_invoice(uuid, uuid, integer)',
+    'public.send_invoice(uuid, uuid, integer, timestamptz, uuid)',
     'execute'
   ),
   'authenticated users can execute send_invoice'
@@ -73,7 +73,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.void_invoice(uuid, uuid, integer, text)',
+    'public.void_invoice(uuid, uuid, integer, text, uuid)',
     'execute'
   ),
   'authenticated users can execute void_invoice'
