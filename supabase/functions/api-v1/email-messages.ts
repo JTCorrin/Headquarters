@@ -1197,7 +1197,21 @@ async function postMailboxSync(
     throw new ApiError(404, 'NOT_FOUND', 'Mailbox not found')
   }
   const mailboxId = String((mailbox as Record<string, unknown>).id)
-  const result = await runMailboxSyncCycle(mailboxId, `api-${requestId}`)
+  // Background cron may hold the lease for ~20–120s during catch-up; wait briefly
+  // so Sync now succeeds once that batch finishes instead of surfacing lease_held.
+  const maxAttempts = 16
+  const retryDelayMs = 2000
+  let result = await runMailboxSyncCycle(mailboxId, `api-${requestId}`)
+  for (
+    let attempt = 1;
+    attempt < maxAttempts &&
+    !result.ok &&
+    (result.error_code === 'lease_held' || result.error_code === 'not_claimed');
+    attempt++
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    result = await runMailboxSyncCycle(mailboxId, `api-${requestId}-r${attempt}`)
+  }
   return jsonResponse({ data: result }, 200, requestId)
 }
 
