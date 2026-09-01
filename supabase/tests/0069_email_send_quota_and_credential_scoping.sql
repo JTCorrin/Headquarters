@@ -1,6 +1,6 @@
 begin;
 
-select plan(15);
+select plan(17);
 
 create temporary table _esq_fixture (
   owner_id uuid,
@@ -119,6 +119,21 @@ with created_mailbox as (
   returning id
 )
 update _esq_fixture set mailbox_id = created_mailbox.id from created_mailbox;
+
+-- Member needs their own mailbox so recipient-policy checks run (compose resolves
+-- mailbox by caller membership before validating external recipients).
+insert into public.mailbox_accounts (
+  org_id, membership_id, email_address, from_name,
+  imap_host, imap_port, imap_security,
+  smtp_host, smtp_port, smtp_security,
+  username, status, created_by, updated_by
+)
+select
+  org_id, member_membership_id, 'esq-member@example.test', 'ESQ Member Mailer',
+  'imap.example.test', 993, 'tls',
+  'smtp.example.test', 587, 'starttls',
+  'esq-member@example.test', 'active', owner_id, owner_id
+from _esq_fixture;
 
 with created_client as (
   insert into public.clients (
@@ -391,6 +406,9 @@ select throws_ok(
 );
 
 -- 9. Credential read is org-scoped for user-backed callers.
+reset role;
+set local role authenticated;
+
 select throws_ok(
   $$
     select public.read_mailbox_sync_credentials(
@@ -398,8 +416,8 @@ select throws_ok(
       (select org_id from _esq_fixture)
     )
   $$,
-  'P0002',
-  'Mailbox not found',
+  '42501',
+  'Authentication is required',
   'org-scoped credential read requires an authenticated caller'
 );
 
