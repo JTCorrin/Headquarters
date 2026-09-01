@@ -29,7 +29,7 @@ function sampleNotification(overrides: Record<string, unknown> = {}) {
 describe('NotificationsBell', () => {
 	it('shows unread badge, lists items, marks read, and deep-links to email', async () => {
 		let patchBody: unknown;
-		const onNavigate = vi.fn(() => Promise.resolve());
+		const onNavigate = vi.fn<(href: string) => Promise<void>>(() => Promise.resolve());
 		const fetchMock = createMockFetch({
 			'GET /api/v1/me/notifications/unread-count': async () => ({
 				body: { data: { count: 1 } }
@@ -64,7 +64,7 @@ describe('NotificationsBell', () => {
 	it('labels timeline.mention and deep-links to the entity timeline', async () => {
 		const EVENT_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee9999';
 		const CLIENT_ID = 'cccccccc-dddd-4eee-8fff-000000000001';
-		const onNavigate = vi.fn(() => Promise.resolve());
+		const onNavigate = vi.fn<(href: string) => Promise<void>>(() => Promise.resolve());
 		const fetchMock = createMockFetch({
 			'GET /api/v1/me/notifications/unread-count': async () => ({
 				body: { data: { count: 1 } }

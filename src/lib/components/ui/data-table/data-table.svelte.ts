@@ -82,7 +82,7 @@ type Intersection<T extends readonly unknown[]> = (T extends [infer H, ...infer 
 	: unknown) & {};
 
 /** Eager plain merge — resolves getters once so TanStack does not nest Proxies. */
-function flatMerge<T extends Record<string, unknown>>(...sources: Array<T | null | undefined>): T {
+function flatMerge<T extends object>(...sources: Array<T | null | undefined>): T {
 	const out: Record<string, unknown> = {};
 	for (const src of sources) {
 		if (!src) continue;

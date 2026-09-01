@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(11);
 
 select ok(
   has_function_privilege(
@@ -100,10 +100,10 @@ with created as (
 )
 update _dash_fixture set other_org_id = created.id from created;
 
-insert into public.document_sequences (org_id, document_type, prefix, next_number, pad_length)
+insert into public.document_sequences (org_id, document_type, prefix, next_number, padding)
 select org_id, 'invoice', 'INV-', 1, 4 from _dash_fixture;
 
-insert into public.document_sequences (org_id, document_type, prefix, next_number, pad_length)
+insert into public.document_sequences (org_id, document_type, prefix, next_number, padding)
 select org_id, 'quote', 'Q-', 1, 4 from _dash_fixture;
 
 insert into public.memberships (org_id, user_id, role, status)
@@ -141,7 +141,7 @@ select lives_ok(
       jsonb_build_object(
         'client_id', (select client_id from _dash_fixture),
         'currency', 'GBP',
-        'issue_on', (timezone('utc', now()))::date,
+        'issue_on', (timezone('utc', now()))::date - 20,
         'due_on', (timezone('utc', now()))::date - 15,
         'discount_cents', 0
       ),

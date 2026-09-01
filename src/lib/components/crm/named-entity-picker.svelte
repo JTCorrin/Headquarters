@@ -39,11 +39,16 @@
 
 	let open = $state(false);
 	let search = $state('');
+	let inputValue = $state('');
 
 	const selected = $derived(options.find((o) => o.id === value) ?? null);
 	const filtered = $derived(
 		options.filter((o) => o.name.toLowerCase().includes(search.trim().toLowerCase()))
 	);
+
+	$effect(() => {
+		if (!open) inputValue = selected?.name ?? '';
+	});
 
 	function handleChange(next: string) {
 		if (!next) return;
@@ -56,6 +61,7 @@
 <ComboboxPrimitive.Root
 	type="single"
 	bind:open
+	inputValue={inputValue}
 	value={value || undefined}
 	onValueChange={handleChange}
 	disabled={disabled || loading}
@@ -69,14 +75,16 @@
 			)}
 			placeholder={loading ? 'Loading…' : placeholder}
 			aria-invalid={ariaInvalid}
-			value={open ? search : (selected?.name ?? '')}
 			oninput={(e) => {
-				search = (e.currentTarget as HTMLInputElement).value;
+				const next = (e.currentTarget as HTMLInputElement).value;
+				search = next;
+				inputValue = next;
 				if (!open) open = true;
 			}}
 			onfocus={() => {
 				open = true;
 				search = '';
+				inputValue = '';
 			}}
 			data-testid={dataTestId}
 		/>

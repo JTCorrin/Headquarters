@@ -168,20 +168,44 @@ describe('organisation schemas', () => {
 	});
 
 	it('accepts org config and theme preference enums', () => {
+		const baseConfig = {
+			name: 'Corrin Data',
+			legalName: '',
+			phone: '',
+			billingEmail: '',
+			websiteUrl: '',
+			taxIdentifier: '',
+			registrationNumber: '',
+			addressLine1: '',
+			addressLine2: '',
+			city: '',
+			region: '',
+			postalCode: '',
+			country: 'GB',
+			timezone: 'Europe/London',
+			currency: 'GBP',
+			locale: 'en-GB'
+		} as const;
+
 		expect(
 			organisationConfigSchema.safeParse({
-				timezone: 'Europe/London',
-				currency: 'USD',
-				locale: 'en-US',
+				...baseConfig,
 				themeDefault: 'dark'
 			}).success
 		).toBe(true);
 		expect(
 			organisationConfigSchema.safeParse({
+				...baseConfig,
 				timezone: 'UTC',
-				currency: 'GBP',
-				locale: 'en-GB',
+				currency: 'USD',
+				locale: 'en-US',
 				themeDefault: 'system'
+			}).success
+		).toBe(true);
+		expect(
+			organisationConfigSchema.safeParse({
+				...baseConfig,
+				themeDefault: 'light'
 			}).success
 		).toBe(true);
 		expect(

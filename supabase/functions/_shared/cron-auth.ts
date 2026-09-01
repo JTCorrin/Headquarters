@@ -17,29 +17,49 @@ export type CronAuthResult =
   | { ok: false; status: number; error: string }
 
 /**
- * Require a configured env secret and a matching request header.
- * Missing configuration → 503 (fail closed). Wrong/missing header → 401.
+ * Require a configured cron secret header, or a service-role Bearer token.
+ *
+ * Hosted pg_cron callers typically send `Authorization: Bearer <service_role>`
+ * (platform-injected into Edge). Self-hosted/staging cron wrappers send the
+ * dedicated header secret instead.
+ *
+ * Missing both configurations → 503 (fail closed). Wrong credentials → 401.
  */
 export function authorizeCronRequest(
   req: Request,
   options: {
     envSecret: string | undefined
     headerName: string
+    serviceRoleKey?: string | undefined
     missingConfigLog?: string
   },
 ): CronAuthResult {
   const expected = options.envSecret?.trim() ?? ''
-  if (!expected) {
+  const serviceRole = options.serviceRoleKey?.trim() ?? ''
+  if (!expected && !serviceRole) {
     if (options.missingConfigLog) {
       console.error(options.missingConfigLog)
     }
     return { ok: false, status: 503, error: 'SERVICE_UNAVAILABLE' }
   }
-  const supplied = req.headers.get(options.headerName) ?? ''
-  if (!timingSafeEqual(supplied, expected)) {
-    return { ok: false, status: 401, error: 'UNAUTHORIZED' }
+
+  if (expected) {
+    const supplied = req.headers.get(options.headerName) ?? ''
+    if (timingSafeEqual(supplied, expected)) {
+      return { ok: true }
+    }
   }
-  return { ok: true }
+
+  if (serviceRole) {
+    const authorization = req.headers.get('Authorization') ?? ''
+    const match = /^Bearer\s+(.+)$/i.exec(authorization.trim())
+    const token = match?.[1]?.trim() ?? ''
+    if (token && timingSafeEqual(token, serviceRole)) {
+      return { ok: true }
+    }
+  }
+
+  return { ok: false, status: 401, error: 'UNAUTHORIZED' }
 }
 
 /** Bearer token shape used by the api-v1 production router to pick JWT vs API-key path. */
