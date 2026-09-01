@@ -5,7 +5,7 @@ select plan(11);
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.send_invoice_idempotent(uuid, uuid, integer, text, text, text, integer)',
+    'public.send_invoice_idempotent(uuid, uuid, integer, text, text, text, integer, timestamptz, uuid)',
     'execute'
   ),
   'authenticated can execute send_invoice_idempotent'
@@ -14,7 +14,7 @@ select ok(
 select ok(
   has_function_privilege(
     'authenticated',
-    'public.void_invoice_idempotent(uuid, uuid, integer, text, text, text, text, integer)',
+    'public.void_invoice_idempotent(uuid, uuid, integer, text, text, text, text, integer, uuid)',
     'execute'
   ),
   'authenticated can execute void_invoice_idempotent'

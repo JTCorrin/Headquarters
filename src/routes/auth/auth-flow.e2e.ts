@@ -12,8 +12,8 @@ test.describe('auth flow UI (local preview)', () => {
 	test('signup exposes password, social, and enterprise SSO entry points', async ({ page }) => {
 		await page.goto('/signup?next=%2Finvite%2Faccept%3Ftoken%3Dtest-token');
 
-		await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Continue with Microsoft' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Google' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Microsoft' })).toBeVisible();
 		await expect(page.getByLabel('Company domain')).toBeVisible();
 
 		await page.getByTestId('auth-display-name').fill('Invitee User');

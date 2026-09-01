@@ -1,11 +1,15 @@
 name: Backend CI
 
-# PR gate for Deno + pgTAP + db lint. Staging push re-runs this suite in
-# `.forgejo/workflows/staging-deploy.yml` alongside deploy + Playwright.
+# Gate for Deno + pgTAP + db lint.
+# Runs on every push to `dev`, and on PRs into `dev` / `main` / `staging`.
+# Staging branch protection should require these checks before merging into staging.
+# Post-merge staging still re-verifies in `.forgejo/workflows/staging-deploy.yml`.
 
 on:
+  push:
+    branches: [dev]
   pull_request:
-    branches: [dev, main]
+    branches: [dev, main, staging]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
@@ -16,12 +20,15 @@ jobs:
   backend:
     name: Supabase migrations and API
     # Docker socket access is host-equivalent. Never run this job for forked PR code.
-    if: forgejo.event_name == 'workflow_dispatch' || forgejo.event.pull_request.head.repo.full_name == forgejo.repository
+    if: >
+      forgejo.event_name == 'workflow_dispatch' ||
+      forgejo.event_name == 'push' ||
+      forgejo.event.pull_request.head.repo.full_name == forgejo.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Check out pull request
+      - name: Check out code
         uses: https://data.forgejo.org/actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
