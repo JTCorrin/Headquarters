@@ -1,5 +1,8 @@
 name: Frontend CI
 
+# PR gate for Vitest + local Playwright preview. Staging push runs the same Vitest
+# suite (plus backend + deployed Playwright) in `.forgejo/workflows/staging-deploy.yml`.
+
 on:
   pull_request:
     branches: [dev, main]
