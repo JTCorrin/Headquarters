@@ -11,7 +11,7 @@ import {
 } from './http.ts'
 
 const CLIENT_SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,status,website_url,industry,primary_email,phone,tax_identifier,tax_exempt,email_domain,registration_number,default_currency,payment_terms_days,owner_membership_id,converted_from_lead_id,renewal_on,notes,metadata'
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,status,website_url,industry,primary_email,invoicing_email,phone,tax_identifier,tax_exempt,email_domain,registration_number,default_currency,payment_terms_days,owner_membership_id,converted_from_lead_id,renewal_on,notes,metadata'
 
 const WRITABLE_FIELDS = new Set([
   'name',
@@ -19,6 +19,7 @@ const WRITABLE_FIELDS = new Set([
   'website_url',
   'industry',
   'primary_email',
+  'invoicing_email',
   'phone',
   'tax_identifier',
   'tax_exempt',
@@ -36,6 +37,7 @@ const NULLABLE_TEXT_FIELDS = [
   'website_url',
   'industry',
   'primary_email',
+  'invoicing_email',
   'phone',
   'tax_identifier',
   'email_domain',
@@ -47,6 +49,7 @@ const TEXT_LIMITS: Record<(typeof NULLABLE_TEXT_FIELDS)[number], number> = {
   website_url: 2000,
   industry: 120,
   primary_email: 320,
+  invoicing_email: 320,
   phone: 64,
   tax_identifier: 120,
   email_domain: 255,
@@ -180,6 +183,7 @@ type ClientWritable = {
   website_url?: string | null
   industry?: string | null
   primary_email?: string | null
+  invoicing_email?: string | null
   phone?: string | null
   tax_identifier?: string | null
   tax_exempt?: boolean
@@ -266,6 +270,12 @@ export function validateClientBody(
   if ('primary_email' in output && typeof output.primary_email === 'string') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(output.primary_email)) {
       fields.primary_email = 'Must be a valid email address'
+    }
+  }
+
+  if ('invoicing_email' in output && typeof output.invoicing_email === 'string') {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(output.invoicing_email)) {
+      fields.invoicing_email = 'Must be a valid email address'
     }
   }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { get } from 'svelte/store';
+	import { fromStore, get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
@@ -55,6 +55,7 @@
 	let createError = $state<string | null>(null);
 	let busy = $state(false);
 	let drawerOpen = $state(false);
+	let contactsClientId = $state<string | null>(null);
 
 	const scheduleForm = superForm(
 		defaults(emptyRecurringInvoiceFormData(), zod4(recurringInvoiceFormSchema)),
@@ -66,6 +67,8 @@
 			resetForm: false
 		}
 	);
+
+	const formSnapshot = fromStore(scheduleForm.form);
 
 	const orgName = $derived(
 		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
@@ -107,10 +110,46 @@
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
 	}
 
+	function isPlaceholderClientId(clientId: string): boolean {
+		return !clientId || clientId.startsWith('00000000');
+	}
+
+	function mapContactsForClient(
+		contacts: Array<{ id: string; display_name: string; primary_email: string | null }>,
+		clientId: string
+	): RecurringInvoiceContactOption[] {
+		return contacts.map((c) => ({
+			id: c.id,
+			label: c.display_name || c.primary_email || c.id,
+			clientId
+		}));
+	}
+
+	async function loadContactsForClient(clientId: string, epoch: RequestEpoch) {
+		if (isPlaceholderClientId(clientId)) {
+			contactOptions = [];
+			contactsClientId = null;
+			return;
+		}
+		const listed = await api.contacts.list({ client_id: clientId, limit: 100 });
+		if (isStale(epoch)) return;
+		const selectedIds = new Set(get(scheduleForm.form).recipients.map((r) => r.contactId));
+		const mapped = mapContactsForClient(listed.data, clientId);
+		const byId = new Map(mapped.map((c) => [c.id, c]));
+		for (const existing of contactOptions) {
+			if (selectedIds.has(existing.id) && !byId.has(existing.id)) {
+				byId.set(existing.id, existing);
+			}
+		}
+		contactOptions = [...byId.values()];
+		contactsClientId = clientId;
+	}
+
 	function resetOrgScopedState() {
 		rows = [];
 		clientOptions = [];
 		contactOptions = [];
+		contactsClientId = null;
 		drawerOpen = false;
 		viewState = { kind: 'loading' };
 	}
@@ -143,10 +182,9 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [listed, clients, contacts] = await Promise.all([
+			const [listed, clients] = await Promise.all([
 				api.recurringInvoiceSchedules.list({ limit: 50 }),
-				api.clients.list({ limit: 100 }),
-				api.contacts.list({ limit: 100 })
+				api.clients.list({ limit: 100 })
 			]);
 			if (isStale(epoch)) return;
 
@@ -155,11 +193,6 @@
 				toRecurringInvoiceListItem(schedule, clientNameById.get(schedule.client_id) ?? '')
 			);
 			clientOptions = clients.data.map((c) => ({ id: c.id, name: c.name }));
-			contactOptions = contacts.data.map((c) => ({
-				id: c.id,
-				label: c.display_name || c.primary_email || c.id,
-				clientId: c.client_id ?? null
-			}));
 			if (clientOptions[0] && get(scheduleForm.form).clientId.startsWith('00000000')) {
 				scheduleForm.form.update((current) => ({
 					...current,
@@ -167,6 +200,8 @@
 					clientName: clientOptions[0]!.name
 				}));
 			}
+			await loadContactsForClient(get(scheduleForm.form).clientId, epoch);
+			if (isStale(epoch)) return;
 			viewState =
 				rows.length === 0
 					? { kind: 'empty', message: 'No recurring schedules yet — create your first one.' }
@@ -241,6 +276,14 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void loadAll();
+	});
+
+	$effect(() => {
+		const clientId = formSnapshot.current.clientId;
+		if (!session.selectedOrgId || isPlaceholderClientId(clientId)) return;
+		if (clientId === contactsClientId) return;
+		const epoch = captureEpoch();
+		void loadContactsForClient(clientId, epoch);
 	});
 </script>
 

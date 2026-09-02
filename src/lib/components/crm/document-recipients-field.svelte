@@ -37,7 +37,9 @@
 	let inputValue = $state('');
 
 	const contactsForClient = $derived(
-		contactOptions.filter((c) => !c.clientId || !clientId || c.clientId === clientId)
+		!clientId
+			? []
+			: contactOptions.filter((c) => c.clientId === clientId)
 	);
 	const selectedIds = $derived(new Set(recipients.map((r) => r.contactId)));
 	const available = $derived(
@@ -194,5 +196,13 @@
 		</ComboboxPrimitive.Root>
 	{:else if !disabled && recipients.length >= 25}
 		<p class="text-muted-foreground text-xs">Max 25 recipients</p>
+	{:else if !disabled && !clientId}
+		<p class="text-muted-foreground text-xs" data-testid="document-recipients-need-client">
+			Select a client to add recipients.
+		</p>
+	{:else if !disabled && clientId && contactsForClient.length === 0}
+		<p class="text-muted-foreground text-xs" data-testid="document-recipients-empty-client">
+			No contacts linked to this client.
+		</p>
 	{/if}
 </div>

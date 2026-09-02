@@ -20,6 +20,10 @@
 	export interface RecurringInvoiceFormProps {
 		form: SuperForm<RecurringInvoiceFormData>;
 		submitLabel?: string;
+		/** When false, omit the submit button (e.g. detail page saves below line items). */
+		showSubmit?: boolean;
+		/** Optional form id so an external submit button can target this form. */
+		formId?: string;
 		clientOptions?: RecurringInvoiceClientOption[];
 		contactOptions?: RecurringInvoiceContactOption[];
 		readonly?: boolean;
@@ -30,6 +34,8 @@
 	let {
 		form,
 		submitLabel = 'Save schedule',
+		showSubmit = true,
+		formId,
 		clientOptions = [],
 		contactOptions = [],
 		readonly = false,
@@ -104,6 +110,7 @@
 </script>
 
 <form
+	id={formId}
 	method="POST"
 	class={cn('space-y-4', className)}
 	data-testid="recurring-invoice-form"
@@ -400,7 +407,7 @@
 		<Textarea id="ri-notes" bind:value={$formData.notes} rows={2} disabled={readonly} />
 	</div>
 
-	{#if !readonly}
+	{#if !readonly && showSubmit}
 		<Button type="submit" disabled={busy}>{submitLabel}</Button>
 	{/if}
 </form>
