@@ -114,11 +114,29 @@
 				name="primaryEmail"
 				type="email"
 				bind:value={$formData.primaryEmail}
-				placeholder="billing@northwind.com"
+				placeholder="hello@northwind.com"
 				aria-invalid={!!$errors.primaryEmail}
 			/>
 			{#if $errors.primaryEmail}<p class="text-destructive text-xs">{$errors.primaryEmail}</p>{/if}
 		</div>
+		<div class="space-y-2">
+			<Label for="client-invoicing-email">Invoicing email</Label>
+			<Input
+				id="client-invoicing-email"
+				name="invoicingEmail"
+				type="email"
+				bind:value={$formData.invoicingEmail}
+				placeholder="accounts@northwind.com"
+				data-testid="client-invoicing-email"
+				aria-invalid={!!$errors.invoicingEmail}
+			/>
+			{#if $errors.invoicingEmail}
+				<p class="text-destructive text-xs">{$errors.invoicingEmail}</p>
+			{/if}
+		</div>
+	</div>
+
+	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="client-phone">Phone</Label>
 			<Input id="client-phone" name="phone" bind:value={$formData.phone} />

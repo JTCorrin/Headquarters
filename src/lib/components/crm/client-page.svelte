@@ -82,6 +82,7 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		invoicingEmail: '',
 		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',
@@ -116,6 +117,7 @@
 					{ label: 'Industry', value: client.industry ?? '—' },
 					{ label: 'Website', value: client.website_url ?? '—' },
 					{ label: 'Primary email', value: client.primary_email ?? '—' },
+					{ label: 'Invoicing email', value: client.invoicing_email ?? '—' },
 					{ label: 'Email domain', value: client.email_domain ?? '—' },
 					{ label: 'Phone', value: client.phone ?? '—' },
 					{ label: 'Notes', value: client.notes ?? '—' }

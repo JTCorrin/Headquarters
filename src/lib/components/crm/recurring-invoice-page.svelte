@@ -77,6 +77,7 @@
 	let lineDrawerOpen = $state(false);
 	/** When set, line drawer updates this index instead of appending. */
 	let lineEditIndex = $state<number | null>(null);
+	let contactsClientId = $state<string | null>(null);
 
 	const LINE_API_TO_FORM: Record<string, keyof RecurringLineFormData> = {
 		quantity: 'qty',
@@ -275,10 +276,42 @@
 		runs = [];
 		clientOptions = [];
 		contactOptions = [];
+		contactsClientId = null;
 		products = [];
 		savedFingerprint = '';
 		actionError = null;
 		viewState = { kind: 'loading' };
+	}
+
+	function mapContactsForClient(
+		contacts: Array<{ id: string; display_name: string; primary_email: string | null }>,
+		clientId: string
+	): RecurringInvoiceContactOption[] {
+		return contacts.map((c) => ({
+			id: c.id,
+			label: c.display_name || c.primary_email || c.id,
+			clientId
+		}));
+	}
+
+	async function loadContactsForClient(clientId: string, epoch: RequestEpoch) {
+		if (!clientId || clientId.startsWith('00000000')) {
+			contactOptions = [];
+			contactsClientId = null;
+			return;
+		}
+		const listed = await api.contacts.list({ client_id: clientId, limit: 100 });
+		if (isStale(epoch)) return;
+		const selectedIds = new Set(get(scheduleForm.form).recipients.map((r) => r.contactId));
+		const mapped = mapContactsForClient(listed.data, clientId);
+		const byId = new Map(mapped.map((c) => [c.id, c]));
+		for (const existing of contactOptions) {
+			if (selectedIds.has(existing.id) && !byId.has(existing.id)) {
+				byId.set(existing.id, existing);
+			}
+		}
+		contactOptions = [...byId.values()];
+		contactsClientId = clientId;
 	}
 
 	function applyDocument(document: ApiRecurringInvoiceDocument) {
@@ -329,10 +362,9 @@
 				session.setMemberships(membershipRows.map(toOrgMembershipSummary));
 			}
 
-			const [document, clients, contacts, productList, rates] = await Promise.all([
+			const [document, clients, productList, rates] = await Promise.all([
 				api.recurringInvoiceSchedules.get(scheduleId),
 				api.clients.list({ limit: 100 }),
-				api.contacts.list({ limit: 100 }),
 				api.products.list({ limit: 100 }),
 				api.taxRates.list({ limit: 100 })
 			]);
@@ -344,11 +376,8 @@
 				name: c.name,
 				taxExempt: Boolean(c.tax_exempt)
 			}));
-			contactOptions = contacts.data.map((c) => ({
-				id: c.id,
-				label: c.display_name || c.primary_email || c.id,
-				clientId: c.client_id ?? null
-			}));
+			await loadContactsForClient(document.data.client_id, epoch);
+			if (isStale(epoch)) return;
 			products = productList.data.map((p) => toCatalogProductOption(p, taxRates));
 			applyDocument(document.data);
 			lineForm.form.set(emptyRecurringLineForm());
@@ -534,6 +563,14 @@
 		void session.cacheGeneration;
 		void scheduleId;
 		void loadAll();
+	});
+
+	$effect(() => {
+		const clientId = formSnapshot.current.clientId;
+		if (!session.selectedOrgId || !clientId || clientId.startsWith('00000000')) return;
+		if (clientId === contactsClientId) return;
+		const epoch = captureEpoch();
+		void loadContactsForClient(clientId, epoch);
 	});
 
 	function onPrepareAddLine() {

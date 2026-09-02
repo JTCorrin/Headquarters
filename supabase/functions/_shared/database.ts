@@ -253,6 +253,7 @@ export type ClientRow = {
   website_url: string | null
   industry: string | null
   primary_email: string | null
+  invoicing_email: string | null
   phone: string | null
   tax_identifier: string | null
   tax_exempt: boolean

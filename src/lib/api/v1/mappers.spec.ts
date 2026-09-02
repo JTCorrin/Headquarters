@@ -1042,6 +1042,7 @@ describe('api mappers', () => {
 			website_url: 'https://northwind.example',
 			industry: 'Logistics',
 			primary_email: 'billing@northwind.com',
+			invoicing_email: 'accounts@northwind.com',
 			phone: null,
 			tax_identifier: null,
 			tax_exempt: false,
@@ -1086,7 +1087,8 @@ describe('api mappers', () => {
 			status: 'on_hold',
 			defaultCurrency: 'GBP',
 			paymentTermsDays: '30',
-			emailDomain: 'northwind.com'
+			emailDomain: 'northwind.com',
+			invoicingEmail: 'accounts@northwind.com'
 		});
 		expect(
 			toClientCreateBody({
@@ -1095,6 +1097,7 @@ describe('api mappers', () => {
 				websiteUrl: '',
 				industry: 'Retail',
 				primaryEmail: '',
+				invoicingEmail: '',
 				emailDomain: '',
 				phone: '',
 				taxIdentifier: '',
@@ -1111,6 +1114,7 @@ describe('api mappers', () => {
 			website_url: null,
 			industry: 'Retail',
 			primary_email: null,
+			invoicing_email: null,
 			email_domain: null,
 			phone: null,
 			tax_identifier: null,

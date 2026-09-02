@@ -99,6 +99,7 @@ function sampleClient() {
 		website_url: null,
 		industry: null,
 		primary_email: null,
+		invoicing_email: null,
 		phone: null,
 		tax_identifier: null,
 		tax_exempt: false,
@@ -287,10 +288,46 @@ describe('RecurringInvoicePage integration', () => {
 		render(RecurringInvoicePage, { api, session, scheduleId: SCHEDULE_ID });
 
 		await expect.element(page.getByRole('button', { name: 'Activate' })).toBeInTheDocument();
+		await expect.element(page.getByTestId('recurring-save-changes')).toBeInTheDocument();
 		await page.getByRole('button', { name: 'Activate' }).click();
 
 		await expect.poll(() => activateIfMatch).toBe('"1"');
 		await expect.element(page.getByText('Active', { exact: true })).toBeInTheDocument();
+	});
+
+	it('disables Activate when the draft has no lines', async () => {
+		const session = sessionForOrg();
+
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			[`GET /api/v1/recurring-invoice-schedules/${SCHEDULE_ID}`]: async () => ({
+				body: { data: sampleSchedule({ lines: [] }) }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/tax-rates': async () => ({
+				body: { data: [] }
+			}),
+			'GET /api/v1/invoices': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			[`GET /api/v1/recurring-invoice-schedules/${SCHEDULE_ID}/runs`]: async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			})
+		});
+
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(RecurringInvoicePage, { api, session, scheduleId: SCHEDULE_ID });
+
+		await expect.element(page.getByTestId('recurring-lines-hint')).toBeInTheDocument();
+		await expect.element(page.getByTestId('recurring-activate')).toBeDisabled();
 	});
 
 	it('surfaces ETag conflict on activate', async () => {

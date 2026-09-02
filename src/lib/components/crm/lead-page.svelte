@@ -109,6 +109,7 @@
 		websiteUrl: '',
 		industry: '',
 		primaryEmail: '',
+		invoicingEmail: '',
 		emailDomain: '',
 		phone: '',
 		taxIdentifier: '',

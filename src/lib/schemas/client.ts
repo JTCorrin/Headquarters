@@ -71,6 +71,7 @@ export const clientFormSchema = z.object({
 			(v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
 			'Must be a valid email address'
 		),
+	invoicingEmail: z.email('Enter a valid email').or(z.literal('')),
 	emailDomain: z
 		.string()
 		.max(255)
@@ -116,6 +117,7 @@ export interface ClientResource {
 	website_url?: string | null;
 	industry?: string | null;
 	primary_email?: string | null;
+	invoicing_email?: string | null;
 	email_domain?: string | null;
 	phone?: string | null;
 	tax_identifier?: string | null;

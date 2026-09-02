@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { fromStore } from 'svelte/store';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { RecurringLineRow } from '$lib/api/v1/mappers.js';
 	import type { CatalogProductOption } from '$lib/schemas/line-item.js';
@@ -21,6 +20,8 @@
 	import { cn } from '$lib/utils.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import type { SuperForm as LineSuperForm } from 'sveltekit-superforms';
+
+	const SCHEDULE_FORM_ID = 'recurring-schedule-editor';
 
 	export interface RecurringInvoiceDetailPageProps {
 		orgName: string;
@@ -93,8 +94,8 @@
 		class: className
 	}: RecurringInvoiceDetailPageProps = $props();
 
-	const formData = fromStore(scheduleForm.form);
 	const statusLower = $derived(status.toLowerCase());
+	const canActivate = $derived(!isDirty && lines.length > 0);
 </script>
 
 <AppSidebarFrame
@@ -114,7 +115,7 @@
 				breadcrumb="Accounting / Recurring invoices"
 				{title}
 				{status}
-				description="Edit schedule configuration and lines. Lifecycle commands use optimistic concurrency (ETag)."
+				description="Edit schedule and line items, then save. Activate when the draft is ready."
 			>
 				{#snippet actions()}
 					{#if statusLower === 'draft'}
@@ -128,7 +129,7 @@
 						</Button>
 						<Button
 							size="sm"
-							disabled={actionPending || isDirty}
+							disabled={actionPending || !canActivate}
 							title={
 								isDirty
 									? 'Save changes before activating'
@@ -203,52 +204,76 @@
 			<div class="grid gap-6 lg:grid-cols-2">
 				<div class="space-y-6">
 					<div
-						class="bg-card rounded-3xl p-6 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="bg-card space-y-6 rounded-3xl p-6 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						data-testid="recurring-schedule-editor"
 					>
 						<RecurringInvoiceForm
 							form={scheduleForm}
-							submitLabel="Save schedule"
+							formId={SCHEDULE_FORM_ID}
+							showSubmit={false}
 							{clientOptions}
 							{contactOptions}
 							readonly={!isEditable}
 							onValidSubmit={onSaveSchedule}
 						/>
-					</div>
 
-					<RecurringLinesTable
-						rows={lines}
-						readonly={!isEditable}
-						onRemove={onRemoveLine}
-					>
-						{#snippet headerActions()}
-							{#if isEditable}
-								<RecurringLineFormDrawer
-									bind:open={lineDrawerOpen}
-									form={lineForm}
-									{products}
-									onValidSubmit={onAddLine}
-									submitLabel={lineEditing ? 'Update line' : 'Add line'}
-									triggerLabel="Add line"
-									title={lineEditing ? 'Fix schedule line' : 'Add schedule line'}
-									description={lineEditing
-										? 'Correct the highlighted fields, then save the schedule again.'
-										: 'Lines copy into each generated invoice snapshot.'}
+						<RecurringLinesTable
+							rows={lines}
+							readonly={!isEditable}
+							onRemove={onRemoveLine}
+						>
+							{#snippet headerActions()}
+								{#if isEditable}
+									<RecurringLineFormDrawer
+										bind:open={lineDrawerOpen}
+										form={lineForm}
+										{products}
+										onValidSubmit={onAddLine}
+										submitLabel={lineEditing ? 'Update line' : 'Add line'}
+										triggerLabel="Add line"
+										title={lineEditing ? 'Fix schedule line' : 'Add schedule line'}
+										description={lineEditing
+											? 'Correct the highlighted fields, then save changes again.'
+											: 'Lines copy into each generated invoice snapshot.'}
+									>
+										{#snippet trigger()}
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												onclick={() => onPrepareAddLine?.()}
+											>
+												<PlusIcon class="mr-1 size-4" />
+												Add line
+											</Button>
+										{/snippet}
+									</RecurringLineFormDrawer>
+								{/if}
+							{/snippet}
+						</RecurringLinesTable>
+
+						{#if isEditable && statusLower === 'draft' && lines.length === 0}
+							<p class="text-muted-foreground text-sm" data-testid="recurring-lines-hint">
+								Add at least one line, then save, then Activate.
+							</p>
+						{/if}
+
+						{#if isEditable}
+							<div class="flex flex-wrap items-center gap-3">
+								<Button
+									type="submit"
+									form={SCHEDULE_FORM_ID}
+									disabled={actionPending}
+									data-testid="recurring-save-changes"
 								>
-									{#snippet trigger()}
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onclick={() => onPrepareAddLine?.()}
-										>
-											<PlusIcon class="mr-1 size-4" />
-											Add line
-										</Button>
-									{/snippet}
-								</RecurringLineFormDrawer>
-							{/if}
-						{/snippet}
-					</RecurringLinesTable>
+									Save changes
+								</Button>
+								{#if isDirty}
+									<span class="text-muted-foreground text-xs">Unsaved changes</span>
+								{/if}
+							</div>
+						{/if}
+					</div>
 				</div>
 
 				<RecurringInvoiceRunsTable rows={runs} {onRetryDelivery} />
