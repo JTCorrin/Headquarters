@@ -3,6 +3,8 @@ import type { Database } from '../_shared/database.ts'
 import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
 import { handleEmailTemplates } from './email-templates.ts'
+import { handleCampaigns } from './campaigns.ts'
+import { handleTags } from './tags.ts'
 import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
 import { handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
@@ -1407,6 +1409,187 @@ const TOOLS: ToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_tags',
+    description: 'List organisation tags used for campaign audiences and CRM filtering.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_tag',
+    description: 'Create an organisation tag (name unique per org, case-insensitive).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 80 },
+        color: { type: ['string', 'null'], maxLength: 32 },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_tag',
+    description: 'Update a tag (PATCH). Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string', minLength: 1, maxLength: 80 },
+        color: { type: ['string', 'null'], maxLength: 32 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_tag',
+    description: 'Soft-delete a tag. Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_entity_tags',
+    description:
+      'List tags assigned to a lead, contact, or client. entity_type path uses contacts|leads|clients.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entity_type: { type: 'string', enum: ['contact', 'lead', 'client'] },
+        entity_id: { type: 'string', format: 'uuid' },
+      },
+      required: ['entity_type', 'entity_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'replace_entity_tags',
+    description:
+      'Replace the full tag set on a lead, contact, or client (PUT). Pass tag_ids array (may be empty).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entity_type: { type: 'string', enum: ['contact', 'lead', 'client'] },
+        entity_id: { type: 'string', format: 'uuid' },
+        tag_ids: {
+          type: 'array',
+          items: { type: 'string', format: 'uuid' },
+        },
+      },
+      required: ['entity_type', 'entity_id', 'tag_ids'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_campaigns',
+    description: 'List mail campaigns. Status: draft|scheduled|sending|completed|cancelled|failed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        status: {
+          type: 'string',
+          enum: ['draft', 'scheduled', 'sending', 'completed', 'cancelled', 'failed'],
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_campaign',
+    description:
+      'Get a campaign including tag_ids, entity_types, recipient_counts, and quota_remaining.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_campaign',
+    description:
+      'Create a draft campaign. Provide name; optionally template_id, mailbox_id, tag_ids, entity_types (lead|contact|client), scheduled_at. Launch separately via launch_campaign. Template merge tokens {{contact.name}}, {{client.name}}, {{lead.name}} are substituted at send time.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', minLength: 1, maxLength: 200 },
+        template_id: { type: ['string', 'null'], format: 'uuid' },
+        mailbox_id: { type: ['string', 'null'], format: 'uuid' },
+        scheduled_at: { type: ['string', 'null'], format: 'date-time' },
+        tag_ids: { type: 'array', items: { type: 'string', format: 'uuid' } },
+        entity_types: {
+          type: 'array',
+          items: { type: 'string', enum: ['lead', 'contact', 'client'] },
+        },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_campaign',
+    description: 'Update a draft campaign only. Requires version for If-Match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string', minLength: 1, maxLength: 200 },
+        template_id: { type: ['string', 'null'], format: 'uuid' },
+        mailbox_id: { type: ['string', 'null'], format: 'uuid' },
+        scheduled_at: { type: ['string', 'null'], format: 'date-time' },
+        tag_ids: { type: 'array', items: { type: 'string', format: 'uuid' } },
+        entity_types: {
+          type: 'array',
+          items: { type: 'string', enum: ['lead', 'contact', 'client'] },
+        },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'launch_campaign',
+    description:
+      'Freeze audience recipients and start sending (or schedule). Requires version. send_immediately defaults true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        send_immediately: { type: 'boolean' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'cancel_campaign',
+    description: 'Cancel a scheduled or sending campaign. Requires version.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 export function listMcpTools(): ToolDef[] {
@@ -1727,6 +1910,33 @@ function assertCanAccessEmailTemplates(
       'Readonly members cannot modify email templates',
     )
   }
+}
+
+function assertCanAccessTags(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access tags')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify tags')
+  }
+}
+
+function assertCanAccessCampaigns(role: MembershipRole, method: string): void {
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access campaigns')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(403, 'FORBIDDEN', 'Readonly members cannot modify campaigns')
+  }
+}
+
+function entityCollectionPath(entityType: string): string {
+  if (entityType === 'contact') return 'contacts'
+  if (entityType === 'lead') return 'leads'
+  if (entityType === 'client') return 'clients'
+  throw new ApiError(422, 'VALIDATION_ERROR', 'entity_type is invalid', {
+    entity_type: 'Must be contact, lead, or client',
+  })
 }
 
 function requireUserBackedActor(userId: string | null): string {
@@ -2826,6 +3036,188 @@ export async function callTool(
         syntheticRequest('DELETE', path, undefined, {
           'if-match': `"${version}"`,
         }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_tags': {
+      assertCanAccessTags(membership.role, 'GET')
+      const path = `/api/v1/tags${optionalQuery(args, ['limit'])}`
+      const response = await handleTags(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/tags',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_tag': {
+      assertCanAccessTags(membership.role, 'POST')
+      const response = await handleTags(
+        syntheticRequest('POST', '/api/v1/tags', args),
+        db,
+        '/api/v1/tags',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_tag': {
+      assertCanAccessTags(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/tags/${id}`
+      const response = await handleTags(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'delete_tag': {
+      assertCanAccessTags(membership.role, 'DELETE')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/tags/${id}`
+      const response = await handleTags(
+        syntheticRequest('DELETE', path, undefined, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_entity_tags': {
+      assertCanAccessTags(membership.role, 'GET')
+      const entityType = requireString(args, 'entity_type')
+      const entityId = parseUuid(requireString(args, 'entity_id'), 'entity_id')
+      const path = `/api/v1/${entityCollectionPath(entityType)}/${entityId}/tags`
+      const response = await handleTags(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'replace_entity_tags': {
+      assertCanAccessTags(membership.role, 'PUT')
+      const entityType = requireString(args, 'entity_type')
+      const entityId = parseUuid(requireString(args, 'entity_id'), 'entity_id')
+      const path = `/api/v1/${entityCollectionPath(entityType)}/${entityId}/tags`
+      const response = await handleTags(
+        syntheticRequest('PUT', path, { tag_ids: args.tag_ids }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_campaigns': {
+      assertCanAccessCampaigns(membership.role, 'GET')
+      const path = `/api/v1/campaigns${optionalQuery(args, ['limit', 'status'])}`
+      const response = await handleCampaigns(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/campaigns',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_campaign': {
+      assertCanAccessCampaigns(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/campaigns/${id}`
+      const response = await handleCampaigns(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_campaign': {
+      assertCanAccessCampaigns(membership.role, 'POST')
+      const response = await handleCampaigns(
+        syntheticRequest('POST', '/api/v1/campaigns', args),
+        db,
+        '/api/v1/campaigns',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_campaign': {
+      assertCanAccessCampaigns(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/campaigns/${id}`
+      const response = await handleCampaigns(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'launch_campaign': {
+      assertCanAccessCampaigns(membership.role, 'POST')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/campaigns/${id}/launch`
+      const response = await handleCampaigns(
+        syntheticRequest(
+          'POST',
+          path,
+          { send_immediately: args.send_immediately !== false },
+          { 'if-match': `"${version}"` },
+        ),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'cancel_campaign': {
+      assertCanAccessCampaigns(membership.role, 'POST')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/campaigns/${id}/cancel`
+      const response = await handleCampaigns(
+        syntheticRequest('POST', path, {}, { 'if-match': `"${version}"` }),
         db,
         path,
         orgId,

@@ -437,6 +437,10 @@
 						{onUseSuggestion}
 						{onDiscardSuggestion}
 						showNav={false}
+						tagsApi={api}
+						tagsEntityType="contact"
+						tagsEntityId={contact.id}
+						tagsCanEdit={canMutateCrmRecords(role)}
 						class="min-h-0 flex-1"
 					/>
 				{/if}

@@ -6,6 +6,9 @@ export { createContactsEndpoints } from './contacts.js';
 export { createDocumentsEndpoints } from './documents.js';
 export { createEmailMessagesEndpoints } from './email-messages.js';
 export { createEmailTemplatesEndpoints } from './email-templates.js';
+export { createTagsEndpoints } from './tags.js';
+export { createCampaignsEndpoints } from './campaigns.js';
+export { createOrgMailboxesEndpoints } from './org-mailboxes.js';
 export { createPlaybooksEndpoints } from './playbooks.js';
 export { createInvoicesEndpoints } from './invoices.js';
 export { createIntegrationsEndpoints } from './integrations.js';
@@ -41,6 +44,9 @@ export type {
 	DocumentsEndpoints,
 	EmailMessagesEndpoints,
 	EmailTemplatesEndpoints,
+	TagsEndpoints,
+	CampaignsEndpoints,
+	OrgMailboxesEndpoints,
 	PlaybooksEndpoints,
 	IntegrationsEndpoints,
 	InvoicesEndpoints,

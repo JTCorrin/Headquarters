@@ -114,6 +114,8 @@ import {
   validateReverseBody,
 } from './payments.ts'
 import { validateEmailTemplateBody } from './email-templates.ts'
+import { validateTagBody } from './tags.ts'
+import { validateCampaignBody } from './campaigns.ts'
 import {
   handleOrganisationConfiguration,
   validateLogoUploadIntentBody,
@@ -2473,6 +2475,65 @@ Deno.test('email template create validation defaults status and merge_schema', (
   )
 })
 
+Deno.test('tag create validation trims name and rejects org_id', () => {
+  assertEquals(validateTagBody({ name: '  Newsletter  ', color: 'blue' }, false), {
+    name: 'Newsletter',
+    color: 'blue',
+  })
+  assertThrows(() => validateTagBody({ name: '' }, false), ApiError)
+  assertThrows(
+    () => validateTagBody({ name: 'X', org_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }, false),
+    ApiError,
+  )
+  assertEquals(validateTagBody({ color: null }, true), { color: null })
+})
+
+Deno.test('campaign create validation rejects status and accepts audience', () => {
+  const templateId = '11111111-2222-4333-8444-555555555555'
+  const mailboxId = '22222222-3333-4444-8555-666666666666'
+  const tagId = '33333333-4444-4555-8666-777777777777'
+  assertEquals(
+    validateCampaignBody(
+      {
+        name: '  Spring Shot  ',
+        template_id: templateId,
+        mailbox_id: mailboxId,
+        tag_ids: [tagId],
+        entity_types: ['lead', 'contact'],
+      },
+      false,
+    ),
+    {
+      name: 'Spring Shot',
+      template_id: templateId,
+      mailbox_id: mailboxId,
+      tag_ids: [tagId],
+      entity_types: ['lead', 'contact'],
+    },
+  )
+  assertThrows(
+    () => validateCampaignBody({ name: 'X', status: 'sending' }, false),
+    ApiError,
+  )
+  assertThrows(
+    () =>
+      validateCampaignBody(
+        { name: 'X', entity_types: ['invoice'] },
+        false,
+      ),
+    ApiError,
+  )
+})
+
+Deno.test('MCP create_tag and create_campaign require expected fields', () => {
+  const createTag = listMcpTools().find((tool) => tool.name === 'create_tag')
+  assertEquals(createTag?.inputSchema.required, ['name'])
+  const createCampaign = listMcpTools().find((tool) => tool.name === 'create_campaign')
+  assertEquals(createCampaign?.inputSchema.required, ['name'])
+  const launchCampaign = listMcpTools().find((tool) => tool.name === 'launch_campaign')
+  assertEquals(launchCampaign?.inputSchema.required, ['id', 'version'])
+})
+
 Deno.test('API key secret shape and create body validation', async () => {
   assertEquals(isOrgApiKeySecret('crm_key_' + 'a'.repeat(32)), true)
   assertEquals(isOrgApiKeySecret('crm_key_short'), false)
@@ -2599,6 +2660,8 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'add_timeline_note',
     'adjust_product_stock',
     'allocate_payment',
+    'cancel_campaign',
+    'create_campaign',
     'create_card',
     'create_client',
     'create_contact',
@@ -2612,9 +2675,12 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'create_product_category',
     'create_project',
     'create_quote',
+    'create_tag',
     'create_task',
     'delete_card',
     'delete_email_template',
+    'delete_tag',
+    'get_campaign',
     'get_client',
     'get_contact',
     'get_email_template',
@@ -2627,9 +2693,12 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'get_project',
     'get_quote',
     'get_task',
+    'launch_campaign',
+    'list_campaigns',
     'list_clients',
     'list_contacts',
     'list_email_templates',
+    'list_entity_tags',
     'list_invoices',
     'list_leads',
     'list_meetings',
@@ -2638,11 +2707,14 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'list_products',
     'list_projects',
     'list_quotes',
+    'list_tags',
     'list_tasks',
     'reject_quote',
+    'replace_entity_tags',
     'reverse_payment',
     'send_invoice',
     'send_quote',
+    'update_campaign',
     'update_card',
     'update_client',
     'update_contact',
@@ -2654,6 +2726,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'update_product_category',
     'update_project',
     'update_quote',
+    'update_tag',
     'update_task',
     'void_invoice',
   ])

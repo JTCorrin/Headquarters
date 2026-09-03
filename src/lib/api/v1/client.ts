@@ -7,6 +7,9 @@ import { createContactsEndpoints } from './endpoints/contacts.js';
 import { createDocumentsEndpoints } from './endpoints/documents.js';
 import { createEmailMessagesEndpoints } from './endpoints/email-messages.js';
 import { createEmailTemplatesEndpoints } from './endpoints/email-templates.js';
+import { createTagsEndpoints } from './endpoints/tags.js';
+import { createCampaignsEndpoints } from './endpoints/campaigns.js';
+import { createOrgMailboxesEndpoints } from './endpoints/org-mailboxes.js';
 import { createPlaybooksEndpoints } from './endpoints/playbooks.js';
 import { createIntegrationsEndpoints } from './endpoints/integrations.js';
 import { createApiKeysEndpoints } from './endpoints/api-keys.js';
@@ -42,6 +45,9 @@ import type {
 	DocumentsEndpoints,
 	EmailMessagesEndpoints,
 	EmailTemplatesEndpoints,
+	TagsEndpoints,
+	CampaignsEndpoints,
+	OrgMailboxesEndpoints,
 	PlaybooksEndpoints,
 	IntegrationsEndpoints,
 	InvoicesEndpoints,
@@ -118,6 +124,9 @@ export interface ApiV1Client {
 	documents: DocumentsEndpoints;
 	emailMessages: EmailMessagesEndpoints;
 	emailTemplates: EmailTemplatesEndpoints;
+	tags: TagsEndpoints;
+	campaigns: CampaignsEndpoints;
+	orgMailboxes: OrgMailboxesEndpoints;
 	playbooks: PlaybooksEndpoints;
 	timelineEvents: TimelineEventsEndpoints;
 	auditEvents: AuditEventsEndpoints;
@@ -297,6 +306,9 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		documents: createDocumentsEndpoints(request),
 		emailMessages: createEmailMessagesEndpoints(request),
 		emailTemplates: createEmailTemplatesEndpoints(request),
+		tags: createTagsEndpoints(request),
+		campaigns: createCampaignsEndpoints(request),
+		orgMailboxes: createOrgMailboxesEndpoints(request),
 		playbooks: createPlaybooksEndpoints(request),
 		timelineEvents: createTimelineEventsEndpoints(request),
 		auditEvents: createAuditEventsEndpoints(request)
