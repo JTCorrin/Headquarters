@@ -544,6 +544,10 @@
 						}}
 						onReload={loadAll}
 						showNav={false}
+						tagsApi={api}
+						tagsEntityType="lead"
+						tagsEntityId={leadResource.id}
+						tagsCanEdit={canMutateCrmRecords(role)}
 						class="min-h-0 flex-1"
 					/>
 					<ClientFormDrawer

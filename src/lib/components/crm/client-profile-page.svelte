@@ -19,6 +19,7 @@
 	import EntityProjects, { type EntityProject } from './entity-projects.svelte';
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
 	import ClientFormDrawer from './client-form-drawer.svelte';
+	import EntityTagsEditor from './entity-tags-editor.svelte';
 	import ResourceStateBanner, {
 		type ResourceViewState
 	} from './resource-state-banner.svelte';
@@ -27,6 +28,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
+	import type { TagEntityType } from '$lib/api/v1/endpoints/types.js';
 
 	export interface RelatedContact {
 		id: string;
@@ -73,6 +75,10 @@
 		clientId?: string;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
+		tagsApi?: ApiV1Client;
+		tagsEntityType?: TagEntityType;
+		tagsEntityId?: string;
+		tagsCanEdit?: boolean;
 		class?: string;
 		onReload?: () => void;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
@@ -133,6 +139,10 @@
 		projects = [],
 		clientId,
 		showNav = true,
+		tagsApi,
+		tagsEntityType,
+		tagsEntityId,
+		tagsCanEdit = false,
 		class: className,
 		onReload,
 		onValidSubmit,
@@ -247,6 +257,16 @@
 						{/if}
 					{/snippet}
 				</ProfileHeader>
+				{#if tagsApi && tagsEntityType && tagsEntityId}
+					<div class="mt-3">
+						<EntityTagsEditor
+							api={tagsApi}
+							entityType={tagsEntityType}
+							entityId={tagsEntityId}
+							canEdit={tagsCanEdit}
+						/>
+					</div>
+				{/if}
 			</div>
 
 			<ResourceStateBanner state={viewState} {onReload} />

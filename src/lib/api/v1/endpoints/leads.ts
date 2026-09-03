@@ -17,7 +17,8 @@ export function createLeadsEndpoints(request: ApiRequestFn): LeadsEndpoints {
 				query: {
 					limit: params.limit,
 					cursor: params.cursor,
-					stage: params.stage
+					stage: params.stage,
+					tag_id: params.tag_id
 				},
 				signal
 			});

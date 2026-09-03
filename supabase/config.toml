@@ -482,3 +482,13 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/jobs-playbooks/deno.json"
 entrypoint = "./functions/jobs-playbooks/index.ts"
+
+# Mail campaigns: drain pending recipients via selected mailbox SMTP.
+# Schedule externally against /functions/v1/jobs-campaigns
+# with header x-campaigns-cron-secret = CAMPAIGNS_CRON_SECRET
+# (falls back to PLAYBOOKS_CRON_SECRET).
+[functions.jobs-campaigns]
+enabled = true
+verify_jwt = false
+import_map = "./functions/jobs-campaigns/deno.json"
+entrypoint = "./functions/jobs-campaigns/index.ts"
