@@ -144,7 +144,31 @@ Deno.test('MCP guards block billing and readonly across resources', async () => 
       undefined,
       `${role} should be blocked from card mutation`,
     )
+    await assertRejects(
+      () =>
+        callTool(
+          auth,
+          'create_email_template',
+          {
+            name: 'Chase',
+            subject: 'Hello',
+            category: 'chase',
+          },
+          `req-guard-email-${role}`,
+        ),
+      ApiError,
+      undefined,
+      `${role} should be blocked from email template mutation`,
+    )
   }
+
+  const billingAuth = makeAuth('billing', makeDb({}))
+  await assertRejects(
+    () => callTool(billingAuth, 'list_email_templates', {}, 'req-billing-list-email'),
+    ApiError,
+    undefined,
+    'billing should be blocked from listing email templates',
+  )
 })
 
 Deno.test('MCP billing members can read clients but not modify them', async () => {
