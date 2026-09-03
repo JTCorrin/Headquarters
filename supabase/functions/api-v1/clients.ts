@@ -482,6 +482,23 @@ async function listClients(
     throw new ApiError(400, 'BAD_REQUEST', 'status is invalid')
   }
 
+  const tagIdRaw = url.searchParams.get('tag_id')
+  let tagEntityIds: string[] | null = null
+  if (tagIdRaw) {
+    const tagId = parseUuid(tagIdRaw, 'tag_id')
+    const { data: assignments, error: tagError } = await db
+      .from('tag_assignments')
+      .select('entity_id')
+      .eq('org_id', orgId)
+      .eq('tag_id', tagId)
+      .eq('entity_type', 'client')
+    if (tagError) throw databaseError(tagError, requestId)
+    tagEntityIds = (assignments ?? []).map((row) => row.entity_id)
+    if (tagEntityIds.length === 0) {
+      return jsonResponse({ data: [], meta: { next_cursor: null } }, 200, requestId)
+    }
+  }
+
   let query = db
     .from('clients')
     .select(CLIENT_SELECT)
@@ -493,6 +510,9 @@ async function listClients(
 
   if (status) {
     query = query.eq('status', status as ClientStatus)
+  }
+  if (tagEntityIds) {
+    query = query.in('id', tagEntityIds)
   }
 
   const cursorValue = url.searchParams.get('cursor')

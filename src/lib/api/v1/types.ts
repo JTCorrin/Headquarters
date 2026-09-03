@@ -1122,6 +1122,7 @@ export interface ApiClient {
 export interface ApiClientListParams {
 	limit?: number;
 	cursor?: string;
+	tag_id?: string;
 }
 
 export interface ApiClientCreateBody {
@@ -1203,6 +1204,7 @@ export interface ApiLeadListParams {
 	limit?: number;
 	cursor?: string;
 	stage?: ApiLeadStage;
+	tag_id?: string;
 }
 
 export interface ApiLeadConvertBody {
@@ -1271,6 +1273,7 @@ export interface ApiContactListParams {
 	lifecycle_status?: ApiContactLifecycleStatus;
 	/** Restrict to people linked to this client via `client_contacts`. */
 	client_id?: string;
+	tag_id?: string;
 }
 
 export interface ApiTaxRateListParams {
@@ -1906,6 +1909,137 @@ export interface ApiEmailTemplateListParams {
 	limit?: number;
 	status?: ApiEmailTemplateStatus;
 	category?: ApiEmailTemplateCategory;
+}
+
+export interface ApiTag {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	color: string | null;
+}
+
+export interface ApiTagCreateBody {
+	name: string;
+	color?: string | null;
+}
+
+export type ApiTagUpdateBody = Partial<ApiTagCreateBody>;
+
+export interface ApiTagListParams {
+	limit?: number;
+}
+
+/** Tag row returned from entity tag list/replace endpoints. */
+export interface ApiEntityTag {
+	id: string;
+	name: string;
+	color: string | null;
+	version: number;
+}
+
+export interface ApiOrgMailbox {
+	id: string;
+	org_id: string;
+	membership_id: string;
+	email_address: string;
+	from_name: string | null;
+	status: string;
+	member_display_name: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export type ApiCampaignStatus =
+	| 'draft'
+	| 'scheduled'
+	| 'sending'
+	| 'completed'
+	| 'cancelled'
+	| 'failed';
+
+export interface ApiCampaignRecipientCounts {
+	pending: number;
+	sent: number;
+	skipped: number;
+	failed: number;
+	total: number;
+}
+
+export interface ApiCampaign {
+	id: string;
+	org_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	name: string;
+	status: ApiCampaignStatus;
+	template_id: string | null;
+	mailbox_id: string | null;
+	scheduled_at: string | null;
+	started_at: string | null;
+	completed_at: string | null;
+	last_error: string | null;
+	tag_ids: string[];
+	entity_types: Array<'lead' | 'contact' | 'client'>;
+	recipient_counts: ApiCampaignRecipientCounts;
+	quota_remaining: number | null;
+}
+
+export interface ApiCampaignCreateBody {
+	name: string;
+	template_id?: string | null;
+	mailbox_id?: string | null;
+	scheduled_at?: string | null;
+	tag_ids?: string[];
+	entity_types?: Array<'lead' | 'contact' | 'client'>;
+}
+
+export type ApiCampaignUpdateBody = Partial<ApiCampaignCreateBody>;
+
+export interface ApiCampaignListParams {
+	limit?: number;
+	status?: ApiCampaignStatus;
+}
+
+export interface ApiCampaignAudiencePreviewSample {
+	entity_type: string;
+	entity_id: string;
+	to_email: string | null;
+	to_name: string | null;
+}
+
+export interface ApiCampaignAudiencePreview {
+	total: number;
+	sendable: number;
+	skipped: number;
+	capped: boolean;
+	sample: ApiCampaignAudiencePreviewSample[];
+	skipped_sample: Array<ApiCampaignAudiencePreviewSample & { skip_reason?: string | null }>;
+}
+
+export interface ApiCampaignRecipient {
+	id: string;
+	org_id: string;
+	campaign_id: string;
+	created_at: string;
+	updated_at: string;
+	entity_type: string;
+	entity_id: string;
+	to_email: string | null;
+	to_name: string | null;
+	status: string;
+	error: string | null;
+	sent_at: string | null;
+	email_message_id: string | null;
 }
 
 export interface ApiPlaybook {

@@ -463,6 +463,10 @@
 						onDelete={canMutateCrmRecords(role) ? onDelete : undefined}
 						onReload={loadAll}
 						showNav={false}
+						tagsApi={api}
+						tagsEntityType="client"
+						tagsEntityId={client.id}
+						tagsCanEdit={canMutateCrmRecords(role)}
 						class="min-h-0 flex-1"
 					/>
 				{/if}
