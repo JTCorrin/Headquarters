@@ -8,3 +8,6 @@ bun.lockb
 # Miscellaneous
 /static/
 /drizzle/
+
+# Go/Supabase Auth email templates ({{ .Var }} syntax; not app HTML)
+/supabase/templates/

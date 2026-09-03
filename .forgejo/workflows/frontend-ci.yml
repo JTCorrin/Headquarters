@@ -3,7 +3,7 @@ name: Frontend CI
 # Gate for Vitest + local Playwright preview + build.
 # Runs on every push to `dev`, and on PRs into `dev` / `main` / `staging`.
 # Staging branch protection should require these checks before merging into staging.
-# Post-merge staging still re-verifies + deploys via `.forgejo/workflows/staging-deploy.yml`.
+# Post-merge staging deploys + live Playwright only (see staging-deploy.yml); it does not re-run this gate.
 
 on:
   push:
