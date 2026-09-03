@@ -2561,6 +2561,37 @@ Deno.test('MCP create_card requires project_id, column_id, and title', () => {
   ])
 })
 
+Deno.test('MCP create_email_template requires name, subject, and category', () => {
+  const createTemplate = listMcpTools().find(
+    (tool) => tool.name === 'create_email_template',
+  )
+  assertEquals(createTemplate?.inputSchema.required, [
+    'name',
+    'subject',
+    'category',
+  ])
+  assertEquals(
+    (createTemplate?.inputSchema.properties as Record<string, { enum?: string[] }>)
+      ?.category?.enum,
+    ['transactional', 'campaign', 'chase', 'onboarding', 'other'],
+  )
+  assertEquals(
+    (createTemplate?.inputSchema.properties as Record<string, { enum?: string[] }>)
+      ?.status?.enum,
+    ['draft', 'active', 'archived'],
+  )
+
+  const updateTemplate = listMcpTools().find(
+    (tool) => tool.name === 'update_email_template',
+  )
+  assertEquals(updateTemplate?.inputSchema.required, ['id', 'version'])
+
+  const deleteTemplate = listMcpTools().find(
+    (tool) => tool.name === 'delete_email_template',
+  )
+  assertEquals(deleteTemplate?.inputSchema.required, ['id', 'version'])
+})
+
 Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => {
   const names = listMcpTools().map((tool) => tool.name).sort()
   assertEquals(names, [
@@ -2571,6 +2602,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'create_card',
     'create_client',
     'create_contact',
+    'create_email_template',
     'create_invoice',
     'create_invoice_from_quote',
     'create_lead',
@@ -2582,8 +2614,10 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'create_quote',
     'create_task',
     'delete_card',
+    'delete_email_template',
     'get_client',
     'get_contact',
+    'get_email_template',
     'get_invoice',
     'get_lead',
     'get_meeting',
@@ -2595,6 +2629,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'get_task',
     'list_clients',
     'list_contacts',
+    'list_email_templates',
     'list_invoices',
     'list_leads',
     'list_meetings',
@@ -2611,6 +2646,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'update_card',
     'update_client',
     'update_contact',
+    'update_email_template',
     'update_invoice',
     'update_lead',
     'update_meeting',

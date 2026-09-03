@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../_shared/database.ts'
 import { handleClients } from './clients.ts'
 import { handleContacts } from './contacts.ts'
+import { handleEmailTemplates } from './email-templates.ts'
 import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
 import { handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
@@ -1289,6 +1290,123 @@ const TOOLS: ToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_email_templates',
+    description:
+      'List email templates in the organisation pinned to the API key. Filter by status (draft|active|archived) and/or category (transactional|campaign|chase|onboarding|other). Playbook emailSend only uses templates with status=active.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'archived'],
+        },
+        category: {
+          type: 'string',
+          enum: ['transactional', 'campaign', 'chase', 'onboarding', 'other'],
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_email_template',
+    description: 'Get an email template by id.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', format: 'uuid' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_email_template',
+    description:
+      'Create an org email template (POST /api/v1/email-templates). Required: name, subject, category. Prefer body_text as plain text; leave body_html null unless intentionally supplying HTML (the product UI always stores plain text in body_text). Defaults: status=draft, merge_schema=[]. Set status=active if the template will be used by playbook emailSend. Documented merge tokens ({{contact.name}}, {{client.name}}, {{invoice.number}}, {{quote.number}}) are conventional only — outbound mail currently sends subject/body verbatim with no substitution. Names must be unique per org (case-insensitive). Prefer body under ~8000 chars for UI-editable templates (API allows up to 200000).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 200,
+          description: 'Unique display name within the organisation.',
+        },
+        subject: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 200,
+          description:
+            'Email subject line. May include conventional tokens like {{invoice.number}}.',
+        },
+        body_text: {
+          type: ['string', 'null'],
+          description: 'Plain-text body (preferred). Prefer under ~8000 chars for UI editors.',
+        },
+        body_html: {
+          type: ['string', 'null'],
+          description: 'Optional HTML body. Leave null unless intentionally supplying HTML.',
+        },
+        category: {
+          type: 'string',
+          enum: ['transactional', 'campaign', 'chase', 'onboarding', 'other'],
+        },
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'archived'],
+          description: 'Defaults to draft. Playbook emailSend requires active.',
+        },
+        merge_schema: {
+          type: 'array',
+          description: 'Optional JSON array; defaults to []. Not enforced against placeholders.',
+        },
+      },
+      required: ['name', 'subject', 'category'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_email_template',
+    description:
+      'Update an email template (PATCH /api/v1/email-templates/{id}). Requires version for If-Match. Same field rules as create: prefer body_text plain text; set status=active for playbook emailSend; merge tokens are conventional only (no substitution at send time yet).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        name: { type: 'string', minLength: 1, maxLength: 200 },
+        subject: { type: 'string', minLength: 1, maxLength: 200 },
+        body_text: { type: ['string', 'null'] },
+        body_html: { type: ['string', 'null'] },
+        category: {
+          type: 'string',
+          enum: ['transactional', 'campaign', 'chase', 'onboarding', 'other'],
+        },
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'archived'],
+        },
+        merge_schema: { type: 'array' },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_email_template',
+    description:
+      'Soft-delete an email template (DELETE /api/v1/email-templates/{id}). Requires version for If-Match. Soft delete archives the template.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 export function listMcpTools(): ToolDef[] {
@@ -1587,6 +1705,26 @@ function assertCanAccessCatalog(role: MembershipRole, method: string): void {
       403,
       'FORBIDDEN',
       'This membership cannot modify the product catalog',
+    )
+  }
+}
+
+function assertCanAccessEmailTemplates(
+  role: MembershipRole,
+  method: string,
+): void {
+  if (role === 'billing') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Billing members cannot access email templates',
+    )
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Readonly members cannot modify email templates',
     )
   }
 }
@@ -2618,6 +2756,80 @@ export async function callTool(
         db,
         path,
         orgId,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'list_email_templates': {
+      assertCanAccessEmailTemplates(membership.role, 'GET')
+      const path = `/api/v1/email-templates${optionalQuery(args, ['limit', 'status', 'category'])}`
+      const response = await handleEmailTemplates(
+        syntheticRequest('GET', path),
+        db,
+        '/api/v1/email-templates',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'get_email_template': {
+      assertCanAccessEmailTemplates(membership.role, 'GET')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const path = `/api/v1/email-templates/${id}`
+      const response = await handleEmailTemplates(
+        syntheticRequest('GET', path),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'create_email_template': {
+      assertCanAccessEmailTemplates(membership.role, 'POST')
+      const response = await handleEmailTemplates(
+        syntheticRequest('POST', '/api/v1/email-templates', args),
+        db,
+        '/api/v1/email-templates',
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'update_email_template': {
+      assertCanAccessEmailTemplates(membership.role, 'PATCH')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const { id: _id, version: _version, ...patch } = args
+      const path = `/api/v1/email-templates/${id}`
+      const response = await handleEmailTemplates(
+        syntheticRequest('PATCH', path, patch, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
+        requestId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'delete_email_template': {
+      assertCanAccessEmailTemplates(membership.role, 'DELETE')
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/email-templates/${id}`
+      const response = await handleEmailTemplates(
+        syntheticRequest('DELETE', path, undefined, {
+          'if-match': `"${version}"`,
+        }),
+        db,
+        path,
+        orgId,
+        membership.role,
         requestId,
       )
       return await toolResultFromHttp(response)
