@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(17);
 
 create temporary table _campaign_fixture (
   owner_id uuid,
@@ -87,7 +87,7 @@ set membership_id = m.id
 from public.memberships m
 where m.org_id = f.org_id and m.user_id = f.owner_id;
 
--- Fixture rows as postgres (bypasses mailbox insert grants).
+-- Fixture rows as table owner (bypass mailbox insert grants / template admin RLS).
 with created_tag as (
   insert into public.tags (org_id, name, color, created_by, updated_by)
   select org_id, 'Newsletter', 'blue', owner_id, owner_id from _campaign_fixture
@@ -177,8 +177,8 @@ with created_campaign as (
 )
 update _campaign_fixture set campaign_id = created_campaign.id from created_campaign;
 
--- Authenticated actor for RPC/RLS checks
-select pg_temp.as_user(owner_id) from _campaign_fixture;
+select pg_temp.as_user((select owner_id from _campaign_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$
@@ -190,25 +190,40 @@ select throws_ok(
   'tag names are unique per org case-insensitively'
 );
 
-select public.replace_entity_tags(
-  (select org_id from _campaign_fixture),
-  'contact',
-  (select contact_id from _campaign_fixture),
-  array[(select tag_id from _campaign_fixture)]
+select lives_ok(
+  $$
+    select public.replace_entity_tags(
+      (select org_id from _campaign_fixture),
+      'contact',
+      (select contact_id from _campaign_fixture),
+      array[(select tag_id from _campaign_fixture)]
+    )
+  $$,
+  'replace_entity_tags assigns contact tag'
 );
 
-select public.replace_entity_tags(
-  (select org_id from _campaign_fixture),
-  'lead',
-  (select lead_id from _campaign_fixture),
-  array[(select tag_id from _campaign_fixture)]
+select lives_ok(
+  $$
+    select public.replace_entity_tags(
+      (select org_id from _campaign_fixture),
+      'lead',
+      (select lead_id from _campaign_fixture),
+      array[(select tag_id from _campaign_fixture)]
+    )
+  $$,
+  'replace_entity_tags assigns lead tag'
 );
 
-select public.replace_entity_tags(
-  (select org_id from _campaign_fixture),
-  'client',
-  (select client_id from _campaign_fixture),
-  array[(select tag_id from _campaign_fixture)]
+select lives_ok(
+  $$
+    select public.replace_entity_tags(
+      (select org_id from _campaign_fixture),
+      'client',
+      (select client_id from _campaign_fixture),
+      array[(select tag_id from _campaign_fixture)]
+    )
+  $$,
+  'replace_entity_tags assigns client tag'
 );
 
 select is(
@@ -270,11 +285,16 @@ select is(
   'exactly one sendable recipient after dedupe'
 );
 
-select public.replace_campaign_audience(
-  (select campaign_id from _campaign_fixture),
-  (select org_id from _campaign_fixture),
-  array[(select tag_id from _campaign_fixture)],
-  array['lead', 'contact', 'client']::text[]
+select lives_ok(
+  $$
+    select public.replace_campaign_audience(
+      (select campaign_id from _campaign_fixture),
+      (select org_id from _campaign_fixture),
+      array[(select tag_id from _campaign_fixture)],
+      array['lead', 'contact', 'client']::text[]
+    )
+  $$,
+  'replace_campaign_audience stores tag audience'
 );
 
 select lives_ok(
@@ -317,10 +337,15 @@ select is(
   'launch marks skipped recipients'
 );
 
-select public.cancel_campaign(
-  (select campaign_id from _campaign_fixture),
-  (select org_id from _campaign_fixture),
-  (select version from public.campaigns where id = (select campaign_id from _campaign_fixture))
+select lives_ok(
+  $$
+    select public.cancel_campaign(
+      (select campaign_id from _campaign_fixture),
+      (select org_id from _campaign_fixture),
+      (select version from public.campaigns where id = (select campaign_id from _campaign_fixture))
+    )
+  $$,
+  'cancel_campaign succeeds'
 );
 
 select is(
@@ -329,16 +354,25 @@ select is(
   'cancel_campaign sets cancelled'
 );
 
-select public.soft_delete_tag(
-  (select tag_b_id from _campaign_fixture),
-  (select org_id from _campaign_fixture),
-  (select version from public.tags where id = (select tag_b_id from _campaign_fixture))
+select lives_ok(
+  $$
+    select public.soft_delete_tag(
+      (select tag_b_id from _campaign_fixture),
+      (select org_id from _campaign_fixture),
+      (select version from public.tags where id = (select tag_b_id from _campaign_fixture))
+    )
+  $$,
+  'soft_delete_tag succeeds'
 );
 
 select is(
-  (select deleted_at is not null from public.tags where id = (select tag_b_id from _campaign_fixture)),
-  true,
-  'soft_delete_tag sets deleted_at'
+  (
+    select count(*)::integer
+    from public.tags
+    where id = (select tag_b_id from _campaign_fixture)
+  ),
+  0,
+  'soft-deleted tags are hidden by RLS'
 );
 
 select finish();
