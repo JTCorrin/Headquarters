@@ -25,8 +25,11 @@
 	} from './entity-email-inbox.svelte';
 	import Timeline, { type TimelineEvent } from './timeline.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
+	import EntityTagsEditor from './entity-tags-editor.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+	import type { ApiV1Client } from '$lib/api/v1/client.js';
+	import type { TagEntityType } from '$lib/api/v1/endpoints/types.js';
 
 	export interface LeadConvertResult {
 		lead: LeadResource;
@@ -60,6 +63,10 @@
 		emailDefaultTo?: string;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
+		tagsApi?: ApiV1Client;
+		tagsEntityType?: TagEntityType;
+		tagsEntityId?: string;
+		tagsCanEdit?: boolean;
 		class?: string;
 		onSave?: () => boolean | void | Promise<boolean | void>;
 		onDelete?: () => void;
@@ -111,6 +118,10 @@
 		sharingId = null,
 		emailDefaultTo = '',
 		showNav = true,
+		tagsApi,
+		tagsEntityType,
+		tagsEntityId,
+		tagsCanEdit = false,
 		class: className,
 		onSave,
 		onDelete,
@@ -215,6 +226,15 @@
 						{/if}
 					{/snippet}
 				</PageHeader>
+
+				{#if tagsApi && tagsEntityType && tagsEntityId}
+					<EntityTagsEditor
+						api={tagsApi}
+						entityType={tagsEntityType}
+						entityId={tagsEntityId}
+						canEdit={tagsCanEdit}
+					/>
+				{/if}
 
 				<ResourceStateBanner state={viewState} {onReload} />
 

@@ -92,6 +92,92 @@ export type EmailTemplateInsert = {
   deleted_at?: string | null
 }
 
+export type TagRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  color: string | null
+}
+
+export type TagInsert = {
+  org_id: string
+  name: string
+  color?: string | null
+  deleted_at?: string | null
+}
+
+export type TagAssignmentRow = {
+  id: string
+  org_id: string
+  created_at: string
+  created_by: string | null
+  tag_id: string
+  entity_type: 'lead' | 'contact' | 'client'
+  entity_id: string
+}
+
+export type CampaignStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'sending'
+  | 'completed'
+  | 'cancelled'
+  | 'failed'
+
+export type CampaignRow = {
+  id: string
+  org_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  name: string
+  status: CampaignStatus
+  template_id: string | null
+  mailbox_id: string | null
+  scheduled_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  last_error: string | null
+}
+
+export type CampaignInsert = {
+  org_id: string
+  name: string
+  status?: CampaignStatus
+  template_id?: string | null
+  mailbox_id?: string | null
+  scheduled_at?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  last_error?: string | null
+  deleted_at?: string | null
+}
+
+export type CampaignRecipientRow = {
+  id: string
+  org_id: string
+  campaign_id: string
+  created_at: string
+  updated_at: string
+  entity_type: 'lead' | 'contact' | 'client'
+  entity_id: string
+  to_email: string
+  to_name: string | null
+  status: 'pending' | 'sent' | 'skipped' | 'failed'
+  error: string | null
+  sent_at: string | null
+  email_message_id: string | null
+}
+
 export type PlaybookRow = {
   id: string
   org_id: string
@@ -1485,6 +1571,82 @@ export type Database = {
         Update: Partial<EmailTemplateInsert>
         Relationships: []
       }
+      tags: {
+        Row: TagRow
+        Insert: TagInsert
+        Update: Partial<TagInsert>
+        Relationships: []
+      }
+      tag_assignments: {
+        Row: TagAssignmentRow
+        Insert: {
+          org_id: string
+          tag_id: string
+          entity_type: TagAssignmentRow['entity_type']
+          entity_id: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      campaigns: {
+        Row: CampaignRow
+        Insert: CampaignInsert
+        Update: Partial<CampaignInsert>
+        Relationships: []
+      }
+      campaign_audience_tags: {
+        Row: {
+          campaign_id: string
+          org_id: string
+          tag_id: string
+          created_at: string
+        }
+        Insert: {
+          campaign_id: string
+          org_id: string
+          tag_id: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      campaign_audience_entity_types: {
+        Row: {
+          campaign_id: string
+          org_id: string
+          entity_type: 'lead' | 'contact' | 'client'
+          created_at: string
+        }
+        Insert: {
+          campaign_id: string
+          org_id: string
+          entity_type: 'lead' | 'contact' | 'client'
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      campaign_recipients: {
+        Row: CampaignRecipientRow
+        Insert: {
+          org_id: string
+          campaign_id: string
+          entity_type: CampaignRecipientRow['entity_type']
+          entity_id: string
+          to_email: string
+          to_name?: string | null
+          status?: CampaignRecipientRow['status']
+          error?: string | null
+          sent_at?: string | null
+          email_message_id?: string | null
+        }
+        Update: Partial<{
+          status: CampaignRecipientRow['status']
+          error: string | null
+          sent_at: string | null
+          email_message_id: string | null
+          updated_at: string
+        }>
+        Relationships: []
+      }
       playbooks: {
         Row: PlaybookRow
         Insert: PlaybookInsert
@@ -2572,6 +2734,123 @@ export type Database = {
           p_expected_version: number
           p_org_id: string
           p_template_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_tag: {
+        Args: {
+          p_tag_id: string
+          p_org_id: string
+          p_expected_version: number
+        }
+        Returns: undefined
+      }
+      list_entity_tags: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+        }
+        Returns: Json
+      }
+      replace_entity_tags: {
+        Args: {
+          p_org_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_tag_ids: string[]
+        }
+        Returns: Json
+      }
+      soft_delete_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+          p_expected_version: number
+        }
+        Returns: undefined
+      }
+      replace_campaign_audience: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+          p_tag_ids: string[]
+          p_entity_types: string[]
+        }
+        Returns: undefined
+      }
+      resolve_campaign_audience: {
+        Args: {
+          p_org_id: string
+          p_tag_ids: string[]
+          p_entity_types: string[]
+          p_limit?: number
+        }
+        Returns: Array<{
+          entity_type: string
+          entity_id: string
+          to_email: string | null
+          to_name: string | null
+          skip_reason: string | null
+        }>
+      }
+      launch_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+          p_expected_version: number
+          p_send_immediately?: boolean
+        }
+        Returns: CampaignRow
+      }
+      cancel_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+          p_expected_version: number
+        }
+        Returns: CampaignRow
+      }
+      claim_due_campaigns: {
+        Args: { p_limit?: number }
+        Returns: CampaignRow[]
+      }
+      claim_campaign_recipients: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+          p_limit?: number
+        }
+        Returns: CampaignRecipientRow[]
+      }
+      mark_campaign_recipient_result: {
+        Args: {
+          p_recipient_id: string
+          p_org_id: string
+          p_status: string
+          p_error?: string | null
+          p_email_message_id?: string | null
+        }
+        Returns: CampaignRecipientRow
+      }
+      finalize_campaign_if_done: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+        }
+        Returns: CampaignRow
+      }
+      campaign_mailbox_quota_remaining: {
+        Args: {
+          p_org_id: string
+          p_mailbox_id: string
+        }
+        Returns: number
+      }
+      campaign_consume_send_quota: {
+        Args: {
+          p_org_id: string
+          p_mailbox_id: string
         }
         Returns: undefined
       }
