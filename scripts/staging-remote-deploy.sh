@@ -161,25 +161,102 @@ EOF
 # applied the old filename still list 20260829190000 in schema_migrations, which
 # makes `migration up` / `supabase start` fail with "Remote migration versions
 # not found in local migrations directory".
-repair_renamed_hosted_subscriptions_migration() {
-	# Works when the local DB is reachable (full stack up, or DB container only).
-	local list
-	list="$(supabase migration list --local 2>/dev/null || true)"
-	if ! printf '%s\n' "$list" | grep -Eq '(^|[[:space:]])20260829190000([[:space:]]|$)'; then
+#
+# Never rename an already-applied migration version again — heal history here instead.
+STALE_HOSTED_SUB_MIGRATION=20260829190000
+CANONICAL_HOSTED_SUB_MIGRATION=20260829175735
+
+supabase_db_container() {
+	local project_id container
+	project_id="$(
+		awk -F'"' '/^project_id[[:space:]]*=/ { print $2; exit }' supabase/config.toml 2>/dev/null || true
+	)"
+	if [[ -n "$project_id" ]]; then
+		container="supabase_db_${project_id}"
+		if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+			printf '%s\n' "$container"
+			return 0
+		fi
+	fi
+	docker ps --format '{{.Names}}' 2>/dev/null | awk '/^supabase_db_/ { print; exit }'
+}
+
+db_has_schema_migration_version() {
+	local version="$1"
+	local container
+	container="$(supabase_db_container)"
+	[[ -n "$container" ]] || return 1
+	docker exec "$container" psql -U postgres -d postgres -Atqc \
+		"select 1 from supabase_migrations.schema_migrations where version = '${version}' limit 1" \
+		2>/dev/null | grep -q 1
+}
+
+ensure_local_db_for_migration_repair() {
+	# Full stack may be down; start Postgres only so we can rewrite schema_migrations.
+	if supabase status >/dev/null 2>&1; then
 		return 0
 	fi
-	log "repairing renamed migration 20260829190000 → 20260829175735"
-	supabase migration repair --local --status reverted 20260829190000
-	if ! printf '%s\n' "$list" | grep -Eq '(^|[[:space:]])20260829175735([[:space:]]|$)'; then
+	if [[ -n "$(supabase_db_container)" ]]; then
+		return 0
+	fi
+	log "starting local DB only (for migration history repair)"
+	supabase db start >/dev/null
+}
+
+repair_renamed_hosted_subscriptions_migration() {
+	ensure_local_db_for_migration_repair || true
+
+	local list has_stale=0 has_canonical=0
+	list="$(supabase migration list --local 2>/dev/null || true)"
+	if printf '%s\n' "$list" | grep -Eq "(^|[[:space:]])${STALE_HOSTED_SUB_MIGRATION}([[:space:]]|$)"; then
+		has_stale=1
+	elif db_has_schema_migration_version "$STALE_HOSTED_SUB_MIGRATION"; then
+		has_stale=1
+	fi
+	if printf '%s\n' "$list" | grep -Eq "(^|[[:space:]])${CANONICAL_HOSTED_SUB_MIGRATION}([[:space:]]|$)"; then
+		has_canonical=1
+	elif db_has_schema_migration_version "$CANONICAL_HOSTED_SUB_MIGRATION"; then
+		has_canonical=1
+	fi
+
+	if [[ "$has_stale" -ne 1 ]]; then
+		return 0
+	fi
+
+	log "repairing renamed migration ${STALE_HOSTED_SUB_MIGRATION} → ${CANONICAL_HOSTED_SUB_MIGRATION}"
+	supabase migration repair --local --status reverted "$STALE_HOSTED_SUB_MIGRATION"
+	if [[ "$has_canonical" -ne 1 ]]; then
 		# Identical SQL already applied under the old version id — do not re-run.
-		supabase migration repair --local --status applied 20260829175735
+		supabase migration repair --local --status applied "$CANONICAL_HOSTED_SUB_MIGRATION"
 	fi
 }
 
+supabase_start_with_migration_repair() {
+	# Always heal history before start when the DB volume may still carry the stale id.
+	repair_renamed_hosted_subscriptions_migration || true
+	local start_log
+	start_log="$(mktemp)"
+	if supabase start 2>"$start_log"; then
+		cat "$start_log" >&2 || true
+		rm -f "$start_log"
+		return 0
+	fi
+	cat "$start_log" >&2 || true
+	if grep -Eq "Remote migration versions not found|${STALE_HOSTED_SUB_MIGRATION}" "$start_log"; then
+		log "supabase start failed on migration history — repairing and retrying"
+		repair_renamed_hosted_subscriptions_migration
+		rm -f "$start_log"
+		supabase start
+		return 0
+	fi
+	rm -f "$start_log"
+	return 1
+}
+
 log "starting Supabase (migrations apply on first start)"
-repair_renamed_hosted_subscriptions_migration
 if supabase status >/dev/null 2>&1; then
-	# Already running — apply any new migrations from this SHA (do not wipe data).
+	# Already running — heal history if needed, then apply any new migrations (do not wipe data).
+	repair_renamed_hosted_subscriptions_migration
 	supabase migration up
 	# PostgREST schema cache otherwise misses new tables/RPCs until restart.
 	if command -v docker >/dev/null 2>&1; then
@@ -198,11 +275,7 @@ if supabase status >/dev/null 2>&1; then
 		fi
 	fi
 else
-	if ! supabase start; then
-		# Persistent volumes can still carry the renamed version id; repair and retry.
-		repair_renamed_hosted_subscriptions_migration
-		supabase start
-	fi
+	supabase_start_with_migration_repair
 fi
 
 status_json="$(supabase status -o json)"
