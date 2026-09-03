@@ -14,7 +14,8 @@ export function createClientsEndpoints(request: ApiRequestFn): ClientsEndpoints 
 				orgScoped: true,
 				query: {
 					limit: params.limit,
-					cursor: params.cursor
+					cursor: params.cursor,
+					tag_id: params.tag_id
 				},
 				signal
 			});
