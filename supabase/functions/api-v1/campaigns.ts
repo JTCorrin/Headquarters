@@ -348,7 +348,12 @@ export function handleCampaigns(
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
           .limit(limit)
-        if (status) query = query.eq('status', status as Database['public']['Tables']['campaigns']['Row']['status'])
+        if (status) {
+          query = query.eq(
+            'status',
+            status as Database['public']['Tables']['campaigns']['Row']['status'],
+          )
+        }
         const { data, error } = await query
         if (error) throw databaseError(error, requestId)
         const enriched = await Promise.all(

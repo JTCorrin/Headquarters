@@ -59,8 +59,7 @@ export async function handleOrganisationMailboxes(
         .filter((row) => typeof row.membership_id === 'string')
         .map((row) => {
           const id = String(row.membership_id)
-          const display =
-            (typeof row.display_name === 'string' && row.display_name.trim()) ||
+          const display = (typeof row.display_name === 'string' && row.display_name.trim()) ||
             'Member'
           return [id, display] as const
         }),

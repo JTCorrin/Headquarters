@@ -12,8 +12,7 @@ import {
 
 type DatabaseClient = SupabaseClient<Database>
 
-const SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,color'
+const SELECT = 'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,color'
 
 const ENTITY_PATH: Record<string, 'lead' | 'contact' | 'client'> = {
   leads: 'lead',
@@ -86,7 +85,11 @@ function databaseError(error: { code?: string; message?: string }, requestId: st
     return new ApiError(409, 'CONFLICT', 'A tag with this name already exists')
   }
   if (error.code === '23514' || error.code === '22023') {
-    return new ApiError(422, 'VALIDATION_ERROR', error.message || 'Tag failed a database constraint')
+    return new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      error.message || 'Tag failed a database constraint',
+    )
   }
   if (error.code === '42501') {
     return new ApiError(403, 'FORBIDDEN', 'This action is not permitted')
@@ -230,7 +233,7 @@ export function handleTags(
 
   if (req.method === 'GET') {
     return findTag(db, orgId, tagId, requestId).then((data) =>
-      jsonResponse({ data }, 200, requestId, { etag: etag(data.version) }),
+      jsonResponse({ data }, 200, requestId, { etag: etag(data.version) })
     )
   }
 

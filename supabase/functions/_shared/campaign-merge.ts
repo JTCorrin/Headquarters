@@ -20,7 +20,8 @@ export function buildCampaignMergeVars(input: {
   leadName?: string | null
   toName?: string | null
 }): CampaignMergeVars {
-  const contactName = input.contactName ?? (input.entityType === 'contact' ? input.entityName : null)
+  const contactName = input.contactName ??
+    (input.entityType === 'contact' ? input.entityName : null)
   const clientName = input.clientName ?? (input.entityType === 'client' ? input.entityName : null)
   const leadName = input.leadName ?? (input.entityType === 'lead' ? input.entityName : null)
   const display = input.toName ?? input.entityName ?? ''
