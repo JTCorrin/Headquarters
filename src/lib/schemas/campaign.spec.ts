@@ -6,7 +6,21 @@ const MAILBOX_ID = '22222222-3333-4444-8555-666666666666';
 const TAG_ID = '33333333-4444-4555-8666-777777777777';
 
 describe('campaignFormSchema', () => {
-	it('requires name, template, mailbox, and at least one entity type', () => {
+	it('allows draft save with name only (template/mailbox optional)', () => {
+		const parsed = campaignFormSchema.parse({
+			name: 'Spring Shot',
+			template_id: '',
+			mailbox_id: '',
+			tag_ids: [],
+			entity_types: ['lead', 'contact', 'client'],
+			scheduled_at: ''
+		});
+		expect(parsed.name).toBe('Spring Shot');
+		expect(parsed.template_id).toBe('');
+		expect(parsed.mailbox_id).toBe('');
+	});
+
+	it('accepts template, mailbox, tags, and entity types when set', () => {
 		const parsed = campaignFormSchema.parse({
 			name: 'Spring Shot',
 			template_id: TEMPLATE_ID,
