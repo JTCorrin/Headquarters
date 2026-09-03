@@ -268,6 +268,13 @@
 									<p class="text-muted-foreground text-sm">No tags in this organisation yet.</p>
 								{/each}
 							</div>
+							{#if $errors.tag_ids}
+								<p class="text-destructive text-sm">
+									{Array.isArray($errors.tag_ids)
+										? $errors.tag_ids.join(', ')
+										: ($errors.tag_ids._errors?.join(', ') ?? 'Invalid tags')}
+								</p>
+							{/if}
 						</div>
 
 						<div class="space-y-2">
