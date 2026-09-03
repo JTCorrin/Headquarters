@@ -287,26 +287,61 @@
 		}
 	}
 
+	async function validateCampaignForm(): Promise<boolean> {
+		const result = await campaignForm.validateForm({ update: true });
+		return result.valid;
+	}
+
+	function launchReadyMessage(form: CampaignFormData): boolean {
+		const fields: Record<string, string> = {};
+		if (!form.template_id) fields.template_id = 'Select a template';
+		if (!form.mailbox_id) fields.mailbox_id = 'Select a mailbox';
+		if (form.tag_ids.length === 0) fields.tag_ids = 'Select at least one audience tag';
+		if (Object.keys(fields).length === 0) return true;
+
+		if (fields.template_id || fields.mailbox_id) {
+			campaignForm.errors.update((current) => {
+				const next = { ...current };
+				if (fields.template_id) next.template_id = [fields.template_id];
+				if (fields.mailbox_id) next.mailbox_id = [fields.mailbox_id];
+				return next;
+			});
+		}
+		viewState = {
+			kind: 'validation',
+			message: 'Finish the draft before launching or scheduling.',
+			fields
+		};
+		return false;
+	}
+
 	async function onSave() {
-		const valid = await campaignForm.validateForm();
-		if (!valid.valid) return;
+		if (!(await validateCampaignForm())) return;
 		const saved = await persistDraft();
 		if (saved) viewState = { kind: 'ready' };
 	}
 
 	async function onPreview() {
-		const valid = await campaignForm.validateForm();
-		if (!valid.valid) return;
+		if (!(await validateCampaignForm())) return;
+		const form = get(campaignForm.form);
+		if (form.tag_ids.length === 0) {
+			viewState = {
+				kind: 'validation',
+				message: 'Select at least one audience tag to preview.',
+				fields: { tag_ids: 'Select at least one audience tag' }
+			};
+			return;
+		}
 		const saved = await persistDraft();
 		if (!saved) return;
 
-		const form = get(campaignForm.form);
 		previewLoading = true;
 		try {
 			preview = await api.campaigns.audiencePreview(saved.id, {
 				tag_ids: form.tag_ids,
 				entity_types: form.entity_types
 			});
+			viewState = { kind: 'ready' };
 		} catch (error) {
 			viewState = {
 				kind: 'validation',
@@ -318,8 +353,9 @@
 	}
 
 	async function onLaunch(sendImmediately = true) {
-		const valid = await campaignForm.validateForm();
-		if (!valid.valid) return;
+		if (!(await validateCampaignForm())) return;
+		const form = get(campaignForm.form);
+		if (!launchReadyMessage(form)) return;
 		const saved = await persistDraft();
 		if (!saved) return;
 
