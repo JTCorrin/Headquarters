@@ -29,6 +29,9 @@ import { handleVendors } from './vendors.ts'
 import { handleLeads } from './leads.ts'
 import { handleEmailTemplates } from './email-templates.ts'
 import { handlePlaybooks } from './playbooks.ts'
+import { handleCampaigns } from './campaigns.ts'
+import { handleTags, isTagsPath } from './tags.ts'
+import { handleOrganisationMailboxes } from './org-mailboxes.ts'
 import { handleMailbox, listEntityEmailMessages, listMyEmailMessages } from './mailbox.ts'
 import { handleNotifications } from './notifications.ts'
 import { handleOrgMembers } from './org-members.ts'
@@ -339,6 +342,19 @@ async function routeOrgScoped(
   }
 
   if (
+    path === '/api/v1/organisation/mailboxes'
+  ) {
+    return await handleOrganisationMailboxes(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    )
+  }
+
+  if (
     path === '/api/v1/organisation/invoice-email' ||
     path === '/api/v1/organisation/invoice-email/test'
   ) {
@@ -458,6 +474,21 @@ async function routeOrgScoped(
     path.startsWith('/api/v1/email-templates/')
   ) {
     return await handleEmailTemplates(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+    )
+  }
+
+  if (isTagsPath(path)) {
+    return await handleTags(req, db, path, orgId, membership.role, requestId)
+  }
+
+  if (path === '/api/v1/campaigns' || path.startsWith('/api/v1/campaigns/')) {
+    return await handleCampaigns(
       req,
       db,
       path,

@@ -160,6 +160,30 @@ Deno.test('MCP guards block billing and readonly across resources', async () => 
       undefined,
       `${role} should be blocked from email template mutation`,
     )
+    await assertRejects(
+      () =>
+        callTool(
+          auth,
+          'create_tag',
+          { name: 'Newsletter' },
+          `req-guard-tag-${role}`,
+        ),
+      ApiError,
+      undefined,
+      `${role} should be blocked from tag mutation`,
+    )
+    await assertRejects(
+      () =>
+        callTool(
+          auth,
+          'create_campaign',
+          { name: 'Spring Shot' },
+          `req-guard-campaign-${role}`,
+        ),
+      ApiError,
+      undefined,
+      `${role} should be blocked from campaign mutation`,
+    )
   }
 
   const billingAuth = makeAuth('billing', makeDb({}))
@@ -168,6 +192,18 @@ Deno.test('MCP guards block billing and readonly across resources', async () => 
     ApiError,
     undefined,
     'billing should be blocked from listing email templates',
+  )
+  await assertRejects(
+    () => callTool(billingAuth, 'list_tags', {}, 'req-billing-list-tags'),
+    ApiError,
+    undefined,
+    'billing should be blocked from listing tags',
+  )
+  await assertRejects(
+    () => callTool(billingAuth, 'list_campaigns', {}, 'req-billing-list-campaigns'),
+    ApiError,
+    undefined,
+    'billing should be blocked from listing campaigns',
   )
 })
 

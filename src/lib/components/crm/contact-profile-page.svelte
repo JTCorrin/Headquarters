@@ -18,9 +18,11 @@
 	import DocumentWorkspaceApiHost from './document-workspace-api-host.svelte';
 	import EntityDocuments, { type EntityDocument } from './entity-documents.svelte';
 	import ContactFormDrawer from './contact-form-drawer.svelte';
+	import EntityTagsEditor from './entity-tags-editor.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 	import type { MembershipRole } from '$lib/schemas/organisation.js';
+	import type { TagEntityType } from '$lib/api/v1/endpoints/types.js';
 
 	export interface ContactProfilePageProps {
 		orgName: string;
@@ -55,6 +57,10 @@
 		editDrawerOpen?: boolean;
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
+		tagsApi?: ApiV1Client;
+		tagsEntityType?: TagEntityType;
+		tagsEntityId?: string;
+		tagsCanEdit?: boolean;
 		class?: string;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
 		onDelete?: () => void;
@@ -108,6 +114,10 @@
 		clientOptions = [],
 		editDrawerOpen = $bindable(false),
 		showNav = true,
+		tagsApi,
+		tagsEntityType,
+		tagsEntityId,
+		tagsCanEdit = false,
 		class: className,
 		onValidSubmit,
 		onDelete,
@@ -192,6 +202,16 @@
 						{/if}
 					{/snippet}
 				</ProfileHeader>
+				{#if tagsApi && tagsEntityType && tagsEntityId}
+					<div class="mt-3">
+						<EntityTagsEditor
+							api={tagsApi}
+							entityType={tagsEntityType}
+							entityId={tagsEntityId}
+							canEdit={tagsCanEdit}
+						/>
+					</div>
+				{/if}
 			</div>
 
 			<ProfileTabs {tabs} bind:value={activeTab}>

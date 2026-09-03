@@ -151,6 +151,18 @@ import type {
 	ApiEmailTemplateCreateBody,
 	ApiEmailTemplateListParams,
 	ApiEmailTemplateUpdateBody,
+	ApiEntityTag,
+	ApiTag,
+	ApiTagCreateBody,
+	ApiTagListParams,
+	ApiTagUpdateBody,
+	ApiOrgMailbox,
+	ApiCampaign,
+	ApiCampaignAudiencePreview,
+	ApiCampaignCreateBody,
+	ApiCampaignListParams,
+	ApiCampaignRecipient,
+	ApiCampaignUpdateBody,
 	ApiPlaybook,
 	ApiPlaybookCreateBody,
 	ApiPlaybookListParams,
@@ -747,6 +759,69 @@ export interface EmailTemplatesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiEmailTemplate>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export type TagEntityType = 'contact' | 'lead' | 'client';
+
+export interface TagsEndpoints {
+	list(params?: ApiTagListParams, signal?: AbortSignal): Promise<ApiResult<ApiTag[]>>;
+	create(body: ApiTagCreateBody, signal?: AbortSignal): Promise<ApiTag>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiTag>>;
+	update(
+		id: string,
+		body: ApiTagUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiTag>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	listForEntity(
+		entityType: TagEntityType,
+		entityId: string,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiEntityTag[]>>;
+	replaceForEntity(
+		entityType: TagEntityType,
+		entityId: string,
+		tagIds: string[],
+		signal?: AbortSignal
+	): Promise<ApiEntityTag[]>;
+}
+
+export interface OrgMailboxesEndpoints {
+	list(signal?: AbortSignal): Promise<ApiResult<ApiOrgMailbox[]>>;
+}
+
+export interface CampaignsEndpoints {
+	list(
+		params?: ApiCampaignListParams,
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiCampaign[]>>;
+	create(body: ApiCampaignCreateBody, signal?: AbortSignal): Promise<ApiCampaign>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiCampaign>>;
+	update(
+		id: string,
+		body: ApiCampaignUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiCampaign>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	launch(
+		id: string,
+		version: number,
+		options?: { sendImmediately?: boolean },
+		signal?: AbortSignal
+	): Promise<ApiCampaign>;
+	cancel(id: string, version: number, signal?: AbortSignal): Promise<ApiCampaign>;
+	audiencePreview(
+		id: string,
+		body?: Pick<ApiCampaignUpdateBody, 'tag_ids' | 'entity_types'>,
+		signal?: AbortSignal
+	): Promise<ApiCampaignAudiencePreview>;
+	listRecipients(
+		id: string,
+		params?: { limit?: number; status?: string },
+		signal?: AbortSignal
+	): Promise<ApiResult<ApiCampaignRecipient[]>>;
 }
 
 export interface PlaybooksEndpoints {
