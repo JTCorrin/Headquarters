@@ -337,7 +337,7 @@ else
 fi
 # Preserve DB/storage volumes (default). --no-backup would wipe staging data.
 supabase stop
-supabase start
+supabase_start_with_migration_repair
 
 edge_after="$(
 	docker ps --format '{{.Names}}' \
