@@ -264,7 +264,7 @@
 	data-testid="entity-documents"
 	aria-label={title}
 >
-	<div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+	<div class="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
 		<div class="min-w-0">
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
 			{#if resolvedView.kind === 'ready'}
@@ -347,7 +347,7 @@
 
 	{#if workspaceEnabled && breadcrumbs.length > 0}
 		<nav
-			class="border-t px-4 py-2"
+			class="shrink-0 border-t px-4 py-2"
 			aria-label="Folder breadcrumbs"
 			data-testid="documents-breadcrumbs"
 		>
@@ -378,7 +378,7 @@
 	{/if}
 
 	{#if uploads.length > 0}
-		<div class="border-t px-4 py-3" data-testid="documents-upload-queue" aria-live="polite">
+		<div class="shrink-0 border-t px-4 py-3" data-testid="documents-upload-queue" aria-live="polite">
 			<p class="mb-2 text-xs font-medium tracking-tight">Uploads</p>
 			<ul class="m-0 list-none space-y-2 p-0">
 				{#each uploads as upload (upload.id)}
@@ -470,7 +470,7 @@
 		</p>
 	{:else if viewMode === 'grid'}
 		<ul
-			class="m-0 grid list-none grid-cols-2 gap-3 border-t p-4 sm:grid-cols-3 lg:grid-cols-4"
+			class="m-0 grid min-h-0 flex-1 list-none grid-cols-2 gap-3 overflow-y-auto overscroll-contain border-t p-4 sm:grid-cols-3 lg:grid-cols-4"
 			data-testid="documents-grid"
 		>
 			{#each entries as entry (entry.id)}
@@ -516,7 +516,10 @@
 			{/each}
 		</ul>
 	{:else}
-		<ul class="m-0 list-none border-t p-0" data-testid="documents-list">
+		<ul
+			class="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain border-t p-0"
+			data-testid="documents-list"
+		>
 			{#each entries as entry (entry.id)}
 				<li
 					class="hover:bg-muted/40 flex items-start gap-3 border-t px-4 py-3 first:border-t-0"
