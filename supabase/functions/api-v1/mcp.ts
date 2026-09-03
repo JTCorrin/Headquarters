@@ -1342,13 +1342,11 @@ const TOOLS: ToolDef[] = [
         },
         body_text: {
           type: ['string', 'null'],
-          description:
-            'Plain-text body (preferred). Prefer under ~8000 chars for UI editors.',
+          description: 'Plain-text body (preferred). Prefer under ~8000 chars for UI editors.',
         },
         body_html: {
           type: ['string', 'null'],
-          description:
-            'Optional HTML body. Leave null unless intentionally supplying HTML.',
+          description: 'Optional HTML body. Leave null unless intentionally supplying HTML.',
         },
         category: {
           type: 'string',
@@ -1357,13 +1355,11 @@ const TOOLS: ToolDef[] = [
         status: {
           type: 'string',
           enum: ['draft', 'active', 'archived'],
-          description:
-            'Defaults to draft. Playbook emailSend requires active.',
+          description: 'Defaults to draft. Playbook emailSend requires active.',
         },
         merge_schema: {
           type: 'array',
-          description:
-            'Optional JSON array; defaults to []. Not enforced against placeholders.',
+          description: 'Optional JSON array; defaults to []. Not enforced against placeholders.',
         },
       },
       required: ['name', 'subject', 'category'],
@@ -2766,9 +2762,7 @@ export async function callTool(
     }
     case 'list_email_templates': {
       assertCanAccessEmailTemplates(membership.role, 'GET')
-      const path = `/api/v1/email-templates${
-        optionalQuery(args, ['limit', 'status', 'category'])
-      }`
+      const path = `/api/v1/email-templates${optionalQuery(args, ['limit', 'status', 'category'])}`
       const response = await handleEmailTemplates(
         syntheticRequest('GET', path),
         db,
