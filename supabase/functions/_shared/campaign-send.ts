@@ -16,7 +16,14 @@ async function loadMergeContext(
   orgId: string,
   entityType: CampaignRecipientRow['entity_type'],
   entityId: string,
-): Promise<{ entityName: string | null; contactName: string | null; clientName: string | null; leadName: string | null }> {
+): Promise<
+  {
+    entityName: string | null
+    contactName: string | null
+    clientName: string | null
+    leadName: string | null
+  }
+> {
   if (entityType === 'contact') {
     const { data } = await db
       .from('contacts')
@@ -126,9 +133,7 @@ export async function sendCampaignRecipient(input: {
   })
   const subject = renderMergeTemplate(template.subject, vars)
   const bodyText = renderMergeTemplate(template.body_text ?? '', vars)
-  const bodyHtml = template.body_html
-    ? renderMergeTemplate(template.body_html, vars)
-    : null
+  const bodyHtml = template.body_html ? renderMergeTemplate(template.body_html, vars) : null
 
   const resolved = await resolveMailboxAuth(db, mailboxId)
   if (!resolved) {

@@ -1411,8 +1411,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_tags',
-    description:
-      'List organisation tags used for campaign audiences and CRM filtering.',
+    description: 'List organisation tags used for campaign audiences and CRM filtering.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1496,8 +1495,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_campaigns',
-    description:
-      'List mail campaigns. Status: draft|scheduled|sending|completed|cancelled|failed.',
+    description: 'List mail campaigns. Status: draft|scheduled|sending|completed|cancelled|failed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1544,8 +1542,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'update_campaign',
-    description:
-      'Update a draft campaign only. Requires version for If-Match.',
+    description: 'Update a draft campaign only. Requires version for If-Match.',
     inputSchema: {
       type: 'object',
       properties: {

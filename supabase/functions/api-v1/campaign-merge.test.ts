@@ -1,8 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
-import {
-  buildCampaignMergeVars,
-  renderMergeTemplate,
-} from '../_shared/campaign-merge.ts'
+import { buildCampaignMergeVars, renderMergeTemplate } from '../_shared/campaign-merge.ts'
 
 Deno.test('renderMergeTemplate substitutes known tokens and blanks unknown', () => {
   const out = renderMergeTemplate(
