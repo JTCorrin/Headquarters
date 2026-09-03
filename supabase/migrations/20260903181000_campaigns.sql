@@ -297,7 +297,7 @@ create table public.campaign_recipients (
   updated_at timestamptz not null default now(),
   entity_type text not null,
   entity_id uuid not null,
-  to_email citext not null,
+  to_email extensions.citext not null,
   to_name text check (to_name is null or char_length(to_name) between 1 and 200),
   status text not null default 'pending',
   error text check (error is null or char_length(error) <= 2000),
@@ -347,7 +347,7 @@ create or replace function private.campaign_resolve_entity_email(
   p_entity_type text,
   p_entity_id uuid
 )
-returns table (to_email citext, to_name text)
+returns table (to_email extensions.citext, to_name text)
 language plpgsql
 stable
 security definer
@@ -366,7 +366,10 @@ begin
 
   if p_entity_type = 'lead' then
     return query
-    select coalesce(nullif(trim(l.primary_email::text), '')::citext, ct.primary_email),
+    select coalesce(
+             nullif(trim(l.primary_email::text), '')::extensions.citext,
+             ct.primary_email
+           ),
            coalesce(nullif(trim(l.name), ''), ct.display_name)
     from public.leads l
     left join public.contacts ct
@@ -382,7 +385,7 @@ begin
   if p_entity_type = 'client' then
     return query
     select coalesce(
-             nullif(trim(cl.primary_email::text), '')::citext,
+             nullif(trim(cl.primary_email::text), '')::extensions.citext,
              (
                select ct.primary_email
                from public.client_contacts cc
@@ -419,7 +422,7 @@ create or replace function public.resolve_campaign_audience(
 returns table (
   entity_type text,
   entity_id uuid,
-  to_email citext,
+  to_email extensions.citext,
   to_name text,
   skip_reason text
 )
@@ -741,7 +744,7 @@ begin
         'skip+' || r.entity_type || '+' || r.entity_id::text
         || '+' || coalesce(r.skip_reason, 'unknown')
         || '@campaign.invalid'
-      )::citext
+      )::extensions.citext
     end,
     r.to_name,
     case when r.skip_reason is null then 'pending' else 'skipped' end,
