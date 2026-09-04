@@ -103,7 +103,7 @@ async function processDeliveryClaim(
     const { data: lines, error: linesError } = await service
       .from("invoice_lines")
       .select(
-        "description, quantity, total_cents, position",
+        "description, quantity, discount_percent, total_cents, position",
       )
       .eq("invoice_id", claim.invoice_id)
       .eq("org_id", claim.org_id)
@@ -178,6 +178,7 @@ async function processDeliveryClaim(
         description: line.description,
         quantity: line.quantity,
         unitLabel: null,
+        discountPercent: line.discount_percent,
         totalCents: line.total_cents,
       })),
       subtotalCents: invoice.subtotal_cents,

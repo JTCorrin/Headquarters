@@ -4,6 +4,8 @@ export type InvoicePdfLineInput = {
   description: string
   quantity: number
   unitLabel?: string | null
+  /** Line discount percent (0–100); shown on the description when > 0. */
+  discountPercent?: number | null
   totalCents: number
 }
 
@@ -111,7 +113,13 @@ export async function buildInvoicePdfBytes(input: InvoicePdfInput): Promise<Uint
 
   for (const line of input.lines) {
     if (y < margin + 120) break
-    drawText(truncate(line.description, 52), colDesc, 10)
+    const discount = line.discountPercent != null && line.discountPercent > 0
+      ? Number(line.discountPercent)
+      : 0
+    const desc = discount > 0
+      ? `${truncate(line.description, 40)} (−${discount}%)`
+      : truncate(line.description, 52)
+    drawText(desc, colDesc, 10)
     page.drawText(String(line.quantity), { x: colQty, y, size: 10, font, color: black })
     drawText(truncate(line.unitLabel?.trim() || '—', 10), colUnit, 10)
     drawText(formatMoney(line.totalCents, input.currency), colTotal, 10)
