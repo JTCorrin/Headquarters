@@ -275,11 +275,18 @@
 			return updated;
 		} catch (error) {
 			if (!isStale(epoch)) {
-				viewState = {
-					kind: 'validation',
-					message: userMessage(error, 'Could not save campaign.'),
-					fields: isApiClientError(error) ? error.fields : undefined
-				};
+				if (isApiClientError(error) && error.isPreconditionFailed) {
+					viewState = {
+						kind: 'conflict',
+						message: userMessage(error, 'Could not save campaign.')
+					};
+				} else {
+					viewState = {
+						kind: 'validation',
+						message: userMessage(error, 'Could not save campaign.'),
+						fields: isApiClientError(error) ? error.fields : undefined
+					};
+				}
 			}
 			return null;
 		} finally {
@@ -362,7 +369,9 @@
 		busy = true;
 		const epoch = captureEpoch();
 		try {
-			const launched = await api.campaigns.launch(saved.id, version, { sendImmediately });
+			const launched = await api.campaigns.launch(saved.id, saved.version, {
+				sendImmediately
+			});
 			if (isStale(epoch)) return;
 			campaign = launched;
 			version = launched.version;
@@ -372,10 +381,17 @@
 			viewState = { kind: 'ready' };
 		} catch (error) {
 			if (!isStale(epoch)) {
-				viewState = {
-					kind: 'validation',
-					message: userMessage(error, 'Could not launch campaign.')
-				};
+				if (isApiClientError(error) && error.isPreconditionFailed) {
+					viewState = {
+						kind: 'conflict',
+						message: userMessage(error, 'Could not launch campaign.')
+					};
+				} else {
+					viewState = {
+						kind: 'validation',
+						message: userMessage(error, 'Could not launch campaign.')
+					};
+				}
 			}
 		} finally {
 			if (!isStale(epoch)) busy = false;
