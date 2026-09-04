@@ -135,7 +135,19 @@ export async function sendCampaignRecipient(input: {
   const bodyText = renderMergeTemplate(template.body_text ?? '', vars)
   const bodyHtml = template.body_html ? renderMergeTemplate(template.body_html, vars) : null
 
-  const resolved = await resolveMailboxAuth(db, mailboxId)
+  let resolved
+  try {
+    resolved = await resolveMailboxAuth(db, mailboxId)
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Failed to resolve mailbox credentials'
+    await db.rpc('mark_campaign_recipient_result', {
+      p_recipient_id: recipient.id,
+      p_org_id: orgId,
+      p_status: 'failed',
+      p_error: error.slice(0, 2000),
+    })
+    return { ok: false, error }
+  }
   if (!resolved) {
     await db.rpc('mark_campaign_recipient_result', {
       p_recipient_id: recipient.id,
@@ -192,7 +204,9 @@ export async function sendCampaignRecipient(input: {
   })
 
   const noteBody = `Included in campaign “${input.campaignName}” (${subject}).`
-  await db.rpc('create_playbook_timeline_note', {
+  // Timeline note is best-effort; send already succeeded.
+  // Do not chain .catch on rpc() — the Edge supabase-js builder is not a Promise.
+  const { error: noteError } = await db.rpc('create_playbook_timeline_note', {
     p_org_id: orgId,
     p_entity_type: recipient.entity_type,
     p_entity_id: recipient.entity_id,
@@ -204,9 +218,10 @@ export async function sendCampaignRecipient(input: {
       template_id: template.id,
       note_kind: 'campaign_sent',
     },
-  }).catch(() => {
-    // Timeline note is best-effort; send already succeeded.
   })
+  if (noteError) {
+    console.error('campaign timeline note failed', noteError)
+  }
 
   return { ok: true }
 }
