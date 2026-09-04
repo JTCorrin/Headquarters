@@ -534,7 +534,8 @@ export function handleCampaigns(
     return (async () => {
       await findCampaign(db, orgId, campaignId, requestId)
       const url = new URL(req.url)
-      const limit = parseLimit(url.searchParams.get('limit'))
+      // Matches launch snapshot cap (resolve_campaign_audience max 500).
+      const limit = parseLimit(url.searchParams.get('limit'), { max: 500 })
       const status = url.searchParams.get('status')
       let query = db
         .from('campaign_recipients')
