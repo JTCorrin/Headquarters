@@ -58,7 +58,18 @@ function lineTotal(row: LineItemRow): number {
 		const parsed = Number(row.total);
 		if (!Number.isNaN(parsed)) return parsed;
 	}
-	return qty * unit;
+	const discount =
+		row.discountPercent != null && row.discountPercent > 0 ? row.discountPercent / 100 : 0;
+	return qty * unit * (1 - discount);
+}
+
+function lineDescription(row: LineItemRow): string {
+	const parts = [row.description];
+	if (row.productSku) parts.push(`SKU ${row.productSku}`);
+	if (row.discountPercent != null && row.discountPercent > 0) {
+		parts.push(`Discount −${row.discountPercent}%`);
+	}
+	return parts.join('\n');
 }
 
 export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefinitions {
@@ -96,7 +107,7 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 		...lines.map(
 			(row): Content[] => [
 				{
-					text: row.productSku ? `${row.description}\nSKU ${row.productSku}` : row.description,
+					text: lineDescription(row),
 					style: 'tableCell'
 				},
 				{ text: row.qty, style: 'tableCell', alignment: 'right' as const },
