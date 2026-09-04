@@ -395,10 +395,12 @@ export function handleCampaigns(
           )
         }
 
-        const enriched = await enrichCampaign(db, orgId, data)
+        // replace_campaign_audience stamps campaigns.version — always return the fresh row.
+        const created = await findCampaign(db, orgId, data.id, requestId)
+        const enriched = await enrichCampaign(db, orgId, created)
         return jsonResponse({ data: enriched }, 201, requestId, {
-          etag: etag(data.version),
-          location: `/api/v1/campaigns/${data.id}`,
+          etag: etag(created.version),
+          location: `/api/v1/campaigns/${created.id}`,
         })
       })()
     }
@@ -609,11 +611,9 @@ export function handleCampaigns(
             'Campaign version does not match If-Match',
           )
         }
-        await replaceAudience(db, orgId, campaignId, tag_ids, entity_types, requestId)
-        const enriched = await enrichCampaign(db, orgId, data)
-        return jsonResponse({ data: enriched }, 200, requestId, { etag: etag(data.version) })
       }
       await replaceAudience(db, orgId, campaignId, tag_ids, entity_types, requestId)
+      // Audience RPC also stamps campaigns.version — re-read so clients keep a matching etag.
       const refreshed = await findCampaign(db, orgId, campaignId, requestId)
       const enriched = await enrichCampaign(db, orgId, refreshed)
       return jsonResponse({ data: enriched }, 200, requestId, {
