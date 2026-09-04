@@ -94,12 +94,28 @@
 
 	function toggleEntityType(value: 'lead' | 'contact' | 'client') {
 		const current = new Set($formData.entity_types);
-		if (current.has(value)) current.delete(value);
-		else current.add(value);
+		if (current.has(value)) {
+			// Keep at least one type: tags define the audience; these only narrow kinds.
+			if (current.size <= 1) return;
+			current.delete(value);
+		} else {
+			current.add(value);
+		}
 		form.form.update((data) => ({
 			...data,
 			entity_types: [...current] as CampaignFormData['entity_types']
 		}));
+	}
+
+	function fieldError(value: unknown): string | null {
+		if (!value) return null;
+		if (Array.isArray(value)) return value.join(', ') || null;
+		if (typeof value === 'object' && value !== null && '_errors' in value) {
+			const nested = (value as { _errors?: unknown })._errors;
+			if (Array.isArray(nested)) return nested.join(', ') || null;
+		}
+		if (typeof value === 'string') return value;
+		return null;
 	}
 
 	function toggleTag(tagId: string) {
@@ -148,7 +164,7 @@
 					breadcrumb="Comms / Campaigns"
 					{title}
 					{status}
-					description="Configure audience tags, template, and sending mailbox."
+					description="Audience is everyone with the selected tags. Template and mailbox are required to launch."
 				>
 					{#snippet actions()}
 						{#if onBack}
@@ -250,6 +266,10 @@
 
 						<div class="space-y-2">
 							<Label>Audience tags</Label>
+							<p class="text-muted-foreground text-xs">
+								Only people (leads, contacts, or clients) with at least one of these tags are
+								included. This is not “everyone in the CRM”.
+							</p>
 							<div class="flex flex-wrap gap-2">
 								{#each orgTags as tag (tag.id)}
 									<button
@@ -268,17 +288,17 @@
 									<p class="text-muted-foreground text-sm">No tags in this organisation yet.</p>
 								{/each}
 							</div>
-							{#if $errors.tag_ids}
-								<p class="text-destructive text-sm">
-									{Array.isArray($errors.tag_ids)
-										? $errors.tag_ids.join(', ')
-										: ($errors.tag_ids._errors?.join(', ') ?? 'Invalid tags')}
-								</p>
+							{#if fieldError($errors.tag_ids)}
+								<p class="text-destructive text-sm">{fieldError($errors.tag_ids)}</p>
 							{/if}
 						</div>
 
 						<div class="space-y-2">
-							<Label>Include entity types</Label>
+							<Label>Among tagged people, include</Label>
+							<p class="text-muted-foreground text-xs">
+								Leave all checked to email every tagged lead, contact, and client. Uncheck a type
+								only to exclude that kind — it never expands the audience beyond the tags.
+							</p>
 							<div class="flex flex-wrap gap-4">
 								{#each entityTypeOptions as option (option.value)}
 									<label class="flex items-center gap-2 text-sm">
@@ -293,8 +313,8 @@
 									</label>
 								{/each}
 							</div>
-							{#if $errors.entity_types}
-								<p class="text-destructive text-sm">{$errors.entity_types}</p>
+							{#if fieldError($errors.entity_types)}
+								<p class="text-destructive text-sm">{fieldError($errors.entity_types)}</p>
 							{/if}
 						</div>
 
@@ -347,7 +367,8 @@
 							{/if}
 						{:else}
 							<p class="text-muted-foreground text-sm">
-								Save the draft, then run audience preview to see sendable counts.
+								Pick tags (and keep the record types you want), save the draft, then preview
+								sendable counts.
 							</p>
 						{/if}
 					</aside>
