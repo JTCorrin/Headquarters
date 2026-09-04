@@ -56,6 +56,42 @@ describe('buildMoneyDocumentDef', () => {
 		expect(content).toContain('Northwind');
 	});
 
+	it('shows line discount percent on the description when set', () => {
+		const def = buildMoneyDocumentDef({
+			kind: 'invoice',
+			orgName: 'Corrin',
+			partyLabel: 'Bill to',
+			partyName: 'Northwind',
+			documentNumber: 'INV-0004',
+			currency: 'GBP',
+			status: 'draft',
+			lines: [
+				{
+					id: 'line-1',
+					description: 'Retainer',
+					productSku: 'RET-1',
+					qty: '1',
+					unitPrice: '100.00',
+					total: '90.00',
+					discountPercent: 10
+				}
+			],
+			totals: {
+				subtotalCents: 9000,
+				discountCents: 0,
+				taxCents: 0,
+				totalCents: 9000
+			}
+		});
+
+		const content = JSON.stringify(def.content);
+		expect(content).toContain('Retainer');
+		expect(content).toContain('SKU RET-1');
+		expect(content).toContain('Discount −10%');
+		expect(content).toContain('£90.00');
+		expect(content).toContain('£100.00');
+	});
+
 	it('shows Tax on quote PDFs when server totals include tax_cents', () => {
 		const def = buildMoneyDocumentDef({
 			kind: 'quote',
