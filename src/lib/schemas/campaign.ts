@@ -12,7 +12,9 @@ export const campaignFormSchema = z.object({
 	/** Required to launch; optional while drafting. */
 	mailbox_id: optionalUuid,
 	tag_ids: z.array(z.string().uuid()).default([]),
-	entity_types: z.array(entityTypeSchema).min(1, 'Select at least one audience type'),
+	entity_types: z
+		.array(entityTypeSchema)
+		.min(1, 'Keep at least one of leads, contacts, or clients among the tagged audience'),
 	scheduled_at: z.string().optional().or(z.literal(''))
 });
 
