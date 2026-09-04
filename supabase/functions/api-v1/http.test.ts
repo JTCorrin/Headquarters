@@ -161,6 +161,8 @@ Deno.test('parseLimit applies defaults and bounds', () => {
   assertThrows(() => parseLimit('0'), ApiError)
   assertThrows(() => parseLimit('1.5'), ApiError)
   assertThrows(() => parseLimit('201'), ApiError)
+  assertEquals(parseLimit('500', { max: 500 }), 500)
+  assertThrows(() => parseLimit('501', { max: 500 }), ApiError)
 })
 
 Deno.test('parseVersion accepts numeric ETags and requires a precondition', () => {
