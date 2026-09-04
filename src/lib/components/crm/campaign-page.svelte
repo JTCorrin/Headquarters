@@ -375,10 +375,22 @@
 			if (isStale(epoch)) return;
 			campaign = launched;
 			version = launched.version;
-			if (launched.status !== 'draft') {
-				await loadRecipients(launched.id, epoch);
-			}
 			viewState = { kind: 'ready' };
+			if (launched.status !== 'draft') {
+				try {
+					await loadRecipients(launched.id, epoch);
+				} catch (recipientsError) {
+					if (!isStale(epoch)) {
+						viewState = {
+							kind: 'validation',
+							message: userMessage(
+								recipientsError,
+								'Campaign launched, but recipients could not be loaded. Reload to refresh.'
+							)
+						};
+					}
+				}
+			}
 		} catch (error) {
 			if (!isStale(epoch)) {
 				if (isApiClientError(error) && error.isPreconditionFailed) {

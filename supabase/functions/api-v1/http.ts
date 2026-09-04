@@ -84,18 +84,23 @@ export function parseUuid(value: string | null, field: string): string {
   return value
 }
 
-export function parseLimit(value: string | null): number {
-  if (value === null) return 50
+export function parseLimit(
+  value: string | null,
+  options: { max?: number; fallback?: number } = {},
+): number {
+  const max = options.max ?? 200
+  const fallback = options.fallback ?? 50
+  if (value === null) return fallback
   if (!/^\d+$/.test(value)) {
     throw new ApiError(400, 'BAD_REQUEST', 'limit must be an integer', {
-      limit: 'Must be an integer between 1 and 200',
+      limit: `Must be an integer between 1 and ${max}`,
     })
   }
 
   const limit = Number(value)
-  if (limit < 1 || limit > 200) {
+  if (limit < 1 || limit > max) {
     throw new ApiError(400, 'BAD_REQUEST', 'limit is out of range', {
-      limit: 'Must be between 1 and 200',
+      limit: `Must be between 1 and ${max}`,
     })
   }
   return limit
