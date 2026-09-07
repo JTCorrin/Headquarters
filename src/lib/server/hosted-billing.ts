@@ -93,7 +93,7 @@ export async function hostedEntitlementForUser(
 }
 
 export async function hostedBillingAction(
-	action: 'portal' | 'recover',
+	action: 'portal' | 'recover' | 'recover-email',
 	accessToken: string,
 	body: Record<string, string> = {}
 ): Promise<Response> {
