@@ -1,5 +1,7 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
+	import { HOSTED_BILLING_CONTEXT } from '$lib/hosted/context.js';
+	const hostedBilling = getContext<boolean | undefined>(HOSTED_BILLING_CONTEXT);
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -101,7 +103,9 @@
 
 <AppSidebarFrame
 	{orgName}
-	groups={navGroups}
+	groups={hostedBilling
+		? [...(navGroups ?? []), { items: [{ label: 'Hosted billing', href: '/billing' }] }]
+		: navGroups}
 	{showNav}
 	showTrigger={false}
 	class={cn('h-svh overflow-hidden', className)}

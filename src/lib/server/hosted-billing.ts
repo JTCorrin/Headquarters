@@ -26,7 +26,8 @@ export async function lookupHostedClaim(token: string): Promise<HostedClaimLooku
 	const base = billingApiBaseUrl();
 	if (!base) return null;
 	const res = await fetch(`${base}/v1/claim?token=${encodeURIComponent(token)}`, {
-		headers: { Accept: 'application/json' }
+		headers: { Accept: 'application/json' },
+		signal: AbortSignal.timeout(15000)
 	});
 	if (res.status === 404) return null;
 	if (!res.ok) {
@@ -39,6 +40,7 @@ export async function claimHostedSubscription(input: {
 	token: string;
 	userId: string;
 	email: string;
+	accessToken: string;
 }): Promise<{ ok: boolean; error?: string; status?: number }> {
 	const base = billingApiBaseUrl();
 	const secret = (privateEnv.BILLING_CLAIM_SECRET ?? '').trim();
@@ -50,8 +52,10 @@ export async function claimHostedSubscription(input: {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			'x-claim-secret': secret
+			'x-claim-secret': secret,
+			Authorization: `Bearer ${input.accessToken}`
 		},
+		signal: AbortSignal.timeout(15000),
 		body: JSON.stringify({
 			token: input.token,
 			user_id: input.userId,
@@ -69,7 +73,7 @@ export async function claimHostedSubscription(input: {
 
 export async function hostedEntitlementForUser(
 	userId: string
-): Promise<{ id: string; status: string } | null> {
+): Promise<{ id: string; status: string; org_id: string | null } | null> {
 	const base = billingApiBaseUrl();
 	const secret = (privateEnv.BILLING_CLAIM_SECRET ?? '').trim();
 	if (!base || !secret) return null;
@@ -78,9 +82,33 @@ export async function hostedEntitlementForUser(
 		headers: {
 			Accept: 'application/json',
 			'x-claim-secret': secret
-		}
+		},
+		signal: AbortSignal.timeout(15000)
 	});
-	if (!res.ok) return null;
-	const data = (await res.json()) as { entitlement: { id: string; status: string } | null };
+	if (!res.ok) throw new Error('Billing is temporarily unavailable');
+	const data = (await res.json()) as {
+		entitlement: { id: string; status: string; org_id: string | null } | null;
+	};
 	return data.entitlement;
+}
+
+export async function hostedBillingAction(
+	action: 'portal' | 'recover',
+	accessToken: string,
+	body: Record<string, string> = {}
+): Promise<Response> {
+	const base = billingApiBaseUrl();
+	const secret = (privateEnv.BILLING_CLAIM_SECRET ?? '').trim();
+	if (!base || !secret)
+		return Response.json({ error: 'Billing is not configured' }, { status: 503 });
+	return fetch(`${base}/v1/${action}`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'x-claim-secret': secret,
+			Authorization: `Bearer ${accessToken}`
+		},
+		body: JSON.stringify(body),
+		signal: AbortSignal.timeout(15000)
+	});
 }

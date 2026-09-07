@@ -9,10 +9,7 @@ export const AUTH_PUBLIC_PATHS = new Set([
 ]);
 
 /** Onboarding routes that must not bounce to create-org while memberships catch up. */
-export const AUTH_ONBOARDING_PATHS = new Set([
-	'/onboarding/create-org',
-	'/onboarding/invite-team'
-]);
+export const AUTH_ONBOARDING_PATHS = new Set(['/onboarding/create-org', '/onboarding/invite-team']);
 
 export function isAuthPublicPath(pathname: string): boolean {
 	return (
@@ -27,7 +24,9 @@ export function isAuthPublicPath(pathname: string): boolean {
  * (keep update-password and invite accept reachable while authenticated).
  */
 export function isPostAuthRedirectPath(pathname: string): boolean {
-	return isAuthPublicPath(pathname) && pathname !== '/update-password' && pathname !== '/invite/accept';
+	return (
+		isAuthPublicPath(pathname) && pathname !== '/update-password' && pathname !== '/invite/accept'
+	);
 }
 
 export function isOnboardingPath(pathname: string): boolean {
@@ -39,7 +38,7 @@ export function isOnboardingPath(pathname: string): boolean {
  * Keep in sync with `src/lib/org/nav.ts` as routes come online.
  */
 export function requiresSelectedOrg(pathname: string): boolean {
-	if (pathname === '/select-org') return false;
+	if (pathname === '/select-org' || pathname === '/billing') return false;
 	if (pathname === '/') return true;
 	if (pathname.startsWith('/org/')) return true;
 	if (pathname === '/settings' || pathname.startsWith('/settings/')) return true;

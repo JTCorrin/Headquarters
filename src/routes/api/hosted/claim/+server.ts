@@ -39,7 +39,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const result = await claimHostedSubscription({
 		token,
 		userId: user.id,
-		email: user.email
+		email: user.email,
+		accessToken: session.access_token
 	});
 
 	if (!result.ok) {
