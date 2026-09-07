@@ -43,12 +43,31 @@ attach it under `/billing`. Do not enable the hosted database gate before planni
 for existing users. A plan cannot be attached to an organisation with more than three active members
 and pending invitations.
 
+## Email recovery rollout
+
+The billing page offers **Email me a recovery link** for the signed-in account. Supabase sends a
+one-time magic link; customers must open it in the same browser and choose **Recover my subscription**.
+The checkout-reference form remains available under a disclosure as a fallback.
+
+Deploy the billing `/v1/recover-email` endpoint before the CRM email-recovery UI. Set the same
+`BILLING_CLAIM_SECRET` / `CLAIM_SHARED_SECRET` on both services and configure CRM `ORIGIN` correctly.
+Register `https://app.headquarters-crm.com/billing/email-callback` in Supabase Auth's redirect allowlist
+(and the equivalent URL for each test environment). Supabase's Magic Link template must contain
+`{{ .ConfirmationURL }}`; configure and verify SMTP delivery before relying on this flow in production.
+
+The callback checks a signed challenge, its PKCE verifier, and the authenticated account's ID/email,
+then issues a ten-minute proof. Billing checks that proof and independently retrieves matching completed
+Stripe checkouts before calling the atomic recovery RPC. A password login or an auto-confirmed email
+alone cannot authorize email-only payment discovery. Email sending is subject to Supabase's rate limits.
+No recovery email was sent to the founders as part of granting their complimentary access.
+
 ## Still required before marketing
 
 - Confirm legal operator/address, public support/privacy contact, refund policy and retention/deletion
   periods, then replace the marketing Privacy/Terms placeholders with the actual policies.
-- Supply a Stripe test key and matching test price and configure a test webhook against an isolated
-  database. The committed unit/browser tests never submit live payments.
+- The Stripe test payment journey passed on 2026-09-07 against an isolated preview; see billing’s
+  `STRIPE-E2E.md`. Verify the deployed production configuration separately and test email recovery
+  delivery after configuring its callback and SMTP. The committed tests never submit live payments.
 - Configure a Headquarters-specific Stripe portal and complete the environment steps above.
 - Verify backup restoration and scheduled mailbox/playbook/invoice jobs in the target environment.
 
