@@ -1,3 +1,4 @@
+import { assertHostedOrgAccess } from './hosted-access.ts'
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { withSupabase } from '@supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -270,6 +271,7 @@ async function routeOrgScoped(
   requestId: string,
 ): Promise<Response> {
   const { db, userId, membership, orgId, actorType, apiKeyId } = auth
+  await assertHostedOrgAccess(db, orgId)
 
   if (path === '/api/v1/mcp') {
     if (actorType !== 'api_key' || !apiKeyId) {

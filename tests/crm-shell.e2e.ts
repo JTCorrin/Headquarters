@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect } from './helpers/runtime.js';
 import { readE2EEnv } from './helpers/e2e-env.js';
 import { test } from './helpers/owner-fixture.js';
 
