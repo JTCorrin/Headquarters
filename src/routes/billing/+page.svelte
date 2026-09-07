@@ -17,6 +17,9 @@
 <div class="mx-auto max-w-xl space-y-6 px-6 py-12">
 	<h1 class="text-3xl font-semibold">Your hosted subscription</h1>
 	{#if form?.error}<p role="alert" class="text-destructive">{form.error}</p>{/if}
+	{#if data.recoveryError}<p role="alert">
+			That email link has expired or was opened in a different browser. Request a new link below.
+		</p>{/if}
 	{#if data.entitlement}
 		<p>Your subscription is {data.entitlement.status}. Your organisation includes three seats.</p>
 		<Button href={resolve('/')}>Continue to Headquarters</Button>
@@ -42,22 +45,45 @@
 		</form>
 	{/if}
 
-	<form method="POST" action="?/recover" use:enhance class="space-y-3">
-		<label for="checkout-reference" class="block font-medium">Recover an existing payment</label>
+	<section class="space-y-3">
+		<h2 class="font-medium">Recover your subscription by email</h2>
 		<p class="text-sm text-muted-foreground">
-			Use the checkout reference beginning cs_ from the address you returned to after paying. Sign
-			in with the same email you used at checkout.
+			We’ll send a secure link to {data.email}. Use the same email you paid with.
 		</p>
-		<input
-			id="checkout-reference"
-			name="session_id"
-			value={data.sessionId}
-			required
-			autocomplete="off"
-			class="w-full rounded-md border p-2"
-		/>
-		<Button type="submit" variant="outline">Recover payment</Button>
-	</form>
+		{#if form?.emailSent}
+			<p role="status">
+				Check your email. Open the recovery link in this browser, then choose Recover my
+				subscription.
+			</p>
+		{/if}
+		{#if data.emailRecovery}
+			<form method="POST" action="?/completeEmailRecovery" use:enhance>
+				<Button type="submit">Recover my subscription</Button>
+			</form>
+		{/if}
+		<form method="POST" action="?/emailRecovery" use:enhance>
+			<Button type="submit" variant="outline">Email me a recovery link</Button>
+		</form>
+	</section>
+	<details class="space-y-3">
+		<summary class="cursor-pointer text-sm underline">Use a checkout reference instead</summary>
+		<form method="POST" action="?/recover" use:enhance class="space-y-3">
+			<label for="checkout-reference" class="block font-medium">Recover an existing payment</label>
+			<p class="text-sm text-muted-foreground">
+				Use the checkout reference beginning cs_ from the address you returned to after paying. Sign
+				in with the same email you used at checkout.
+			</p>
+			<input
+				id="checkout-reference"
+				name="session_id"
+				value={data.sessionId}
+				required
+				autocomplete="off"
+				class="w-full rounded-md border p-2"
+			/>
+			<Button type="submit" variant="outline">Recover payment</Button>
+		</form>
+	</details>
 	{#each data.billingAccounts as account (account.id)}
 		<form method="POST" action="?/portal">
 			<p class="font-medium">{account.name} — {account.status}</p>
