@@ -29,3 +29,10 @@ test-results
 
 *storybook.log
 storybook-static
+
+# Local review evidence and generated reports
+/artifacts/
+/headquarters-launch-review/
+/coverage/
+/playwright-report/
+/docs/HOSTED-LAUNCH.md
