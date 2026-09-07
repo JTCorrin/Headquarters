@@ -9,12 +9,12 @@ const againstStaging = Boolean(process.env.E2E_BASE_URL?.trim());
 test.describe('auth flow UI (local preview)', () => {
 	test.skip(againstStaging, 'Staging uses CRM onboarding/auth journeys with live Supabase');
 
-	test('signup exposes password, social, and enterprise SSO entry points', async ({ page }) => {
+	test('signup exposes password and hides unconfigured providers', async ({ page }) => {
 		await page.goto('/signup?next=%2Finvite%2Faccept%3Ftoken%3Dtest-token');
 
-		await expect(page.getByRole('button', { name: 'Google' })).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Microsoft' })).toBeVisible();
-		await expect(page.getByLabel('Company domain')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Google' })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Microsoft' })).toHaveCount(0);
+		await expect(page.getByLabel('Company domain')).toHaveCount(0);
 
 		await page.getByTestId('auth-display-name').fill('Invitee User');
 		await page.getByTestId('auth-email').fill('invitee@example.test');

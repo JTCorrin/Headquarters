@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/runtime.js';
 import { bootstrapOwnerSession, pagePathname, signInViaUi } from './helpers/auth.js';
 import { readE2EEnv } from './helpers/e2e-env.js';
 

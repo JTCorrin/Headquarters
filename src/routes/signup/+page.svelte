@@ -16,10 +16,17 @@
 
 	const auth = getAuthSession();
 	let formError = $state<string | null>(null);
-	const next = $derived(safeNextPath(page.url.searchParams.get('next')));
-	const nextQuery = $derived(next === '/' ? '' : `?next=${encodeURIComponent(next)}`);
-	const invitedSignup = $derived(next.startsWith('/invite/accept'));
 	const claimToken = $derived(page.url.searchParams.get('claim')?.trim() ?? '');
+	const next = $derived(
+		claimToken
+			? `/billing?claim=${encodeURIComponent(claimToken)}&session_id=${encodeURIComponent(page.url.searchParams.get('session_id') ?? '')}`
+			: safeNextPath(page.url.searchParams.get('next'))
+	);
+	const nextQuery = $derived(next === '/' ? '' : `?next=${encodeURIComponent(next)}`);
+	const invitedSignup = $derived(
+		new URL(next, 'https://local.invalid').pathname === '/invite/accept' &&
+			Boolean(new URL(next, 'https://local.invalid').searchParams.get('token'))
+	);
 	const hostedBilling = $derived(
 		['1', 'true', 'yes'].includes((env.PUBLIC_HOSTED_BILLING ?? '').trim().toLowerCase())
 	);
@@ -43,17 +50,21 @@
 		| { status: 'error'; message: string };
 
 	let claimState = $state<ClaimState>({ status: 'idle' });
+	let recoverPayment = $state(false);
 
 	$effect(() => {
 		const token = claimToken;
+		recoverPayment = false;
 		if (!token) {
 			claimState = { status: 'idle' };
 			return;
 		}
 		storeHostedClaimToken(token);
 		let cancelled = false;
+		let retryTimer: ReturnType<typeof setTimeout> | undefined;
 		claimState = { status: 'loading' };
-		void (async () => {
+		let attempts = 0;
+		const verifyClaim = async () => {
 			try {
 				const res = await fetch(`/api/hosted/claim?token=${encodeURIComponent(token)}`);
 				const data = (await res.json()) as {
@@ -81,16 +92,26 @@
 					};
 					return;
 				}
+				if (data.expired && ['active', 'trialing', 'past_due'].includes(data.status ?? '')) {
+					recoverPayment = true;
+					claimState = { status: 'ready', email: data.email ?? null, usable: true };
+					if (data.email)
+						credentialsForm.form.update((current) => ({ ...current, email: data.email! }));
+					return;
+				}
 				if (data.expired) {
 					claimState = {
 						status: 'ready',
 						email: data.email ?? null,
 						usable: false,
-						message: 'This payment link has expired. Start checkout again from the pricing page.'
+						message:
+							'This link has expired. Sign in to recover your existing payment using the checkout reference. Do not purchase again.'
 					};
 					return;
 				}
 				if (!data.usable) {
+					if (data.status === 'pending_checkout' && ++attempts < 20)
+						retryTimer = setTimeout(() => void verifyClaim(), 3000);
 					claimState = {
 						status: 'ready',
 						email: data.email ?? null,
@@ -115,9 +136,11 @@
 					claimState = { status: 'error', message: 'Could not verify payment. Try again.' };
 				}
 			}
-		})();
+		};
+		void verifyClaim();
 		return () => {
 			cancelled = true;
+			clearTimeout(retryTimer);
 		};
 	});
 
@@ -126,8 +149,7 @@
 	);
 	const blockOpenSignup = $derived(hostedBilling && !claimToken && !invitedSignup);
 	const showForm = $derived(
-		!blockOpenSignup &&
-			(!claimToken || (claimState.status === 'ready' && claimState.usable))
+		!blockOpenSignup && (!claimToken || (claimState.status === 'ready' && claimState.usable))
 	);
 
 	async function handleSubmit(): Promise<boolean> {
@@ -151,7 +173,7 @@
 			return false;
 		}
 
-		if (claimToken && !result.requiresEmailConfirmation) {
+		if (claimToken && !recoverPayment && !result.requiresEmailConfirmation) {
 			const claimRes = await fetch('/api/hosted/claim', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -215,6 +237,7 @@
 					Hosted accounts start from the pricing page after payment.
 				</p>
 				{#if landingUrl}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external marketing origin -->
 					<a class="text-sm text-foreground underline" href={`${landingUrl}/#pricing`}>
 						Go to pricing
 					</a>
@@ -226,6 +249,7 @@
 			{:else if claimToken && claimState.status === 'ready' && !claimState.usable}
 				<p class="text-sm text-muted-foreground" role="status">{claimState.message}</p>
 				{#if landingUrl}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external marketing origin -->
 					<a class="text-sm text-foreground underline" href={`${landingUrl}/#pricing`}>
 						Back to pricing
 					</a>
@@ -235,7 +259,7 @@
 					form={credentialsForm}
 					submitLabel="Sign up"
 					showDisplayName
-					emailLocked={emailLocked}
+					{emailLocked}
 					passwordAutocomplete="new-password"
 					errorMessage={formError}
 					onValidSubmit={handleSubmit}
