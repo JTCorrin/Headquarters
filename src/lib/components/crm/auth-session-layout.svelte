@@ -4,7 +4,8 @@
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 	import type { Session } from '@supabase/supabase-js';
-	import { untrack, type Snippet } from 'svelte';
+	import { setContext, untrack, type Snippet } from 'svelte';
+	import { HOSTED_BILLING_CONTEXT } from '$lib/hosted/context.js';
 	import { resolveApiV1BaseUrl } from '$lib/api/v1/base-url.js';
 	import { createApiV1Client, setApiV1Client } from '$lib/api/v1/index.js';
 	import { themePreferenceFromApi, toOrgMembershipSummary } from '$lib/api/v1/mappers.js';
@@ -27,10 +28,6 @@
 		resolveThemeChoice,
 		subscribePrefersDark
 	} from '$lib/theme/index.js';
-	import {
-		clearHostedClaimToken,
-		readHostedClaimToken
-	} from '$lib/hosted/claim-storage.js';
 
 	export interface AuthSessionLayoutProps {
 		children: Snippet;
@@ -63,6 +60,10 @@
 		getAccessToken: () => untrack(() => auth.accessToken)
 	});
 
+	setContext(
+		HOSTED_BILLING_CONTEXT,
+		['true', '1', 'yes'].includes(env.PUBLIC_HOSTED_BILLING ?? '')
+	);
 	setOrgSession(orgSession);
 	setAuthSession(auth);
 	setApiV1Client(api);
@@ -70,7 +71,6 @@
 	let membershipsReady = $state(!auth.enabled);
 	let membershipsError = $state<string | null>(null);
 	let lastTokenForMemberships = $state<string | null>(null);
-	let claimAttemptedForToken = $state<string | null>(null);
 
 	async function refreshMemberships(token: string): Promise<void> {
 		membershipsError = null;
@@ -103,30 +103,6 @@
 		}
 	}
 
-	// After email-confirm / OAuth return, finish linking a paid hosted claim if present.
-	$effect(() => {
-		if (!auth.enabled || !auth.ready || !auth.session?.user?.id) return;
-		const pendingClaim = readHostedClaimToken();
-		if (!pendingClaim) return;
-		if (claimAttemptedForToken === pendingClaim) return;
-		claimAttemptedForToken = pendingClaim;
-		void (async () => {
-			try {
-				const res = await fetch('/api/hosted/claim', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ token: pendingClaim })
-				});
-				if (res.ok || res.status === 409) {
-					clearHostedClaimToken();
-				}
-			} catch {
-				/* retry on next navigation */
-				claimAttemptedForToken = null;
-			}
-		})();
-	});
-
 	$effect(() => {
 		if (!auth.enabled || !auth.ready) return;
 		const token = auth.accessToken;
@@ -140,9 +116,12 @@
 		if (mode === 'clear') {
 			membershipsReady = true;
 			lastTokenForMemberships = null;
-			orgSession.clearSelection();
-			orgSession.setMemberships([]);
-			orgSession.setThemePreference('org_default');
+			// Session setters read reactive state; those reads must not subscribe this effect.
+			untrack(() => {
+				orgSession.clearSelection();
+				orgSession.setMemberships([]);
+				orgSession.setThemePreference('org_default');
+			});
 			applyResolvedTheme('org_default', 'system');
 			return;
 		}
@@ -176,6 +155,7 @@
 	$effect(() => {
 		if (!auth.enabled || !auth.ready) return;
 		const path = page.url.pathname;
+		if (path === '/billing') return;
 		const acceptingInvitation = path === '/invite/accept';
 		const invitingTeam = path === '/onboarding/invite-team';
 

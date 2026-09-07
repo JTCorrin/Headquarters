@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { test as base } from '@playwright/test';
+import { test as base } from './runtime.js';
 import { bootstrapOwnerSession } from './auth.js';
 import { readE2EEnv } from './e2e-env.js';
 
@@ -37,4 +37,4 @@ export const test = base.extend<object, WorkerFixtures>({
 	}
 });
 
-export { expect } from '@playwright/test';
+export { expect } from './runtime.js';
