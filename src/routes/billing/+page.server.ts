@@ -6,8 +6,15 @@ import {
 	isHostedBillingEnabled
 } from '$lib/server/hosted-billing.js';
 import type { Actions, PageServerLoad } from './$types.js';
+import {
+	challengeCookie,
+	proofCookie,
+	pkceVerifierHash,
+	readEmailProof,
+	signEmailProof
+} from '$lib/server/billing-email-proof.js';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies }) => {
 	if (!isHostedBillingEnabled()) redirect(303, '/');
 	const { session, user } = await locals.getValidatedSession();
 	if (!session || !user)
@@ -24,10 +31,64 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		ownedOrganisations: (ownedOrganisations ?? []) as { id: string; name: string }[],
 		entitlement: await hostedEntitlementForUser(user.id),
 		claim: url.searchParams.get('claim') ?? '',
+		email: user.email ?? '',
+		emailRecovery: readEmailProof(cookies.get(proofCookie))?.userId === user.id,
+		recoveryError: url.searchParams.has('recovery_error'),
 		sessionId: url.searchParams.get('session_id') ?? ''
 	};
 };
 export const actions: Actions = {
+	emailRecovery: async ({ locals, url, cookies }) => {
+		if (!isHostedBillingEnabled()) return fail(404, { error: 'Hosted billing is not enabled.' });
+		const { session, user } = await locals.getValidatedSession();
+		if (!session || !user?.email || !locals.supabase)
+			return fail(401, { error: 'Please sign in again.' });
+		const callback = new URL('/billing/email-callback', url.origin);
+		const { error } = await locals.supabase.auth.signInWithOtp({
+			email: user.email,
+			options: { shouldCreateUser: false, emailRedirectTo: callback.toString() }
+		});
+		if (error)
+			return fail(429, { error: 'Could not send the recovery link. Wait a minute and try again.' });
+		const verifierHash = pkceVerifierHash(cookies.getAll());
+		if (!verifierHash) return fail(503, { error: 'Email recovery could not start. Please retry.' });
+		cookies.set(
+			challengeCookie,
+			signEmailProof({
+				purpose: 'headquarters-email-challenge',
+				userId: user.id,
+				email: user.email,
+				verifierHash,
+				expiresAt: Math.floor(Date.now() / 1000) + 3600
+			}),
+			{
+				path: '/billing',
+				httpOnly: true,
+				sameSite: 'lax',
+				secure: url.protocol === 'https:',
+				maxAge: 3600
+			}
+		);
+		cookies.delete(proofCookie, { path: '/billing' });
+		return { emailSent: true };
+	},
+	completeEmailRecovery: async ({ locals, cookies }) => {
+		if (!isHostedBillingEnabled()) return fail(404, { error: 'Hosted billing is not enabled.' });
+		const { session } = await locals.getValidatedSession();
+		if (!session) return fail(401, { error: 'Please sign in again.' });
+		try {
+			const response = await hostedBillingAction('recover-email', session.access_token, {
+				recovery_proof: cookies.get(proofCookie) ?? ''
+			});
+			const result = await response.json();
+			if (!response.ok)
+				return fail(response.status, { error: result.error ?? 'Could not recover payment.' });
+		} catch {
+			return fail(502, { error: 'Billing is temporarily unavailable. Please retry.' });
+		}
+		cookies.delete(proofCookie, { path: '/billing' });
+		redirect(303, '/');
+	},
 	attach: async ({ locals, request }) => {
 		const { session } = await locals.getValidatedSession();
 		if (!session || !locals.supabase) return fail(401, { error: 'Please sign in again.' });
