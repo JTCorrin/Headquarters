@@ -147,6 +147,8 @@ export type CampaignRow = {
   started_at: string | null
   completed_at: string | null
   last_error: string | null
+  last_worker_at?: string | null
+  next_attempt_at?: string | null
 }
 
 export type CampaignInsert = {
@@ -159,6 +161,8 @@ export type CampaignInsert = {
   started_at?: string | null
   completed_at?: string | null
   last_error?: string | null
+  last_worker_at?: string | null
+  next_attempt_at?: string | null
   deleted_at?: string | null
 }
 
@@ -176,6 +180,7 @@ export type CampaignRecipientRow = {
   error: string | null
   sent_at: string | null
   email_message_id: string | null
+  claimed_at?: string | null
 }
 
 export type PlaybookRow = {
@@ -1594,6 +1599,24 @@ export type Database = {
         Update: Partial<CampaignInsert>
         Relationships: []
       }
+      campaign_events: {
+        Row: {
+          id: string
+          org_id: string
+          campaign_id: string
+          created_at: string
+          level: 'info' | 'warning' | 'error'
+          message: string
+        }
+        Insert: {
+          org_id: string
+          campaign_id: string
+          level: 'info' | 'warning' | 'error'
+          message: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
       campaign_audience_tags: {
         Row: {
           campaign_id: string
@@ -1640,6 +1663,7 @@ export type Database = {
         }
         Update: Partial<{
           status: CampaignRecipientRow['status']
+          claimed_at: string | null
           error: string | null
           sent_at: string | null
           email_message_id: string | null
@@ -2804,6 +2828,14 @@ export type Database = {
         Returns: CampaignRow
       }
       cancel_campaign: {
+        Args: {
+          p_campaign_id: string
+          p_org_id: string
+          p_expected_version: number
+        }
+        Returns: CampaignRow
+      }
+      resend_campaign: {
         Args: {
           p_campaign_id: string
           p_org_id: string

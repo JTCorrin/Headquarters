@@ -118,3 +118,20 @@ Send/accept/create-invoice commands are intentionally omitted from this foundati
 Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Marking a lead as `won`
 must go through `/convert`. Stock quantity changes only through `/adjust-stock`; clients must never
 send or trust an `org_id` in a JSON body.
+
+## Campaign sending
+
+Deploy `api-v1` and `jobs-campaigns` after applying the campaign migrations. Deploying the
+worker alone does not schedule it. With Supabase Cron, pg_net and Vault enabled, run
+`node scripts/configure-campaign-scheduler.mjs` from the repository root with
+`SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN` in the environment. It configures a
+minute-by-minute job and stores the worker secret in Vault; rerunning reuses that secret.
+Self-hosted deployments may instead call `jobs-campaigns` from their own scheduler with
+`x-campaigns-cron-secret` matching `CAMPAIGNS_CRON_SECRET`.
+
+`GET /api/v1/campaigns/{id}/activity` returns the latest 100 campaign events. The page
+refreshes active campaigns automatically. `POST /api/v1/campaigns/{id}/resend` requires
+`If-Match` and creates an editable draft from a finished/cancelled campaign; launching
+the new draft resolves its audience afresh. It never clears earlier delivery history.
+Interrupted SMTP attempts are marked as having an unknown outcome instead of automatically
+being sent twice. Check the sending mailbox before deliberately resending those messages.

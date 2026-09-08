@@ -1958,12 +1958,7 @@ export interface ApiOrgMailbox {
 }
 
 export type ApiCampaignStatus =
-	| 'draft'
-	| 'scheduled'
-	| 'sending'
-	| 'completed'
-	| 'cancelled'
-	| 'failed';
+	'draft' | 'scheduled' | 'sending' | 'completed' | 'cancelled' | 'failed';
 
 export interface ApiCampaignRecipientCounts {
 	pending: number;
@@ -1990,10 +1985,19 @@ export interface ApiCampaign {
 	started_at: string | null;
 	completed_at: string | null;
 	last_error: string | null;
+	last_worker_at?: string | null;
+	next_attempt_at?: string | null;
 	tag_ids: string[];
 	entity_types: Array<'lead' | 'contact' | 'client'>;
 	recipient_counts: ApiCampaignRecipientCounts;
 	quota_remaining: number | null;
+}
+
+export interface ApiCampaignEvent {
+	id: string;
+	created_at: string;
+	level: 'info' | 'warning' | 'error';
+	message: string;
 }
 
 export interface ApiCampaignCreateBody {
