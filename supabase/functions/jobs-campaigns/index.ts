@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
           })
           .eq('id', campaign.id)
           .eq('org_id', campaign.org_id)
+          .eq('status', 'sending')
         results.push({
           campaign_id: campaign.id,
           status: 'failed',
@@ -116,13 +117,14 @@ Deno.serve(async (req) => {
       }
 
       // Re-check cancelled mid-flight.
-      const { data: fresh } = await service
+      const { data: fresh, error: freshError } = await service
         .from('campaigns')
         .select('id,status,name,mailbox_id,template_id')
         .eq('id', campaign.id)
         .eq('org_id', campaign.org_id)
         .is('deleted_at', null)
         .maybeSingle()
+      if (freshError) throw new Error('Could not check the campaign status.')
       if (!fresh || fresh.status === 'cancelled') {
         results.push({
           campaign_id: campaign.id,
@@ -133,13 +135,14 @@ Deno.serve(async (req) => {
         continue
       }
 
-      const { data: template } = await service
+      const { data: template, error: templateError } = await service
         .from('email_templates')
         .select('id,subject,body_text,body_html,status')
         .eq('org_id', campaign.org_id)
         .eq('id', campaign.template_id)
         .is('deleted_at', null)
         .maybeSingle()
+      if (templateError) throw new Error('Could not load the campaign template.')
 
       if (!template || template.status !== 'active') {
         await activity(
@@ -156,6 +159,7 @@ Deno.serve(async (req) => {
           })
           .eq('id', campaign.id)
           .eq('org_id', campaign.org_id)
+          .eq('status', 'sending')
         results.push({
           campaign_id: campaign.id,
           status: 'failed',
