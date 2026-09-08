@@ -3054,6 +3054,7 @@ export async function callTool(
         orgId,
         membership.role,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
@@ -3066,6 +3067,7 @@ export async function callTool(
         orgId,
         membership.role,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
@@ -3084,11 +3086,13 @@ export async function callTool(
         orgId,
         membership.role,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
     case 'delete_tag': {
       assertCanAccessTags(membership.role, 'DELETE')
+      requireUserBackedActor(auth.userId)
       const id = parseUuid(requireString(args, 'id'), 'id')
       const version = requireVersion(args)
       const path = `/api/v1/tags/${id}`
@@ -3101,11 +3105,13 @@ export async function callTool(
         orgId,
         membership.role,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
     case 'list_entity_tags': {
       assertCanAccessTags(membership.role, 'GET')
+      requireUserBackedActor(auth.userId)
       const entityType = requireString(args, 'entity_type')
       const entityId = parseUuid(requireString(args, 'entity_id'), 'entity_id')
       const path = `/api/v1/${entityCollectionPath(entityType)}/${entityId}/tags`
@@ -3116,11 +3122,13 @@ export async function callTool(
         orgId,
         membership.role,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }
     case 'replace_entity_tags': {
       assertCanAccessTags(membership.role, 'PUT')
+      requireUserBackedActor(auth.userId)
       const entityType = requireString(args, 'entity_type')
       const entityId = parseUuid(requireString(args, 'entity_id'), 'entity_id')
       const path = `/api/v1/${entityCollectionPath(entityType)}/${entityId}/tags`
@@ -3131,6 +3139,7 @@ export async function callTool(
         orgId,
         membership.role,
         requestId,
+        auth.userId,
       )
       return await toolResultFromHttp(response)
     }

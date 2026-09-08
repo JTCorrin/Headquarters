@@ -129,11 +129,14 @@ export function handleTags(
   orgId: string,
   role: MembershipRow['role'],
   requestId: string,
+  actorUserId?: string | null,
 ): Promise<Response> {
   if (role === 'billing') {
     throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access tags')
   }
   const canMutate = role === 'owner' || role === 'admin' || role === 'member'
+  // API-key / service_role path has no auth.uid(); pass creator user id as p_actor_id.
+  const actorArg = actorUserId ? { p_actor_id: actorUserId } : {}
 
   const entityTagsMatch = path.match(
     /^\/api\/v1\/(contacts|leads|clients)\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/tags$/i,
@@ -148,6 +151,7 @@ export function handleTags(
           p_org_id: orgId,
           p_entity_type: entityType,
           p_entity_id: entityId,
+          ...actorArg,
         })
         if (error) throw databaseError(error, requestId)
         return jsonResponse({ data: data ?? [] }, 200, requestId)
@@ -178,6 +182,7 @@ export function handleTags(
           p_entity_type: entityType,
           p_entity_id: entityId,
           p_tag_ids: tagIds,
+          ...actorArg,
         })
         if (error) throw databaseError(error, requestId)
         return jsonResponse({ data: data ?? [] }, 200, requestId)
@@ -275,6 +280,7 @@ export function handleTags(
         p_tag_id: tagId,
         p_org_id: orgId,
         p_expected_version: version,
+        ...actorArg,
       })
       if (error) throw databaseError(error, requestId)
       return new Response(null, {

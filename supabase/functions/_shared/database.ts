@@ -2765,6 +2765,7 @@ export type Database = {
           p_tag_id: string
           p_org_id: string
           p_expected_version: number
+          p_actor_id?: string
         }
         Returns: undefined
       }
@@ -2773,6 +2774,7 @@ export type Database = {
           p_org_id: string
           p_entity_type: string
           p_entity_id: string
+          p_actor_id?: string
         }
         Returns: Json
       }
@@ -2782,6 +2784,7 @@ export type Database = {
           p_entity_type: string
           p_entity_id: string
           p_tag_ids: string[]
+          p_actor_id?: string
         }
         Returns: Json
       }
