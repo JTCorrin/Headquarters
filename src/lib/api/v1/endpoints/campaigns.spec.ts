@@ -35,6 +35,49 @@ function campaignFixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('campaigns endpoints', () => {
+	it('prepares a resend using the selected organisation and source version', async () => {
+		let seenOrg: string | null = null;
+		let seenVersion: string | null = null;
+		const fetchMock = createMockFetch({
+			[`POST /api/v1/campaigns/${CAMPAIGN_ID}/resend`]: async (request) => {
+				seenOrg = request.headers.get('x-org-id');
+				seenVersion = request.headers.get('if-match');
+				return { status: 201, body: { data: campaignFixture({ id: TEMPLATE_ID }) } };
+			}
+		});
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const draft = await api.campaigns.resend(CAMPAIGN_ID, 4);
+		expect(seenOrg).toBe(ORG_A);
+		expect(seenVersion).toBe('"4"');
+		expect(draft.id).toBe(TEMPLATE_ID);
+		expect(draft.status).toBe('draft');
+	});
+
+	it('loads activity within the selected organisation', async () => {
+		let seenOrg: string | null = null;
+		const fetchMock = createMockFetch({
+			[`GET /api/v1/campaigns/${CAMPAIGN_ID}/activity`]: async (request) => {
+				seenOrg = request.headers.get('x-org-id');
+				return {
+					body: {
+						data: [
+							{
+								id: 'event',
+								level: 'info',
+								message: 'Batch finished',
+								created_at: '2026-09-08T10:00:00Z'
+							}
+						]
+					}
+				};
+			}
+		});
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const result = await api.campaigns.activity(CAMPAIGN_ID);
+		expect(seenOrg).toBe(ORG_A);
+		expect(result.data[0]?.message).toBe('Batch finished');
+	});
+
 	it('list passes status filter', async () => {
 		let seenQuery = '';
 		const fetchMock = createMockFetch({
