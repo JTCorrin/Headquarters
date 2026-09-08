@@ -1,6 +1,7 @@
 import type { ApiRequestFn } from '../request.js';
 import type {
 	ApiCampaign,
+	ApiCampaignEvent,
 	ApiCampaignAudiencePreview,
 	ApiCampaignCreateBody,
 	ApiCampaignListParams,
@@ -73,6 +74,20 @@ export function createCampaignsEndpoints(request: ApiRequestFn): CampaignsEndpoi
 			});
 			return data;
 		},
+		resend: async (id, version, signal) => {
+			const { data } = await request<ApiCampaign>(`/api/v1/campaigns/${id}/resend`, {
+				method: 'POST',
+				orgScoped: true,
+				ifMatchVersion: version,
+				signal
+			});
+			return data;
+		},
+		activity: (id, signal) =>
+			request<ApiCampaignEvent[]>(`/api/v1/campaigns/${id}/activity`, {
+				orgScoped: true,
+				signal
+			}),
 		audiencePreview: async (id, body, signal) => {
 			const { data } = await request<ApiCampaignAudiencePreview>(
 				`/api/v1/campaigns/${id}/audience-preview`,
