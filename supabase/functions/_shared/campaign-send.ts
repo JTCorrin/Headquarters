@@ -97,9 +97,16 @@ export async function sendCampaignRecipient(input: {
   campaignId: string
   campaignName: string
   mailboxId: string
-  template: { id: string; subject: string; body_text: string | null; body_html: string | null }
+  template: {
+    id: string
+    subject: string
+    body_text: string | null
+    body_html: string | null
+  }
   recipient: CampaignRecipientRow
-}): Promise<{ ok: true } | { ok: false; error: string; quotaExhausted?: boolean }> {
+}): Promise<
+  { ok: true } | { ok: false; error: string; quotaExhausted?: boolean }
+> {
   const { db, orgId, mailboxId, template, recipient } = input
 
   if (recipient.status !== 'pending') {
@@ -117,12 +124,23 @@ export async function sendCampaignRecipient(input: {
       message.includes('daily email send limit') ||
       message.includes('quota')
     ) {
-      return { ok: false, error: 'Daily email send limit reached', quotaExhausted: true }
+      return {
+        ok: false,
+        error: 'Daily email send limit reached',
+        quotaExhausted: true,
+      }
     }
-    return { ok: false, error: quotaError.message || 'Quota check failed' }
+    throw new Error(
+      'Could not check the sending allowance. No email was sent.',
+    )
   }
 
-  const mergeCtx = await loadMergeContext(db, orgId, recipient.entity_type, recipient.entity_id)
+  const mergeCtx = await loadMergeContext(
+    db,
+    orgId,
+    recipient.entity_type,
+    recipient.entity_id,
+  )
   const vars = buildCampaignMergeVars({
     entityType: recipient.entity_type,
     entityName: mergeCtx.entityName,
@@ -197,11 +215,19 @@ export async function sendCampaignRecipient(input: {
     return { ok: false, error }
   }
 
-  await db.rpc('mark_campaign_recipient_result', {
-    p_recipient_id: recipient.id,
-    p_org_id: orgId,
-    p_status: 'sent',
-  })
+  const { error: recordError } = await db.rpc(
+    'mark_campaign_recipient_result',
+    {
+      p_recipient_id: recipient.id,
+      p_org_id: orgId,
+      p_status: 'sent',
+    },
+  )
+  if (recordError) {
+    throw new Error(
+      'The mail server accepted this message, but its delivery record could not be saved. Check the sending mailbox before resending.',
+    )
+  }
 
   const noteBody = `Included in campaign “${input.campaignName}” (${subject}).`
   // Timeline note is best-effort; send already succeeded.

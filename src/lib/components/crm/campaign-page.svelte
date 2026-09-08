@@ -12,6 +12,7 @@
 	} from '$lib/api/v1/mappers.js';
 	import type {
 		ApiCampaign,
+		ApiCampaignEvent,
 		ApiCampaignAudiencePreview,
 		ApiCampaignRecipient,
 		ApiEmailTemplate,
@@ -64,6 +65,8 @@
 	let viewState = $state<ResourceViewState>({ kind: 'loading' });
 	let campaign = $state<ApiCampaign | null>(null);
 	let recipients = $state<ApiCampaignRecipient[]>([]);
+	let activity = $state<ApiCampaignEvent[]>([]);
+	let activityError = $state<string | null>(null);
 	let templates = $state<ApiEmailTemplate[]>([]);
 	let mailboxes = $state<ApiOrgMailbox[]>([]);
 	let orgTags = $state<ApiTag[]>([]);
@@ -93,12 +96,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Campaigns', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -168,6 +169,8 @@
 	}
 
 	function resetOrgScopedState() {
+		activity = [];
+		activityError = null;
 		campaign = null;
 		recipients = [];
 		preview = null;
@@ -193,7 +196,51 @@
 		const result = await api.campaigns.listRecipients(id, { limit: 500 });
 		if (isStale(epoch)) return;
 		recipients = result.data;
+		await loadActivity(id, epoch);
 	}
+
+	async function loadActivity(id: string, epoch: RequestEpoch) {
+		try {
+			const result = await api.campaigns.activity(id);
+			if (isStale(epoch)) return;
+			activity = result.data;
+			activityError = null;
+		} catch {
+			if (!isStale(epoch))
+				activityError = 'Could not load campaign activity. Refresh to try again.';
+		}
+	}
+
+	let polling = false;
+	async function refreshProgress() {
+		if (busy || polling || !campaign || !['scheduled', 'sending'].includes(campaign.status)) return;
+		const epoch = captureEpoch();
+		const id = campaign.id;
+		polling = true;
+		try {
+			const [result, rows] = await Promise.all([
+				api.campaigns.get(id),
+				api.campaigns.listRecipients(id, { limit: 500 })
+			]);
+			if (isStale(epoch) || busy || campaign?.id !== id) return;
+			campaign = result.data;
+			version = result.data.version;
+			recipients = rows.data;
+			await loadActivity(id, epoch);
+		} catch {
+			if (!isStale(epoch))
+				activityError =
+					'Live progress could not be refreshed. Your campaign continues in the background.';
+		} finally {
+			polling = false;
+		}
+	}
+
+	$effect(() => {
+		if (!campaign || !['scheduled', 'sending'].includes(campaign.status)) return;
+		const timer = setInterval(() => void refreshProgress(), 10000);
+		return () => clearInterval(timer);
+	});
 
 	async function loadAll() {
 		if (!session.selectedOrgId) {
@@ -457,6 +504,32 @@
 		}
 	}
 
+	async function onResendCampaign() {
+		if (!campaign || busy) return;
+		busy = true;
+		const epoch = captureEpoch();
+		try {
+			const draft = await api.campaigns.resend(campaign.id, version);
+			if (isStale(epoch)) return;
+			campaign = draft;
+			version = draft.version;
+			title = draft.name;
+			recipients = [];
+			activity = [];
+			campaignForm.form.set(toFormData(draft));
+			viewState = { kind: 'ready' };
+			onSaved?.(draft.id);
+		} catch (error) {
+			if (!isStale(epoch))
+				viewState = {
+					kind: 'validation',
+					message: userMessage(error, 'Could not prepare a resend draft.')
+				};
+		} finally {
+			if (!isStale(epoch)) busy = false;
+		}
+	}
+
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
 		busy = true;
@@ -501,7 +574,7 @@
 			{createError}
 			{busy}
 			{onSwitchOrg}
-			onValidCreate={onValidCreate}
+			{onValidCreate}
 			{onLogout}
 		>
 			{#if viewState.kind === 'not_found'}
@@ -538,11 +611,14 @@
 					{navGroups}
 					{campaign}
 					{recipients}
+					{activity}
+					{activityError}
 					{viewState}
 					{busy}
 					onReload={loadAll}
 					{onBack}
 					onCancel={canEdit ? onCancelCampaign : undefined}
+					onResend={canEdit ? onResendCampaign : undefined}
 					showNav={false}
 					class="min-h-0 flex-1"
 				/>
