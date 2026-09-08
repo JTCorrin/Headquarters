@@ -158,6 +158,7 @@ import type {
 	ApiTagUpdateBody,
 	ApiOrgMailbox,
 	ApiCampaign,
+	ApiCampaignEvent,
 	ApiCampaignAudiencePreview,
 	ApiCampaignCreateBody,
 	ApiCampaignListParams,
@@ -792,10 +793,7 @@ export interface OrgMailboxesEndpoints {
 }
 
 export interface CampaignsEndpoints {
-	list(
-		params?: ApiCampaignListParams,
-		signal?: AbortSignal
-	): Promise<ApiResult<ApiCampaign[]>>;
+	list(params?: ApiCampaignListParams, signal?: AbortSignal): Promise<ApiResult<ApiCampaign[]>>;
 	create(body: ApiCampaignCreateBody, signal?: AbortSignal): Promise<ApiCampaign>;
 	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiCampaign>>;
 	update(
@@ -812,6 +810,8 @@ export interface CampaignsEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiCampaign>;
 	cancel(id: string, version: number, signal?: AbortSignal): Promise<ApiCampaign>;
+	resend(id: string, version: number, signal?: AbortSignal): Promise<ApiCampaign>;
+	activity(id: string, signal?: AbortSignal): Promise<ApiResult<ApiCampaignEvent[]>>;
 	audiencePreview(
 		id: string,
 		body?: Pick<ApiCampaignUpdateBody, 'tag_ids' | 'entity_types'>,

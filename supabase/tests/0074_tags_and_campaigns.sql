@@ -1,6 +1,6 @@
 begin;
 
-select plan(17);
+select plan(31);
 
 create temporary table _campaign_fixture (
   owner_id uuid,
@@ -353,6 +353,65 @@ select is(
   'cancelled',
   'cancel_campaign sets cancelled'
 );
+
+reset role;
+-- Simulate a resumed send without ever making an SMTP request.
+update public.campaigns set status = 'sending' where id = (select campaign_id from _campaign_fixture);
+select is((select count(*)::integer from public.claim_campaign_recipients(
+  (select campaign_id from _campaign_fixture),(select org_id from _campaign_fixture),15)),1,
+  'worker reserves the pending recipient');
+select is((select count(*)::integer from public.claim_campaign_recipients(
+  (select campaign_id from _campaign_fixture),(select org_id from _campaign_fixture),15)),0,
+  'a second worker cannot reserve a recipient already claimed');
+update public.campaign_recipients set claimed_at = now() - interval '11 minutes'
+  where campaign_id = (select campaign_id from _campaign_fixture) and status = 'pending';
+select is((select count(*)::integer from public.claim_campaign_recipients(
+  (select campaign_id from _campaign_fixture),(select org_id from _campaign_fixture),15)),0,
+  'an interrupted delivery is never automatically retried');
+select is((select status from public.campaign_recipients where campaign_id =
+  (select campaign_id from _campaign_fixture) and claimed_at is not null),'failed',
+  'interrupted delivery has a visible failed outcome');
+update public.campaigns set status = 'cancelled' where id = (select campaign_id from _campaign_fixture);
+create temporary table _resend_fixture(original_version integer, draft_id uuid, readonly_id uuid);
+grant all on _resend_fixture to authenticated;
+insert into _resend_fixture(original_version)
+  select version from public.campaigns where id = (select campaign_id from _campaign_fixture);
+set local role authenticated;
+update _resend_fixture set draft_id = (public.resend_campaign(
+  (select campaign_id from _campaign_fixture),(select org_id from _campaign_fixture),original_version)).id;
+select is((select status from public.campaigns where id=(select draft_id from _resend_fixture)),
+  'draft','resend prepares a draft rather than sending emails');
+select is((select count(*)::integer from public.campaign_recipients where campaign_id=
+  (select draft_id from _resend_fixture)),0,'resend does not reuse the original recipient snapshot');
+select is((select count(*)::integer from public.campaign_audience_tags where campaign_id=
+  (select draft_id from _resend_fixture)),1,'resend copies audience filters');
+select is((select count(*)::integer from public.campaign_recipients where campaign_id=
+  (select campaign_id from _campaign_fixture)),3,'original recipient history is preserved');
+select throws_ok($$select public.resend_campaign((select draft_id from _resend_fixture),
+  (select org_id from _campaign_fixture),(select version from public.campaigns where id=
+  (select draft_id from _resend_fixture)))$$,'22023',null,'a draft cannot be resent');
+select throws_ok($$select public.resend_campaign((select campaign_id from _campaign_fixture),
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',1)$$,'42501',null,'resend cannot cross organisation boundaries');
+select throws_ok($$select public.resend_campaign((select campaign_id from _campaign_fixture),
+  (select org_id from _campaign_fixture),(select original_version from _resend_fixture))$$,
+  'P0001',null,'duplicate resend with the old version is rejected');
+select ok((select count(*) > 0 from public.campaign_events where campaign_id=
+  (select campaign_id from _campaign_fixture)),'members can read campaign activity');
+reset role;
+update _resend_fixture set readonly_id=pg_temp.make_auth_user('campaign-reader@example.test','Campaign Reader');
+insert into public.memberships(org_id,user_id,role,status)
+  select f.org_id,r.readonly_id,'readonly','active' from _campaign_fixture f cross join _resend_fixture r;
+select pg_temp.as_user((select readonly_id from _resend_fixture));
+set local role authenticated;
+select throws_ok($$select public.resend_campaign((select campaign_id from _campaign_fixture),
+  (select org_id from _campaign_fixture),(select version from public.campaigns where id=
+  (select campaign_id from _campaign_fixture)))$$,'42501',null,'readonly members cannot resend');
+reset role;
+select pg_temp.as_user((select owner_id from _campaign_fixture));
+set local role authenticated;
+select throws_ok($$insert into public.campaign_events(org_id,campaign_id,level,message)
+  select org_id,campaign_id,'info','Forged worker result' from _campaign_fixture$$,
+  '42501',null,'members cannot forge worker activity');
 
 select lives_ok(
   $$

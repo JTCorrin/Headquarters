@@ -13,7 +13,7 @@ import {
 type DatabaseClient = SupabaseClient<Database>
 
 const SELECT =
-  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,status,template_id,mailbox_id,scheduled_at,started_at,completed_at,last_error'
+  'id,org_id,created_at,updated_at,created_by,updated_by,deleted_at,version,name,status,template_id,mailbox_id,scheduled_at,started_at,completed_at,last_error,last_worker_at,next_attempt_at'
 
 const STATUSES = new Set([
   'draft',
@@ -43,13 +43,24 @@ type CampaignUpdate = {
   entity_types?: string[]
 }
 
-function databaseError(error: { code?: string; message?: string }, requestId: string): ApiError {
+function databaseError(
+  error: { code?: string; message?: string },
+  requestId: string,
+): ApiError {
   const message = error.message?.toLowerCase() ?? ''
   if (message.includes('version conflict')) {
-    return new ApiError(412, 'PRECONDITION_FAILED', 'Campaign version does not match If-Match')
+    return new ApiError(
+      412,
+      'PRECONDITION_FAILED',
+      'Campaign version does not match If-Match',
+    )
   }
   if (error.code === '23505') {
-    return new ApiError(409, 'CONFLICT', 'A campaign with this name already exists')
+    return new ApiError(
+      409,
+      'CONFLICT',
+      'A campaign with this name already exists',
+    )
   }
   if (error.code === '23514' || error.code === '22023') {
     return new ApiError(
@@ -79,9 +90,14 @@ function parseUuidArray(value: unknown, field: string): string[] {
   }
   return value.map((id, index) => {
     if (typeof id !== 'string') {
-      throw new ApiError(422, 'VALIDATION_ERROR', `${field} must be uuid strings`, {
-        [`${field}[${index}]`]: 'Must be a uuid',
-      })
+      throw new ApiError(
+        422,
+        'VALIDATION_ERROR',
+        `${field} must be uuid strings`,
+        {
+          [`${field}[${index}]`]: 'Must be a uuid',
+        },
+      )
     }
     return parseUuid(id, `${field}[${index}]`)
   })
@@ -90,9 +106,14 @@ function parseUuidArray(value: unknown, field: string): string[] {
 function parseEntityTypes(value: unknown): string[] {
   if (value === undefined) return ['lead', 'contact', 'client']
   if (!Array.isArray(value) || value.length === 0) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'entity_types must be a non-empty array', {
-      entity_types: 'Must include lead, contact, and/or client',
-    })
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'entity_types must be a non-empty array',
+      {
+        entity_types: 'Must include lead, contact, and/or client',
+      },
+    )
   }
   const out: string[] = []
   for (const item of value) {
@@ -124,8 +145,12 @@ export function validateCampaignBody(
   for (const key of Object.keys(body)) {
     if (!writable.has(key)) fields[key] = 'Unknown field'
   }
-  if ('org_id' in body) fields.org_id = 'Must not be supplied in the request body'
-  if ('status' in body) fields.status = 'Status is managed by launch/cancel endpoints'
+  if ('org_id' in body) {
+    fields.org_id = 'Must not be supplied in the request body'
+  }
+  if ('status' in body) {
+    fields.status = 'Status is managed by launch/cancel endpoints'
+  }
 
   if (partial) {
     const hasWritableField = Object.keys(body).some((key) => writable.has(key))
@@ -134,7 +159,9 @@ export function validateCampaignBody(
 
   if ('name' in body) {
     const value = body.name
-    if (typeof value !== 'string' || !value.trim() || value.trim().length > 200) {
+    if (
+      typeof value !== 'string' || !value.trim() || value.trim().length > 200
+    ) {
       fields.name = 'Must be a non-empty string up to 200 characters'
     } else {
       output.name = value.trim()
@@ -205,7 +232,12 @@ export function validateCampaignBody(
   }
 
   if (Object.keys(fields).length > 0) {
-    throw new ApiError(422, 'VALIDATION_ERROR', 'Campaign validation failed', fields)
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'Campaign validation failed',
+      fields,
+    )
   }
   return output as CampaignCreate | CampaignUpdate
 }
@@ -276,7 +308,11 @@ async function enrichCampaign(
   campaign: Record<string, unknown>,
 ) {
   const audience = await loadAudience(db, orgId, String(campaign.id))
-  const recipient_counts = await loadRecipientCounts(db, orgId, String(campaign.id))
+  const recipient_counts = await loadRecipientCounts(
+    db,
+    orgId,
+    String(campaign.id),
+  )
   let quota_remaining: number | null = null
   if (campaign.mailbox_id) {
     const { data } = await db.rpc('campaign_mailbox_quota_remaining', {
@@ -325,7 +361,11 @@ export function handleCampaigns(
   requestId: string,
 ): Promise<Response> {
   if (role === 'billing') {
-    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access campaigns')
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Billing members cannot access campaigns',
+    )
   }
   const canMutate = role === 'owner' || role === 'admin' || role === 'member'
 
@@ -351,7 +391,9 @@ export function handleCampaigns(
         if (status) {
           query = query.eq(
             'status',
-            status as Database['public']['Tables']['campaigns']['Row']['status'],
+            status as Database['public']['Tables']['campaigns']['Row'][
+              'status'
+            ],
           )
         }
         const { data, error } = await query
@@ -365,10 +407,17 @@ export function handleCampaigns(
 
     if (req.method === 'POST') {
       if (!canMutate) {
-        throw new ApiError(403, 'FORBIDDEN', 'This membership cannot manage campaigns')
+        throw new ApiError(
+          403,
+          'FORBIDDEN',
+          'This membership cannot manage campaigns',
+        )
       }
       return (async () => {
-        const payload = validateCampaignBody(await jsonBody(req), false) as CampaignCreate
+        const payload = validateCampaignBody(
+          await jsonBody(req),
+          false,
+        ) as CampaignCreate
         const { tag_ids, entity_types, ...row } = payload
         const { data, error } = await db
           .from('campaigns')
@@ -405,7 +454,11 @@ export function handleCampaigns(
       })()
     }
 
-    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for campaigns')
+    throw new ApiError(
+      405,
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for campaigns',
+    )
   }
 
   const previewMatch = path.match(
@@ -413,7 +466,11 @@ export function handleCampaigns(
   )
   if (previewMatch) {
     if (req.method !== 'POST' && req.method !== 'GET') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for audience preview')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for audience preview',
+      )
     }
     const campaignId = parseUuid(previewMatch[1], 'id')
     return (async () => {
@@ -473,15 +530,25 @@ export function handleCampaigns(
   )
   if (launchMatch) {
     if (req.method !== 'POST') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for campaign launch')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for campaign launch',
+      )
     }
     if (!canMutate) {
-      throw new ApiError(403, 'FORBIDDEN', 'This membership cannot launch campaigns')
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'This membership cannot launch campaigns',
+      )
     }
     const campaignId = parseUuid(launchMatch[1], 'id')
     return (async () => {
       const version = parseVersion(req)
-      const body = await jsonBody(req).catch(() => ({} as Record<string, unknown>))
+      const body = await jsonBody(req).catch(
+        () => ({} as Record<string, unknown>),
+      )
       const sendImmediately = body.send_immediately !== false
       const { data, error } = await db.rpc('launch_campaign', {
         p_campaign_id: campaignId,
@@ -490,9 +557,65 @@ export function handleCampaigns(
         p_send_immediately: sendImmediately,
       })
       if (error) throw databaseError(error, requestId)
-      const enriched = await enrichCampaign(db, orgId, data as Record<string, unknown>)
+      const enriched = await enrichCampaign(
+        db,
+        orgId,
+        data as Record<string, unknown>,
+      )
       return jsonResponse({ data: enriched }, 200, requestId, {
         etag: etag((data as { version: number }).version),
+      })
+    })()
+  }
+
+  const activityMatch = path.match(/^\/api\/v1\/campaigns\/([^/]+)\/activity$/)
+  if (activityMatch) {
+    if (req.method !== 'GET') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
+    }
+    const campaignId = parseUuid(activityMatch[1], 'id')
+    return (async () => {
+      await findCampaign(db, orgId, campaignId, requestId)
+      const { data, error } = await db.from('campaign_events')
+        .select('id,created_at,level,message').eq('org_id', orgId).eq(
+          'campaign_id',
+          campaignId,
+        )
+        .order('created_at', { ascending: false }).order('id', {
+          ascending: false,
+        }).limit(100)
+      if (error) throw databaseError(error, requestId)
+      return jsonResponse({ data: data ?? [] }, 200, requestId)
+    })()
+  }
+
+  const resendMatch = path.match(/^\/api\/v1\/campaigns\/([^/]+)\/resend$/)
+  if (resendMatch) {
+    if (req.method !== 'POST') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed')
+    }
+    if (!canMutate) {
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'This membership cannot resend campaigns',
+      )
+    }
+    const campaignId = parseUuid(resendMatch[1], 'id')
+    return (async () => {
+      const { data, error } = await db.rpc('resend_campaign', {
+        p_campaign_id: campaignId,
+        p_org_id: orgId,
+        p_expected_version: parseVersion(req),
+      })
+      if (error) throw databaseError(error, requestId)
+      const enriched = await enrichCampaign(
+        db,
+        orgId,
+        data as Record<string, unknown>,
+      )
+      return jsonResponse({ data: enriched }, 201, requestId, {
+        etag: etag(data.version),
       })
     })()
   }
@@ -502,10 +625,18 @@ export function handleCampaigns(
   )
   if (cancelMatch) {
     if (req.method !== 'POST') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for campaign cancel')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for campaign cancel',
+      )
     }
     if (!canMutate) {
-      throw new ApiError(403, 'FORBIDDEN', 'This membership cannot cancel campaigns')
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'This membership cannot cancel campaigns',
+      )
     }
     const campaignId = parseUuid(cancelMatch[1], 'id')
     return (async () => {
@@ -516,7 +647,11 @@ export function handleCampaigns(
         p_expected_version: version,
       })
       if (error) throw databaseError(error, requestId)
-      const enriched = await enrichCampaign(db, orgId, data as Record<string, unknown>)
+      const enriched = await enrichCampaign(
+        db,
+        orgId,
+        data as Record<string, unknown>,
+      )
       return jsonResponse({ data: enriched }, 200, requestId, {
         etag: etag((data as { version: number }).version),
       })
@@ -528,7 +663,11 @@ export function handleCampaigns(
   )
   if (recipientsMatch) {
     if (req.method !== 'GET') {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for campaign recipients')
+      throw new ApiError(
+        405,
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for campaign recipients',
+      )
     }
     const campaignId = parseUuid(recipientsMatch[1], 'id')
     return (async () => {
@@ -550,7 +689,9 @@ export function handleCampaigns(
       if (status) {
         query = query.eq(
           'status',
-          status as Database['public']['Tables']['campaign_recipients']['Row']['status'],
+          status as Database['public']['Tables']['campaign_recipients']['Row'][
+            'status'
+          ],
         )
       }
       const { data, error } = await query
@@ -569,13 +710,19 @@ export function handleCampaigns(
     return (async () => {
       const data = await findCampaign(db, orgId, campaignId, requestId)
       const enriched = await enrichCampaign(db, orgId, data)
-      return jsonResponse({ data: enriched }, 200, requestId, { etag: etag(data.version) })
+      return jsonResponse({ data: enriched }, 200, requestId, {
+        etag: etag(data.version),
+      })
     })()
   }
 
   if (req.method === 'PATCH') {
     if (!canMutate) {
-      throw new ApiError(403, 'FORBIDDEN', 'This membership cannot manage campaigns')
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'This membership cannot manage campaigns',
+      )
     }
     return (async () => {
       const version = parseVersion(req)
@@ -588,11 +735,19 @@ export function handleCampaigns(
         )
       }
       if (current.status !== 'draft') {
-        throw new ApiError(422, 'VALIDATION_ERROR', 'Only draft campaigns can be edited', {
-          status: 'Campaign is not a draft',
-        })
+        throw new ApiError(
+          422,
+          'VALIDATION_ERROR',
+          'Only draft campaigns can be edited',
+          {
+            status: 'Campaign is not a draft',
+          },
+        )
       }
-      const payload = validateCampaignBody(await jsonBody(req), true) as CampaignUpdate
+      const payload = validateCampaignBody(
+        await jsonBody(req),
+        true,
+      ) as CampaignUpdate
       const { tag_ids, entity_types, ...row } = payload
       if (Object.keys(row).length > 0) {
         const { data, error } = await db
@@ -613,7 +768,14 @@ export function handleCampaigns(
           )
         }
       }
-      await replaceAudience(db, orgId, campaignId, tag_ids, entity_types, requestId)
+      await replaceAudience(
+        db,
+        orgId,
+        campaignId,
+        tag_ids,
+        entity_types,
+        requestId,
+      )
       // Audience RPC also stamps campaigns.version — re-read so clients keep a matching etag.
       const refreshed = await findCampaign(db, orgId, campaignId, requestId)
       const enriched = await enrichCampaign(db, orgId, refreshed)
@@ -625,7 +787,11 @@ export function handleCampaigns(
 
   if (req.method === 'DELETE') {
     if (!canMutate) {
-      throw new ApiError(403, 'FORBIDDEN', 'This membership cannot manage campaigns')
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'This membership cannot manage campaigns',
+      )
     }
     return (async () => {
       const version = parseVersion(req)
@@ -642,5 +808,9 @@ export function handleCampaigns(
     })()
   }
 
-  throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for campaign')
+  throw new ApiError(
+    405,
+    'METHOD_NOT_ALLOWED',
+    'Method not allowed for campaign',
+  )
 }
