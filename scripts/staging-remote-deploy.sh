@@ -135,6 +135,12 @@ if [[ ! -s "$MAILBOX_SECRET_FILE" ]]; then
 	log "generated MAILBOX_SYNC_SECRET at ${MAILBOX_SECRET_FILE}"
 fi
 MAILBOX_SYNC_SECRET="$(tr -d '[:space:]' <"$MAILBOX_SECRET_FILE")"
+CAMPAIGNS_SECRET_FILE="${STAGING_SECRETS_DIR}/campaigns-cron-secret"
+if [[ ! -s "$CAMPAIGNS_SECRET_FILE" ]]; then
+	(umask 077; openssl rand -hex 32 >"$CAMPAIGNS_SECRET_FILE")
+	log "generated campaign worker secret"
+fi
+CAMPAIGNS_CRON_SECRET="$(tr -d '[:space:]' <"$CAMPAIGNS_SECRET_FILE")"
 
 # Edge secrets load from supabase/functions/.env (CLI default), not supabase/.env.
 # api-v1 defaults to `*` when unset; pin staging origin explicitly.
@@ -145,6 +151,7 @@ API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
+CAMPAIGNS_CRON_SECRET=${CAMPAIGNS_CRON_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 # Mirror for any tooling that still reads the repo-root supabase/.env.
@@ -153,6 +160,7 @@ API_CORS_ORIGIN=${STAGING_ORIGIN}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
+CAMPAIGNS_CRON_SECRET=${CAMPAIGNS_CRON_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 
@@ -227,6 +235,7 @@ PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
+CAMPAIGNS_CRON_SECRET=${CAMPAIGNS_CRON_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 cat > supabase/.env <<EOF
@@ -235,6 +244,7 @@ PUBLIC_SUPABASE_URL=${PUBLIC_SUPABASE_URL}
 CALENDAR_SYNC_STAGING_STUB=1
 RECURRING_INVOICES_CRON_SECRET=${RECURRING_INVOICES_CRON_SECRET}
 MAILBOX_SYNC_SECRET=${MAILBOX_SYNC_SECRET}
+CAMPAIGNS_CRON_SECRET=${CAMPAIGNS_CRON_SECRET}
 APP_BASE_URL=${STAGING_ORIGIN}
 EOF
 log "wrote PUBLIC_SUPABASE_URL + APP_BASE_URL into supabase/functions/.env"
@@ -418,6 +428,30 @@ if command -v crontab >/dev/null 2>&1; then
 	fi
 else
 	log "crontab not available — skipping mailbox sync schedule install"
+fi
+
+# Campaign queue worker. Keep credentials off argv and bound each HTTP request.
+CAMPAIGNS_CRON_WRAPPER="${STAGING_SECRETS_DIR}/run-campaigns-cron.sh"
+cat >"$CAMPAIGNS_CRON_WRAPPER" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+SECRET=\$(tr -d '[:space:]' <"${CAMPAIGNS_SECRET_FILE}")
+curl -fsS --max-time 120 --config - <<CURL_CONFIG
+request = "POST"
+header = "x-campaigns-cron-secret: \${SECRET}"
+url = "http://127.0.0.1:54321/functions/v1/jobs-campaigns"
+CURL_CONFIG
+EOF
+chmod 700 "$CAMPAIGNS_CRON_WRAPPER"
+CAMPAIGNS_CRON_LINE="* * * * * ${CAMPAIGNS_CRON_WRAPPER} >>${STAGING_SECRETS_DIR}/campaigns-cron.log 2>&1"
+if command -v crontab >/dev/null 2>&1; then
+	existing="$(crontab -l 2>/dev/null || true)"
+	filtered="$(printf '%s\n' "$existing" | awk '!/run-campaigns-cron\\.sh/')"
+	printf '%s\n%s\n' "$filtered" "$CAMPAIGNS_CRON_LINE" | crontab -
+	log "installed campaign sending cron (every minute → jobs-campaigns)"
+else
+	log "crontab not available — campaign sending needs an external scheduler"
+	exit 1
 fi
 
 log "done"
