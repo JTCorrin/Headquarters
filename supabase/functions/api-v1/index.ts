@@ -486,7 +486,15 @@ async function routeOrgScoped(
   }
 
   if (isTagsPath(path)) {
-    return await handleTags(req, db, path, orgId, membership.role, requestId)
+    return await handleTags(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      requestId,
+      userId,
+    )
   }
 
   if (path === '/api/v1/campaigns' || path.startsWith('/api/v1/campaigns/')) {
