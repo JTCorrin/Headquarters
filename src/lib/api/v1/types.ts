@@ -1708,6 +1708,16 @@ export interface ApiMailboxTestResult {
 	ok: boolean;
 	error_code?: string | null;
 	message?: string | null;
+	imap?: {
+		ok: boolean;
+		error_code?: string | null;
+		message?: string | null;
+	};
+	smtp?: {
+		ok: boolean;
+		error_code?: string | null;
+		message?: string | null;
+	};
 }
 
 export interface ApiOrgInvoiceEmailAccount {
