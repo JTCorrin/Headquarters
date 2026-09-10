@@ -1,14 +1,14 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@supabase/supabase-js";
-import type { Database, Json } from "../_shared/database.ts";
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+import type { Database, Json } from '../_shared/database.ts'
 import {
   type ImapProbeOptions,
   type ImapSecurity,
   ImapSyncError,
   isSyntheticImapHost,
   probeImap,
-} from "../_shared/imap-inbound.ts";
-import { resolveMailboxAuth } from "../_shared/mailbox-credentials.ts";
+} from '../_shared/imap-inbound.ts'
+import { resolveMailboxAuth } from '../_shared/mailbox-credentials.ts'
 import {
   buildMailboxAuthUrl,
   exchangeMailboxAuthCode,
@@ -17,162 +17,161 @@ import {
   mailboxPresetHosts,
   randomOAuthState,
   serializeMailboxTokenBlob,
-} from "../_shared/mailbox-oauth.ts";
+} from '../_shared/mailbox-oauth.ts'
 import {
   probeSmtp,
   type SmtpAuth,
   type SmtpProbeOptions,
   type SmtpSecurity,
   SmtpSendError,
-} from "../_shared/smtp-outbound.ts";
-import { ApiError, jsonBody, jsonResponse, parseLimit } from "./http.ts";
+} from '../_shared/smtp-outbound.ts'
+import { ApiError, jsonBody, jsonResponse, parseLimit } from './http.ts'
 
-type DatabaseClient = SupabaseClient<Database>;
-type MembershipRole =
-  Database["public"]["Tables"]["memberships"]["Row"]["role"];
+type DatabaseClient = SupabaseClient<Database>
+type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
-const SECURITY = new Set(["tls", "starttls", "none"]);
+const SECURITY = new Set(['tls', 'starttls', 'none'])
 
-type ImapProbeFn = (options: ImapProbeOptions) => Promise<void>;
-type SmtpProbeFn = (options: SmtpProbeOptions) => Promise<void>;
+type ImapProbeFn = (options: ImapProbeOptions) => Promise<void>
+type SmtpProbeFn = (options: SmtpProbeOptions) => Promise<void>
 
-let imapProbeFn: ImapProbeFn = probeImap;
-let smtpProbeFn: SmtpProbeFn = probeSmtp;
+let imapProbeFn: ImapProbeFn = probeImap
+let smtpProbeFn: SmtpProbeFn = probeSmtp
 
 /** Test seam — pass null to restore the real IMAP probe. */
 export function setImapProbeForTests(fn: ImapProbeFn | null): void {
-  imapProbeFn = fn ?? probeImap;
+  imapProbeFn = fn ?? probeImap
 }
 
 /** Test seam — pass null to restore the real SMTP probe. */
 export function setSmtpProbeForTests(fn: SmtpProbeFn | null): void {
-  smtpProbeFn = fn ?? probeSmtp;
+  smtpProbeFn = fn ?? probeSmtp
 }
 
 type MailboxProbeLeg = {
-  ok: boolean;
-  error_code: string | null;
-  message: string | null;
-};
+  ok: boolean
+  error_code: string | null
+  message: string | null
+}
 
 function mailboxTestFailure(
   errorCode: string,
   message: string,
   legs?: { imap?: MailboxProbeLeg; smtp?: MailboxProbeLeg },
 ): {
-  ok: false;
-  error_code: string;
-  message: string;
-  imap: MailboxProbeLeg;
-  smtp: MailboxProbeLeg;
+  ok: false
+  error_code: string
+  message: string
+  imap: MailboxProbeLeg
+  smtp: MailboxProbeLeg
 } {
   const skipped: MailboxProbeLeg = {
     ok: false,
-    error_code: "skipped",
-    message: "Skipped — fix the earlier check first.",
-  };
+    error_code: 'skipped',
+    message: 'Skipped — fix the earlier check first.',
+  }
   return {
     ok: false,
     error_code: errorCode,
     message,
     imap: legs?.imap ?? skipped,
     smtp: legs?.smtp ?? skipped,
-  };
+  }
 }
 
 function parseMailSecurity(
   raw: string,
-  fallback: "tls",
+  fallback: 'tls',
 ): ImapSecurity | SmtpSecurity {
-  if (raw === "starttls" || raw === "none" || raw === "tls") return raw;
-  return fallback;
+  if (raw === 'starttls' || raw === 'none' || raw === 'tls') return raw
+  return fallback
 }
 
 function smtpProbeFailureMessage(
   error: SmtpSendError,
   authMode: string,
 ): string {
-  if (error.code === "smtp_auth_disabled") {
+  if (error.code === 'smtp_auth_disabled') {
     return (
-      "Authenticated SMTP is disabled for this Microsoft 365 mailbox (tenant setting). " +
-      "Enable it in Microsoft 365 admin → Users → Mail → Manage email apps → Authenticated SMTP."
-    );
+      'Authenticated SMTP is disabled for this Microsoft 365 mailbox (tenant setting). ' +
+      'Enable it in Microsoft 365 admin → Users → Mail → Manage email apps → Authenticated SMTP.'
+    )
   }
-  if (error.code === "smtp_auth_failed") {
-    return authMode === "oauth"
-      ? "SMTP sign-in failed — reconnect your Microsoft or Google account."
-      : "SMTP sign-in failed — check the email address and password (or app password).";
+  if (error.code === 'smtp_auth_failed') {
+    return authMode === 'oauth'
+      ? 'SMTP sign-in failed — reconnect your Microsoft or Google account.'
+      : 'SMTP sign-in failed — check the email address and password (or app password).'
   }
-  if (error.code === "timeout") {
-    return "SMTP server timed out — check host, port, security, and network path.";
+  if (error.code === 'timeout') {
+    return 'SMTP server timed out — check host, port, security, and network path.'
   }
-  if (error.code === "smtp_tls_failed") {
-    return "SMTP secure connection failed — try a different security setting (SSL / STARTTLS).";
+  if (error.code === 'smtp_tls_failed') {
+    return 'SMTP secure connection failed — try a different security setting (SSL / STARTTLS).'
   }
-  if (error.code === "smtp_host_blocked") {
-    return "This SMTP host is not allowed — private, link-local, and metadata addresses are blocked.";
+  if (error.code === 'smtp_host_blocked') {
+    return 'This SMTP host is not allowed — private, link-local, and metadata addresses are blocked.'
   }
-  if (error.code === "smtp_host_missing") {
-    return "SMTP host is missing — save mailbox SMTP settings, then try Test again.";
+  if (error.code === 'smtp_host_missing') {
+    return 'SMTP host is missing — save mailbox SMTP settings, then try Test again.'
   }
-  return `SMTP test failed (${error.code}).`;
+  return `SMTP test failed (${error.code}).`
 }
 
 function serviceRoleClient(): SupabaseClient {
-  const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !key) {
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "Service credentials are unavailable",
-    );
+      'INTERNAL_ERROR',
+      'Service credentials are unavailable',
+    )
   }
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  })
 }
 
 /** Reject CR/LF and other controls that could break IMAP protocol lines. */
 function hasControlChars(value: string): boolean {
   for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code <= 0x1f || code === 0x7f) return true;
+    const code = value.charCodeAt(i)
+    if (code <= 0x1f || code === 0x7f) return true
   }
-  return false;
+  return false
 }
 
 export type MailboxUpsertBody = {
-  email_address: string;
-  from_name: string | null;
-  imap_host: string;
-  imap_port: number;
-  imap_security: string;
-  smtp_host: string;
-  smtp_port: number;
-  smtp_security: string;
-  username: string;
-  password: string | null;
-};
+  email_address: string
+  from_name: string | null
+  imap_host: string
+  imap_port: number
+  imap_security: string
+  smtp_host: string
+  smtp_port: number
+  smtp_security: string
+  username: string
+  password: string | null
+}
 
 export type MailboxPatchBody = {
-  sync_interval_minutes: number;
-};
+  sync_interval_minutes: number
+}
 
 function assertCanAccessMailbox(role: MembershipRole, method: string): void {
-  if (role === "billing") {
+  if (role === 'billing') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members cannot access mailboxes",
-    );
+      'FORBIDDEN',
+      'Billing members cannot access mailboxes',
+    )
   }
-  if (role === "readonly" && method !== "GET") {
+  if (role === 'readonly' && method !== 'GET') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Readonly members cannot modify mailboxes",
-    );
+      'FORBIDDEN',
+      'Readonly members cannot modify mailboxes',
+    )
   }
 }
 
@@ -180,168 +179,154 @@ function databaseError(
   error: { code?: string; message?: string },
   requestId: string,
 ): ApiError {
-  const message = error.message?.toLowerCase() ?? "";
-  if (error.code === "42501" || message.includes("forbidden")) {
-    return new ApiError(403, "FORBIDDEN", "Mailbox operation is forbidden");
+  const message = error.message?.toLowerCase() ?? ''
+  if (error.code === '42501' || message.includes('forbidden')) {
+    return new ApiError(403, 'FORBIDDEN', 'Mailbox operation is forbidden')
   }
-  if (error.code === "P0002" || message.includes("not found")) {
-    return new ApiError(404, "NOT_FOUND", "Mailbox not found");
+  if (error.code === 'P0002' || message.includes('not found')) {
+    return new ApiError(404, 'NOT_FOUND', 'Mailbox not found')
   }
-  if (error.code === "P0001" || message.includes("oauth state expired")) {
+  if (error.code === 'P0001' || message.includes('oauth state expired')) {
     return new ApiError(
       400,
-      "BAD_REQUEST",
-      "OAuth state expired — start connect again",
-    );
+      'BAD_REQUEST',
+      'OAuth state expired — start connect again',
+    )
   }
-  if (error.code === "22023" || message.includes("password is required")) {
+  if (error.code === '22023' || message.includes('password is required')) {
     return new ApiError(
       422,
-      "VALIDATION_ERROR",
-      error.message ?? "Mailbox validation failed",
-    );
+      'VALIDATION_ERROR',
+      error.message ?? 'Mailbox validation failed',
+    )
   }
-  if (error.code === "23505") {
+  if (error.code === '23505') {
     return new ApiError(
       409,
-      "CONFLICT",
-      "A mailbox already exists for this membership",
-    );
+      'CONFLICT',
+      'A mailbox already exists for this membership',
+    )
   }
-  console.error("Mailbox operation failed", {
+  console.error('Mailbox operation failed', {
     request_id: requestId,
-    code: error.code ?? "unknown",
-  });
-  return new ApiError(500, "INTERNAL_ERROR", "The mailbox operation failed");
+    code: error.code ?? 'unknown',
+  })
+  return new ApiError(500, 'INTERNAL_ERROR', 'The mailbox operation failed')
 }
 
 function isHostname(value: string): boolean {
-  return /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/.test(value);
+  return /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/.test(value)
 }
 
 function isEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 320;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 320
 }
 
 export function validateMailboxBody(
   body: Record<string, unknown>,
 ): MailboxUpsertBody {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = {}
   const writable = new Set([
-    "email_address",
-    "from_name",
-    "imap_host",
-    "imap_port",
-    "imap_security",
-    "smtp_host",
-    "smtp_port",
-    "smtp_security",
-    "username",
-    "password",
-  ]);
+    'email_address',
+    'from_name',
+    'imap_host',
+    'imap_port',
+    'imap_security',
+    'smtp_host',
+    'smtp_port',
+    'smtp_security',
+    'username',
+    'password',
+  ])
   for (const key of Object.keys(body)) {
-    if (!writable.has(key)) fields[key] = "Field is not writable";
+    if (!writable.has(key)) fields[key] = 'Field is not writable'
   }
 
-  const email = typeof body.email_address === "string"
-    ? body.email_address.trim()
-    : "";
-  if (!isEmail(email)) fields.email_address = "Must be a valid email address";
+  const email = typeof body.email_address === 'string' ? body.email_address.trim() : ''
+  if (!isEmail(email)) fields.email_address = 'Must be a valid email address'
 
-  let fromName: string | null = null;
-  if ("from_name" in body) {
+  let fromName: string | null = null
+  if ('from_name' in body) {
     if (body.from_name === null) {
-      fromName = null;
-    } else if (typeof body.from_name === "string") {
-      fromName = body.from_name.trim() || null;
+      fromName = null
+    } else if (typeof body.from_name === 'string') {
+      fromName = body.from_name.trim() || null
       if (fromName && fromName.length > 120) {
-        fields.from_name = "Must be at most 120 characters";
+        fields.from_name = 'Must be at most 120 characters'
       }
     } else {
-      fields.from_name = "Must be a string or null";
+      fields.from_name = 'Must be a string or null'
     }
   }
 
-  const imapHost = typeof body.imap_host === "string"
-    ? body.imap_host.trim()
-    : "";
+  const imapHost = typeof body.imap_host === 'string' ? body.imap_host.trim() : ''
   if (!imapHost || !isHostname(imapHost)) {
-    fields.imap_host = "Must be a valid hostname";
+    fields.imap_host = 'Must be a valid hostname'
   }
 
-  const smtpHost = typeof body.smtp_host === "string"
-    ? body.smtp_host.trim()
-    : "";
+  const smtpHost = typeof body.smtp_host === 'string' ? body.smtp_host.trim() : ''
   if (!smtpHost || !isHostname(smtpHost)) {
-    fields.smtp_host = "Must be a valid hostname";
+    fields.smtp_host = 'Must be a valid hostname'
   }
 
-  const imapPort =
-    typeof body.imap_port === "number" && Number.isInteger(body.imap_port)
-      ? body.imap_port
-      : NaN;
+  const imapPort = typeof body.imap_port === 'number' && Number.isInteger(body.imap_port)
+    ? body.imap_port
+    : NaN
   if (!(imapPort >= 1 && imapPort <= 65535)) {
-    fields.imap_port = "Must be an integer 1–65535";
+    fields.imap_port = 'Must be an integer 1–65535'
   }
 
-  const smtpPort =
-    typeof body.smtp_port === "number" && Number.isInteger(body.smtp_port)
-      ? body.smtp_port
-      : NaN;
+  const smtpPort = typeof body.smtp_port === 'number' && Number.isInteger(body.smtp_port)
+    ? body.smtp_port
+    : NaN
   if (!(smtpPort >= 1 && smtpPort <= 65535)) {
-    fields.smtp_port = "Must be an integer 1–65535";
+    fields.smtp_port = 'Must be an integer 1–65535'
   }
 
-  const imapSecurity = typeof body.imap_security === "string"
-    ? body.imap_security
-    : "";
+  const imapSecurity = typeof body.imap_security === 'string' ? body.imap_security : ''
   if (!SECURITY.has(imapSecurity)) {
-    fields.imap_security = "Must be tls, starttls, or none";
+    fields.imap_security = 'Must be tls, starttls, or none'
   }
 
-  const smtpSecurity = typeof body.smtp_security === "string"
-    ? body.smtp_security
-    : "";
+  const smtpSecurity = typeof body.smtp_security === 'string' ? body.smtp_security : ''
   if (!SECURITY.has(smtpSecurity)) {
-    fields.smtp_security = "Must be tls, starttls, or none";
+    fields.smtp_security = 'Must be tls, starttls, or none'
   }
 
-  const username = typeof body.username === "string"
-    ? body.username.trim()
-    : "";
+  const username = typeof body.username === 'string' ? body.username.trim() : ''
   if (!username || username.length > 320) {
-    fields.username = "Must be 1–320 characters";
+    fields.username = 'Must be 1–320 characters'
   } else if (hasControlChars(username)) {
     // Control characters (esp. CR/LF) could be injected into IMAP protocol lines.
-    fields.username = "Must not contain control characters";
+    fields.username = 'Must not contain control characters'
   }
 
-  let password: string | null = null;
-  if ("password" in body) {
+  let password: string | null = null
+  if ('password' in body) {
     if (body.password === null || body.password === undefined) {
-      password = null;
-    } else if (typeof body.password === "string") {
+      password = null
+    } else if (typeof body.password === 'string') {
       if (body.password.length === 0) {
-        fields.password = "Password cannot be empty; omit to keep existing";
+        fields.password = 'Password cannot be empty; omit to keep existing'
       } else if (body.password.length > 512) {
-        fields.password = "Must be at most 512 characters";
+        fields.password = 'Must be at most 512 characters'
       } else if (hasControlChars(body.password)) {
-        fields.password = "Must not contain control characters";
+        fields.password = 'Must not contain control characters'
       } else {
-        password = body.password;
+        password = body.password
       }
     } else {
-      fields.password = "Must be a string";
+      fields.password = 'Must be a string'
     }
   }
 
   if (Object.keys(fields).length > 0) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "Mailbox validation failed",
+      'VALIDATION_ERROR',
+      'Mailbox validation failed',
       fields,
-    );
+    )
   }
 
   return {
@@ -355,70 +340,70 @@ export function validateMailboxBody(
     smtp_security: smtpSecurity,
     username,
     password,
-  };
+  }
 }
 
 export function validateMailboxPatchBody(
   body: Record<string, unknown>,
 ): MailboxPatchBody {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = {}
   for (const key of Object.keys(body)) {
-    if (key !== "sync_interval_minutes") fields[key] = "Field is not writable";
+    if (key !== 'sync_interval_minutes') fields[key] = 'Field is not writable'
   }
 
-  const syncInterval = typeof body.sync_interval_minutes === "number"
+  const syncInterval = typeof body.sync_interval_minutes === 'number'
     ? body.sync_interval_minutes
-    : NaN;
+    : NaN
   if (
     !Number.isInteger(syncInterval) || syncInterval < 1 || syncInterval > 60
   ) {
-    fields.sync_interval_minutes = "Must be an integer 1–60";
+    fields.sync_interval_minutes = 'Must be an integer 1–60'
   }
 
   if (Object.keys(fields).length > 0) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "Mailbox validation failed",
+      'VALIDATION_ERROR',
+      'Mailbox validation failed',
       fields,
-    );
+    )
   }
-  return { sync_interval_minutes: syncInterval };
+  return { sync_interval_minutes: syncInterval }
 }
 
 export function validateMailboxTestBody(
   body: Record<string, unknown>,
 ): { password: string | null } {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = {}
   for (const key of Object.keys(body)) {
-    if (key !== "password") fields[key] = "Field is not writable";
+    if (key !== 'password') fields[key] = 'Field is not writable'
   }
-  let password: string | null = null;
-  if ("password" in body) {
-    if (typeof body.password !== "string" || body.password.length === 0) {
-      fields.password = "Must be a non-empty string when provided";
+  let password: string | null = null
+  if ('password' in body) {
+    if (typeof body.password !== 'string' || body.password.length === 0) {
+      fields.password = 'Must be a non-empty string when provided'
     } else if (body.password.length > 512) {
-      fields.password = "Must be at most 512 characters";
+      fields.password = 'Must be at most 512 characters'
     } else if (hasControlChars(body.password)) {
-      fields.password = "Must not contain control characters";
+      fields.password = 'Must not contain control characters'
     } else {
-      password = body.password;
+      password = body.password
     }
   }
   if (Object.keys(fields).length > 0) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "Mailbox test validation failed",
+      'VALIDATION_ERROR',
+      'Mailbox test validation failed',
       fields,
-    );
+    )
   }
-  return { password };
+  return { password }
 }
 
 function assertNoSecretEcho(payload: unknown): void {
   // Match JSON *keys* only. Values like config.auth_mode = "api_key" must not trip this.
-  const text = JSON.stringify(payload);
+  const text = JSON.stringify(payload)
   if (
     /"secret_ref"\s*:/.test(text) ||
     /"password"\s*:/.test(text) ||
@@ -429,46 +414,46 @@ function assertNoSecretEcho(payload: unknown): void {
   ) {
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "Mailbox response contained a forbidden secret field",
-    );
+      'INTERNAL_ERROR',
+      'Mailbox response contained a forbidden secret field',
+    )
   }
 }
 
 function parseOAuthProvider(raw: string | null): MailboxOAuthProvider {
-  const value = (raw ?? "").trim().toLowerCase();
-  if (value === "microsoft" || value === "outlook") return "microsoft";
-  if (value === "google" || value === "gmail") return "google";
+  const value = (raw ?? '').trim().toLowerCase()
+  if (value === 'microsoft' || value === 'outlook') return 'microsoft'
+  if (value === 'google' || value === 'gmail') return 'google'
   throw new ApiError(
     422,
-    "VALIDATION_ERROR",
-    "provider must be microsoft or google",
+    'VALIDATION_ERROR',
+    'provider must be microsoft or google',
     {
-      provider: "Must be microsoft or google",
+      provider: 'Must be microsoft or google',
     },
-  );
+  )
 }
 
 function validateOAuthCallbackParams(input: {
-  code: string | null;
-  state: string | null;
+  code: string | null
+  state: string | null
 }): { code: string; state: string } {
-  const fields: Record<string, string> = {};
-  const code = input.code?.trim() ?? "";
-  const state = input.state?.trim() ?? "";
-  if (!code) fields.code = "Required";
+  const fields: Record<string, string> = {}
+  const code = input.code?.trim() ?? ''
+  const state = input.state?.trim() ?? ''
+  if (!code) fields.code = 'Required'
   if (!state || state.length < 16) {
-    fields.state = "Must be at least 16 characters";
+    fields.state = 'Must be at least 16 characters'
   }
   if (Object.keys(fields).length > 0) {
     throw new ApiError(
       422,
-      "VALIDATION_ERROR",
-      "OAuth callback validation failed",
+      'VALIDATION_ERROR',
+      'OAuth callback validation failed',
       fields,
-    );
+    )
   }
-  return { code, state };
+  return { code, state }
 }
 
 async function getMailbox(
@@ -476,15 +461,15 @@ async function getMailbox(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const { data, error } = await db.rpc("get_mailbox_account", {
+  const { data, error } = await db.rpc('get_mailbox_account', {
     p_org_id: orgId,
-  });
-  if (error) throw databaseError(error, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
   if (data === null || data === undefined) {
-    throw new ApiError(404, "NOT_FOUND", "Mailbox not found");
+    throw new ApiError(404, 'NOT_FOUND', 'Mailbox not found')
   }
-  assertNoSecretEcho(data);
-  return jsonResponse({ data }, 200, requestId);
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
 }
 
 async function putMailbox(
@@ -493,8 +478,8 @@ async function putMailbox(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const payload = validateMailboxBody(await jsonBody(req));
-  const { data, error } = await db.rpc("upsert_mailbox_account", {
+  const payload = validateMailboxBody(await jsonBody(req))
+  const { data, error } = await db.rpc('upsert_mailbox_account', {
     p_org_id: orgId,
     p_email_address: payload.email_address,
     p_from_name: payload.from_name,
@@ -506,10 +491,10 @@ async function putMailbox(
     p_smtp_security: payload.smtp_security,
     p_username: payload.username,
     p_password: payload.password,
-  });
-  if (error) throw databaseError(error, requestId);
-  assertNoSecretEcho(data);
-  return jsonResponse({ data }, 200, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
 }
 
 async function patchMailbox(
@@ -518,14 +503,14 @@ async function patchMailbox(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const payload = validateMailboxPatchBody(await jsonBody(req));
-  const { data, error } = await db.rpc("update_mailbox_sync_interval", {
+  const payload = validateMailboxPatchBody(await jsonBody(req))
+  const { data, error } = await db.rpc('update_mailbox_sync_interval', {
     p_org_id: orgId,
     p_sync_interval_minutes: payload.sync_interval_minutes,
-  });
-  if (error) throw databaseError(error, requestId);
-  assertNoSecretEcho(data);
-  return jsonResponse({ data }, 200, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
 }
 
 async function deleteMailbox(
@@ -533,14 +518,14 @@ async function deleteMailbox(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const { error } = await db.rpc("disconnect_mailbox_account", {
+  const { error } = await db.rpc('disconnect_mailbox_account', {
     p_org_id: orgId,
-  });
-  if (error) throw databaseError(error, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
   return new Response(null, {
     status: 204,
-    headers: { "x-request-id": requestId },
-  });
+    headers: { 'x-request-id': requestId },
+  })
 }
 
 async function testMailbox(
@@ -550,170 +535,168 @@ async function testMailbox(
   requestId: string,
 ): Promise<Response> {
   // Live IMAP probe (LOGIN or XOAUTH2). Never log body / password / tokens.
-  let password: string | null = null;
-  if (req.headers.get("content-type")?.includes("application/json")) {
-    const raw = await req.text();
+  let password: string | null = null
+  if (req.headers.get('content-type')?.includes('application/json')) {
+    const raw = await req.text()
     if (raw.trim().length > 0) {
-      let parsed: unknown;
+      let parsed: unknown
       try {
-        parsed = JSON.parse(raw);
+        parsed = JSON.parse(raw)
       } catch {
         throw new ApiError(
           400,
-          "BAD_REQUEST",
-          "Request body must be valid JSON",
-        );
+          'BAD_REQUEST',
+          'Request body must be valid JSON',
+        )
       }
       if (
-        typeof parsed !== "object" || parsed === null || Array.isArray(parsed)
+        typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)
       ) {
         throw new ApiError(
           400,
-          "BAD_REQUEST",
-          "Request body must be a JSON object",
-        );
+          'BAD_REQUEST',
+          'Request body must be a JSON object',
+        )
       }
-      password =
-        validateMailboxTestBody(parsed as Record<string, unknown>).password;
+      password = validateMailboxTestBody(parsed as Record<string, unknown>).password
     }
   }
 
-  const { data: present, error } = await db.rpc("mailbox_credentials_present", {
+  const { data: present, error } = await db.rpc('mailbox_credentials_present', {
     p_org_id: orgId,
     p_password: password,
-  });
-  if (error) throw databaseError(error, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
 
   if (!present) {
     return jsonResponse(
       {
         data: mailboxTestFailure(
-          "credentials_missing",
-          "Mailbox credentials are missing — connect your account or save a password, then try Test again.",
+          'credentials_missing',
+          'Mailbox credentials are missing — connect your account or save a password, then try Test again.',
         ),
       },
       200,
       requestId,
-    );
+    )
   }
 
   const { data: mailbox, error: mailboxError } = await db.rpc(
-    "get_mailbox_account",
+    'get_mailbox_account',
     {
       p_org_id: orgId,
     },
-  );
-  if (mailboxError) throw databaseError(mailboxError, requestId);
-  if (!mailbox || typeof mailbox !== "object") {
+  )
+  if (mailboxError) throw databaseError(mailboxError, requestId)
+  if (!mailbox || typeof mailbox !== 'object') {
     return jsonResponse(
       {
         data: mailboxTestFailure(
-          "credentials_missing",
-          "Mailbox credentials are missing — save mailbox settings, then try Test again.",
+          'credentials_missing',
+          'Mailbox credentials are missing — save mailbox settings, then try Test again.',
         ),
       },
       200,
       requestId,
-    );
+    )
   }
 
-  const row = mailbox as Record<string, unknown>;
-  const imapHost = String(row.imap_host ?? "");
-  const smtpHost = String(row.smtp_host ?? "");
-  const username = String(row.username ?? "");
-  const imapPort = Number(row.imap_port ?? 993);
-  const smtpPort = Number(row.smtp_port ?? 465);
+  const row = mailbox as Record<string, unknown>
+  const imapHost = String(row.imap_host ?? '')
+  const smtpHost = String(row.smtp_host ?? '')
+  const username = String(row.username ?? '')
+  const imapPort = Number(row.imap_port ?? 993)
+  const smtpPort = Number(row.smtp_port ?? 465)
   const imapSecurity = parseMailSecurity(
-    String(row.imap_security ?? "tls"),
-    "tls",
-  ) as ImapSecurity;
+    String(row.imap_security ?? 'tls'),
+    'tls',
+  ) as ImapSecurity
   const smtpSecurity = parseMailSecurity(
-    String(row.smtp_security ?? "tls"),
-    "tls",
-  ) as SmtpSecurity;
-  const authMode = row.auth_mode === "oauth" ? "oauth" : "password";
+    String(row.smtp_security ?? 'tls'),
+    'tls',
+  ) as SmtpSecurity
+  const authMode = row.auth_mode === 'oauth' ? 'oauth' : 'password'
   const okLeg = (message: string): MailboxProbeLeg => ({
     ok: true,
     error_code: null,
     message,
-  });
+  })
 
   // Staging / unit synthetic hosts: credentials-present is enough (no network).
   if (isSyntheticImapHost(imapHost) || isSyntheticImapHost(smtpHost)) {
-    const imap = okLeg("Synthetic IMAP host — skipped network probe.");
-    const smtp = okLeg("Synthetic SMTP host — skipped network probe.");
+    const imap = okLeg('Synthetic IMAP host — skipped network probe.')
+    const smtp = okLeg('Synthetic SMTP host — skipped network probe.')
     return jsonResponse(
       {
         data: {
           ok: true,
           error_code: null,
-          message:
-            "Synthetic mailbox host — credentials present (no network probe).",
+          message: 'Synthetic mailbox host — credentials present (no network probe).',
           imap,
           smtp,
         },
       },
       200,
       requestId,
-    );
+    )
   }
 
-  let imapAuth: ImapProbeOptions["auth"];
-  let smtpAuth: SmtpAuth;
+  let imapAuth: ImapProbeOptions['auth']
+  let smtpAuth: SmtpAuth
   if (password) {
-    imapAuth = { type: "password", username, password };
-    smtpAuth = { type: "password", username, password };
-  } else if (authMode === "oauth") {
+    imapAuth = { type: 'password', username, password }
+    smtpAuth = { type: 'password', username, password }
+  } else if (authMode === 'oauth') {
     try {
-      const service = serviceRoleClient();
-      const resolved = await resolveMailboxAuth(service, String(row.id));
+      const service = serviceRoleClient()
+      const resolved = await resolveMailboxAuth(service, String(row.id))
       if (!resolved) {
         return jsonResponse(
           {
             data: mailboxTestFailure(
-              "credentials_missing",
-              "Mailbox OAuth credentials are missing — reconnect your account, then try Test again.",
+              'credentials_missing',
+              'Mailbox OAuth credentials are missing — reconnect your account, then try Test again.',
             ),
           },
           200,
           requestId,
-        );
+        )
       }
-      imapAuth = resolved.imapAuth;
-      smtpAuth = resolved.smtpAuth;
+      imapAuth = resolved.imapAuth
+      smtpAuth = resolved.smtpAuth
     } catch (err) {
-      console.error("Mailbox OAuth resolve failed during test", {
+      console.error('Mailbox OAuth resolve failed during test', {
         request_id: requestId,
-        message: err instanceof Error ? err.message : "unknown",
-      });
+        message: err instanceof Error ? err.message : 'unknown',
+      })
       return jsonResponse(
         {
           data: mailboxTestFailure(
-            "imap_auth_failed",
-            "Sign-in failed — reconnect your Microsoft or Google account.",
+            'imap_auth_failed',
+            'Sign-in failed — reconnect your Microsoft or Google account.',
           ),
         },
         200,
         requestId,
-      );
+      )
     }
   } else {
-    const service = serviceRoleClient();
-    const resolved = await resolveMailboxAuth(service, String(row.id));
-    if (!resolved || resolved.imapAuth.type !== "password") {
+    const service = serviceRoleClient()
+    const resolved = await resolveMailboxAuth(service, String(row.id))
+    if (!resolved || resolved.imapAuth.type !== 'password') {
       return jsonResponse(
         {
           data: mailboxTestFailure(
-            "credentials_missing",
-            "Mailbox credentials are missing — save a password, then try Test again.",
+            'credentials_missing',
+            'Mailbox credentials are missing — save a password, then try Test again.',
           ),
         },
         200,
         requestId,
-      );
+      )
     }
-    imapAuth = resolved.imapAuth;
-    smtpAuth = resolved.smtpAuth;
+    imapAuth = resolved.imapAuth
+    smtpAuth = resolved.smtpAuth
   }
 
   const imapOptions: ImapProbeOptions = {
@@ -721,40 +704,37 @@ async function testMailbox(
     port: imapPort,
     security: imapSecurity,
     auth: imapAuth,
-  };
+  }
   const smtpOptions: SmtpProbeOptions = {
     host: smtpHost,
     port: smtpPort,
     security: smtpSecurity,
     auth: smtpAuth,
-  };
+  }
 
-  let imapLeg: MailboxProbeLeg;
+  let imapLeg: MailboxProbeLeg
   try {
-    await imapProbeFn(imapOptions);
+    await imapProbeFn(imapOptions)
     imapLeg = okLeg(
-      authMode === "oauth"
-        ? "IMAP OAuth login succeeded."
-        : "IMAP login succeeded.",
-    );
+      authMode === 'oauth' ? 'IMAP OAuth login succeeded.' : 'IMAP login succeeded.',
+    )
   } catch (probeError) {
     if (probeError instanceof ImapSyncError) {
       const messages: Record<string, string> = {
-        timeout:
-          "Mail server timed out — check host, port, security, and network path.",
-        imap_auth_failed: authMode === "oauth"
-          ? "Sign-in failed — reconnect your Microsoft or Google account."
-          : "Sign-in failed — check the email address and password (or app password).",
+        timeout: 'Mail server timed out — check host, port, security, and network path.',
+        imap_auth_failed: authMode === 'oauth'
+          ? 'Sign-in failed — reconnect your Microsoft or Google account.'
+          : 'Sign-in failed — check the email address and password (or app password).',
         imap_tls_failed:
-          "Secure connection failed — try a different security setting (SSL / STARTTLS).",
+          'Secure connection failed — try a different security setting (SSL / STARTTLS).',
         imap_connection_failed:
-          "Could not reach the mail server — check host, port, and security settings.",
+          'Could not reach the mail server — check host, port, and security settings.',
         imap_host_blocked:
-          "This mail host is not allowed — private, link-local, and metadata addresses are blocked.",
-      };
+          'This mail host is not allowed — private, link-local, and metadata addresses are blocked.',
+      }
       const message = messages[probeError.code] ??
-        `IMAP test failed (${probeError.code}).`;
-      imapLeg = { ok: false, error_code: probeError.code, message };
+        `IMAP test failed (${probeError.code}).`
+      imapLeg = { ok: false, error_code: probeError.code, message }
       return jsonResponse(
         {
           data: mailboxTestFailure(probeError.code, `IMAP failed. ${message}`, {
@@ -763,62 +743,57 @@ async function testMailbox(
         },
         200,
         requestId,
-      );
+      )
     }
-    console.error("Mailbox IMAP probe failed", { request_id: requestId });
+    console.error('Mailbox IMAP probe failed', { request_id: requestId })
     imapLeg = {
       ok: false,
-      error_code: "imap_connection_failed",
-      message:
-        "Could not reach the mail server — check host, port, and security settings.",
-    };
+      error_code: 'imap_connection_failed',
+      message: 'Could not reach the mail server — check host, port, and security settings.',
+    }
     return jsonResponse(
       {
         data: mailboxTestFailure(
-          "imap_connection_failed",
+          'imap_connection_failed',
           `IMAP failed. ${imapLeg.message}`,
           { imap: imapLeg },
         ),
       },
       200,
       requestId,
-    );
+    )
   }
 
   try {
-    await smtpProbeFn(smtpOptions);
+    await smtpProbeFn(smtpOptions)
     const smtpLeg = okLeg(
-      authMode === "oauth"
-        ? "SMTP OAuth login succeeded."
-        : "SMTP login succeeded.",
-    );
+      authMode === 'oauth' ? 'SMTP OAuth login succeeded.' : 'SMTP login succeeded.',
+    )
     return jsonResponse(
       {
         data: {
           ok: true,
           error_code: null,
-          message: "IMAP and SMTP login succeeded.",
+          message: 'IMAP and SMTP login succeeded.',
           imap: imapLeg,
           smtp: smtpLeg,
         },
       },
       200,
       requestId,
-    );
+    )
   } catch (probeError) {
-    const smtpError = probeError instanceof SmtpSendError
-      ? probeError
-      : new SmtpSendError(
-        "smtp_connection_failed",
-        probeError instanceof Error ? probeError.message : "SMTP probe failed",
-        "connect",
-      );
-    const message = smtpProbeFailureMessage(smtpError, authMode);
+    const smtpError = probeError instanceof SmtpSendError ? probeError : new SmtpSendError(
+      'smtp_connection_failed',
+      probeError instanceof Error ? probeError.message : 'SMTP probe failed',
+      'connect',
+    )
+    const message = smtpProbeFailureMessage(smtpError, authMode)
     const smtpLeg: MailboxProbeLeg = {
       ok: false,
       error_code: smtpError.code,
       message,
-    };
+    }
     return jsonResponse(
       {
         data: mailboxTestFailure(
@@ -832,7 +807,7 @@ async function testMailbox(
       },
       200,
       requestId,
-    );
+    )
   }
 }
 
@@ -842,60 +817,56 @@ async function oauthStart(
   requestId: string,
   req: Request,
 ): Promise<Response> {
-  const url = new URL(req.url);
-  const provider = parseOAuthProvider(url.searchParams.get("provider"));
-  const state = randomOAuthState();
-  const { error } = await db.rpc("create_mailbox_oauth_state", {
+  const url = new URL(req.url)
+  const provider = parseOAuthProvider(url.searchParams.get('provider'))
+  const state = randomOAuthState()
+  const { error } = await db.rpc('create_mailbox_oauth_state', {
     p_org_id: orgId,
     p_state: state,
     p_provider: provider,
     p_ttl_seconds: 600,
-  });
-  if (error) throw databaseError(error, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
 
   if (isMailboxOAuthStubMode()) {
     const callback = new URL(
-      `${url.origin}${
-        url.pathname.replace(/\/oauth\/start$/, "/oauth/callback")
-      }`,
-    );
-    const configured = provider === "microsoft"
-      ? Deno.env.get("MICROSOFT_MAILBOX_REDIRECT_URI")?.trim()
-      : Deno.env.get("GOOGLE_MAILBOX_REDIRECT_URI")?.trim();
-    const redirectBase = configured && configured.length > 0
-      ? configured
-      : callback.toString();
-    const stubUrl = new URL(redirectBase);
-    stubUrl.searchParams.set("code", "stub");
-    stubUrl.searchParams.set("state", state);
-    stubUrl.searchParams.set("provider", provider);
+      `${url.origin}${url.pathname.replace(/\/oauth\/start$/, '/oauth/callback')}`,
+    )
+    const configured = provider === 'microsoft'
+      ? Deno.env.get('MICROSOFT_MAILBOX_REDIRECT_URI')?.trim()
+      : Deno.env.get('GOOGLE_MAILBOX_REDIRECT_URI')?.trim()
+    const redirectBase = configured && configured.length > 0 ? configured : callback.toString()
+    const stubUrl = new URL(redirectBase)
+    stubUrl.searchParams.set('code', 'stub')
+    stubUrl.searchParams.set('state', state)
+    stubUrl.searchParams.set('provider', provider)
     return jsonResponse(
       { data: { url: stubUrl.toString(), state, provider } },
       200,
       requestId,
-    );
+    )
   }
 
   try {
-    const authorizeUrl = buildMailboxAuthUrl({ provider, state });
+    const authorizeUrl = buildMailboxAuthUrl({ provider, state })
     return jsonResponse(
       { data: { url: authorizeUrl, state, provider } },
       200,
       requestId,
-    );
+    )
   } catch (err) {
-    console.error("Mailbox OAuth start failed", {
+    console.error('Mailbox OAuth start failed', {
       request_id: requestId,
       provider,
-      message: err instanceof Error ? err.message : "unknown",
-    });
+      message: err instanceof Error ? err.message : 'unknown',
+    })
     throw new ApiError(
       503,
-      "INTERNAL_ERROR",
+      'INTERNAL_ERROR',
       `${
-        provider === "microsoft" ? "Microsoft" : "Google"
+        provider === 'microsoft' ? 'Microsoft' : 'Google'
       } mailbox OAuth is not configured on this environment`,
-    );
+    )
   }
 }
 
@@ -905,65 +876,65 @@ async function oauthCallback(
   orgId: string,
   requestId: string,
 ): Promise<Response> {
-  const url = new URL(req.url);
-  let code: string | null = url.searchParams.get("code");
-  let state: string | null = url.searchParams.get("state");
-  if (req.method === "POST") {
+  const url = new URL(req.url)
+  let code: string | null = url.searchParams.get('code')
+  let state: string | null = url.searchParams.get('state')
+  if (req.method === 'POST') {
     try {
-      const body = await req.json() as Record<string, unknown>;
-      if (typeof body.code === "string") code = body.code;
-      if (typeof body.state === "string") state = body.state;
+      const body = await req.json() as Record<string, unknown>
+      if (typeof body.code === 'string') code = body.code
+      if (typeof body.state === 'string') state = body.state
     } catch {
       // keep query params
     }
   }
-  const params = validateOAuthCallbackParams({ code, state });
+  const params = validateOAuthCallbackParams({ code, state })
 
   const { data: consumed, error: consumeError } = await db.rpc(
-    "consume_mailbox_oauth_state",
+    'consume_mailbox_oauth_state',
     {
       p_org_id: orgId,
       p_state: params.state,
     },
-  );
-  if (consumeError) throw databaseError(consumeError, requestId);
+  )
+  if (consumeError) throw databaseError(consumeError, requestId)
   const providerRaw = (consumed as { provider?: string } | null)?.provider ??
-    null;
-  const provider = parseOAuthProvider(providerRaw);
+    null
+  const provider = parseOAuthProvider(providerRaw)
 
-  let tokenBlob: string;
-  let accountEmail: string;
-  if (isMailboxOAuthStubMode() && params.code === "stub") {
-    accountEmail = provider === "microsoft"
-      ? "mailbox-stub@outlook.example.test"
-      : "mailbox-stub@gmail.example.test";
+  let tokenBlob: string
+  let accountEmail: string
+  if (isMailboxOAuthStubMode() && params.code === 'stub') {
+    accountEmail = provider === 'microsoft'
+      ? 'mailbox-stub@outlook.example.test'
+      : 'mailbox-stub@gmail.example.test'
     tokenBlob = serializeMailboxTokenBlob({
       stub: true,
-      refresh_token: "stub-refresh",
-      access_token: "stub-access",
+      refresh_token: 'stub-refresh',
+      access_token: 'stub-access',
       account_email: accountEmail,
-    });
+    })
   } else {
     try {
-      const exchanged = await exchangeMailboxAuthCode(provider, params.code);
-      tokenBlob = serializeMailboxTokenBlob(exchanged);
-      accountEmail = exchanged.account_email;
+      const exchanged = await exchangeMailboxAuthCode(provider, params.code)
+      tokenBlob = serializeMailboxTokenBlob(exchanged)
+      accountEmail = exchanged.account_email
     } catch (err) {
-      console.error("Mailbox OAuth exchange failed", {
+      console.error('Mailbox OAuth exchange failed', {
         request_id: requestId,
         provider,
-        message: err instanceof Error ? err.message : "unknown",
-      });
+        message: err instanceof Error ? err.message : 'unknown',
+      })
       throw new ApiError(
         502,
-        "INTERNAL_ERROR",
-        "Mailbox OAuth token exchange failed",
-      );
+        'INTERNAL_ERROR',
+        'Mailbox OAuth token exchange failed',
+      )
     }
   }
 
-  const hosts = mailboxPresetHosts(provider);
-  const { data, error } = await db.rpc("upsert_mailbox_account_oauth", {
+  const hosts = mailboxPresetHosts(provider)
+  const { data, error } = await db.rpc('upsert_mailbox_account_oauth', {
     p_org_id: orgId,
     p_provider: provider,
     p_token_blob: tokenBlob,
@@ -976,10 +947,10 @@ async function oauthCallback(
     p_smtp_port: hosts.smtp_port,
     p_smtp_security: hosts.smtp_security,
     p_username: accountEmail,
-  });
-  if (error) throw databaseError(error, requestId);
-  assertNoSecretEcho(data);
-  return jsonResponse({ data }, 200, requestId);
+  })
+  if (error) throw databaseError(error, requestId)
+  assertNoSecretEcho(data)
+  return jsonResponse({ data }, 200, requestId)
 }
 
 export async function listMyEmailMessages(
@@ -989,104 +960,104 @@ export async function listMyEmailMessages(
   role: MembershipRole,
   requestId: string,
 ): Promise<Response> {
-  if (role === "billing") {
+  if (role === 'billing') {
     throw new ApiError(
       403,
-      "FORBIDDEN",
-      "Billing members cannot access personal email inbox",
-    );
+      'FORBIDDEN',
+      'Billing members cannot access personal email inbox',
+    )
   }
-  if (req.method !== "GET") {
+  if (req.method !== 'GET') {
     throw new ApiError(
       405,
-      "METHOD_NOT_ALLOWED",
-      "Method not allowed for personal email inbox",
-    );
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for personal email inbox',
+    )
   }
 
-  const url = new URL(req.url);
-  const limit = parseLimit(url.searchParams.get("limit"));
-  const { data, error } = await db.rpc("list_my_email_messages", {
+  const url = new URL(req.url)
+  const limit = parseLimit(url.searchParams.get('limit'))
+  const { data, error } = await db.rpc('list_my_email_messages', {
     p_org_id: orgId,
     p_limit: limit,
-  });
+  })
   if (error) {
-    const message = error.message?.toLowerCase() ?? "";
-    if (error.code === "42501" || message.includes("forbidden")) {
-      throw new ApiError(403, "FORBIDDEN", "Personal email inbox is forbidden");
+    const message = error.message?.toLowerCase() ?? ''
+    if (error.code === '42501' || message.includes('forbidden')) {
+      throw new ApiError(403, 'FORBIDDEN', 'Personal email inbox is forbidden')
     }
-    console.error("Personal email inbox list failed", {
+    console.error('Personal email inbox list failed', {
       request_id: requestId,
-      code: error.code ?? "unknown",
-    });
+      code: error.code ?? 'unknown',
+    })
     throw new ApiError(
       500,
-      "INTERNAL_ERROR",
-      "Personal email inbox list failed",
-    );
+      'INTERNAL_ERROR',
+      'Personal email inbox list failed',
+    )
   }
-  return jsonResponse({ data: (data ?? []) as Json[] }, 200, requestId);
+  return jsonResponse({ data: (data ?? []) as Json[] }, 200, requestId)
 }
 
 export async function listEntityEmailMessages(
   db: DatabaseClient,
   orgId: string,
-  entityType: "contact" | "lead" | "client",
+  entityType: 'contact' | 'lead' | 'client',
   entityId: string,
   requestId: string,
   limit = 50,
 ): Promise<Response> {
   // Wave B: entity existence check + ownership/share list RPC.
-  let exists: { id: string } | null = null;
-  let lookupError: { code?: string } | null = null;
-  if (entityType === "contact") {
-    ({ data: exists, error: lookupError } = await db
-      .from("contacts")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("id", entityId)
-      .is("deleted_at", null)
-      .maybeSingle());
-  } else if (entityType === "lead") {
-    ({ data: exists, error: lookupError } = await db
-      .from("leads")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("id", entityId)
-      .is("deleted_at", null)
-      .maybeSingle());
+  let exists: { id: string } | null = null
+  let lookupError: { code?: string } | null = null
+  if (entityType === 'contact') {
+    ;({ data: exists, error: lookupError } = await db
+      .from('contacts')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('id', entityId)
+      .is('deleted_at', null)
+      .maybeSingle())
+  } else if (entityType === 'lead') {
+    ;({ data: exists, error: lookupError } = await db
+      .from('leads')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('id', entityId)
+      .is('deleted_at', null)
+      .maybeSingle())
   } else {
-    ({ data: exists, error: lookupError } = await db
-      .from("clients")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("id", entityId)
-      .is("deleted_at", null)
-      .maybeSingle());
+    ;({ data: exists, error: lookupError } = await db
+      .from('clients')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('id', entityId)
+      .is('deleted_at', null)
+      .maybeSingle())
   }
   if (lookupError) {
-    console.error("Entity email list lookup failed", {
+    console.error('Entity email list lookup failed', {
       request_id: requestId,
-      code: lookupError.code ?? "unknown",
-    });
-    throw new ApiError(500, "INTERNAL_ERROR", "Entity email list failed");
+      code: lookupError.code ?? 'unknown',
+    })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Entity email list failed')
   }
-  if (!exists) throw new ApiError(404, "NOT_FOUND", `${entityType} not found`);
+  if (!exists) throw new ApiError(404, 'NOT_FOUND', `${entityType} not found`)
 
-  const { data, error } = await db.rpc("list_entity_email_messages", {
+  const { data, error } = await db.rpc('list_entity_email_messages', {
     p_org_id: orgId,
     p_entity_type: entityType,
     p_entity_id: entityId,
     p_limit: limit,
-  });
+  })
   if (error) {
-    console.error("Entity email list failed", {
+    console.error('Entity email list failed', {
       request_id: requestId,
-      code: error.code ?? "unknown",
-    });
-    throw new ApiError(500, "INTERNAL_ERROR", "Entity email list failed");
+      code: error.code ?? 'unknown',
+    })
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Entity email list failed')
   }
-  return jsonResponse({ data: (data ?? []) as Json[] }, 200, requestId);
+  return jsonResponse({ data: (data ?? []) as Json[] }, 200, requestId)
 }
 
 export function handleMailbox(
@@ -1097,50 +1068,50 @@ export function handleMailbox(
   role: MembershipRole,
   requestId: string,
 ): Promise<Response> {
-  assertCanAccessMailbox(role, req.method);
+  assertCanAccessMailbox(role, req.method)
 
-  if (path === "/api/v1/me/mailbox") {
-    if (req.method === "GET") return getMailbox(db, orgId, requestId);
-    if (req.method === "PUT") return putMailbox(req, db, orgId, requestId);
-    if (req.method === "PATCH") return patchMailbox(req, db, orgId, requestId);
-    if (req.method === "DELETE") return deleteMailbox(db, orgId, requestId);
+  if (path === '/api/v1/me/mailbox') {
+    if (req.method === 'GET') return getMailbox(db, orgId, requestId)
+    if (req.method === 'PUT') return putMailbox(req, db, orgId, requestId)
+    if (req.method === 'PATCH') return patchMailbox(req, db, orgId, requestId)
+    if (req.method === 'DELETE') return deleteMailbox(db, orgId, requestId)
     throw new ApiError(
       405,
-      "METHOD_NOT_ALLOWED",
-      "Method not allowed for mailbox",
-    );
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for mailbox',
+    )
   }
 
-  if (path === "/api/v1/me/mailbox/test") {
-    if (req.method === "POST") return testMailbox(req, db, orgId, requestId);
+  if (path === '/api/v1/me/mailbox/test') {
+    if (req.method === 'POST') return testMailbox(req, db, orgId, requestId)
     throw new ApiError(
       405,
-      "METHOD_NOT_ALLOWED",
-      "Method not allowed for mailbox test",
-    );
+      'METHOD_NOT_ALLOWED',
+      'Method not allowed for mailbox test',
+    )
   }
 
-  if (path === "/api/v1/me/mailbox/oauth/start") {
-    if (req.method !== "GET") {
+  if (path === '/api/v1/me/mailbox/oauth/start') {
+    if (req.method !== 'GET') {
       throw new ApiError(
         405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for mailbox OAuth start",
-      );
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for mailbox OAuth start',
+      )
     }
-    return oauthStart(db, orgId, requestId, req);
+    return oauthStart(db, orgId, requestId, req)
   }
 
-  if (path === "/api/v1/me/mailbox/oauth/callback") {
-    if (req.method !== "GET" && req.method !== "POST") {
+  if (path === '/api/v1/me/mailbox/oauth/callback') {
+    if (req.method !== 'GET' && req.method !== 'POST') {
       throw new ApiError(
         405,
-        "METHOD_NOT_ALLOWED",
-        "Method not allowed for mailbox OAuth callback",
-      );
+        'METHOD_NOT_ALLOWED',
+        'Method not allowed for mailbox OAuth callback',
+      )
     }
-    return oauthCallback(req, db, orgId, requestId);
+    return oauthCallback(req, db, orgId, requestId)
   }
 
-  throw new ApiError(404, "NOT_FOUND", "Route not found");
+  throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 }
