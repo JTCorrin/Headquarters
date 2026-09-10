@@ -1,9 +1,11 @@
 import { assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1'
 import {
   buildMimeMessage,
+  classifySmtpProbeError,
   formatMessageIdHeader,
   generateOutboundMessageId,
   isSyntheticSmtpHost,
+  probeSmtp,
   replySubject,
   sendSmtpMail,
   setOpenSmtpConnectionForTests,
@@ -188,6 +190,44 @@ Deno.test('sendSmtpMail short-circuits synthetic hosts without opening sockets',
   } finally {
     setOpenSmtpConnectionForTests(null)
   }
+})
+
+Deno.test('probeSmtp short-circuits synthetic hosts without opening sockets', async () => {
+  setOpenSmtpConnectionForTests(() => {
+    throw new Error('should not open SMTP for synthetic probe host')
+  })
+  try {
+    await probeSmtp({
+      host: 'smtp.example.test',
+      port: 587,
+      security: 'starttls',
+      auth: { type: 'password', username: 'me@example.test', password: 'secret' },
+    })
+  } finally {
+    setOpenSmtpConnectionForTests(null)
+  }
+})
+
+Deno.test('classifySmtpProbeError maps M365 tenant SMTP disabled', () => {
+  const classified = classifySmtpProbeError(
+    new SmtpSendError(
+      'smtp_protocol_error',
+      'SMTP AUTH XOAUTH2 failed: 535 5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Tenant.',
+      'SMTP AUTH XOAUTH2',
+    ),
+  )
+  assertEquals(classified.code, 'smtp_auth_disabled')
+})
+
+Deno.test('classifySmtpProbeError maps AUTH 535 to smtp_auth_failed', () => {
+  const classified = classifySmtpProbeError(
+    new SmtpSendError(
+      'smtp_protocol_error',
+      'SMTP AUTH password failed: 535 5.7.8 Username and Password not accepted',
+      'SMTP AUTH password',
+    ),
+  )
+  assertEquals(classified.code, 'smtp_auth_failed')
 })
 
 Deno.test('buildMimeMessage attaches PDF as multipart/mixed base64', () => {

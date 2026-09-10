@@ -71,6 +71,7 @@ describe('mailbox schema', () => {
 		expect(humanizeMailboxSyncError('imap_not_configured_for_host')).toMatch(
 			/imap_not_configured_for_host/
 		);
+		expect(humanizeMailboxSyncError('smtp_auth_disabled')).toMatch(/Authenticated SMTP/i);
 	});
 
 	it('humanizes lease_held as another sync in progress', () => {

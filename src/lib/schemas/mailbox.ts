@@ -152,6 +152,11 @@ export function humanizeMailboxSyncError(
 		case 'imap_auth_failed':
 		case 'smtp_auth_failed':
 			return 'Sign-in failed — reconnect your Microsoft/Google account, or check the password (or app password).';
+		case 'smtp_auth_disabled':
+			return (
+				'Authenticated SMTP is disabled for this Microsoft 365 mailbox (tenant setting). ' +
+				'Enable it in Microsoft 365 admin → Users → Mail → Manage email apps → Authenticated SMTP.'
+			);
 		case 'connection_failed':
 		case 'imap_connection_failed':
 		case 'smtp_connection_failed':
@@ -167,7 +172,14 @@ export function humanizeMailboxSyncError(
 		}
 		case 'tls_failed':
 		case 'certificate_error':
+		case 'smtp_tls_failed':
+		case 'imap_tls_failed':
 			return 'Secure connection failed — try a different security setting (SSL / STARTTLS).';
+		case 'smtp_host_blocked':
+		case 'imap_host_blocked':
+			return 'This mail host is not allowed — private, link-local, and metadata addresses are blocked.';
+		case 'smtp_host_missing':
+			return 'SMTP host is missing — save mailbox SMTP settings, then try Test again.';
 		case 'circuit_open':
 		case 'circuit_breaker':
 			return 'Sync paused after repeated failures — fix credentials, then use Test connection.';
