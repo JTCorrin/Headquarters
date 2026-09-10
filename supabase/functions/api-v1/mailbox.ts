@@ -18,6 +18,13 @@ import {
   randomOAuthState,
   serializeMailboxTokenBlob,
 } from '../_shared/mailbox-oauth.ts'
+import {
+  probeSmtp,
+  type SmtpAuth,
+  type SmtpProbeOptions,
+  type SmtpSecurity,
+  SmtpSendError,
+} from '../_shared/smtp-outbound.ts'
 import { ApiError, jsonBody, jsonResponse, parseLimit } from './http.ts'
 
 type DatabaseClient = SupabaseClient<Database>
@@ -26,12 +33,82 @@ type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 const SECURITY = new Set(['tls', 'starttls', 'none'])
 
 type ImapProbeFn = (options: ImapProbeOptions) => Promise<void>
+type SmtpProbeFn = (options: SmtpProbeOptions) => Promise<void>
 
 let imapProbeFn: ImapProbeFn = probeImap
+let smtpProbeFn: SmtpProbeFn = probeSmtp
 
 /** Test seam — pass null to restore the real IMAP probe. */
 export function setImapProbeForTests(fn: ImapProbeFn | null): void {
   imapProbeFn = fn ?? probeImap
+}
+
+/** Test seam — pass null to restore the real SMTP probe. */
+export function setSmtpProbeForTests(fn: SmtpProbeFn | null): void {
+  smtpProbeFn = fn ?? probeSmtp
+}
+
+type MailboxProbeLeg = {
+  ok: boolean
+  error_code: string | null
+  message: string | null
+}
+
+function mailboxTestFailure(
+  errorCode: string,
+  message: string,
+  legs?: { imap?: MailboxProbeLeg; smtp?: MailboxProbeLeg },
+): {
+  ok: false
+  error_code: string
+  message: string
+  imap: MailboxProbeLeg
+  smtp: MailboxProbeLeg
+} {
+  const skipped: MailboxProbeLeg = {
+    ok: false,
+    error_code: 'skipped',
+    message: 'Skipped — fix the earlier check first.',
+  }
+  return {
+    ok: false,
+    error_code: errorCode,
+    message,
+    imap: legs?.imap ?? skipped,
+    smtp: legs?.smtp ?? skipped,
+  }
+}
+
+function parseMailSecurity(raw: string, fallback: 'tls'): ImapSecurity | SmtpSecurity {
+  if (raw === 'starttls' || raw === 'none' || raw === 'tls') return raw
+  return fallback
+}
+
+function smtpProbeFailureMessage(error: SmtpSendError, authMode: string): string {
+  if (error.code === 'smtp_auth_disabled') {
+    return (
+      'Authenticated SMTP is disabled for this Microsoft 365 mailbox (tenant setting). ' +
+      'Enable it in Microsoft 365 admin → Users → Mail → Manage email apps → Authenticated SMTP.'
+    )
+  }
+  if (error.code === 'smtp_auth_failed') {
+    return authMode === 'oauth'
+      ? 'SMTP sign-in failed — reconnect your Microsoft or Google account.'
+      : 'SMTP sign-in failed — check the email address and password (or app password).'
+  }
+  if (error.code === 'timeout') {
+    return 'SMTP server timed out — check host, port, security, and network path.'
+  }
+  if (error.code === 'smtp_tls_failed') {
+    return 'SMTP secure connection failed — try a different security setting (SSL / STARTTLS).'
+  }
+  if (error.code === 'smtp_host_blocked') {
+    return 'This SMTP host is not allowed — private, link-local, and metadata addresses are blocked.'
+  }
+  if (error.code === 'smtp_host_missing') {
+    return 'SMTP host is missing — save mailbox SMTP settings, then try Test again.'
+  }
+  return `SMTP test failed (${error.code}).`
 }
 
 function serviceRoleClient(): SupabaseClient {
@@ -43,14 +120,6 @@ function serviceRoleClient(): SupabaseClient {
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-}
-
-function mailboxTestFailure(errorCode: string, message: string): {
-  ok: false
-  error_code: string
-  message: string
-} {
-  return { ok: false, error_code: errorCode, message }
 }
 
 /** Reject CR/LF and other controls that could break IMAP protocol lines. */
@@ -433,22 +502,31 @@ async function testMailbox(
 
   const row = mailbox as Record<string, unknown>
   const imapHost = String(row.imap_host ?? '')
+  const smtpHost = String(row.smtp_host ?? '')
   const username = String(row.username ?? '')
   const imapPort = Number(row.imap_port ?? 993)
-  const securityRaw = String(row.imap_security ?? 'tls')
-  const security: ImapSecurity = securityRaw === 'starttls' || securityRaw === 'none'
-    ? securityRaw
-    : 'tls'
+  const smtpPort = Number(row.smtp_port ?? 465)
+  const imapSecurity = parseMailSecurity(String(row.imap_security ?? 'tls'), 'tls') as ImapSecurity
+  const smtpSecurity = parseMailSecurity(String(row.smtp_security ?? 'tls'), 'tls') as SmtpSecurity
   const authMode = row.auth_mode === 'oauth' ? 'oauth' : 'password'
+  const okLeg = (message: string): MailboxProbeLeg => ({
+    ok: true,
+    error_code: null,
+    message,
+  })
 
   // Staging / unit synthetic hosts: credentials-present is enough (no network).
-  if (isSyntheticImapHost(imapHost)) {
+  if (isSyntheticImapHost(imapHost) || isSyntheticImapHost(smtpHost)) {
+    const imap = okLeg('Synthetic IMAP host — skipped network probe.')
+    const smtp = okLeg('Synthetic SMTP host — skipped network probe.')
     return jsonResponse(
       {
         data: {
           ok: true,
           error_code: null,
           message: 'Synthetic mailbox host — credentials present (no network probe).',
+          imap,
+          smtp,
         },
       },
       200,
@@ -456,14 +534,11 @@ async function testMailbox(
     )
   }
 
-  let probeOptions: ImapProbeOptions
+  let imapAuth: ImapProbeOptions['auth']
+  let smtpAuth: SmtpAuth
   if (password) {
-    probeOptions = {
-      host: imapHost,
-      port: imapPort,
-      security,
-      auth: { type: 'password', username, password },
-    }
+    imapAuth = { type: 'password', username, password }
+    smtpAuth = { type: 'password', username, password }
   } else if (authMode === 'oauth') {
     try {
       const service = serviceRoleClient()
@@ -480,12 +555,8 @@ async function testMailbox(
           requestId,
         )
       }
-      probeOptions = {
-        host: imapHost,
-        port: imapPort,
-        security,
-        auth: resolved.imapAuth,
-      }
+      imapAuth = resolved.imapAuth
+      smtpAuth = resolved.smtpAuth
     } catch (err) {
       console.error('Mailbox OAuth resolve failed during test', {
         request_id: requestId,
@@ -517,27 +588,27 @@ async function testMailbox(
         requestId,
       )
     }
-    probeOptions = {
-      host: imapHost,
-      port: imapPort,
-      security,
-      auth: resolved.imapAuth,
-    }
+    imapAuth = resolved.imapAuth
+    smtpAuth = resolved.smtpAuth
   }
 
+  const imapOptions: ImapProbeOptions = {
+    host: imapHost,
+    port: imapPort,
+    security: imapSecurity,
+    auth: imapAuth,
+  }
+  const smtpOptions: SmtpProbeOptions = {
+    host: smtpHost,
+    port: smtpPort,
+    security: smtpSecurity,
+    auth: smtpAuth,
+  }
+
+  let imapLeg: MailboxProbeLeg
   try {
-    await imapProbeFn(probeOptions)
-    return jsonResponse(
-      {
-        data: {
-          ok: true,
-          error_code: null,
-          message: authMode === 'oauth' ? 'IMAP OAuth login succeeded.' : 'IMAP login succeeded.',
-        },
-      },
-      200,
-      requestId,
-    )
+    await imapProbeFn(imapOptions)
+    imapLeg = okLeg(authMode === 'oauth' ? 'IMAP OAuth login succeeded.' : 'IMAP login succeeded.')
   } catch (probeError) {
     if (probeError instanceof ImapSyncError) {
       const messages: Record<string, string> = {
@@ -552,24 +623,75 @@ async function testMailbox(
         imap_host_blocked:
           'This mail host is not allowed — private, link-local, and metadata addresses are blocked.',
       }
+      const message = messages[probeError.code] ?? `IMAP test failed (${probeError.code}).`
+      imapLeg = { ok: false, error_code: probeError.code, message }
       return jsonResponse(
         {
-          data: mailboxTestFailure(
-            probeError.code,
-            messages[probeError.code] ?? `IMAP test failed (${probeError.code}).`,
-          ),
+          data: mailboxTestFailure(probeError.code, `IMAP failed. ${message}`, {
+            imap: imapLeg,
+          }),
         },
         200,
         requestId,
       )
     }
     console.error('Mailbox IMAP probe failed', { request_id: requestId })
+    imapLeg = {
+      ok: false,
+      error_code: 'imap_connection_failed',
+      message: 'Could not reach the mail server — check host, port, and security settings.',
+    }
     return jsonResponse(
       {
         data: mailboxTestFailure(
           'imap_connection_failed',
-          'Could not reach the mail server — check host, port, and security settings.',
+          `IMAP failed. ${imapLeg.message}`,
+          { imap: imapLeg },
         ),
+      },
+      200,
+      requestId,
+    )
+  }
+
+  try {
+    await smtpProbeFn(smtpOptions)
+    const smtpLeg = okLeg(
+      authMode === 'oauth' ? 'SMTP OAuth login succeeded.' : 'SMTP login succeeded.',
+    )
+    return jsonResponse(
+      {
+        data: {
+          ok: true,
+          error_code: null,
+          message: 'IMAP and SMTP login succeeded.',
+          imap: imapLeg,
+          smtp: smtpLeg,
+        },
+      },
+      200,
+      requestId,
+    )
+  } catch (probeError) {
+    const smtpError = probeError instanceof SmtpSendError
+      ? probeError
+      : new SmtpSendError(
+        'smtp_connection_failed',
+        probeError instanceof Error ? probeError.message : 'SMTP probe failed',
+        'connect',
+      )
+    const message = smtpProbeFailureMessage(smtpError, authMode)
+    const smtpLeg: MailboxProbeLeg = {
+      ok: false,
+      error_code: smtpError.code,
+      message,
+    }
+    return jsonResponse(
+      {
+        data: mailboxTestFailure(smtpError.code, `IMAP OK. SMTP failed: ${message}`, {
+          imap: imapLeg,
+          smtp: smtpLeg,
+        }),
       },
       200,
       requestId,

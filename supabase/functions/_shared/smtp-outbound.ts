@@ -3,7 +3,7 @@
  * Reuses IMAP SSRF policy via assertSafeOutboundHost.
  */
 
-import { assertSafeOutboundHost, isSyntheticImapHost, withImapTimeout } from './imap-inbound.ts'
+import { assertSafeOutboundHost, isSyntheticImapHost, ImapSyncError, withImapTimeout } from './imap-inbound.ts'
 import { buildXoauth2SaslString } from './mailbox-oauth.ts'
 
 export type SmtpSecurity = 'tls' | 'starttls' | 'none'
@@ -449,6 +449,121 @@ function resolveSmtpAuth(options: SmtpSendOptions): SmtpAuth | null {
     return { type: 'password', username: options.username, password: options.password }
   }
   return null
+}
+
+export type SmtpProbeOptions = {
+  host: string
+  port: number
+  security: SmtpSecurity
+  auth: SmtpAuth
+  /** Trusted infrastructure only; never set for user-supplied mailbox hosts. */
+  allowPrivateHost?: boolean
+  connectTimeoutMs?: number
+  commandTimeoutMs?: number
+}
+
+const SMTP_PROBE_TIMEOUT_MS = 20_000
+
+/** Map SMTP probe failures to stable error codes (incl. M365 tenant SMTP disabled). */
+export function classifySmtpProbeError(error: unknown): SmtpSendError {
+  if (error instanceof SmtpSendError) {
+    const text = error.message
+    if (/smtpclientauthentication is disabled|smtp_auth_disabled/i.test(text)) {
+      return new SmtpSendError(
+        'smtp_auth_disabled',
+        text,
+        error.step ?? 'auth',
+      )
+    }
+    if (
+      error.code === 'smtp_protocol_error' &&
+      /AUTH/i.test(error.step ?? '') &&
+      /\b535\b/.test(text)
+    ) {
+      return new SmtpSendError('smtp_auth_failed', text, error.step ?? 'auth')
+    }
+    return error
+  }
+  if (error instanceof ImapSyncError) {
+    if (error.code === 'imap_host_blocked') {
+      return new SmtpSendError('smtp_host_blocked', error.message, 'connect')
+    }
+    if (error.code === 'timeout') {
+      return new SmtpSendError('timeout', error.message, error.step ?? 'connect')
+    }
+    if (error.code === 'imap_tls_failed') {
+      return new SmtpSendError('smtp_tls_failed', error.message, 'connect')
+    }
+    return new SmtpSendError('smtp_connection_failed', error.message, 'connect')
+  }
+  const message = error instanceof Error ? error.message : 'SMTP probe failed'
+  if (/smtpclientauthentication is disabled/i.test(message)) {
+    return new SmtpSendError('smtp_auth_disabled', message, 'auth')
+  }
+  if (/timed?\s*out|aborted|abort/i.test(message)) {
+    return new SmtpSendError('timeout', message, 'connect')
+  }
+  if (/tls|certificate|ssl/i.test(message)) {
+    return new SmtpSendError('smtp_tls_failed', message, 'connect')
+  }
+  return new SmtpSendError('smtp_connection_failed', message, 'connect')
+}
+
+/**
+ * Live SMTP probe: connect + EHLO + AUTH (LOGIN or XOAUTH2) + QUIT.
+ * Does not send mail (no MAIL FROM / RCPT / DATA).
+ */
+export async function probeSmtp(options: SmtpProbeOptions): Promise<void> {
+  const host = options.host.trim()
+  if (!host) {
+    throw new SmtpSendError('smtp_host_missing', 'SMTP host is empty', 'connect')
+  }
+
+  if (isSyntheticSmtpHost(host)) {
+    return
+  }
+
+  const connectTimeoutMs = options.connectTimeoutMs ?? SMTP_CONNECT_TIMEOUT_MS
+  const commandTimeoutMs = options.commandTimeoutMs ?? SMTP_COMMAND_TIMEOUT_MS
+  const overallTimeoutMs = SMTP_PROBE_TIMEOUT_MS
+
+  const run = async () => {
+    const session = await openSmtpConnectionImpl(
+      host,
+      options.port,
+      options.security,
+      connectTimeoutMs,
+      commandTimeoutMs,
+      options.allowPrivateHost,
+    )
+    try {
+      await session.writeLine('EHLO crm.local')
+      await session.expect([250], 'SMTP EHLO')
+      if (options.auth.type === 'password') {
+        await smtpAuthLogin(session, options.auth.username, options.auth.password)
+      } else {
+        await smtpAuthXoauth2(
+          session,
+          options.auth.username,
+          options.auth.accessToken,
+        )
+      }
+      await session.writeLine('QUIT')
+      try {
+        await session.readReply('SMTP QUIT')
+      } catch {
+        // servers often close after QUIT
+      }
+    } finally {
+      session.close()
+    }
+  }
+
+  try {
+    await withImapTimeout(run(), overallTimeoutMs, 'SMTP probe')
+  } catch (error) {
+    throw classifySmtpProbeError(error)
+  }
 }
 
 /**
