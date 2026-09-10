@@ -329,15 +329,18 @@
 			const result = await api.mailbox.test();
 			if (isStale(epoch)) return false;
 			if (!result.ok) {
-				const humanized = humanizeMailboxSyncError(result.error_code);
-				// Prefer known code copy (e.g. timeout); keep API message for unknown codes.
+				// Prefer the API summary (covers IMAP+SMTP), then known code copy.
+				const apiMessage = result.message?.trim() || null;
+				const humanized = humanizeMailboxSyncError(result.error_code, {
+					message: apiMessage
+				});
 				const known =
 					humanized != null && !humanized.startsWith('Sync issue (');
 				return {
 					ok: false,
 					message:
+						apiMessage ||
 						(known ? humanized : null) ||
-						result.message ||
 						humanized ||
 						result.error_code ||
 						'Mailbox test failed.'
@@ -347,7 +350,7 @@
 			viewState = { kind: 'ready' };
 			return {
 				ok: true,
-				message: result.message?.trim() || 'Connection successful.'
+				message: result.message?.trim() || 'IMAP and SMTP connection successful.'
 			};
 		} catch (error) {
 			if (isStale(epoch)) return false;
