@@ -31,6 +31,7 @@
 		/** When false, omit AppNav (shell already renders it at full window height). */
 		showNav?: boolean;
 		class?: string;
+		onBack?: () => void;
 		onTitleChange?: (value: string) => void;
 		onColorChange?: (color: NoteColor) => void;
 		onTogglePin?: () => void;
@@ -51,6 +52,7 @@
 		actionBusy = false,
 		showNav = true,
 		class: className,
+		onBack,
 		onTitleChange,
 		onColorChange,
 		onTogglePin,
@@ -74,7 +76,14 @@
 		<div class="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-6 md:px-8">
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<div class="flex min-w-0 items-center gap-2">
-					<Button variant="ghost" size="sm" href="/notes" class="-ml-2">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="-ml-2"
+						data-testid="note-back"
+						onclick={() => onBack?.()}
+					>
 						<ArrowLeftIcon class="size-4" />
 						Notes
 					</Button>
