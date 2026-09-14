@@ -1,6 +1,6 @@
 begin;
 
-select plan(18);
+select plan(19);
 
 select ok(
   exists (
@@ -219,19 +219,23 @@ select is_empty(
   'org owner cannot SELECT another member''s note'
 );
 
-select is(
-  (
-    with updated as (
-      update public.notes
-      set title = 'Bob was here', updated_by = (select bob_id from _notes_fixture)
-      where id = (select note_id from _notes_fixture)
-      returning id
-    )
-    select count(*)::integer from updated
-  ),
-  0,
-  'org owner update of another member''s note affects zero rows'
+select lives_ok(
+  $$
+    update public.notes
+    set title = 'Bob was here', updated_by = (select bob_id from _notes_fixture)
+    where id = (select note_id from _notes_fixture)
+  $$,
+  'org owner update of another member''s note is silently filtered by RLS'
 );
+
+reset role;
+select is(
+  (select title from public.notes where id = (select note_id from _notes_fixture)),
+  'Alice updated',
+  'org owner update of another member''s note changed nothing'
+);
+select pg_temp.as_user((select bob_id from _notes_fixture));
+set local role authenticated;
 
 select throws_ok(
   $$
