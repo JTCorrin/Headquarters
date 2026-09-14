@@ -130,10 +130,9 @@ describe('NotePage integration', () => {
 			pinned: false
 		});
 		expect(patches[0].body.body).toMatchObject({ type: 'doc' });
-		await expect.element(page.getByTestId('note-save-status')).toHaveAttribute(
-			'data-status',
-			'saved'
-		);
+		await expect
+			.element(page.getByTestId('note-save-status'))
+			.toHaveAttribute('data-status', 'saved');
 
 		await page.getByTestId('note-pin').click();
 		await expect.poll(() => patches.length).toBe(2);
@@ -158,9 +157,7 @@ describe('NotePage integration', () => {
 				gets += 1;
 				return {
 					body: {
-						data: sampleNote(
-							gets > 1 ? { title: 'Groceries (edited elsewhere)', version: 7 } : {}
-						)
+						data: sampleNote(gets > 1 ? { title: 'Groceries (edited elsewhere)', version: 7 } : {})
 					}
 				};
 			},
@@ -180,9 +177,9 @@ describe('NotePage integration', () => {
 		await expect.element(page.getByText(/changed elsewhere/i).first()).toBeInTheDocument();
 
 		await status.getByRole('button', { name: 'Reload' }).click();
-		await expect.element(page.getByTestId('note-title')).toHaveValue(
-			'Groceries (edited elsewhere)'
-		);
+		await expect
+			.element(page.getByTestId('note-title'))
+			.toHaveValue('Groceries (edited elsewhere)');
 		await expect.element(status).toHaveAttribute('data-status', 'idle');
 	});
 
@@ -217,6 +214,29 @@ describe('NotePage integration', () => {
 
 		await expect.poll(() => deleted?.ifMatch).toBe('"4"');
 		await expect.poll(() => onDeletedCalls).toBe(1);
+	});
+
+	it('calls onBack when the Notes button is clicked', async () => {
+		let onBackCalls = 0;
+		const fetchMock = createMockFetch({
+			'GET /api/v1/organisations': async () => ({ body: organisationsListBody() }),
+			[`GET /api/v1/notes/${NOTE_A}`]: async () => ({ body: { data: sampleNote() } })
+		});
+
+		const session = sessionForOrg();
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(NotePage, {
+			api,
+			session,
+			noteId: NOTE_A,
+			onBack: () => {
+				onBackCalls += 1;
+			}
+		});
+
+		await expect.element(page.getByTestId('note-back')).toBeInTheDocument();
+		await page.getByTestId('note-back').click();
+		await expect.poll(() => onBackCalls).toBe(1);
 	});
 
 	it('shows not found for a missing note', async () => {
