@@ -36,13 +36,21 @@ const browserOptimizeDepsInclude = [
 	'pdfmake/build/pdfmake',
 	'pdfmake/build/vfs_fonts',
 	'vaul-svelte',
-	'@lucide/svelte/icons/arrow-left'
+	'@lucide/svelte/icons/arrow-left',
+	// Edra's code-block extension and lowlight both import highlight.js, which is CJS.
+	'lowlight',
+	'@tiptap/extension-code-block-lowlight'
 ];
+
+// Keep ProseMirror/Tiptap out of the prebundled chunks above so only one copy of
+// prosemirror-view/model is ever loaded (duplicates break node view decorations).
+const browserOptimizeDepsExclude = ['@tiptap/core', '@tiptap/pm'];
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
 	optimizeDeps: {
-		include: browserOptimizeDepsInclude
+		include: browserOptimizeDepsInclude,
+		exclude: browserOptimizeDepsExclude
 	},
 	plugins: [
 		tailwindcss(),
@@ -111,7 +119,8 @@ export default defineConfig({
 					// skips prebundling and races the client browser project on a cold CI cache.
 					// Pin includes and disable discovery so stories are never crawled by Rolldown.
 					noDiscovery: true,
-					include: browserOptimizeDepsInclude
+					include: browserOptimizeDepsInclude,
+					exclude: browserOptimizeDepsExclude
 				},
 				test: {
 					name: 'storybook',
