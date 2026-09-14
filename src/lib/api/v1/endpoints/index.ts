@@ -29,6 +29,7 @@ export { createProductsEndpoints } from './products.js';
 export { createProfilePreferencesEndpoints } from './profile-preferences.js';
 export { createQuotesEndpoints } from './quotes.js';
 export { createTasksEndpoints } from './tasks.js';
+export { createNotesEndpoints } from './notes.js';
 export { createMeetingsEndpoints } from './meetings.js';
 export { createProjectsEndpoints } from './projects.js';
 export { createTaxRatesEndpoints } from './tax-rates.js';
@@ -69,6 +70,7 @@ export type {
 	RecurringInvoiceSchedulesEndpoints,
 	TaxRatesEndpoints,
 	TasksEndpoints,
+	NotesEndpoints,
 	TimelineEventsEndpoints,
 	VendorsEndpoints
 } from './types.js';

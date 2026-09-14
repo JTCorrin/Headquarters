@@ -78,12 +78,37 @@
 		"zod": "^4.4.3"
 	},
 	"dependencies": {
+		"@floating-ui/dom": "^1.8.0",
 		"@supabase/ssr": "^0.12.4",
 		"@supabase/supabase-js": "^2.111.0",
 		"@svar-ui/svelte-kanban": "^2.6.0",
 		"@tanstack/table-core": "^8.21.3",
+		"@tiptap/core": "^3.31.3",
+		"@tiptap/extension-bubble-menu": "^3.31.3",
+		"@tiptap/extension-code-block-lowlight": "^3.31.3",
+		"@tiptap/extension-drag-handle": "^3.31.3",
+		"@tiptap/extension-highlight": "^3.31.3",
+		"@tiptap/extension-list": "^3.31.3",
+		"@tiptap/extension-mathematics": "^3.31.3",
+		"@tiptap/extension-subscript": "^3.31.3",
+		"@tiptap/extension-superscript": "^3.31.3",
+		"@tiptap/extension-table": "^3.31.3",
+		"@tiptap/extension-table-of-contents": "^3.31.3",
+		"@tiptap/extension-text-align": "^3.31.3",
+		"@tiptap/extension-text-style": "^3.31.3",
+		"@tiptap/extension-typography": "^3.31.3",
+		"@tiptap/extension-unique-id": "^3.31.3",
+		"@tiptap/extensions": "^3.31.3",
+		"@tiptap/markdown": "^3.31.3",
+		"@tiptap/pm": "^3.31.3",
+		"@tiptap/starter-kit": "^3.31.3",
+		"@tiptap/suggestion": "^3.31.3",
 		"@xyflow/svelte": "^1.6.2",
+		"katex": "^0.18.7",
+		"lowlight": "^3.3.0",
+		"mode-watcher": "^1.1.0",
 		"pdfmake": "^0.3.11",
-		"pdfmake-html-renderer": "^0.4.1"
+		"pdfmake-html-renderer": "^0.4.1",
+		"svelte-sonner": "^1.2.1"
 	}
 }

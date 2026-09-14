@@ -31,6 +31,7 @@ import { createProductsEndpoints } from './endpoints/products.js';
 import { createQuotesEndpoints } from './endpoints/quotes.js';
 import { createTaxRatesEndpoints } from './endpoints/tax-rates.js';
 import { createTasksEndpoints } from './endpoints/tasks.js';
+import { createNotesEndpoints } from './endpoints/notes.js';
 import { createMeetingsEndpoints } from './endpoints/meetings.js';
 import { createProjectsEndpoints } from './endpoints/projects.js';
 import { createTimelineEventsEndpoints } from './endpoints/timeline-events.js';
@@ -70,6 +71,7 @@ import type {
 	RecurringInvoiceSchedulesEndpoints,
 	TaxRatesEndpoints,
 	TasksEndpoints,
+	NotesEndpoints,
 	TimelineEventsEndpoints,
 	VendorsEndpoints
 } from './endpoints/types.js';
@@ -119,6 +121,7 @@ export interface ApiV1Client {
 	clients: ClientsEndpoints;
 	leads: LeadsEndpoints;
 	tasks: TasksEndpoints;
+	notes: NotesEndpoints;
 	meetings: MeetingsEndpoints;
 	projects: ProjectsEndpoints;
 	documents: DocumentsEndpoints;
@@ -301,6 +304,7 @@ export function createApiV1Client(options: ApiV1ClientOptions = {}): ApiV1Client
 		clients: createClientsEndpoints(request),
 		leads: createLeadsEndpoints(request),
 		tasks: createTasksEndpoints(request),
+		notes: createNotesEndpoints(request),
 		meetings: createMeetingsEndpoints(request),
 		projects: createProjectsEndpoints(request),
 		documents: createDocumentsEndpoints(request),
