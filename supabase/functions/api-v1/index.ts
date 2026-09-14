@@ -21,6 +21,7 @@ import { handleOrgInvoiceEmail } from './org-invoice-email.ts'
 import { createInvoiceFromQuoteRoute, handleInvoices } from './invoices.ts'
 import { handleBills } from './bills.ts'
 import { handleTasks } from './tasks.ts'
+import { handleNotes } from './notes.ts'
 import { handleCalendar } from './calendar.ts'
 import { handleMeetings } from './meetings.ts'
 import { handleProjects } from './projects.ts'
@@ -169,6 +170,27 @@ function assertCanAccessTasks(role: MembershipRole, method: string): void {
       403,
       'FORBIDDEN',
       'Readonly members cannot modify tasks',
+    )
+  }
+}
+
+function assertCanAccessNotes(
+  role: MembershipRole,
+  method: string,
+  actorType: 'user' | 'api_key',
+): void {
+  // Notes are private to a person; an org API key has no person behind it.
+  if (actorType === 'api_key') {
+    throw new ApiError(403, 'FORBIDDEN', 'API keys cannot access notes')
+  }
+  if (role === 'billing') {
+    throw new ApiError(403, 'FORBIDDEN', 'Billing members cannot access notes')
+  }
+  if (role === 'readonly' && method !== 'GET') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Readonly members cannot modify notes',
     )
   }
 }
@@ -744,6 +766,19 @@ async function routeOrgScoped(
       actorType === 'api_key' && apiKeyId
         ? { actorType: 'api_key', apiKeyId }
         : { actorType: 'user' },
+    )
+  }
+
+  if (path === '/api/v1/notes' || path.startsWith('/api/v1/notes/')) {
+    assertCanAccessNotes(membership.role, req.method, actorType)
+    return await handleNotes(
+      req,
+      db,
+      path,
+      orgId,
+      membership.role,
+      membership.id,
+      requestId,
     )
   }
 
