@@ -783,6 +783,50 @@ export interface ApiTaskCreateBody {
 
 export type ApiTaskUpdateBody = Partial<ApiTaskCreateBody>;
 
+export type ApiNoteColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'gray';
+
+/** Tiptap/ProseMirror document JSON. Opaque to the API beyond being an object. */
+export type ApiNoteDocument = Record<string, unknown>;
+
+/** Full note as returned by GET/POST/PATCH `/api/v1/notes/:id`. */
+export interface ApiNote {
+	id: string;
+	org_id: string;
+	owner_membership_id: string;
+	created_at: string;
+	updated_at: string;
+	created_by: string | null;
+	updated_by: string | null;
+	deleted_at: string | null;
+	version: number;
+	title: string;
+	body: ApiNoteDocument;
+	body_text: string;
+	color: ApiNoteColor;
+	pinned: boolean;
+}
+
+/** List rows omit the document and carry a plain-text excerpt instead. */
+export type ApiNoteListItem = Omit<ApiNote, 'body' | 'body_text'> & { excerpt: string };
+
+export interface ApiNoteListParams {
+	limit?: number;
+	cursor?: string;
+	/** Full-text search across title and body (websearch syntax). */
+	q?: string;
+	pinned?: boolean;
+}
+
+export interface ApiNoteCreateBody {
+	title?: string;
+	body?: ApiNoteDocument;
+	body_text?: string;
+	color?: ApiNoteColor;
+	pinned?: boolean;
+}
+
+export type ApiNoteUpdateBody = ApiNoteCreateBody;
+
 export type ApiMeetingStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 export type ApiMeetingTranscriptStatus = 'none' | 'uploaded' | 'processing' | 'ready' | 'failed';
 export type ApiMeetingSummaryStatus = 'none' | 'generating' | 'ready' | 'failed';

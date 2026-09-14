@@ -67,7 +67,8 @@ export function appNavGroups(activeLabel?: string, role: MembershipRole = 'owner
 			items: [
 				{ label: 'Tasks', href: '/tasks', active: mark('Tasks') },
 				{ label: 'Meetings', href: '/meetings', active: mark('Meetings') },
-				{ label: 'Projects', href: '/projects', active: mark('Projects') }
+				{ label: 'Projects', href: '/projects', active: mark('Projects') },
+				{ label: 'Notes', href: '/notes', active: mark('Notes') }
 			]
 		},
 		{

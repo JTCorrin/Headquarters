@@ -92,6 +92,11 @@ import type {
 	ApiTaskCreateBody,
 	ApiTaskListParams,
 	ApiTaskUpdateBody,
+	ApiNote,
+	ApiNoteCreateBody,
+	ApiNoteListItem,
+	ApiNoteListParams,
+	ApiNoteUpdateBody,
 	ApiMeeting,
 	ApiMeetingCreateBody,
 	ApiMeetingDocument,
@@ -430,6 +435,19 @@ export interface TasksEndpoints {
 		version: number,
 		signal?: AbortSignal
 	): Promise<ApiTask>;
+	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+}
+
+export interface NotesEndpoints {
+	list(params?: ApiNoteListParams, signal?: AbortSignal): Promise<ApiResult<ApiNoteListItem[]>>;
+	create(body?: ApiNoteCreateBody, signal?: AbortSignal): Promise<ApiNote>;
+	get(id: string, signal?: AbortSignal): Promise<ApiResult<ApiNote>>;
+	update(
+		id: string,
+		body: ApiNoteUpdateBody,
+		version: number,
+		signal?: AbortSignal
+	): Promise<ApiNote>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
 }
 
