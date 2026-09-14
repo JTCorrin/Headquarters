@@ -108,6 +108,7 @@
 					pinned = !pinned;
 					touch();
 				}}
+				onBack={() => {}}
 				onDelete={() => {}}
 			/>
 		</div>
@@ -126,6 +127,7 @@
 				pinned={false}
 				saveStatus="conflict"
 				saveError="This note was changed elsewhere. Reload to see the latest version — your unsaved edits here will be discarded."
+				onBack={() => {}}
 				onReload={() => {}}
 				onDelete={() => {}}
 			/>

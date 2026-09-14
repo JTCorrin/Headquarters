@@ -28,6 +28,9 @@
 		onSwitchNavigate={() => {
 			void goto('/notes');
 		}}
+		onBack={() => {
+			void goto('/notes');
+		}}
 		onDeleted={() => {
 			void goto('/notes');
 		}}
