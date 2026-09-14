@@ -41,7 +41,7 @@ test.describe('CRM notes journey (staging)', () => {
 		expect(patchResponse.ok(), `PATCH note HTTP ${patchResponse.status()}`).toBeTruthy();
 		await expect(page.getByTestId('note-save-status')).toHaveText(/saved/i, { timeout: 15_000 });
 
-		await page.getByRole('link', { name: 'Notes' }).first().click();
+		await page.getByTestId('note-back').click();
 		await expect(page.getByTestId('notes-page')).toBeVisible({ timeout: 45_000 });
 		await expect(page.getByText(title).first()).toBeVisible({ timeout: 45_000 });
 	});
