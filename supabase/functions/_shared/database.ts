@@ -909,6 +909,26 @@ export type TaskRow = {
   metadata: Json
 }
 
+export type NoteColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'gray'
+
+export type NoteRow = {
+  id: string
+  org_id: string
+  owner_membership_id: string
+  created_at: string
+  updated_at: string
+  created_by: string | null
+  updated_by: string | null
+  deleted_at: string | null
+  version: number
+  title: string
+  body: Json
+  body_text: string
+  color: NoteColor
+  pinned: boolean
+  search: unknown
+}
+
 export type MeetingRow = {
   id: string
   org_id: string
@@ -1526,6 +1546,9 @@ type BillLineInsert =
 type TaskInsert =
   & Pick<TaskRow, 'org_id' | 'title'>
   & Partial<Omit<TaskRow, 'id' | 'org_id' | 'title'>>
+type NoteInsert =
+  & Pick<NoteRow, 'org_id' | 'owner_membership_id'>
+  & Partial<Omit<NoteRow, 'id' | 'org_id' | 'owner_membership_id' | 'search'>>
 type MeetingInsert =
   & Pick<MeetingRow, 'org_id' | 'title' | 'starts_at' | 'ends_at' | 'timezone'>
   & Partial<
@@ -1948,6 +1971,12 @@ export type Database = {
         Row: TaskRow
         Insert: TaskInsert
         Update: Partial<TaskInsert>
+        Relationships: []
+      }
+      notes: {
+        Row: NoteRow
+        Insert: NoteInsert
+        Update: Partial<NoteInsert>
         Relationships: []
       }
       meetings: {
@@ -2631,6 +2660,14 @@ export type Database = {
           p_expected_version: number
           p_org_id: string
           p_task_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_note: {
+        Args: {
+          p_expected_version: number
+          p_note_id: string
+          p_org_id: string
         }
         Returns: undefined
       }
