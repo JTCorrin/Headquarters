@@ -59,6 +59,7 @@ import type {
 	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
 	ApiInvoiceSendBody,
+	ApiInvoiceMarkSentBody,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody,
 	ApiBill,
@@ -335,10 +336,18 @@ export interface InvoicesEndpoints {
 		signal?: AbortSignal
 	): Promise<ApiInvoiceDocument>;
 	delete(id: string, version: number, signal?: AbortSignal): Promise<void>;
+	/** Email invoice PDF via org invoice email, then mark sent. */
 	send(
 		id: string,
 		version: number,
 		body?: ApiInvoiceSendBody,
+		signal?: AbortSignal
+	): Promise<ApiInvoiceDocument>;
+	/** Status-only draft → sent (no email). Enables payment allocation. */
+	markSent(
+		id: string,
+		version: number,
+		body?: ApiInvoiceMarkSentBody,
 		signal?: AbortSignal
 	): Promise<ApiInvoiceDocument>;
 	void(
