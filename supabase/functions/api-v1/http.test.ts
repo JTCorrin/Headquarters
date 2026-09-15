@@ -2711,6 +2711,7 @@ Deno.test('MCP tools/list catalog covers MVP + Wave A/B/C entity writes', () => 
     'list_quotes',
     'list_tags',
     'list_tasks',
+    'mark_invoice_sent',
     'reject_quote',
     'replace_entity_tags',
     'reverse_payment',
