@@ -76,9 +76,28 @@ describe('invoices endpoints', () => {
 			}
 		});
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
-		const sent = await api.invoices.send(INVOICE_ID, 2, { to_email: 'a@b.com' } as never);
+		const sent = await api.invoices.send(INVOICE_ID, 2);
 		expect(capturedIdempotencyKey).toBeTruthy();
 		expect(sent.status).toBe('sent');
+	});
+
+	it('markSent posts to /mark-sent with Idempotency-Key', async () => {
+		let capturedPath = '';
+		let capturedIdempotencyKey: string | null = null;
+		const fetchMock = createMockFetch({
+			[`POST /api/v1/invoices/${INVOICE_ID}/mark-sent`]: async (request) => {
+				capturedPath = new URL(request.url).pathname;
+				capturedIdempotencyKey = request.headers.get('Idempotency-Key');
+				return {
+					body: { data: { ...invoiceFixture(), status: 'sent' } }
+				};
+			}
+		});
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
+		const marked = await api.invoices.markSent(INVOICE_ID, 2);
+		expect(capturedPath).toBe(`/api/v1/invoices/${INVOICE_ID}/mark-sent`);
+		expect(capturedIdempotencyKey).toBeTruthy();
+		expect(marked.status).toBe('sent');
 	});
 
 	it('void adds an Idempotency-Key header and reason body', async () => {
