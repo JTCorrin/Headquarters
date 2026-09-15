@@ -216,25 +216,28 @@ describe('InvoicePage detail flows', () => {
 		await page.getByTestId('invoice-discount').fill('15.00');
 		await page.getByTestId('invoice-form').getByRole('button', { name: 'Save details' }).click();
 
-		await expect.poll(() => patchBody).toMatchObject({
-			purchase_order_number: 'PO-42',
-			discount_cents: 1500,
-			lines: [
-				{
-					product_id: PRODUCT_ID,
-					description: 'Monthly retainer',
-					quantity: 1,
-					unit_price_cents: 1900,
-					discount_percent: 5,
-					tax_rate_percent: 20,
-					position: 0
-				}
-			]
-		});
+		await expect
+			.poll(() => patchBody)
+			.toMatchObject({
+				purchase_order_number: 'PO-42',
+				discount_cents: 1500,
+				lines: [
+					{
+						product_id: PRODUCT_ID,
+						description: 'Monthly retainer',
+						quantity: 1,
+						unit_price_cents: 1900,
+						discount_percent: 5,
+						tax_rate_percent: 20,
+						position: 0
+					}
+				]
+			});
 	});
 
-	it('disables Send while dirty and blocks lifecycle until saved', async () => {
+	it('disables Send and Mark as sent while dirty and blocks lifecycle until saved', async () => {
 		let sendCalled = false;
+		let markSentCalled = false;
 
 		const fetchMock = pageFetch({
 			[`GET /api/v1/invoices/${INVOICE_ID}`]: async () => ({
@@ -266,6 +269,18 @@ describe('InvoicePage detail flows', () => {
 						})
 					}
 				};
+			},
+			[`POST /api/v1/invoices/${INVOICE_ID}/mark-sent`]: async () => {
+				markSentCalled = true;
+				return {
+					body: {
+						data: sampleInvoice({
+							version: 2,
+							status: 'sent',
+							sent_at: '2026-03-02T00:00:00Z'
+						})
+					}
+				};
 			}
 		});
 
@@ -273,11 +288,60 @@ describe('InvoicePage detail flows', () => {
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
 		render(InvoicePage, { api, session, invoiceId: INVOICE_ID });
 
-		await expect.element(page.getByRole('button', { name: 'Send' })).toBeEnabled();
+		await expect.element(page.getByTestId('invoice-send')).toBeEnabled();
+		await expect.element(page.getByTestId('invoice-mark-sent')).toBeEnabled();
 		await page.getByLabelText('PO number').fill('PO-DIRTY');
 		await expect.element(page.getByTestId('invoice-dirty-hint')).toBeInTheDocument();
-		await expect.element(page.getByRole('button', { name: 'Send' })).toBeDisabled();
+		await expect.element(page.getByTestId('invoice-send')).toBeDisabled();
+		await expect.element(page.getByTestId('invoice-mark-sent')).toBeDisabled();
 		expect(sendCalled).toBe(false);
+		expect(markSentCalled).toBe(false);
+	});
+
+	it('Mark as sent posts to /mark-sent', async () => {
+		let markSentCalled = false;
+
+		const fetchMock = pageFetch({
+			[`GET /api/v1/invoices/${INVOICE_ID}`]: async () => ({
+				body: { data: sampleInvoice() }
+			}),
+			'GET /api/v1/clients': async () => ({
+				body: { data: [sampleClient()], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/contacts': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/products': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			'GET /api/v1/tax-rates': async () => ({
+				body: { data: [] }
+			}),
+			'GET /api/v1/payments': async () => ({
+				body: { data: [], meta: { next_cursor: null } }
+			}),
+			[`POST /api/v1/invoices/${INVOICE_ID}/mark-sent`]: async () => {
+				markSentCalled = true;
+				return {
+					body: {
+						data: sampleInvoice({
+							version: 2,
+							status: 'sent',
+							sent_at: '2026-03-02T00:00:00Z'
+						})
+					}
+				};
+			}
+		});
+
+		const session = sessionForOrg();
+		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
+		render(InvoicePage, { api, session, invoiceId: INVOICE_ID });
+
+		await expect.element(page.getByTestId('invoice-mark-sent')).toBeEnabled();
+		await page.getByTestId('invoice-mark-sent').click();
+		await expect.poll(() => markSentCalled).toBe(true);
+		await expect.element(page.getByText('Sent').first()).toBeInTheDocument();
 	});
 
 	it('includes unsaved header fields when adding a line', async () => {
@@ -351,21 +415,23 @@ describe('InvoicePage detail flows', () => {
 		await page.getByTestId('line-discount').fill('10');
 		await page.getByTestId('line-item-form').getByRole('button', { name: 'Add line' }).click();
 
-		await expect.poll(() => patchBody).toMatchObject({
-			purchase_order_number: 'PO-KEEP',
-			client_id: CLIENT_ID,
-			lines: expect.arrayContaining([
-				expect.objectContaining({
-					product_id: PRODUCT_ID,
-					discount_percent: 5,
-					tax_rate_percent: 20
-				}),
-				expect.objectContaining({
-					description: 'Extra line',
-					discount_percent: 10
-				})
-			])
-		});
+		await expect
+			.poll(() => patchBody)
+			.toMatchObject({
+				purchase_order_number: 'PO-KEEP',
+				client_id: CLIENT_ID,
+				lines: expect.arrayContaining([
+					expect.objectContaining({
+						product_id: PRODUCT_ID,
+						discount_percent: 5,
+						tax_rate_percent: 20
+					}),
+					expect.objectContaining({
+						description: 'Extra line',
+						discount_percent: 10
+					})
+				])
+			});
 	});
 
 	it('keeps a billing contact outside the first contacts page', async () => {

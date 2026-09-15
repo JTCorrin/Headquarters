@@ -7,6 +7,7 @@ import type {
 	ApiInvoiceFromQuoteBody,
 	ApiInvoiceListParams,
 	ApiInvoiceSendBody,
+	ApiInvoiceMarkSentBody,
 	ApiInvoiceUpdateBody,
 	ApiInvoiceVoidBody
 } from '../types.js';
@@ -75,6 +76,17 @@ export function createInvoicesEndpoints(request: ApiRequestFn): InvoicesEndpoint
 				orgScoped: true,
 				ifMatchVersion: version,
 				headers: { 'Idempotency-Key': newIdempotencyKey('inv-send') },
+				signal
+			});
+			return data;
+		},
+		markSent: async (id, version, body: ApiInvoiceMarkSentBody = {}, signal) => {
+			const { data } = await request<ApiInvoiceDocument>(`/api/v1/invoices/${id}/mark-sent`, {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				ifMatchVersion: version,
+				headers: { 'Idempotency-Key': newIdempotencyKey('inv-mark-sent') },
 				signal
 			});
 			return data;

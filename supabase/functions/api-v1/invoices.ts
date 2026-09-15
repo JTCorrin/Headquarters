@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, InvoiceLineRow, InvoiceRow, Json } from '../_shared/database.ts'
+import {
+  InvoiceDocumentMailError,
+  sendInvoiceDocumentEmail,
+} from '../_shared/invoice-document-mail.ts'
+import { buildInvoicePdfBytes } from '../_shared/invoice-pdf.ts'
 import { dispatchPlaybookTriggersSafe } from '../_shared/playbook-dispatch.ts'
 import {
   ApiError,
@@ -793,23 +798,174 @@ function invoiceEnvelopeResponse(
   )
 }
 
-async function sendInvoiceRoute(
-  req: Request,
+function formatInvoiceMoney(cents: number, currency: string): string {
+  const amount = cents / 100
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(amount)
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`
+  }
+}
+
+function clientNameFromPartySnapshot(snapshot: Json | null): string | null {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null
+  const client = (snapshot as Record<string, unknown>).client
+  if (!client || typeof client !== 'object' || Array.isArray(client)) return null
+  const name = (client as Record<string, unknown>).name
+  return typeof name === 'string' && name.trim().length > 0 ? name.trim() : null
+}
+
+function invoiceMailApiError(error: InvoiceDocumentMailError): ApiError {
+  if (
+    error.code === 'credentials_missing' ||
+    error.code === 'credentials_disabled' ||
+    error.code === 'recipients_missing'
+  ) {
+    return new ApiError(422, 'VALIDATION_ERROR', error.message)
+  }
+  return new ApiError(502, 'UPSTREAM_ERROR', error.message)
+}
+
+async function resolveInvoiceRecipientEmails(
   db: DatabaseClient,
   orgId: string,
   invoiceId: string,
   requestId: string,
-  actorUserId?: string | null,
-): Promise<Response> {
-  const version = parseVersion(req)
-  const rawKey = parseIdempotencyKey(req)
-  const route = `/api/v1/invoices/${invoiceId}/send`
-  const contentType = req.headers.get('content-type') ?? ''
-  let sendBody: { sent_at?: string } = {}
-  if (contentType.toLowerCase().includes('application/json')) {
-    const raw = await jsonBody(req)
-    sendBody = validateSendInvoiceBody(raw)
+): Promise<string[]> {
+  const { data: recipientRows, error: recipientsError } = await db
+    .from('invoice_recipients')
+    .select('contact_id, position')
+    .eq('invoice_id', invoiceId)
+    .eq('org_id', orgId)
+    .order('position')
+  if (recipientsError) throw databaseError(recipientsError, requestId)
+
+  const contactIds = (recipientRows ?? [])
+    .map((row) => row.contact_id)
+    .filter((id): id is string => typeof id === 'string')
+  if (contactIds.length < 1) return []
+
+  const { data: contacts, error: contactsError } = await db
+    .from('contacts')
+    .select('id, primary_email')
+    .eq('org_id', orgId)
+    .in('id', contactIds)
+    .is('deleted_at', null)
+  if (contactsError) throw databaseError(contactsError, requestId)
+
+  const emailById = new Map<string, string>()
+  for (const contact of contacts ?? []) {
+    const email = contact.primary_email?.trim()
+    if (email) emailById.set(contact.id, email)
   }
+
+  const toAddresses: string[] = []
+  for (const id of contactIds) {
+    const email = emailById.get(id)
+    if (email) toAddresses.push(email)
+  }
+  return toAddresses
+}
+
+async function emailInvoiceDocument(
+  db: DatabaseClient,
+  orgId: string,
+  invoice: InvoiceDocument,
+  requestId: string,
+): Promise<void> {
+  const toAddresses = await resolveInvoiceRecipientEmails(db, orgId, invoice.id, requestId)
+  if (toAddresses.length < 1) {
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      'Add a recipient with an email address before sending this invoice',
+    )
+  }
+
+  const { data: org, error: orgError } = await db
+    .from('organisations')
+    .select('name, legal_name')
+    .eq('id', orgId)
+    .maybeSingle()
+  if (orgError) throw databaseError(orgError, requestId)
+
+  const { data: client, error: clientError } = await db
+    .from('clients')
+    .select('name')
+    .eq('id', invoice.client_id)
+    .eq('org_id', orgId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (clientError) throw databaseError(clientError, requestId)
+
+  const clientName = client?.name?.trim() ||
+    clientNameFromPartySnapshot(invoice.party_snapshot) ||
+    'Client'
+  const orgName = org?.legal_name?.trim() || org?.name?.trim() || 'Organisation'
+  const invoiceNumber = invoice.number?.trim() || invoice.id.slice(0, 8)
+  const pdfFilename = `invoice-${invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g, '-')}.pdf`
+
+  const pdfBytes = await buildInvoicePdfBytes({
+    orgName,
+    invoiceNumber,
+    clientName,
+    issueOn: invoice.issue_on,
+    dueOn: invoice.due_on,
+    currency: invoice.currency,
+    lines: invoice.lines.map((line) => ({
+      description: line.description,
+      quantity: line.quantity,
+      unitLabel: null,
+      discountPercent: line.discount_percent,
+      totalCents: line.total_cents,
+    })),
+    subtotalCents: invoice.subtotal_cents,
+    discountCents: invoice.discount_cents,
+    taxCents: invoice.tax_cents,
+    totalCents: invoice.total_cents,
+  })
+
+  try {
+    await sendInvoiceDocumentEmail({
+      service: db,
+      orgId,
+      toAddresses,
+      invoiceNumber,
+      clientName,
+      totalLabel: formatInvoiceMoney(invoice.total_cents, invoice.currency),
+      dueOn: invoice.due_on,
+      orgName,
+      pdfBytes,
+      pdfFilename,
+    })
+  } catch (error) {
+    if (error instanceof InvoiceDocumentMailError) throw invoiceMailApiError(error)
+    throw error
+  }
+}
+
+async function runMarkInvoiceSent(params: {
+  db: DatabaseClient
+  orgId: string
+  invoiceId: string
+  requestId: string
+  route: string
+  version: number
+  rawKey: string
+  sendBody: { sent_at?: string }
+  actorUserId?: string | null
+}): Promise<IdempotencyEnvelope> {
+  const {
+    db,
+    orgId,
+    invoiceId,
+    requestId,
+    route,
+    version,
+    rawKey,
+    sendBody,
+    actorUserId,
+  } = params
   const requestHash = await hashIdempotencyRequest(
     route,
     invoiceLifecycleIdempotencyPayload(
@@ -834,8 +990,79 @@ async function sendInvoiceRoute(
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Invoice send returned an unexpected payload')
   }
-  const envelope = data as IdempotencyEnvelope
-  // API-key path: status-only send (no client email). Skip playbooks to avoid outbound mail.
+  return data as IdempotencyEnvelope
+}
+
+async function parseOptionalSendBody(req: Request): Promise<{ sent_at?: string }> {
+  const contentType = req.headers.get('content-type') ?? ''
+  if (!contentType.toLowerCase().includes('application/json')) return {}
+  return validateSendInvoiceBody(await jsonBody(req))
+}
+
+/** Status-only: draft → sent. No email, no playbooks. */
+async function markSentInvoiceRoute(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  invoiceId: string,
+  requestId: string,
+  actorUserId?: string | null,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const rawKey = parseIdempotencyKey(req)
+  const sendBody = await parseOptionalSendBody(req)
+  const envelope = await runMarkInvoiceSent({
+    db,
+    orgId,
+    invoiceId,
+    requestId,
+    route: `/api/v1/invoices/${invoiceId}/mark-sent`,
+    version,
+    rawKey,
+    sendBody,
+    actorUserId,
+  })
+  return invoiceEnvelopeResponse(envelope, requestId, rawKey)
+}
+
+/**
+ * Email the invoice PDF via org invoice email, then mark sent.
+ * Playbooks fire on JWT/CRM path (no api_key actor) after a non-replay success.
+ * Idempotent replays skip email (invoice already left draft).
+ */
+async function sendInvoiceRoute(
+  req: Request,
+  db: DatabaseClient,
+  orgId: string,
+  invoiceId: string,
+  requestId: string,
+  actorUserId?: string | null,
+): Promise<Response> {
+  const version = parseVersion(req)
+  const rawKey = parseIdempotencyKey(req)
+  const sendBody = await parseOptionalSendBody(req)
+  const current = await findInvoiceDocument(db, orgId, invoiceId, requestId, actorUserId)
+
+  if (current.status === 'draft') {
+    if (current.version !== version) {
+      throw new ApiError(412, 'PRECONDITION_FAILED', 'Invoice version does not match If-Match')
+    }
+    await emailInvoiceDocument(db, orgId, current, requestId)
+  }
+
+  const envelope = await runMarkInvoiceSent({
+    db,
+    orgId,
+    invoiceId,
+    requestId,
+    route: `/api/v1/invoices/${invoiceId}/send`,
+    version,
+    rawKey,
+    sendBody,
+    actorUserId,
+  })
+
+  // API-key path passes actorUserId — skip playbooks to avoid duplicate outbound mail.
   if (envelope.replay !== true && !actorUserId) {
     await dispatchPlaybookTriggersSafe({
       orgId,
@@ -949,7 +1176,7 @@ export function handleInvoices(
   }
 
   const itemMatch = path.match(
-    /^\/api\/v1\/invoices\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/(send|void))?$/i,
+    /^\/api\/v1\/invoices\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\/(send|mark-sent|void))?$/i,
   )
   if (!itemMatch) throw new ApiError(404, 'NOT_FOUND', 'Route not found')
 
@@ -961,6 +1188,13 @@ export function handleInvoices(
       return sendInvoiceRoute(req, db, orgId, invoiceId, requestId, actorUserId)
     }
     throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice send')
+  }
+
+  if (action === 'mark-sent') {
+    if (req.method === 'POST') {
+      return markSentInvoiceRoute(req, db, orgId, invoiceId, requestId, actorUserId)
+    }
+    throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed for invoice mark-sent')
   }
 
   if (action === 'void') {
