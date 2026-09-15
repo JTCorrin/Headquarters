@@ -556,6 +556,9 @@ export interface ApiInvoiceSendBody {
 	sent_at?: string;
 }
 
+/** Status-only mark-as-sent (no email). Same optional body as send. */
+export type ApiInvoiceMarkSentBody = ApiInvoiceSendBody;
+
 export interface ApiInvoiceListParams {
 	limit?: number;
 	cursor?: string;
