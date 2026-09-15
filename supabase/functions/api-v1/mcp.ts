@@ -975,9 +975,25 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: 'mark_invoice_sent',
+    description:
+      'Mark a draft invoice as sent without emailing (POST /api/v1/invoices/{id}/mark-sent). Enables payment allocation. Requires version for If-Match. Optional sent_at (ISO timestamptz); optional idempotency_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 1 },
+        sent_at: { type: 'string' },
+        idempotency_key: { type: 'string', minLength: 1, maxLength: 256 },
+      },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'send_invoice',
     description:
-      'Mark a draft invoice as sent (POST /api/v1/invoices/{id}/send). Requires version for If-Match. Optional sent_at (ISO timestamptz) for migration; optional idempotency_key for safe retries.',
+      'Email a draft invoice PDF via organisation invoice email, then mark it sent (POST /api/v1/invoices/{id}/send). Requires org invoice email and a recipient with an email. For status-only (no email), use mark_invoice_sent. Requires version for If-Match. Optional sent_at; optional idempotency_key.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2685,6 +2701,26 @@ export async function callTool(
         orgId,
         requestId,
         actorUserId,
+      )
+      return await toolResultFromHttp(response)
+    }
+    case 'mark_invoice_sent': {
+      assertCanAccessInvoices(membership.role, 'POST')
+      requireUserBackedActor(auth.userId)
+      const id = parseUuid(requireString(args, 'id'), 'id')
+      const version = requireVersion(args)
+      const path = `/api/v1/invoices/${id}/mark-sent`
+      const body: Record<string, unknown> = {}
+      if (typeof args.sent_at === 'string') body.sent_at = args.sent_at
+      const response = await handleInvoices(
+        syntheticRequest('POST', path, body, {
+          'if-match': `"${version}"`,
+          'idempotency-key': resolveIdempotencyKey(args),
+        }),
+        db,
+        path,
+        orgId,
+        requestId,
       )
       return await toolResultFromHttp(response)
     }
