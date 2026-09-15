@@ -30,6 +30,7 @@
 		savedIndicatorMs?: number;
 		onMissingOrg?: () => void;
 		onSwitchNavigate?: (orgId: string) => void;
+		onBack?: () => void;
 		onDeleted?: () => void;
 		onLogout?: () => void | Promise<void>;
 		class?: string;
@@ -43,6 +44,7 @@
 		savedIndicatorMs = 2000,
 		onMissingOrg,
 		onSwitchNavigate,
+		onBack,
 		onDeleted,
 		onLogout,
 		class: className
@@ -383,6 +385,7 @@
 						{saveError}
 						{actionBusy}
 						showNav={false}
+						{onBack}
 						{onTitleChange}
 						{onColorChange}
 						{onTogglePin}
