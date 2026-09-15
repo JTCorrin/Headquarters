@@ -20,10 +20,7 @@
 		toPaymentListItem
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiInvoiceDocument, ApiTaxRate } from '$lib/api/v1/types.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
@@ -40,10 +37,7 @@
 		type InvoiceContactOption,
 		type InvoiceFormData
 	} from '$lib/schemas/invoice.js';
-	import {
-		paymentFormSchema,
-		type PaymentListItem
-	} from '$lib/schemas/payment.js';
+	import { paymentFormSchema, type PaymentListItem } from '$lib/schemas/payment.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import type { TimelineComposerSubmit } from './timeline-composer.svelte';
@@ -182,12 +176,10 @@
 	const formSnapshot = fromStore(invoiceForm.form);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Invoices', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -286,9 +278,7 @@
 			invoiceId: document.id,
 			billId: '',
 			amount:
-				document.balance_due_cents > 0
-					? centsToAmountString(document.balance_due_cents) || ''
-					: '',
+				document.balance_due_cents > 0 ? centsToAmountString(document.balance_due_cents) || '' : '',
 			currency:
 				document.currency === 'USD' || document.currency === 'EUR' || document.currency === 'GBP'
 					? document.currency
@@ -394,8 +384,7 @@
 					if (isStale(epoch)) return;
 					options.push({
 						id: pinned.data.id,
-						label:
-							pinned.data.display_name || pinned.data.primary_email || pinned.data.id,
+						label: pinned.data.display_name || pinned.data.primary_email || pinned.data.id,
 						clientId: pinned.data.client_id ?? null
 					});
 				} catch {
@@ -571,6 +560,22 @@
 	async function onTimelineAdd(submit: TimelineComposerSubmit) {
 		const created = await createEntityTimelineEvent(api, 'invoice', invoiceId, submit);
 		timelineEvents = [created, ...timelineEvents.filter((event) => event.id !== created.id)];
+	}
+
+	async function onMarkSent() {
+		if (!invoice || invoice.status !== 'draft') return;
+		if (isDirty) {
+			viewState = {
+				kind: 'validation',
+				message: 'Save your changes before marking this invoice as sent.'
+			};
+			return;
+		}
+		const version = invoice.version;
+		await runLifecycle(
+			() => api.invoices.markSent(invoice!.id, version),
+			'Could not mark invoice as sent — try again.'
+		);
 	}
 
 	async function onSend() {
@@ -811,15 +816,16 @@
 						bind:lines
 						bind:timelineEvents
 						bind:lineDrawerOpen
-						onSaveInvoice={onSaveInvoice}
-						onAddLine={onAddLine}
-						onRemoveLine={onRemoveLine}
-						onSend={onSend}
-						onVoid={onVoid}
-						onDelete={onDelete}
+						{onSaveInvoice}
+						{onAddLine}
+						{onRemoveLine}
+						{onSend}
+						{onMarkSent}
+						{onVoid}
+						{onDelete}
 						{onGenerateChase}
-						onRecordPayment={onRecordPayment}
-						onReversePayment={onReversePayment}
+						{onRecordPayment}
+						{onReversePayment}
 						{onTimelineAdd}
 						showNav={false}
 						class="min-h-0 flex-1"
@@ -830,7 +836,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="invoice-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening invoices.
 		</p>
 	</div>
