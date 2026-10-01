@@ -129,3 +129,18 @@ export async function resolveMailboxAuth(
   if (!creds) return null
   return resolveMailboxAuthFromCredentials(service, mailboxId, creds)
 }
+
+/**
+ * User-backed send paths: the org-pinned credential read checks auth.uid() owns the
+ * mailbox, so it must run on the caller's JWT client; token refresh stays service-role.
+ */
+export async function resolveMailboxAuthForUser(
+  userDb: SupabaseClient,
+  service: SupabaseClient,
+  mailboxId: string,
+  orgId: string,
+): Promise<ResolvedMailboxAuth | null> {
+  const creds = await readMailboxCredentialRow(userDb, mailboxId, orgId)
+  if (!creds) return null
+  return resolveMailboxAuthFromCredentials(service, mailboxId, creds)
+}

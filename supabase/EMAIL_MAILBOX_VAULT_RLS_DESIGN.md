@@ -1,19 +1,19 @@
-# Wave A deliverable #0 — Vault / `secret_ref` + ownership RLS
+# Email mailbox secrets — Vault / `secret_ref` + ownership RLS
 
-**Tip base:** `d6c7f2b4f387063e0b791090bfb15b01fe22393e`  
-**Challenge:** Buzz nest `RESEARCH/EMAIL_AI_BE_VAULT_RLS_CHALLENGE.md`  
+Design record for the first email/AI milestone ("Wave A"; follow-up "Wave B").
+
 **Migration:** `migrations/20260802140000_email_mailbox_org_ai_foundation.sql`
 
 ## Secret store (chosen path)
 
-Wave A originally shipped a documented fallback (`private.encryption_keys`). **S4** (`20260804130000_encryption_keys_supabase_vault.sql`) moved the wrapping key into Supabase Vault — see `RESEARCH/CRM_ENCRYPTION_KEY_VAULT.md`.
+Wave A originally shipped a documented fallback (`private.encryption_keys`). `20260804130000_encryption_keys_supabase_vault.sql` later moved the wrapping key into Supabase Vault.
 
-| Piece | Location | Notes |
-|-------|----------|-------|
-| Ciphertext rows | `private.integration_secrets` | `id`, `ciphertext` (pgp), `key_id`, timestamps |
-| Symmetric key | Supabase Vault (`crm_enc_key_vN`) | Active name in `private.encryption_key_meta` |
-| Encrypt / decrypt / delete | `private.store_secret` / `private.read_secret` / `private.delete_secret` | `SECURITY DEFINER`, `search_path = ''`; **no** `GRANT` to `authenticated` / `anon` |
-| Opaque pointer | `mailbox_accounts.secret_ref` / `integrations.secret_ref` / `vendors.bank_details_secret_ref` | UUID of `private.integration_secrets.id` |
+| Piece                      | Location                                                                                      | Notes                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Ciphertext rows            | `private.integration_secrets`                                                                 | `id`, `ciphertext` (pgp), `key_id`, timestamps                                     |
+| Symmetric key              | Supabase Vault (`crm_enc_key_vN`)                                                             | Active name in `private.encryption_key_meta`                                       |
+| Encrypt / decrypt / delete | `private.store_secret` / `private.read_secret` / `private.delete_secret`                      | `SECURITY DEFINER`, `search_path = ''`; **no** `GRANT` to `authenticated` / `anon` |
+| Opaque pointer             | `mailbox_accounts.secret_ref` / `integrations.secret_ref` / `vendors.bank_details_secret_ref` | UUID of `private.integration_secrets.id`                                           |
 
 Public API and authenticated PostgREST **never** select `secret_ref` or secret plaintext. Column grants on mailbox/integrations omit `secret_ref`. Edge handlers call security-definer RPCs that accept write-only password/API key parameters and return status-only shapes (`credentials_configured`, never the ref or secret).
 
@@ -23,14 +23,14 @@ Rotate: new `store_secret` → update ref → `delete_secret` on the previous id
 
 ## RLS / ownership
 
-| Table | SELECT model |
-|-------|----------------|
-| `mailbox_accounts` | **Owner membership only** (`membership_id = private.current_membership_id(org_id)`). Not contacts-style org SELECT. Billing blocked at API. |
-| `email_threads` / `email_messages` | Owner membership by default (`owner_membership_id`). |
-| `email_message_links` | Owners see their links; teammates see rows only when `link_reason = 'timeline_share'` (and org role allows entity read). |
-| Teammate message body | Granted only via `timeline_share` (full body per Joe lock). `address_match` does **not** grant body. |
-| `integrations` | Status-visible to owner/admin/member/readonly; connect/disconnect **owner only** (Wave B tighten; API + security-definer RPC). |
-| `ai_suggestions` | Org member SELECT (non-billing); generate/use/discard via security-definer RPCs for owner/admin/member. Use never sends mail. |
+| Table                              | SELECT model                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mailbox_accounts`                 | **Owner membership only** (`membership_id = private.current_membership_id(org_id)`). Not contacts-style org SELECT. Billing blocked at API. |
+| `email_threads` / `email_messages` | Owner membership by default (`owner_membership_id`).                                                                                        |
+| `email_message_links`              | Owners see their links; teammates see rows only when `link_reason = 'timeline_share'` (and org role allows entity read).                    |
+| Teammate message body              | Granted only via `timeline_share` (full body, per maintainer decision). `address_match` does **not** grant body.                            |
+| `integrations`                     | Status-visible to owner/admin/member/readonly; connect/disconnect **owner only** (Wave B tighten; API + security-definer RPC).              |
+| `ai_suggestions`                   | Org member SELECT (non-billing); generate/use/discard via security-definer RPCs for owner/admin/member. Use never sends mail.               |
 
 ## Sync bounds (Wave B live)
 

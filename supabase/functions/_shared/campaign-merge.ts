@@ -5,10 +5,23 @@
 
 export type CampaignMergeVars = Record<string, string>
 
-export function renderMergeTemplate(template: string, vars: CampaignMergeVars): string {
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}
+
+export function renderMergeTemplate(
+  template: string,
+  vars: CampaignMergeVars,
+  options: { html?: boolean } = {},
+): string {
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, key: string) => {
     const value = vars[key]
-    return value == null ? '' : value
+    if (value == null) return ''
+    return options.html ? value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!) : value
   })
 }
 

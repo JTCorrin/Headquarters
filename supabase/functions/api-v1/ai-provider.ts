@@ -80,6 +80,24 @@ function stubModelCatalog(provider: AiProviderName): AiModelOption[] {
   ])
 }
 
+const AI_HTTP_TIMEOUT_MS = 60_000
+
+async function providerFetch(
+  provider: AiProviderName,
+  url: string | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(AI_HTTP_TIMEOUT_MS) })
+  } catch (error) {
+    console.error('AI provider request failed', {
+      provider,
+      error: error instanceof Error ? error.name : 'unknown',
+    })
+    throw new ApiError(502, 'UPSTREAM_ERROR', `${provider} did not respond`)
+  }
+}
+
 /** List chat-capable models for the connected provider key. */
 export async function listProviderModels(
   provider: AiProviderName,
@@ -90,7 +108,7 @@ export async function listProviderModels(
   }
 
   if (provider === 'openai') {
-    const response = await fetch('https://api.openai.com/v1/models', {
+    const response = await providerFetch('openai', 'https://api.openai.com/v1/models', {
       headers: { authorization: `Bearer ${apiKey}` },
     })
     const raw = await response.text()
@@ -115,7 +133,7 @@ export async function listProviderModels(
       const url = new URL('https://api.anthropic.com/v1/models')
       url.searchParams.set('limit', '100')
       if (afterId) url.searchParams.set('after_id', afterId)
-      const response = await fetch(url, {
+      const response = await providerFetch('anthropic', url, {
         headers: {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
@@ -154,7 +172,7 @@ export async function listProviderModels(
       const url = new URL('https://generativelanguage.googleapis.com/v1beta/models')
       url.searchParams.set('pageSize', '100')
       if (pageToken) url.searchParams.set('pageToken', pageToken)
-      const response = await fetch(url, {
+      const response = await providerFetch('google', url, {
         headers: { 'x-goog-api-key': apiKey },
       })
       const raw = await response.text()
@@ -189,7 +207,8 @@ export async function listProviderModels(
   }
 
   // openrouter
-  const response = await fetch(
+  const response = await providerFetch(
+    'openrouter',
     'https://openrouter.ai/api/v1/models?output_modalities=text&limit=500',
     {
       headers: {
@@ -246,7 +265,7 @@ async function completeOpenAiCompatible(
   provider: AiProviderName,
   extraHeaders: Record<string, string> = {},
 ): Promise<AiCompletionResult> {
-  const response = await fetch(url, {
+  const response = await providerFetch(provider, url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -285,7 +304,7 @@ async function completeAnthropic(
   systemPrompt: string,
   userContent: string,
 ): Promise<AiCompletionResult> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await providerFetch('anthropic', 'https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -327,10 +346,10 @@ async function completeGoogle(
 ): Promise<AiCompletionResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${
     encodeURIComponent(model)
-  }:generateContent?key=${encodeURIComponent(apiKey)}`
-  const response = await fetch(url, {
+  }:generateContent`
+  const response = await providerFetch('google', url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: 'user', parts: [{ text: userContent }] }],

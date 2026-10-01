@@ -3,7 +3,13 @@
 The stable product contract is `/api/v1`. Supabase exposes the router natively under
 `/functions/v1/api-v1`; production can map a custom domain to the cleaner product path.
 
-## Foundation included
+For setting up the local stack, running tests, and deploying, see the
+[root README](../README.md).
+
+## Core foundation
+
+The schema has grown well beyond this list (invoices, bills, payments, email, meetings,
+projects, campaigns, playbooks, …); these are the building blocks everything else follows.
 
 - Supabase Auth-backed `profiles`
 - `organisations` and active `memberships`
@@ -16,27 +22,32 @@ The stable product contract is `/api/v1`. Supabase exposes the router natively u
 - authenticated `api-v1` Edge Function with Contacts, Leads, Clients, Products, Quotes draft CRUD
 - concurrency-safe `document_sequences` and transactional quote draft RPCs
 
-The migration is the source of truth. Do not edit a linked database in Studio and leave the change
-uncommitted.
+Migrations are the source of truth. Do not edit a linked database in Studio and leave the change
+uncommitted, and never edit a migration that has already been applied anywhere — add a new one.
 
 ## Local workflow
 
 ```sh
 supabase start
-supabase db reset
-supabase test db supabase/tests --local
-deno fmt --check supabase/functions/api-v1
-deno lint supabase/functions/api-v1
-deno check supabase/functions/api-v1/index.ts
-deno test supabase/functions/api-v1
-supabase functions serve api-v1
+supabase db reset --local
+supabase test db
+supabase functions serve        # serves every function; secrets from supabase/functions/.env
+
+cd supabase/functions/api-v1
+deno fmt --check . ../_shared
+deno lint . ../_shared
+deno check index.ts http.test.ts
+deno test --no-check
 ```
 
-Generate database types after a successful reset:
+Generate database types after a successful reset (CI checks that generation succeeds):
 
 ```sh
-supabase gen types typescript --local > src/lib/types/database.generated.ts
+supabase gen types typescript --local > /tmp/database.generated.ts
 ```
+
+The Edge Functions currently use a hand-maintained subset of these types in
+`functions/_shared/database.ts`.
 
 ## Personal mailbox OAuth
 
@@ -52,8 +63,6 @@ Edge secrets (separate from Supabase Auth social login and calendar OAuth):
 Redirect URIs must match the app route `/settings/mailbox-oauth/callback`.
 Azure app needs delegated `IMAP.AccessAsUser.All` + `SMTP.Send`; Google needs
 `https://mail.google.com/` scope.
-The Edge Function currently carries a bootstrap subset in `functions/_shared/database.ts`. Replace
-that subset with generated types in the first Docker-capable follow-up and verify generation in CI.
 
 ## Request contract
 
@@ -64,6 +73,9 @@ Authorization: Bearer <supabase-user-jwt>
 apikey: <supabase-publishable-key>
 X-Org-Id: <organisation-uuid>
 ```
+
+The routes below illustrate the conventions; they are not exhaustive. The router in
+`functions/api-v1/index.ts` is the source of truth.
 
 Contacts routes:
 
@@ -111,8 +123,6 @@ Quotes draft routes:
 - `GET /api/v1/quotes/{quote_id}` — quote + nested `lines`
 - `PATCH /api/v1/quotes/{quote_id}` — `If-Match` required; optional atomic `lines` replacement
 - `DELETE /api/v1/quotes/{quote_id}` — soft delete draft; `If-Match` required
-
-Send/accept/create-invoice commands are intentionally omitted from this foundation slice.
 
 `PATCH` and `DELETE` require the latest strong numeric ETag (for example, `If-Match: "3"`).
 Stale versions return `412 Precondition Failed`. Deletes are soft deletes. Marking a lead as `won`

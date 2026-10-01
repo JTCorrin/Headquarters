@@ -14,8 +14,8 @@ select ok(
 );
 
 select is(
-  private.derive_email_domain('billing@hesis.co.uk', null)::text,
-  'hesis.co.uk',
+  private.derive_email_domain('billing@acme-fixture.co.uk', null)::text,
+  'acme-fixture.co.uk',
   'derive domain from primary email'
 );
 
@@ -119,7 +119,7 @@ with created_client as (
     org_id, name, status, primary_email, created_by, updated_by
   )
   select
-    org_id, 'Hesis', 'active', 'billing@hesis.co.uk', owner_id, owner_id
+    org_id, 'Acme Fixture', 'active', 'billing@acme-fixture.co.uk', owner_id, owner_id
   from _mail_match_fixture
   returning id
 )
@@ -132,7 +132,7 @@ with created_contact as (
     org_id, display_name, primary_email, created_by, updated_by
   )
   select
-    org_id, 'Daniel Taylor', 'daniel.taylor@hesis.co.uk', owner_id, owner_id
+    org_id, 'Dana Fixture', 'dana.fixture@acme-fixture.co.uk', owner_id, owner_id
   from _mail_match_fixture
   returning id
 )
@@ -142,7 +142,7 @@ from created_contact;
 
 select is(
   (select email_domain::text from public.clients c join _mail_match_fixture f on f.client_id = c.id),
-  'hesis.co.uk',
+  'acme-fixture.co.uk',
   'client email_domain auto-fills from primary_email'
 );
 
@@ -156,7 +156,7 @@ begin
   upserted := public.upsert_inbound_email_message(
     f.org_id,
     f.mailbox_id,
-    'cc-daniel-1',
+    'cc-dana-1',
     'thread-cc-1',
     'someone@other.test',
     'Other',
@@ -167,7 +167,7 @@ begin
     now(),
     false,
     null,
-    '[{"email":"daniel.taylor@hesis.co.uk"}]'::jsonb,
+    '[{"email":"dana.fixture@acme-fixture.co.uk"}]'::jsonb,
     '{}'::jsonb,
     41
   );
@@ -177,7 +177,7 @@ begin
     f.mailbox_id,
     'domain-colleague-1',
     'thread-domain-1',
-    'ops@hesis.co.uk',
+    'ops@acme-fixture.co.uk',
     'Ops',
     '[{"email":"mail-match-owner@example.test"}]'::jsonb,
     'Domain mail',
@@ -197,7 +197,7 @@ select ok(
     join public.email_messages m on m.id = l.message_id
     where l.entity_type = 'contact'
       and l.link_reason = 'address_match'
-      and m.provider_message_id = 'cc-daniel-1'
+      and m.provider_message_id = 'cc-dana-1'
   ),
   'CC address links the contact'
 );

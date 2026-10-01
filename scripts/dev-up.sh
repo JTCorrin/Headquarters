@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bring up local Supabase (Docker via CLI), merge .env, serve api-v1, and run the app.
+# Bring up local Supabase (Docker via CLI), merge .env, serve Edge Functions, and run the app.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,7 +25,7 @@ Usage: scripts/dev-up.sh [options]
   --skip-install  Skip `pnpm install` even if node_modules is missing
   -h, --help      Show this help
 
-Prerequisites: Docker, Node.js >= 22, pnpm, Supabase CLI (~2.111).
+Prerequisites: Docker, Node.js >= 22, pnpm 10 (`corepack enable`), Supabase CLI (~2.111).
 EOF
 }
 
@@ -85,9 +85,9 @@ upsert_env() {
 
 	tmp="$(mktemp)"
 	if grep -Eq "^${key}=" "$file"; then
-		# Escape & and \ for sed replacement
+		# Escape &, \ and the | delimiter for the sed replacement
 		local escaped
-		escaped="$(printf '%s' "$value" | sed -e 's/[&\\]/\\&/g')"
+		escaped="$(printf '%s' "$value" | sed -e 's/[&\\|]/\\&/g')"
 		sed -E "s|^${key}=.*|${key}=${escaped}|" "$file" >"$tmp"
 	else
 		cat "$file" >"$tmp"
@@ -152,12 +152,17 @@ fi
 if [[ ! -f "$ENV_FILE" ]]; then
 	cp "$ENV_EXAMPLE" "$ENV_FILE"
 elif ! grep -Eq '^PUBLIC_SUPABASE_URL=' "$ENV_FILE" 2>/dev/null; then
-	# Stale or unrelated .env — seed from example without clobbering unknown keys blindly.
-	# Prefer a clean template when Headquarters keys are absent.
+	# Unrelated .env without Headquarters keys: keep a backup, then start from the template.
+	backup="$ENV_FILE.bak.$(date +%Y%m%d%H%M%S)"
+	cp "$ENV_FILE" "$backup"
+	echo "    existing .env lacks PUBLIC_SUPABASE_URL; backed up to $backup"
 	cp "$ENV_EXAMPLE" "$ENV_FILE"
 fi
 
+# `supabase status -o env` also prints SERVICE_ROLE_KEY / JWT_SECRET / DB_URL.
+# Keep it in a 0600 temp file and delete it before `exec` (EXIT traps do not run on exec).
 STATUS_ENV="$(mktemp)"
+chmod 600 "$STATUS_ENV"
 trap 'rm -f "$STATUS_ENV"' EXIT
 supabase status -o env >"$STATUS_ENV"
 
@@ -166,6 +171,10 @@ ANON_KEY="$(env_value "$STATUS_ENV" ANON_KEY)"
 if [[ -z "$ANON_KEY" ]]; then
 	ANON_KEY="$(env_value "$STATUS_ENV" PUBLISHABLE_KEY)"
 fi
+INBUCKET_URL="$(env_value "$STATUS_ENV" INBUCKET_URL)"
+[[ -n "$INBUCKET_URL" ]] || INBUCKET_URL="$(env_value "$STATUS_ENV" MAILPIT_URL)"
+[[ -n "$INBUCKET_URL" ]] || INBUCKET_URL="http://127.0.0.1:54324"
+rm -f "$STATUS_ENV"
 
 [[ -n "$API_URL" ]] || die "could not read API_URL from \`supabase status -o env\`"
 [[ -n "$ANON_KEY" ]] || die "could not read ANON_KEY/PUBLISHABLE_KEY from \`supabase status -o env\`"
@@ -175,14 +184,14 @@ upsert_env "$ENV_FILE" "PUBLIC_SUPABASE_ANON_KEY" "$ANON_KEY" 1
 upsert_env "$ENV_FILE" "API_V1_UPSTREAM" "${API_URL%/}/functions/v1/api-v1" 0
 upsert_env "$ENV_FILE" "APP_BASE_URL" "http://127.0.0.1:5173" 0
 
-echo "==> Serving Edge Function api-v1"
+echo "==> Serving Edge Functions (hot reload)"
 stop_functions_serve
-# shellcheck disable=SC2086
-nohup supabase functions serve api-v1 >"$FUNCTIONS_LOG_FILE" 2>&1 &
+# Serves every function in supabase/functions; secrets load from supabase/functions/.env.
+nohup supabase functions serve >"$FUNCTIONS_LOG_FILE" 2>&1 &
 echo $! >"$FUNCTIONS_PID_FILE"
 sleep 1
 if ! kill -0 "$(cat "$FUNCTIONS_PID_FILE")" 2>/dev/null; then
-	die "api-v1 failed to start; see $FUNCTIONS_LOG_FILE"
+	die "functions serve failed to start; see $FUNCTIONS_LOG_FILE"
 fi
 
 cat <<EOF
@@ -192,17 +201,23 @@ Local stack is up.
   App:     http://127.0.0.1:5173
   API:     $API_URL
   Studio:  http://127.0.0.1:54323
+  Mail:    $INBUCKET_URL  (signup confirmation emails land here)
 
-  Sign up in the app, then create an organisation via onboarding.
+  Sign up in the app, confirm the email via the Mail URL above, then create an
+  organisation via onboarding.
   Optional OAuth / mailbox / calendar / cron secrets: see .env.example
+  (Edge Function secrets go in supabase/functions/.env, not the root .env).
+  Functions log: $FUNCTIONS_LOG_FILE
   Stop with: ./scripts/dev-down.sh
 
 EOF
 
 if [[ "$NO_APP" -eq 1 ]]; then
-	echo "Backend only (--no-app). Run \`pnpm dev\` in another terminal when ready."
+	echo "Backend only (--no-app). Run \`pnpm dev --host 127.0.0.1\` in another terminal when ready."
 	exit 0
 fi
 
 echo "==> Starting SvelteKit (pnpm dev)"
-exec pnpm dev
+# Bind explicitly: `localhost` can resolve to ::1 only, while Auth site_url and the
+# printed URLs use 127.0.0.1.
+exec pnpm dev --host 127.0.0.1

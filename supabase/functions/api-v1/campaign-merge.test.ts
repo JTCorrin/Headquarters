@@ -9,6 +9,15 @@ Deno.test('renderMergeTemplate substitutes known tokens and blanks unknown', () 
   assertEquals(out, 'Hello Ava from Acme — !')
 })
 
+Deno.test('renderMergeTemplate html mode escapes merged values only', () => {
+  const out = renderMergeTemplate(
+    '<p>Hi {{contact.name}}</p>',
+    { 'contact.name': '<img src=x onerror=alert(1)>' },
+    { html: true },
+  )
+  assertEquals(out, '<p>Hi &lt;img src=x onerror=alert(1)&gt;</p>')
+})
+
 Deno.test('buildCampaignMergeVars maps entity fields', () => {
   const vars = buildCampaignMergeVars({
     entityType: 'lead',

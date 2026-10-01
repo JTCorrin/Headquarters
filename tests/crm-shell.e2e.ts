@@ -5,10 +5,7 @@ import { test } from './helpers/owner-fixture.js';
 const env = readE2EEnv();
 
 test.describe('CRM shell (staging)', () => {
-	test.skip(
-		!env,
-		'Forgejo secrets E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY required'
-	);
+	test.skip(!env, 'E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY env vars required');
 
 	test('home dashboard and org-scoped CRM pages load', async ({ page }) => {
 		await page.goto('/');

@@ -1013,31 +1013,19 @@ async function handleApiKeyRequest(
 
   const resolved = await resolveOrgApiKey(token)
   const orgId = resolveApiKeyOrgId(req.headers.get('x-org-id'), resolved.org_id)
-  const db = serviceRoleDb()
-  // Prefer membership id from resolve RPC (no second Data API round-trip).
-  let membershipId: string | null = resolved.creator_membership_id
-  if (!membershipId && resolved.created_by) {
-    const { data: creatorMembership, error: creatorError } = await db
-      .from('memberships')
-      .select('id')
-      .eq('org_id', orgId)
-      .eq('user_id', resolved.created_by)
-      .eq('status', 'active')
-      .maybeSingle()
-    if (creatorError) {
-      console.error('API key creator membership lookup failed', {
-        request_id: requestId,
-        code: creatorError.code,
-        message: creatorError.message,
-      })
-      throw new ApiError(
-        500,
-        'INTERNAL_ERROR',
-        'Organisation context validation failed',
-      )
-    }
-    membershipId = creatorMembership?.id ?? null
+  if (path.startsWith('/api/v1/me/')) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'API keys cannot call personal (/me) routes; use a user JWT',
+    )
   }
+
+  const db = serviceRoleDb()
+  // resolve_api_key_by_hash only returns the creator's membership while it is active.
+  const membershipId: string | null = resolved.creator_membership_id
+  // A departed creator must not keep acting as a user through their old key.
+  const actingUserId = membershipId ? resolved.created_by : null
 
   // Routes that persist membership_id (tasks/meetings) need the minting user's membership.
   // Read routes (contacts list/get) ignore membership.id.
@@ -1051,7 +1039,7 @@ async function handleApiKeyRequest(
     path,
     {
       db,
-      userId: resolved.created_by,
+      userId: actingUserId,
       membership: membershipForRoutes,
       orgId,
       actorType: 'api_key',

@@ -3,6 +3,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import {
 	buildApiV1ProxyUrl,
 	forwardProxyHeaders,
+	forwardProxyResponseHeaders,
 	resolveApiV1Upstream
 } from '$lib/auth/proxy.js';
 import type { RequestHandler } from './$types.js';
@@ -26,9 +27,18 @@ async function proxy(event: Parameters<RequestHandler>[0]): Promise<Response> {
 		);
 	}
 
-	const pathSuffix = event.params.path ? `/${event.params.path}` : '';
-	const pathname = `/api/v1${pathSuffix}`;
+	// Raw pathname, not `event.params.path`: params are percent-decoded, so `..%2F`
+	// would become a real dot segment and escape the upstream base.
+	const pathname = event.url.pathname;
 	const target = buildApiV1ProxyUrl(upstream, pathname, event.url.search);
+	if (!target) {
+		return new Response(
+			JSON.stringify({
+				error: { code: 'VALIDATION_ERROR', message: 'Invalid API path' }
+			}),
+			{ status: 400, headers: { 'content-type': 'application/json; charset=utf-8' } }
+		);
+	}
 	const headers = forwardProxyHeaders(event.request.headers, {
 		fallbackApikey: publicEnv.PUBLIC_SUPABASE_ANON_KEY
 	});
@@ -45,20 +55,16 @@ async function proxy(event: Parameters<RequestHandler>[0]): Promise<Response> {
 
 	try {
 		const upstreamResponse = await event.fetch(target, init);
-		const responseHeaders = new Headers(upstreamResponse.headers);
-		// undici may decompress while leaving upstream Content-Length; mismatched
-		// lengths make strict clients (Playwright request, curl) abort the body.
-		responseHeaders.delete('content-encoding');
-		responseHeaders.delete('transfer-encoding');
-		responseHeaders.delete('content-length');
+		// Also drops content-encoding/length: undici may decompress while leaving the
+		// upstream Content-Length, which makes strict clients abort the body.
+		const responseHeaders = forwardProxyResponseHeaders(upstreamResponse.headers);
 		return new Response(upstreamResponse.body, {
 			status: upstreamResponse.status,
 			statusText: upstreamResponse.statusText,
 			headers: responseHeaders
 		});
 	} catch (error) {
-		const requestId =
-			event.request.headers.get('x-request-id')?.trim() || crypto.randomUUID();
+		const requestId = event.request.headers.get('x-request-id')?.trim() || crypto.randomUUID();
 		console.error('API v1 proxy upstream failure', {
 			requestId,
 			method: event.request.method,

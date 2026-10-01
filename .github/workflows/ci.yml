@@ -1,0 +1,134 @@
+name: CI
+
+# GitHub mirror of .forgejo/workflows/frontend-ci.yml + backend-ci.yml.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (Vitest, build, Playwright, Storybook)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Fresh checkouts must work without PUBLIC_API_BASE_URL (same-origin /api/v1 proxy).
+      PUBLIC_API_BASE_URL: ''
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Vitest
+        # Serialized so the client and storybook browser servers do not race optimizeDeps.
+        run: |
+          pnpm exec vitest run --coverage --project server
+          pnpm exec vitest run --coverage --project client
+          pnpm exec vitest run --project storybook
+
+      - name: Build
+        run: pnpm build
+
+      - name: Playwright (local smoke specs)
+        run: pnpm exec playwright test
+
+      - name: Storybook build
+        run: pnpm build-storybook
+
+      # Report-only until existing type/lint debt is cleared (matches Forgejo CI).
+      - name: svelte-check (report only)
+        continue-on-error: true
+        run: pnpm check
+
+      - name: Prettier + ESLint (report only)
+        continue-on-error: true
+        run: pnpm lint
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  backend:
+    name: Backend (Deno, pgTAP, db lint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.111.0
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.4
+
+      - name: Check Edge Functions
+        working-directory: supabase/functions/api-v1
+        run: |
+          deno fmt --check . ../_shared
+          deno check index.ts http.test.ts
+          deno lint . ../_shared
+
+      - name: Deno unit tests
+        working-directory: supabase/functions/api-v1
+        run: deno test --no-check
+
+      - name: Start local database
+        run: supabase db start
+
+      - name: Replay migrations and seed from zero
+        run: supabase db reset --local
+
+      - name: pgTAP tests
+        run: supabase test db
+
+      - name: Concurrency proofs
+        run: |
+          db_container="supabase_db_$(awk -F'"' '/^project_id = /{ print $2; exit }' supabase/config.toml)"
+          bash scripts/quote_document_lock_interleave.sh "${db_container}"
+          bash scripts/contact_primary_takeover_concurrency.sh "${db_container}"
+
+      - name: Lint database schemas
+        run: supabase db lint --local --schema public,private --level warning --fail-on error
+
+      - name: Verify database type generation
+        run: |
+          supabase gen types typescript --local > "${RUNNER_TEMP}/database.generated.ts"
+          test -s "${RUNNER_TEMP}/database.generated.ts"
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

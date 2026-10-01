@@ -5,7 +5,13 @@ import { handleContacts } from './contacts.ts'
 import { handleEmailTemplates } from './email-templates.ts'
 import { handleCampaigns } from './campaigns.ts'
 import { handleTags } from './tags.ts'
-import { ApiError, errorResponse, jsonResponse, parseUuid } from './http.ts'
+import {
+  ApiError,
+  errorResponse,
+  jsonResponse,
+  parseUuid,
+  TRANSCRIPT_JSON_BODY_MAX_BYTES,
+} from './http.ts'
 import { handleInvoices } from './invoices.ts'
 import { handleLeads } from './leads.ts'
 import { handleMeetings } from './meetings.ts'
@@ -3408,9 +3414,17 @@ export async function handleMcp(
     )
   }
 
+  const raw = await req.text()
+  if (new TextEncoder().encode(raw).byteLength > TRANSCRIPT_JSON_BODY_MAX_BYTES) {
+    throw new ApiError(
+      413,
+      'PAYLOAD_TOO_LARGE',
+      `Request body exceeds ${TRANSCRIPT_JSON_BODY_MAX_BYTES} bytes`,
+    )
+  }
   let parsed: unknown
   try {
-    parsed = await req.json()
+    parsed = JSON.parse(raw)
   } catch {
     throw new ApiError(400, 'BAD_REQUEST', 'Request body must be valid JSON')
   }

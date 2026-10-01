@@ -6,10 +6,7 @@ const env = readE2EEnv();
 const POST_ORG_CREATE_PATH = '/onboarding/invite-team';
 
 test.describe('CRM onboarding journey (staging)', () => {
-	test.skip(
-		!env,
-		'Forgejo secrets E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY required'
-	);
+	test.skip(!env, 'E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY env vars required');
 
 	test('signup → create organisation → reach authenticated shell', async ({ page }) => {
 		const session = await bootstrapOwnerSession(page);

@@ -61,6 +61,7 @@
 				size="icon"
 				href={$editorState.link}
 				target="_blank"
+				rel="noopener noreferrer"
 			>
 				<Link />
 			</Button>

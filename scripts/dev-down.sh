@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop Edge Function serve process and local Supabase containers.
+# Stop the Edge Functions serve process and local Supabase containers (data volumes are kept).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,7 +11,7 @@ FUNCTIONS_PID_FILE="$LOCAL_DIR/api-v1.pid"
 if [[ -f "$FUNCTIONS_PID_FILE" ]]; then
 	pid="$(cat "$FUNCTIONS_PID_FILE" 2>/dev/null || true)"
 	if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
-		echo "==> Stopping api-v1 (pid $pid)"
+		echo "==> Stopping functions serve (pid $pid)"
 		kill "$pid" 2>/dev/null || true
 		wait "$pid" 2>/dev/null || true
 	fi

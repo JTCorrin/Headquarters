@@ -115,7 +115,25 @@ function wrapBase64(value: string): string {
 }
 
 function escapeMimeFilename(filename: string): string {
-  return filename.replace(/["\\]/g, '\\$&')
+  return filename.replace(/[\r\n\0]/g, ' ').replace(/["\\]/g, '\\$&')
+}
+
+/** Reject CR/LF/NUL so header values and SMTP commands cannot be split or smuggled. */
+function assertHeaderSafe(field: string, value: string): void {
+  if (/[\r\n\0]/.test(value)) {
+    throw new SmtpSendError('smtp_header_invalid', `${field} contains a line break`, 'build')
+  }
+}
+
+/** Bare addr-spec for MAIL FROM / RCPT TO; accepts `addr` or `"Name" <addr>`. */
+export function envelopeAddress(value: string): string {
+  const trimmed = value.trim()
+  const angle = trimmed.match(/<([^<>\s]+)>$/)
+  const address = angle?.[1] ?? trimmed
+  if (!address || /[\s<>\0]/.test(address)) {
+    throw new SmtpSendError('smtp_address_invalid', 'Email address is invalid', 'envelope')
+  }
+  return address
 }
 
 function encodeHeaderUtf8(value: string): string {
@@ -176,6 +194,14 @@ export function buildMimeMessage(options: {
   references?: string | null
   date?: Date
 }): string {
+  assertHeaderSafe('From', options.from)
+  assertHeaderSafe('To', options.to)
+  assertHeaderSafe('Message-ID', options.messageId)
+  assertHeaderSafe('In-Reply-To', options.inReplyTo ?? '')
+  assertHeaderSafe('References', options.references ?? '')
+  for (const attachment of options.attachments ?? []) {
+    assertHeaderSafe('Attachment content type', attachment.contentType)
+  }
   const date = (options.date ?? new Date()).toUTCString()
   const messageId = formatMessageIdHeader(options.messageId)
   const lines: string[] = [
@@ -612,6 +638,20 @@ export async function sendSmtpMail(
     )
   }
 
+  const envelopeFrom = envelopeAddress(options.from)
+  const envelopeTo = envelopeAddress(options.to)
+  const mime = buildMimeMessage({
+    from: options.from,
+    to: options.to,
+    subject: options.subject,
+    bodyText: options.bodyText,
+    bodyHtml: options.bodyHtml,
+    attachments: options.attachments,
+    messageId: options.messageId,
+    inReplyTo: options.inReplyTo,
+    references: options.references,
+  })
+
   if (isSyntheticSmtpHost(host)) {
     return { message_id: options.messageId, synthetic: true }
   }
@@ -637,24 +677,13 @@ export async function sendSmtpMail(
       await smtpAuthXoauth2(session, auth.username, auth.accessToken)
     }
 
-    await session.writeLine(`MAIL FROM:<${options.from}>`)
+    await session.writeLine(`MAIL FROM:<${envelopeFrom}>`)
     await session.expect([250], 'SMTP MAIL FROM')
-    await session.writeLine(`RCPT TO:<${options.to}>`)
+    await session.writeLine(`RCPT TO:<${envelopeTo}>`)
     await session.expect([250, 251], 'SMTP RCPT TO')
     await session.writeLine('DATA')
     await session.expect([354], 'SMTP DATA')
 
-    const mime = buildMimeMessage({
-      from: options.from,
-      to: options.to,
-      subject: options.subject,
-      bodyText: options.bodyText,
-      bodyHtml: options.bodyHtml,
-      attachments: options.attachments,
-      messageId: options.messageId,
-      inReplyTo: options.inReplyTo,
-      references: options.references,
-    })
     await session.writeRaw(mime)
     await session.writeLine('.')
     await session.expect([250], 'SMTP DATA end')

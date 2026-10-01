@@ -2,9 +2,11 @@ import { assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@1'
 import {
   buildMimeMessage,
   classifySmtpProbeError,
+  envelopeAddress,
   formatMessageIdHeader,
   generateOutboundMessageId,
   isSyntheticSmtpHost,
+  type OpenSmtpFn,
   probeSmtp,
   replySubject,
   sendSmtpMail,
@@ -281,6 +283,68 @@ Deno.test('sendSmtpMail with attachment still short-circuits synthetic hosts', a
   } finally {
     setOpenSmtpConnectionForTests(null)
   }
+})
+
+Deno.test('envelopeAddress extracts addr-spec from display-name form', () => {
+  assertEquals(envelopeAddress('billing@example.test'), 'billing@example.test')
+  assertEquals(envelopeAddress('"Acme Billing" <billing@example.test>'), 'billing@example.test')
+  assertThrows(() => envelopeAddress('a@b.test>\r\nRCPT TO:<x@y.test'), SmtpSendError)
+  assertThrows(() => envelopeAddress('  '), SmtpSendError)
+})
+
+Deno.test('buildMimeMessage rejects CR/LF header injection', () => {
+  const base = {
+    from: 'me@example.test',
+    to: 'peer@example.test',
+    subject: 'Hi',
+    bodyText: 'x',
+    messageId: '<id@example.test>',
+  }
+  assertThrows(
+    () => buildMimeMessage({ ...base, to: 'peer@example.test\r\nBcc: victim@example.test' }),
+    SmtpSendError,
+  )
+  assertThrows(
+    () => buildMimeMessage({ ...base, inReplyTo: 'a@b\r\nX-Injected: 1' }),
+    SmtpSendError,
+  )
+  const mime = buildMimeMessage({ ...base, subject: 'Hi\r\nBcc: victim@example.test' })
+  assertEquals(mime.includes('\r\nBcc:'), false)
+})
+
+Deno.test('sendSmtpMail uses bare envelope addresses for display-name From', async () => {
+  const written: string[] = []
+  const replies = [250, 250, 250, 354, 250, 221]
+  setOpenSmtpConnectionForTests(() =>
+    Promise.resolve(
+      {
+        writeLine: (line: string) => {
+          written.push(line)
+          return Promise.resolve()
+        },
+        writeRaw: () => Promise.resolve(),
+        expect: () => Promise.resolve(''),
+        readReply: () => Promise.resolve({ code: replies.shift() ?? 221, text: '' }),
+        close: () => {},
+      } as unknown as Awaited<ReturnType<OpenSmtpFn>>,
+    )
+  )
+  try {
+    await sendSmtpMail({
+      host: 'smtp.mail.test',
+      port: 587,
+      security: 'starttls',
+      from: '"Acme" <billing@mail.test>',
+      to: 'client@mail.test',
+      subject: 'Invoice',
+      bodyText: 'attached',
+      messageId: '<id@mail.test>',
+    })
+  } finally {
+    setOpenSmtpConnectionForTests(null)
+  }
+  assertEquals(written.includes('MAIL FROM:<billing@mail.test>'), true)
+  assertEquals(written.includes('RCPT TO:<client@mail.test>'), true)
 })
 
 Deno.test('sendSmtpMail rejects empty host', async () => {

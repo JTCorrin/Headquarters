@@ -19,22 +19,68 @@ export function resolveApiV1Upstream(options: {
 	return fallback ? fallback.replace(/\/+$/, '') : null;
 }
 
+function isSafeProxySegment(segment: string): boolean {
+	let decoded: string;
+	try {
+		decoded = decodeURIComponent(segment);
+	} catch {
+		return false;
+	}
+	return decoded !== '.' && decoded !== '..' && !/[/\\?#]/.test(decoded);
+}
+
 /**
  * Browser path `/api/v1/organisations` → edge `/functions/v1/api-v1/organisations`
  * (apiPath on the edge accepts this; avoids `api-v1/api/v1` in the browser).
+ *
+ * `pathname` must be the raw (still percent-encoded) request path. Returns null
+ * when a segment could escape the upstream base (dot segments, encoded `/`, `\`,
+ * `?`, `#`), so callers can reject the request instead of proxying elsewhere.
  */
 export function buildApiV1ProxyUrl(
 	upstreamBase: string,
 	pathname: string,
 	search = ''
-): string {
+): string | null {
 	const base = upstreamBase.replace(/\/+$/, '');
 	const normalized = pathname.replace(/\/+$/, '') || '/';
 	const suffix = normalized.startsWith('/api/v1')
 		? normalized.slice('/api/v1'.length) || '/'
 		: normalized;
 	const path = suffix.startsWith('/') ? suffix : `/${suffix}`;
-	return `${base}${path}${search}`;
+	if (!path.split('/').filter(Boolean).every(isSafeProxySegment)) return null;
+
+	const target = `${base}${path}${search}`;
+	try {
+		const basePath = new URL(base).pathname.replace(/\/+$/, '');
+		const resolved = new URL(target);
+		if (resolved.origin !== new URL(base).origin) return null;
+		if (resolved.pathname !== basePath && !resolved.pathname.startsWith(`${basePath}/`)) {
+			return null;
+		}
+	} catch {
+		return null;
+	}
+	return target;
+}
+
+/** Upstream response headers that must not be relayed to the browser. */
+const STRIP_RESPONSE_HEADERS = [
+	'connection',
+	'content-encoding',
+	'content-length',
+	'keep-alive',
+	'proxy-authenticate',
+	'set-cookie',
+	'trailer',
+	'transfer-encoding',
+	'upgrade'
+];
+
+export function forwardProxyResponseHeaders(source: Headers): Headers {
+	const headers = new Headers(source);
+	for (const name of STRIP_RESPONSE_HEADERS) headers.delete(name);
+	return headers;
 }
 
 /**

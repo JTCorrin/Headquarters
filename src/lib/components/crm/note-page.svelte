@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
 	import {
@@ -323,11 +323,25 @@
 		}
 	}
 
+	/** Best-effort save of the outgoing note before a reload resets local state. */
+	function flushBeforeReload() {
+		if (!note || !dirty || saveStatus === 'conflict') return;
+		const target = note;
+		const body = snapshot();
+		dirty = false;
+		void api.notes.update(target.id, body, target.version).catch(() => {});
+	}
+
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void noteId;
-		void loadAll();
+		// loadAll reads memberships/note state synchronously; untracked so those
+		// writes don't re-run this effect and reset in-progress edits.
+		untrack(() => {
+			flushBeforeReload();
+			void loadAll();
+		});
 	});
 
 	// Flush pending edits when the tab is hidden or the component unmounts (route change).

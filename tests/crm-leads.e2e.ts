@@ -5,10 +5,7 @@ import { test } from './helpers/owner-fixture.js';
 const env = readE2EEnv();
 
 test.describe('CRM leads journey (staging)', () => {
-	test.skip(
-		!env,
-		'Forgejo secrets E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY required'
-	);
+	test.skip(!env, 'E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY env vars required');
 
 	test('create a lead via UI (browser → proxy → Edge → DB)', async ({ page }) => {
 		const name = `E2E Lead ${Date.now()}`;

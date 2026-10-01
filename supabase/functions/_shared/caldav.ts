@@ -86,6 +86,7 @@ export function hostnameFromCaldavUrl(caldavUrl: string): string {
 export function icsEscapeText(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
+    .replace(/\r\n?/g, '\n')
     .replace(/\n/g, '\\n')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
@@ -191,6 +192,7 @@ export type LiveCaldavClientOptions = {
 }
 
 const CALDAV_MAX_REDIRECTS = 5
+const CALDAV_REQUEST_TIMEOUT_MS = 15_000
 
 export async function createLiveCaldavClient(
   options: LiveCaldavClientOptions,
@@ -238,11 +240,12 @@ export async function createLiveCaldavClient(
     init: { body?: string; contentType?: string; depth?: string } = {},
   ): Promise<Response> {
     let current = url
+    const credentialOrigin = new URL(collectionUrl).origin
     for (let hop = 0; hop <= CALDAV_MAX_REDIRECTS; hop++) {
       await assertSafeUrl(current)
-      const headers: Record<string, string> = {
-        authorization: auth,
-      }
+      const headers: Record<string, string> = {}
+      // Never forward Basic credentials to a different origin via redirect.
+      if (new URL(current).origin === credentialOrigin) headers.authorization = auth
       if (init.contentType) headers['content-type'] = init.contentType
       if (init.depth) headers.depth = init.depth
       const res = await fetchImpl(current, {
@@ -250,6 +253,7 @@ export async function createLiveCaldavClient(
         headers,
         body: init.body,
         redirect: 'manual',
+        signal: AbortSignal.timeout(CALDAV_REQUEST_TIMEOUT_MS),
       })
       if (res.status < 300 || res.status >= 400) return res
       const location = res.headers.get('location')

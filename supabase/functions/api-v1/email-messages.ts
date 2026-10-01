@@ -13,7 +13,7 @@ import {
   runImapInboxSync,
   safeMailboxSyncFailureMessage,
 } from '../_shared/imap-inbound.ts'
-import { resolveMailboxAuth } from '../_shared/mailbox-credentials.ts'
+import { resolveMailboxAuth, resolveMailboxAuthForUser } from '../_shared/mailbox-credentials.ts'
 import {
   generateOutboundMessageId,
   isSyntheticSmtpHost,
@@ -482,7 +482,7 @@ async function replyEmailMessage(
 
   try {
     const service = serviceRoleClient()
-    const resolved = await resolveMailboxAuth(service, mailboxId, orgId)
+    const resolved = await resolveMailboxAuthForUser(db, service, mailboxId, orgId)
     if (!resolved) {
       await abortReplyClaim(db, orgId, keyHash)
       throw new ApiError(
@@ -772,7 +772,7 @@ export async function composeEntityEmailMessage(
 
   try {
     const service = serviceRoleClient()
-    const resolved = await resolveMailboxAuth(service, mailboxId, orgId)
+    const resolved = await resolveMailboxAuthForUser(db, service, mailboxId, orgId)
     if (!resolved) {
       await abortComposeClaim(db, orgId, keyHash)
       throw new ApiError(

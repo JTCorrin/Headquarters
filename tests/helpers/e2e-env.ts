@@ -1,8 +1,9 @@
 /**
- * Staging Playwright env contract (Forgejo Actions secrets).
+ * Playwright env contract for CRM journeys against a running deployment
+ * (CI secrets or local shell env).
  *
  * Required:
- *   E2E_BASE_URL            — staging app origin (e.g. http://10.0.0.136:4173)
+ *   E2E_BASE_URL            — deployed app origin (e.g. https://staging.example.com)
  *   E2E_SUPABASE_URL        — staging Kong/Auth (CI gate; journeys use the app UI)
  *   E2E_SUPABASE_ANON_KEY   — staging anon key (never service-role)
  *
@@ -38,7 +39,7 @@ export function requireE2EEnv(): E2EEnv {
 	const env = readE2EEnv();
 	if (!env) {
 		throw new Error(
-			'Missing E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY — set Forgejo Actions secrets'
+			'Missing E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY — set them in the environment'
 		);
 	}
 	return env;

@@ -81,6 +81,7 @@ import {
 import { decodeMeetingCursor, parseMeetingListRange, validateMeetingBody } from './meetings.ts'
 import {
   buildVeventIcs,
+  createLiveCaldavClient,
   createStubCaldavClient,
   eventObjectUrl,
   hostnameFromCaldavUrl,
@@ -1855,6 +1856,36 @@ Deno.test('caldav upsert validation requires url username provider', () => {
       }),
     ApiError,
   )
+})
+
+Deno.test('icsEscapeText folds CR so properties cannot be injected', () => {
+  assertEquals(icsEscapeText('a\r\nATTENDEE:x'), 'a\\nATTENDEE:x')
+  assertEquals(icsEscapeText('a\rb'), 'a\\nb')
+})
+
+Deno.test('live caldav client drops Basic auth on cross-origin redirect', async () => {
+  const seen: Array<{ url: string; auth: string | null }> = []
+  const client = await createLiveCaldavClient({
+    caldavUrl: 'https://dav.public.test/cal/',
+    username: 'u',
+    password: 'p',
+    resolveDns: (_host, type) => Promise.resolve(type === 'A' ? ['93.184.216.34'] : []),
+    fetchImpl: (input, init) => {
+      const url = String(input)
+      const headers = new Headers(init?.headers)
+      seen.push({ url, auth: headers.get('authorization') })
+      if (url.startsWith('https://dav.public.test/')) {
+        return Promise.resolve(
+          new Response(null, { status: 307, headers: { location: 'https://other.public.test/x' } }),
+        )
+      }
+      return Promise.resolve(new Response(null, { status: 207 }))
+    },
+  })
+  await client.propfind()
+  assertEquals(seen.length, 2)
+  assertEquals(seen[0]!.auth?.startsWith('Basic '), true)
+  assertEquals(seen[1]!.auth, null)
 })
 
 Deno.test('caldav client helpers + stub put/delete', async () => {

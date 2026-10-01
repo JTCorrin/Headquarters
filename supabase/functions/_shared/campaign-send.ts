@@ -151,7 +151,9 @@ export async function sendCampaignRecipient(input: {
   })
   const subject = renderMergeTemplate(template.subject, vars)
   const bodyText = renderMergeTemplate(template.body_text ?? '', vars)
-  const bodyHtml = template.body_html ? renderMergeTemplate(template.body_html, vars) : null
+  const bodyHtml = template.body_html
+    ? renderMergeTemplate(template.body_html, vars, { html: true })
+    : null
 
   let resolved
   try {

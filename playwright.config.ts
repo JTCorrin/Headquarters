@@ -4,8 +4,8 @@ const e2eBaseURL = process.env.E2E_BASE_URL?.trim().replace(/\/+$/, '');
 const againstStaging = Boolean(e2eBaseURL);
 
 /**
- * Local default: build + preview (demo / proxy-health without secrets).
- * Staging CRM journeys: set E2E_BASE_URL (+ Supabase secrets) and skip local webServer.
+ * Local default: build + preview (smoke specs such as proxy-health, no secrets).
+ * CRM journeys: set E2E_BASE_URL (+ Supabase secrets) and skip local webServer.
  */
 export default defineConfig({
 	testMatch: '**/*.e2e.{ts,js}',

@@ -29,7 +29,9 @@ if ! supabase status >/dev/null 2>&1; then
 	exit 1
 fi
 
+# Includes the service-role key; keep the temp file private and short-lived.
 STATUS_ENV="$(mktemp)"
+chmod 600 "$STATUS_ENV"
 trap 'rm -f "$STATUS_ENV"' EXIT
 supabase status -o env >"$STATUS_ENV"
 
@@ -58,7 +60,7 @@ Headquarters local status
   App:            $APP_URL
   Supabase API:   $API_URL
   Studio:         $STUDIO_URL
-  api-v1 serve:   $API_SERVE
+  Functions:      $API_SERVE
   Anon key:       ${ANON_KEY:0:24}… (${#ANON_KEY} chars)
 
   .env:           $ENV_FILE

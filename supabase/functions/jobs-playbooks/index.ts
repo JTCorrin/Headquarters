@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (tick.context) {
+      if (tick.kind !== 'failed' && tick.context) {
         ctx.context = tick.context
       }
 

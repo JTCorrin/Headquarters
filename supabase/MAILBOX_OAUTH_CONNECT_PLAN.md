@@ -83,11 +83,11 @@ Update credential RPCs so sync/test/send return either `{ auth_mode: 'password',
 
 In `supabase/functions/api-v1/mailbox.ts`:
 
-| Route | Behavior |
-|-------|----------|
-| `GET /api/v1/me/mailbox/oauth/start?provider=microsoft\|google` | Create state, return authorize URL |
-| `GET\|POST /api/v1/me/mailbox/oauth/callback` | Consume state, exchange code, upsert mailbox with OAuth secret + preset hosts, return public status |
-| Existing `test` / `sync` / SMTP send paths | Refresh access token if needed, persist updated blob, auth via XOAUTH2 |
+| Route                                                           | Behavior                                                                                            |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/me/mailbox/oauth/start?provider=microsoft\|google` | Create state, return authorize URL                                                                  |
+| `GET\|POST /api/v1/me/mailbox/oauth/callback`                   | Consume state, exchange code, upsert mailbox with OAuth secret + preset hosts, return public status |
+| Existing `test` / `sync` / SMTP send paths                      | Refresh access token if needed, persist updated blob, auth via XOAUTH2                              |
 
 Include a staging stub mode (like calendar) so CI can complete the flow without live IdPs.
 

@@ -15,6 +15,7 @@ export function createSupabaseServerClient(event: RequestEvent): SupabaseClient 
 				for (const { name, value, options } of cookies) {
 					event.cookies.set(name, value, {
 						...options,
+						secure: options.secure ?? event.url.protocol === 'https:',
 						path: '/'
 					});
 				}

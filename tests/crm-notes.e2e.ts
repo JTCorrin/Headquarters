@@ -6,10 +6,7 @@ import { test } from './helpers/owner-fixture.js';
 const env = readE2EEnv();
 
 test.describe('CRM notes journey (staging)', () => {
-	test.skip(
-		!env,
-		'Forgejo secrets E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY required'
-	);
+	test.skip(!env, 'E2E_BASE_URL / E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY env vars required');
 
 	test('create a note, autosave the title, and see it in the grid', async ({ page }) => {
 		const title = `E2E Note ${Date.now()}`;

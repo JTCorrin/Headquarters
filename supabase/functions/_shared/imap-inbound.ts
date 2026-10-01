@@ -11,6 +11,8 @@ export type ImapSecurity = 'tls' | 'starttls' | 'none'
 /** Defaults — Edge sync/probe should finish or fail honestly before platform kill. */
 export const IMAP_CONNECT_TIMEOUT_MS = 10_000
 export const IMAP_COMMAND_TIMEOUT_MS = 30_000
+/** Upper bound for a single server literal; protects the isolate from hostile servers. */
+const IMAP_MAX_LITERAL_BYTES = 64 * 1024 * 1024
 export const IMAP_PROBE_TIMEOUT_MS = 15_000
 export const IMAP_SYNC_OVERALL_TIMEOUT_MS = 90_000
 
@@ -209,7 +211,10 @@ export function isBlockedOutboundIp(ip: string): boolean {
       inIpv4Cidr(v4, [169, 254, 0, 0], 16) || // link-local + metadata
       inIpv4Cidr(v4, [172, 16, 0, 0], 12) ||
       inIpv4Cidr(v4, [192, 168, 0, 0], 16) ||
-      inIpv4Cidr(v4, [100, 64, 0, 0], 10) // CGNAT
+      inIpv4Cidr(v4, [100, 64, 0, 0], 10) || // CGNAT
+      inIpv4Cidr(v4, [192, 0, 0, 0], 24) || // IETF protocol assignments
+      inIpv4Cidr(v4, [198, 18, 0, 0], 15) || // benchmarking
+      inIpv4Cidr(v4, [224, 0, 0, 0], 3) // multicast, reserved, broadcast
     )
   }
 
@@ -231,12 +236,48 @@ export function isBlockedOutboundIp(ip: string): boolean {
   if (v6 === '::1' || v6 === '0:0:0:0:0:0:0:1') return true
   if (v6 === '::' || v6 === '0:0:0:0:0:0:0:0') return true
 
-  // Unique local fc00::/7, link-local fe80::/10
+  // Unique local fc00::/7, link-local fe80::/10, multicast ff00::/8
   const head = v6.split(':')[0] ?? ''
   if (/^f[cd]/i.test(head)) return true
   if (/^fe[89ab]/i.test(head)) return true
+  if (/^ff/i.test(head) && head.length === 4) return true
+
+  const hextets = expandIpv6(v6)
+  if (!hextets) return true
+  const embeddedV4 = (hi: number, lo: number) =>
+    isBlockedOutboundIp(`${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`)
+  // IPv4-compatible ::/96 (deprecated) and IPv4-mapped ::ffff:0:0/96 in hex form.
+  if (hextets.slice(0, 5).every((h) => h === 0)) {
+    if (hextets[5] === 0) return true
+    if (hextets[5] === 0xffff) return embeddedV4(hextets[6]!, hextets[7]!)
+  }
+  // NAT64 64:ff9b::/96 and 6to4 2002::/16 embed an IPv4 destination.
+  if (
+    hextets[0] === 0x64 && hextets[1] === 0xff9b &&
+    hextets.slice(2, 6).every((h) => h === 0)
+  ) {
+    return embeddedV4(hextets[6]!, hextets[7]!)
+  }
+  if (hextets[0] === 0x2002) return embeddedV4(hextets[1]!, hextets[2]!)
 
   return false
+}
+
+function expandIpv6(value: string): number[] | null {
+  const halves = value.split('::')
+  if (halves.length > 2) return null
+  const parse = (part: string) => (part ? part.split(':') : [])
+  const head = parse(halves[0] ?? '')
+  const tail = halves.length === 2 ? parse(halves[1] ?? '') : []
+  const missing = 8 - head.length - tail.length
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return null
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...tail]
+  const out: number[] = []
+  for (const group of groups) {
+    if (!/^[0-9a-f]{1,4}$/i.test(group)) return null
+    out.push(parseInt(group, 16))
+  }
+  return out
 }
 
 /** True for localhost / internal / metadata-style hostnames (not public DNS names). */
@@ -1049,20 +1090,22 @@ class ImapSession {
   }
 
   private async fill(minBytes: number): Promise<void> {
-    while (this.buffer.length < minBytes) {
-      const chunk = new Uint8Array(8192)
-      const n = await this.conn.read(chunk)
+    if (this.buffer.length >= minBytes) return
+    // Allocate once for the full requirement so large literals are not re-copied per chunk.
+    const next = new Uint8Array(Math.max(minBytes, this.buffer.length + 8192))
+    next.set(this.buffer)
+    let filled = this.buffer.length
+    while (filled < minBytes) {
+      const n = await this.conn.read(next.subarray(filled))
       if (n === null) {
         throw new ImapSyncError(
           'imap_connection_failed',
           'IMAP connection closed',
         )
       }
-      const next = new Uint8Array(this.buffer.length + n)
-      next.set(this.buffer)
-      next.set(chunk.subarray(0, n), this.buffer.length)
-      this.buffer = next
+      filled += n
     }
+    this.buffer = next.subarray(0, filled)
   }
 
   private async readLineBytes(): Promise<Uint8Array> {
@@ -1119,6 +1162,12 @@ class ImapSession {
       const literalMatch = line.match(/\{(\d+)\}$/)
       if (literalMatch) {
         const size = Number(literalMatch[1])
+        if (!Number.isSafeInteger(size) || size > IMAP_MAX_LITERAL_BYTES) {
+          throw new ImapSyncError(
+            'imap_protocol_error',
+            'IMAP server sent an oversized literal',
+          )
+        }
         // RFC 3501: `{n} CRLF` then exactly n octets; response continues immediately
         // (often `)` or the next BODY token). Do NOT consume a phantom post-literal CRLF.
         const literal = await this.readExact(size)

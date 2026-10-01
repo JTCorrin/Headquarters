@@ -441,6 +441,29 @@ Deno.test('isBlockedOutboundIp rejects private/link-local/metadata ranges', () =
   assertEquals(isBlockedOutboundIp('1.1.1.1'), false)
 })
 
+Deno.test('isBlockedOutboundIp rejects IPv4 embedded in IPv6 and reserved ranges', () => {
+  assertEquals(isBlockedOutboundIp('::ffff:7f00:1'), true)
+  assertEquals(isBlockedOutboundIp('[::ffff:a9fe:a9fe]'), true)
+  assertEquals(isBlockedOutboundIp('::127.0.0.1'), true)
+  assertEquals(isBlockedOutboundIp('64:ff9b::a9fe:a9fe'), true)
+  assertEquals(isBlockedOutboundIp('2002:0a00:0001::1'), true)
+  assertEquals(isBlockedOutboundIp('ff02::1'), true)
+  assertEquals(isBlockedOutboundIp('224.0.0.1'), true)
+  assertEquals(isBlockedOutboundIp('255.255.255.255'), true)
+  assertEquals(isBlockedOutboundIp('198.18.0.1'), true)
+  assertEquals(isBlockedOutboundIp('::ffff:808:808'), false)
+  assertEquals(isBlockedOutboundIp('2606:4700:4700::1111'), false)
+  assertEquals(isBlockedOutboundIp('2002:0808:0808::1'), false)
+})
+
+Deno.test('IMAP session rejects oversized server literals', async () => {
+  const error = await assertRejects(
+    () => runImapCommandForTests(scriptedConn('* 1 FETCH (BODY[] {999999999999}\r\n'), 'NOOP'),
+    ImapSyncError,
+  )
+  assertEquals(error.code, 'imap_protocol_error')
+})
+
 Deno.test('isBlockedOutboundHostname rejects internal names', () => {
   assertEquals(isBlockedOutboundHostname('localhost'), true)
   assertEquals(isBlockedOutboundHostname('mail.internal'), true)

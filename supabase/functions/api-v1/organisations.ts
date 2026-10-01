@@ -621,11 +621,10 @@ export async function createLogoUploadIntent(
   const path = `org/${orgId}/branding/logo.${ext}`
 
   const admin = serviceRoleClient()
-  // Replace any existing object at this path so createSignedUploadUrl succeeds.
-  await admin.storage.from(ORG_ASSETS_BUCKET).remove([path])
+  // Overwrite in place: deleting first would break the current logo if the upload never lands.
   const { data: signed, error: signError } = await admin.storage
     .from(ORG_ASSETS_BUCKET)
-    .createSignedUploadUrl(path)
+    .createSignedUploadUrl(path, { upsert: true })
 
   if (signError || !signed) {
     console.error('Signed logo upload URL failed', {
