@@ -87,10 +87,7 @@
 				api.organisationAccess.listMembers(),
 				api.organisationAccess.listInvitations(),
 				api.mailbox.get().catch((error: unknown) => {
-					if (
-						isApiClientError(error) &&
-						(error.status === 404 || error.code === 'NOT_FOUND')
-					) {
+					if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 						return null;
 					}
 					throw error;

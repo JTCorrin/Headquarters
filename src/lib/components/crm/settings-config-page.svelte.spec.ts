@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { page } from 'vitest/browser';
 import SettingsConfigPageTestHost from './settings-config-page.test-host.svelte';
-import type {
-	OrganisationConfigResource,
-	TaxRateResource
-} from '$lib/schemas/organisation.js';
+import type { OrganisationConfigResource, TaxRateResource } from '$lib/schemas/organisation.js';
 import { navGroupsWithActive } from '../../../stories/crm/story-fixtures.js';
 
 const configuration: OrganisationConfigResource = {
@@ -83,9 +80,7 @@ describe('SettingsConfigPage', () => {
 		});
 
 		await expect.element(page.getByTestId('personal-mail-section')).toBeInTheDocument();
-		await expect
-			.element(page.getByText(/not the org Email sending/i))
-			.toBeInTheDocument();
+		await expect.element(page.getByText(/not the org Email sending/i)).toBeInTheDocument();
 		await expect.element(page.getByTestId('profile-mailbox-form')).toBeInTheDocument();
 		expect(page.getByTestId('mailbox-sync-interval').elements().length).toBe(0);
 	});
@@ -137,9 +132,7 @@ describe('SettingsConfigPage', () => {
 
 		await page.getByTestId('tax-rate-set-default-tax-2').click();
 		expect(onSetDefaultTaxRate).toHaveBeenCalledWith('tax-2');
-		await expect
-			.element(page.getByTestId('tax-rate-row-tax-2'))
-			.toHaveTextContent(/Default/i);
+		await expect.element(page.getByTestId('tax-rate-row-tax-2')).toHaveTextContent(/Default/i);
 	});
 
 	it('keeps tax mutation controls hidden for admin roles', async () => {

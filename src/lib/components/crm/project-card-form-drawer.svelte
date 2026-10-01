@@ -48,13 +48,7 @@
 			<Drawer.Description>{description}</Drawer.Description>
 		</Drawer.Header>
 		<div class="overflow-y-auto px-4 pb-2">
-			<ProjectCardForm
-				{form}
-				{submitLabel}
-				{onValidSubmit}
-				{onDelete}
-				class="max-w-none"
-			/>
+			<ProjectCardForm {form} {submitLabel} {onValidSubmit} {onDelete} class="max-w-none" />
 		</div>
 		<Drawer.Footer class="pt-0">
 			<Drawer.Close>

@@ -2,11 +2,7 @@
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
 	import { centsToAmountString } from '$lib/money.js';
-	import {
-		convertLeadFormSchema,
-		leadFormSchema,
-		type LeadResource
-	} from '$lib/schemas/lead.js';
+	import { convertLeadFormSchema, leadFormSchema, type LeadResource } from '$lib/schemas/lead.js';
 	import LeadDetailPage, { type LeadConvertResult } from './lead-detail-page.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 
@@ -49,7 +45,7 @@
 		{
 			validators: zod4(leadFormSchema),
 			SPA: true,
-		warnings: { duplicateId: false },
+			warnings: { duplicateId: false },
 			applyAction: false,
 			resetForm: false
 		}
@@ -60,7 +56,7 @@
 		{
 			validators: zod4(convertLeadFormSchema),
 			SPA: true,
-		warnings: { duplicateId: false },
+			warnings: { duplicateId: false },
 			applyAction: false,
 			resetForm: false
 		}

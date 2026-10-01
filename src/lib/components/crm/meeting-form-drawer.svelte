@@ -55,10 +55,7 @@
 		const token = ++loadToken;
 		relatedEntityLoading = true;
 		try {
-			const options = await loadMeetingRelatedEntityOptions(
-				api,
-				type as MeetingRelatedEntityType
-			);
+			const options = await loadMeetingRelatedEntityOptions(api, type as MeetingRelatedEntityType);
 			if (token !== loadToken) return;
 			relatedEntityOptions = options;
 		} catch {

@@ -37,16 +37,12 @@
 	let inputValue = $state('');
 
 	const contactsForClient = $derived(
-		!clientId
-			? []
-			: contactOptions.filter((c) => c.clientId === clientId)
+		!clientId ? [] : contactOptions.filter((c) => c.clientId === clientId)
 	);
 	const selectedIds = $derived(new Set(recipients.map((r) => r.contactId)));
 	const available = $derived(
 		contactsForClient.filter(
-			(c) =>
-				!selectedIds.has(c.id) &&
-				c.label.toLowerCase().includes(search.trim().toLowerCase())
+			(c) => !selectedIds.has(c.id) && c.label.toLowerCase().includes(search.trim().toLowerCase())
 		)
 	);
 
@@ -100,7 +96,7 @@
 				<li>
 					<span
 						class={cn(
-							'border-border bg-muted/40 inline-flex items-center gap-1 rounded-3xl border px-2 py-1 text-xs',
+							'inline-flex items-center gap-1 rounded-3xl border border-border bg-muted/40 px-2 py-1 text-xs',
 							row.isBilling && 'border-primary/40 bg-primary/5'
 						)}
 					>
@@ -110,7 +106,7 @@
 						{:else if !disabled}
 							<button
 								type="button"
-								class="text-muted-foreground hover:text-foreground text-[10px] underline-offset-2 hover:underline"
+								class="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 								onclick={() => setBilling(row.contactId)}
 								data-testid="document-recipient-set-billing"
 							>
@@ -120,7 +116,7 @@
 						{#if !disabled}
 							<button
 								type="button"
-								class="text-muted-foreground hover:text-foreground ml-0.5 inline-flex size-4 items-center justify-center"
+								class="ml-0.5 inline-flex size-4 items-center justify-center text-muted-foreground hover:text-foreground"
 								aria-label={`Remove ${labelFor(row.contactId)}`}
 								onclick={() => removeContact(row.contactId)}
 								data-testid="document-recipient-remove"
@@ -133,21 +129,16 @@
 			{/each}
 		</ul>
 	{:else}
-		<p class="text-muted-foreground text-xs">No recipients — optional.</p>
+		<p class="text-xs text-muted-foreground">No recipients — optional.</p>
 	{/if}
 
 	{#if !disabled && contactsForClient.length > 0 && recipients.length < 25}
-		<ComboboxPrimitive.Root
-			type="single"
-			bind:open
-			inputValue={inputValue}
-			onValueChange={addContact}
-		>
+		<ComboboxPrimitive.Root type="single" bind:open {inputValue} onValueChange={addContact}>
 			<div class="relative">
 				<ComboboxPrimitive.Input
 					{id}
 					class={cn(
-						'border-input bg-input/50 focus-visible:border-ring focus-visible:ring-ring/30 flex h-9 w-full rounded-3xl border border-transparent px-3 py-2 pr-9 text-sm outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50',
+						'flex h-9 w-full rounded-3xl border border-input border-transparent bg-input/50 px-3 py-2 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50',
 						'text-muted-foreground'
 					)}
 					placeholder="Add contact…"
@@ -165,7 +156,7 @@
 					data-testid="document-recipients-add"
 				/>
 				<ComboboxPrimitive.Trigger
-					class="text-muted-foreground absolute top-0 right-0 flex h-9 w-9 items-center justify-center"
+					class="absolute top-0 right-0 flex h-9 w-9 items-center justify-center text-muted-foreground"
 					aria-label="Toggle contact list"
 				>
 					<ChevronDownIcon class="size-4" />
@@ -173,18 +164,18 @@
 			</div>
 			<ComboboxPrimitive.Portal>
 				<ComboboxPrimitive.Content
-					class="bg-popover text-popover-foreground z-50 max-h-72 min-w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-3xl shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
+					class="z-50 max-h-72 min-w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-3xl bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
 					sideOffset={4}
 				>
 					<div class="max-h-72 overflow-y-auto p-1">
 						{#if available.length === 0}
-							<p class="text-muted-foreground px-3 py-2 text-sm">No contacts to add</p>
+							<p class="px-3 py-2 text-sm text-muted-foreground">No contacts to add</p>
 						{:else}
 							{#each available as option (option.id)}
 								<ComboboxPrimitive.Item
 									value={option.id}
 									label={option.label}
-									class="data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground flex cursor-pointer items-center rounded-2xl px-3 py-2 text-sm outline-none"
+									class="flex cursor-pointer items-center rounded-2xl px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
 								>
 									{option.label}
 								</ComboboxPrimitive.Item>
@@ -195,13 +186,13 @@
 			</ComboboxPrimitive.Portal>
 		</ComboboxPrimitive.Root>
 	{:else if !disabled && recipients.length >= 25}
-		<p class="text-muted-foreground text-xs">Max 25 recipients</p>
+		<p class="text-xs text-muted-foreground">Max 25 recipients</p>
 	{:else if !disabled && !clientId}
-		<p class="text-muted-foreground text-xs" data-testid="document-recipients-need-client">
+		<p class="text-xs text-muted-foreground" data-testid="document-recipients-need-client">
 			Select a client to add recipients.
 		</p>
 	{:else if !disabled && clientId && contactsForClient.length === 0}
-		<p class="text-muted-foreground text-xs" data-testid="document-recipients-empty-client">
+		<p class="text-xs text-muted-foreground" data-testid="document-recipients-empty-client">
 			No contacts linked to this client.
 		</p>
 	{/if}

@@ -67,7 +67,7 @@
 <ComboboxPrimitive.Root
 	type="single"
 	bind:open
-	inputValue={inputValue}
+	{inputValue}
 	value={value || undefined}
 	onValueChange={handleChange}
 	{disabled}
@@ -76,10 +76,10 @@
 		<ComboboxPrimitive.Input
 			{id}
 			class={cn(
-				'border-input bg-input/50 focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 flex h-9 w-full rounded-3xl border border-transparent px-3 py-2 pr-9 text-sm outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50',
+				'flex h-9 w-full rounded-3xl border border-input border-transparent bg-input/50 px-3 py-2 pr-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
 				!selected && 'text-muted-foreground'
 			)}
-			placeholder={placeholder}
+			{placeholder}
 			aria-invalid={ariaInvalid}
 			oninput={(e) => {
 				const next = (e.currentTarget as HTMLInputElement).value;
@@ -95,7 +95,7 @@
 			data-testid="vendor-picker-input"
 		/>
 		<ComboboxPrimitive.Trigger
-			class="text-muted-foreground absolute top-0 right-0 flex h-9 w-9 items-center justify-center"
+			class="absolute top-0 right-0 flex h-9 w-9 items-center justify-center text-muted-foreground"
 			aria-label="Toggle vendor list"
 		>
 			<ChevronDownIcon class="size-4" />
@@ -104,12 +104,12 @@
 
 	<ComboboxPrimitive.Portal>
 		<ComboboxPrimitive.Content
-			class="bg-popover text-popover-foreground z-50 max-h-72 min-w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-3xl shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
+			class="z-50 max-h-72 min-w-[var(--bits-combobox-anchor-width)] overflow-hidden rounded-3xl bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
 			sideOffset={4}
 		>
 			<ComboboxPrimitive.Viewport class="p-1">
 				{#if filtered.length === 0}
-					<p class="text-muted-foreground px-3 py-2 text-sm">
+					<p class="px-3 py-2 text-sm text-muted-foreground">
 						{options.length === 0 ? 'No vendors yet.' : 'No vendors match.'}
 					</p>
 				{:else}
@@ -117,7 +117,7 @@
 						<ComboboxPrimitive.Item
 							value={option.id}
 							label={option.name}
-							class="data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-2xl px-3 py-2 text-sm outline-none select-none"
+							class="relative flex cursor-default items-center gap-2 rounded-2xl px-3 py-2 text-sm outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
 						>
 							{#snippet children({ selected: isSelected })}
 								<span class="truncate">{option.name}</span>
@@ -129,11 +129,11 @@
 					{/each}
 				{/if}
 				{#if onCreateNew}
-					<div class="bg-border my-1 h-px" role="separator"></div>
+					<div class="my-1 h-px bg-border" role="separator"></div>
 					<ComboboxPrimitive.Item
 						value={CREATE_NEW}
 						label="Create new vendor"
-						class="data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex cursor-default items-center rounded-2xl px-3 py-2 text-sm font-medium outline-none select-none"
+						class="relative flex cursor-default items-center rounded-2xl px-3 py-2 text-sm font-medium outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
 					>
 						Create new vendor
 					</ComboboxPrimitive.Item>

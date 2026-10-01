@@ -106,8 +106,9 @@ export function orgInvoiceEmailFormFromResource(
 	resource: OrgInvoiceEmailAccountResource
 ): OrgInvoiceEmailFormData {
 	const host = resource.smtp_host.toLowerCase();
-	const preset: OrgInvoiceEmailPreset =
-		host.includes('gmail.com') ? 'gmail' : host.includes('outlook') || host.includes('office365')
+	const preset: OrgInvoiceEmailPreset = host.includes('gmail.com')
+		? 'gmail'
+		: host.includes('outlook') || host.includes('office365')
 			? 'outlook'
 			: 'custom';
 	return {

@@ -99,39 +99,20 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
-			<PageHeader
-				breadcrumb="Work / Meetings"
-				{title}
-				{status}
-				description="{when} · {relatedTo}"
-			>
+			<PageHeader breadcrumb="Work / Meetings" {title} {status} description="{when} · {relatedTo}">
 				{#snippet actions()}
 					{#if onEdit}
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={actionBusy}
-							onclick={() => onEdit?.()}
-						>
+						<Button variant="outline" size="sm" disabled={actionBusy} onclick={() => onEdit?.()}>
 							<PencilIcon class="size-3.5" />
 							Edit
 						</Button>
 					{/if}
 					{#if onDelete}
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={actionBusy}
-							onclick={() => onDelete?.()}
-						>
+						<Button variant="outline" size="sm" disabled={actionBusy} onclick={() => onDelete?.()}>
 							<Trash2Icon class="size-3.5" />
 							Delete
 						</Button>
@@ -156,7 +137,7 @@
 			</PageHeader>
 
 			{#if actionError}
-				<p class="text-destructive text-sm" role="alert" data-testid="meeting-ai-error">
+				<p class="text-sm text-destructive" role="alert" data-testid="meeting-ai-error">
 					{actionError}
 				</p>
 			{/if}
@@ -169,7 +150,7 @@
 					<InfoCard title="Attendees" fields={attendeeFields} />
 
 					<section
-						class="bg-card space-y-3 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-3 rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<div class="flex items-center justify-between gap-2">
 							<h2 class="text-sm font-semibold tracking-tight">Transcript</h2>
@@ -181,9 +162,9 @@
 						</div>
 						{#if transcript}
 							<pre
-								class="bg-muted/50 max-h-72 overflow-y-auto rounded-2xl p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap">{transcript}</pre>
+								class="max-h-72 overflow-y-auto rounded-2xl bg-muted/50 p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap">{transcript}</pre>
 						{:else}
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								{#if aiEnabled}
 									Upload a .vtt transcript file to unlock summary generation.
 								{:else}
@@ -208,24 +189,20 @@
 
 				<div class="space-y-6">
 					<section
-						class="bg-card space-y-3 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-3 rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<div class="flex items-center justify-between gap-2">
 							<h2 class="text-sm font-semibold tracking-tight">AI summary</h2>
 							{#if summary || summaryStatusLabel}
-								<StatusBadge
-									status={summaryStatusLabel || (summary ? 'Ready' : 'Missing')}
-								/>
+								<StatusBadge status={summaryStatusLabel || (summary ? 'Ready' : 'Missing')} />
 							{/if}
 						</div>
 						{#if summary}
-							<div
-								class="bg-muted/40 text-sm leading-relaxed whitespace-pre-wrap rounded-2xl p-4"
-							>
+							<div class="rounded-2xl bg-muted/40 p-4 text-sm leading-relaxed whitespace-pre-wrap">
 								{summary}
 							</div>
 						{:else}
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								{#if aiEnabled}
 									Generate a summary once a transcript is attached. Action items land below.
 								{:else}
@@ -236,7 +213,7 @@
 					</section>
 
 					<section
-						class="bg-card space-y-3 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-3 rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<div class="flex items-center justify-between gap-2">
 							<h2 class="text-sm font-semibold tracking-tight">Proposed tasks</h2>
@@ -253,16 +230,14 @@
 							{/if}
 						</div>
 						{#if proposedTasks.length === 0}
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								No proposed tasks yet — generate a summary to extract follow-ups.
 							</p>
 						{:else}
 							<ul class="m-0 list-none space-y-2 p-0">
 								{#each proposedTasks as task (task.id)}
 									{@const rowStatus = taskStatus(task)}
-									<li
-										class="flex items-center justify-between gap-3 rounded-2xl border px-3 py-2"
-									>
+									<li class="flex items-center justify-between gap-3 rounded-2xl border px-3 py-2">
 										<div class="min-w-0">
 											<p
 												class={cn(
@@ -275,7 +250,7 @@
 												{task.title}
 											</p>
 											{#if task.assignee}
-												<p class="text-muted-foreground text-xs">{task.assignee}</p>
+												<p class="text-xs text-muted-foreground">{task.assignee}</p>
 											{/if}
 										</div>
 										{#if rowStatus === 'accepted'}

@@ -72,14 +72,14 @@
 
 <div
 	class={cn(
-		'bg-card overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 >
 	<div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
 		<div class="min-w-0">
 			<p class="text-sm font-semibold tracking-tight">Line items</p>
-			<p class="text-muted-foreground text-xs">{rows.length} line(s)</p>
+			<p class="text-xs text-muted-foreground">{rows.length} line(s)</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-3">
 			<div class="text-end">
@@ -88,7 +88,10 @@
 					{displayTotal}
 				</p>
 				{#if totals && (totals.discountCents > 0 || totals.taxCents > 0)}
-					<p class="text-muted-foreground text-xs tabular-nums" data-testid="line-items-total-detail">
+					<p
+						class="text-xs text-muted-foreground tabular-nums"
+						data-testid="line-items-total-detail"
+					>
 						Sub {formatMajor(totals.subtotalCents)}
 						{#if totals.discountCents > 0}
 							· Disc −{formatMajor(totals.discountCents)}
@@ -124,12 +127,12 @@
 		<Table.Body>
 			{#each rows as row (row.id)}
 				<Table.Row>
-					<Table.Cell class="text-muted-foreground text-xs">{row.productSku ?? '—'}</Table.Cell>
+					<Table.Cell class="text-xs text-muted-foreground">{row.productSku ?? '—'}</Table.Cell>
 					<Table.Cell class="font-medium">
 						{row.description}
 						{#if row.discountPercent != null && row.discountPercent > 0}
 							<span
-								class="text-muted-foreground ms-1 text-xs font-normal tabular-nums"
+								class="ms-1 text-xs font-normal text-muted-foreground tabular-nums"
 								data-testid="line-discount-badge"
 							>
 								· −{row.discountPercent}%
@@ -151,7 +154,7 @@
 				<Table.Row>
 					<Table.Cell
 						colspan={onRemove ? 6 : 5}
-						class="text-muted-foreground h-24 text-center text-sm"
+						class="h-24 text-center text-sm text-muted-foreground"
 					>
 						No line items yet — use Add line item.
 					</Table.Cell>

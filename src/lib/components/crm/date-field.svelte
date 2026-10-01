@@ -130,11 +130,7 @@
 	function applyPreset(preset: DateFieldPreset) {
 		const base = today(getLocalTimeZone());
 		const next =
-			preset === 'today'
-				? base
-				: preset === 'plus7'
-					? base.add({ days: 7 })
-					: endOfMonth(base);
+			preset === 'today' ? base : preset === 'plus7' ? base.add({ days: 7 }) : endOfMonth(base);
 		onValueChange(next);
 	}
 
@@ -177,7 +173,7 @@
 		{#if showClear}
 			<button
 				type="button"
-				class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-full"
+				class="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
 				data-testid="{dataTestId}-clear"
 				aria-label="Clear date"
 				onclick={onClear}
@@ -210,8 +206,8 @@
 						bind:placeholder={calendarPlaceholder}
 						captionLayout="dropdown"
 						initialFocus
-						minValue={minValue}
-						maxValue={maxValue}
+						{minValue}
+						{maxValue}
 						{onValueChange}
 					/>
 					{#if presets.length > 0 || clearable}
@@ -245,7 +241,7 @@
 			</Popover.Root>
 		{:else}
 			<span
-				class="text-muted-foreground inline-flex size-6 items-center justify-center opacity-50"
+				class="inline-flex size-6 items-center justify-center text-muted-foreground opacity-50"
 				aria-hidden="true"
 			>
 				<CalendarIcon class="size-3.5" />

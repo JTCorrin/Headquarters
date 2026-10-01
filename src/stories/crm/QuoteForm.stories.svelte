@@ -40,7 +40,7 @@
 
 <Story name="Drawer">
 	{#snippet template()}
-		<div class="bg-background flex h-[640px] items-start justify-center p-8">
+		<div class="flex h-[640px] items-start justify-center bg-background p-8">
 			<QuoteFormDrawer bind:open {form} />
 		</div>
 	{/snippet}

@@ -67,7 +67,7 @@
 			placeholder="Draft kickoff agenda"
 			aria-invalid={!!$errors.title}
 		/>
-		{#if $errors.title}<p class="text-destructive text-xs">{$errors.title}</p>{/if}
+		{#if $errors.title}<p class="text-xs text-destructive">{$errors.title}</p>{/if}
 	</div>
 
 	<div class="space-y-2">

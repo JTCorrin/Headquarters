@@ -290,12 +290,14 @@ describe('createApiV1Client', () => {
 				apiError(403, 'FORBIDDEN', 'Only owners and admins can update organisation configuration')
 		});
 		const client = createApiV1Client({ fetch: fetchMock, getOrgId: () => ORG_A });
-		await expect(
-			client.organisationConfig.update({ timezone: 'UTC' }, 1)
-		).rejects.toBeInstanceOf(ApiClientError);
-		await expect(
-			client.organisationConfig.update({ timezone: 'UTC' }, 1)
-		).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN', requestId: 'test-request-id' });
+		await expect(client.organisationConfig.update({ timezone: 'UTC' }, 1)).rejects.toBeInstanceOf(
+			ApiClientError
+		);
+		await expect(client.organisationConfig.update({ timezone: 'UTC' }, 1)).rejects.toMatchObject({
+			status: 403,
+			code: 'FORBIDDEN',
+			requestId: 'test-request-id'
+		});
 
 		const fetch412 = createMockFetch({
 			'PATCH /api/v1/tax-rates/tax-1': async (request) => {
@@ -304,9 +306,10 @@ describe('createApiV1Client', () => {
 			}
 		});
 		const client412 = createApiV1Client({ fetch: fetch412, getOrgId: () => ORG_A });
-		await expect(
-			client412.taxRates.update('tax-1', { name: 'VAT' }, 1)
-		).rejects.toMatchObject({ status: 412, code: 'PRECONDITION_FAILED' });
+		await expect(client412.taxRates.update('tax-1', { name: 'VAT' }, 1)).rejects.toMatchObject({
+			status: 412,
+			code: 'PRECONDITION_FAILED'
+		});
 
 		const fetch422 = createMockFetch({
 			'POST /api/v1/tax-rates': async () =>
@@ -462,11 +465,7 @@ describe('createApiV1Client', () => {
 		expect(got.etag).toBe('"1"');
 		expect(got.data.company_name).toBe('Northwind');
 
-		const updated = await client.contacts.update(
-			CONTACT_ID,
-			{ lifecycle_status: 'inactive' },
-			1
-		);
+		const updated = await client.contacts.update(CONTACT_ID, { lifecycle_status: 'inactive' }, 1);
 		expect(updated.version).toBe(2);
 
 		await client.contacts.delete(CONTACT_ID, 2);
@@ -1076,9 +1075,7 @@ describe('createApiV1Client', () => {
 					}
 				};
 			},
-			[`POST /api/v1/entities/client/${CLIENT_ID}/documents/upload-intent`]: async (
-				request
-			) => {
+			[`POST /api/v1/entities/client/${CLIENT_ID}/documents/upload-intent`]: async (request) => {
 				expect(await request.json()).toEqual({
 					name: 'msa.pdf',
 					category: 'contract',
@@ -1309,11 +1306,7 @@ describe('createApiV1Client', () => {
 		});
 		expect(createdFolder.folder.id).toBe(folderId);
 
-		const renamedFolder = await client.documents.updateFolder(
-			folderId,
-			{ name: 'Legal' },
-			1
-		);
+		const renamedFolder = await client.documents.updateFolder(folderId, { name: 'Legal' }, 1);
 		expect(renamedFolder.folder.version).toBe(2);
 
 		await client.documents.deleteFolder(folderId, 2);

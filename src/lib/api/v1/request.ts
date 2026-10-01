@@ -20,7 +20,4 @@ export interface ApiResult<T> {
 	status: number;
 }
 
-export type ApiRequestFn = <T>(
-	path: string,
-	options?: ApiRequestOptions
-) => Promise<ApiResult<T>>;
+export type ApiRequestFn = <T>(path: string, options?: ApiRequestOptions) => Promise<ApiResult<T>>;

@@ -42,11 +42,7 @@ describe('document recipients helpers', () => {
 
 	it('prefers billing contact for chase greeting', () => {
 		expect(
-			chaseGreetingName(
-				[{ contactId: options[0].id, isBilling: true }],
-				options,
-				'Northwind'
-			)
+			chaseGreetingName([{ contactId: options[0].id, isBilling: true }], options, 'Northwind')
 		).toBe('Ada Billing');
 		expect(chaseGreetingName([], options, 'Northwind')).toBe('Northwind');
 		expect(billingContactIdFromRecipients([])).toBeNull();

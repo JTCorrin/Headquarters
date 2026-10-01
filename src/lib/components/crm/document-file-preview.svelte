@@ -12,12 +12,7 @@
 		onDownload?: () => void;
 	}
 
-	let {
-		preview,
-		class: className,
-		onClose,
-		onDownload
-	}: DocumentFilePreviewProps = $props();
+	let { preview, class: className, onClose, onDownload }: DocumentFilePreviewProps = $props();
 
 	const isPdf = $derived(
 		(preview?.mimeType.toLowerCase().split(';')[0]?.trim() ?? '') === 'application/pdf'
@@ -35,10 +30,7 @@
 >
 	<Sheet.Content
 		side="bottom"
-		class={cn(
-			'mx-auto flex h-[min(90vh,48rem)] w-full max-w-4xl flex-col gap-0 p-0',
-			className
-		)}
+		class={cn('mx-auto flex h-[min(90vh,48rem)] w-full max-w-4xl flex-col gap-0 p-0', className)}
 		data-testid="documents-preview-sheet"
 	>
 		{#if preview}
@@ -64,7 +56,7 @@
 				{/if}
 			</Sheet.Header>
 			<div
-				class="bg-muted/30 flex min-h-0 flex-1 items-center justify-center overflow-auto p-3"
+				class="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/30 p-3"
 				data-testid="documents-preview-body"
 			>
 				{#if isImage}
@@ -82,7 +74,7 @@
 						data-testid="documents-preview-pdf"
 					></iframe>
 				{:else}
-					<p class="text-muted-foreground text-sm">Preview is not available for this file type.</p>
+					<p class="text-sm text-muted-foreground">Preview is not available for this file type.</p>
 				{/if}
 			</div>
 		{/if}

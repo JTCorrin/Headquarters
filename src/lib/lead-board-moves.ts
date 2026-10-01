@@ -16,10 +16,7 @@ export interface LeadBoardMoveResult {
 	beforeId: string | null;
 }
 
-function sortedColumn(
-	leads: LeadBoardMoveInput[],
-	stage: LeadBoardStage
-): LeadBoardMoveInput[] {
+function sortedColumn(leads: LeadBoardMoveInput[], stage: LeadBoardStage): LeadBoardMoveInput[] {
 	return leads
 		.filter((lead) => lead.stage === stage)
 		.slice()

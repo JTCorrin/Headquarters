@@ -24,14 +24,14 @@
 
 <div
 	class={cn(
-		'bg-card overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 >
 	<div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
 		<div class="min-w-0">
 			<h3 class="text-sm font-medium">Schedule lines</h3>
-			<p class="text-muted-foreground text-xs">At least one line is required before activation.</p>
+			<p class="text-xs text-muted-foreground">At least one line is required before activation.</p>
 		</div>
 		{#if headerActions}
 			{@render headerActions()}
@@ -39,7 +39,7 @@
 	</div>
 
 	{#if rows.length === 0}
-		<p class="text-muted-foreground px-4 py-8 text-center text-sm">No lines yet.</p>
+		<p class="px-4 py-8 text-center text-sm text-muted-foreground">No lines yet.</p>
 	{:else}
 		<Table.Root>
 			<Table.Header>
@@ -61,7 +61,7 @@
 								{row.descriptionTemplate}
 							</div>
 							{#if row.productSku}
-								<div class="text-muted-foreground text-xs">{row.productSku}</div>
+								<div class="text-xs text-muted-foreground">{row.productSku}</div>
 							{/if}
 						</Table.Cell>
 						<Table.Cell>{row.qty}</Table.Cell>
@@ -69,12 +69,7 @@
 						<Table.Cell>{row.taxRatePercent || '0'}</Table.Cell>
 						{#if !readonly}
 							<Table.Cell>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									onclick={() => onRemove?.(row.id)}
-								>
+								<Button type="button" variant="ghost" size="sm" onclick={() => onRemove?.(row.id)}>
 									Remove
 								</Button>
 							</Table.Cell>

@@ -93,7 +93,7 @@
 			/** @type {import('$lib/components/crm/org-integrations-page.svelte').OrgIntegrationsPageProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen">
+		<div class="h-screen bg-background">
 			<OrgIntegrationsPage {...props} />
 		</div>
 	{/snippet}
@@ -105,7 +105,7 @@
 			/** @type {import('$lib/components/crm/org-integrations-page.svelte').OrgIntegrationsPageProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen">
+		<div class="h-screen bg-background">
 			<OrgIntegrationsPage {...props} />
 		</div>
 	{/snippet}
@@ -117,7 +117,7 @@
 			/** @type {import('$lib/components/crm/org-integrations-page.svelte').OrgIntegrationsPageProps} */ (
 				args
 			)}
-		<div class="bg-background h-screen">
+		<div class="h-screen bg-background">
 			<OrgIntegrationsPage {...props} />
 		</div>
 	{/snippet}

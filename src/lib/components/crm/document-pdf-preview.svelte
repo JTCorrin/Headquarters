@@ -35,14 +35,14 @@
 
 <section
 	class={cn(
-		'bg-muted/40 flex min-h-0 flex-col overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'flex min-h-0 flex-col overflow-hidden rounded-3xl bg-muted/40 ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 >
 	<div class="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
 		<div>
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
-			<p class="text-muted-foreground text-xs">Updates live as you edit · always shown as paper</p>
+			<p class="text-xs text-muted-foreground">Updates live as you edit · always shown as paper</p>
 		</div>
 		<Button type="button" size="sm" variant="outline" disabled={downloading} onclick={onDownload}>
 			<DownloadIcon class="size-3.5" />

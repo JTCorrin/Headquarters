@@ -9,13 +9,15 @@
 		TaxRateResource
 	} from '$lib/schemas/organisation.js';
 	import { canMutateOrgConfig, roleLabel } from '$lib/schemas/organisation.js';
-	import type { MailboxAccountResource, MailboxFormData, MailboxTestFeedback } from '$lib/schemas/mailbox.js';
+	import type {
+		MailboxAccountResource,
+		MailboxFormData,
+		MailboxTestFeedback
+	} from '$lib/schemas/mailbox.js';
 	import { type AppNavGroup } from './app-nav.svelte';
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import OrganisationConfigForm from './organisation-config-form.svelte';
 	import ProfilePreferencesForm from './profile-preferences-form.svelte';
 	import ProfileMailboxForm from './profile-mailbox-form.svelte';
@@ -50,10 +52,7 @@
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
 		onTestMailbox?: () =>
-			| MailboxTestFeedback
-			| false
-			| void
-			| Promise<MailboxTestFeedback | false | void>;
+			MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		/**
 		 * Return `false` (or reject) to keep the tax drawer open after a failed save.
@@ -117,8 +116,7 @@
 			taxDrawerOpen = false;
 			return true;
 		} catch (err) {
-			taxSaveError =
-				err instanceof Error ? err.message : 'Could not save tax rate — try again.';
+			taxSaveError = err instanceof Error ? err.message : 'Could not save tax rate — try again.';
 			return false;
 		}
 	}
@@ -129,12 +127,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -143,7 +137,7 @@
 				description="Organisation defaults and named tax rates. Personal theme and mailbox live under My settings."
 			>
 				{#snippet actions()}
-					<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
+					<span class="text-xs text-muted-foreground">Your role: {roleLabel(role)}</span>
 				{/snippet}
 			</PageHeader>
 
@@ -153,7 +147,7 @@
 				<section class="space-y-4" data-testid="org-defaults-section">
 					<div>
 						<h2 class="text-lg font-semibold tracking-tight">Organisation</h2>
-						<p class="text-muted-foreground text-sm">
+						<p class="text-sm text-muted-foreground">
 							Company letterhead for quotes and invoices, plus org defaults.
 							{#if !canEdit}
 								Read-only for your role.
@@ -175,7 +169,7 @@
 					<div class="flex flex-wrap items-start justify-between gap-3">
 						<div>
 							<h2 class="text-lg font-semibold tracking-tight">Tax rates</h2>
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								Named rates with at most one active default.
 							</p>
 						</div>
@@ -196,13 +190,13 @@
 
 					{#if taxRates.length === 0}
 						<p
-							class="text-muted-foreground rounded-3xl border border-dashed px-4 py-10 text-center text-sm"
+							class="rounded-3xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground"
 							data-testid="tax-rates-empty"
 						>
 							No tax rates yet.
 						</p>
 					{:else}
-						<ul class="divide-border divide-y rounded-3xl border" data-testid="tax-rates-list">
+						<ul class="divide-y divide-border rounded-3xl border" data-testid="tax-rates-list">
 							{#each taxRates as rate (rate.id)}
 								<li
 									class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
@@ -218,7 +212,7 @@
 												<StatusBadge status="Archived" />
 											{/if}
 										</div>
-										<p class="text-muted-foreground text-sm">{rate.rate_percent}%</p>
+										<p class="text-sm text-muted-foreground">{rate.rate_percent}%</p>
 									</div>
 									{#if canEdit}
 										<div class="flex flex-wrap gap-2">
@@ -268,22 +262,19 @@
 					<section class="space-y-4" data-testid="personal-theme-section">
 						<div>
 							<h2 class="text-lg font-semibold tracking-tight">Personal theme</h2>
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								Optional override that applies across every organisation you belong to.
 							</p>
 						</div>
-						<ProfilePreferencesForm
-							form={preferencesForm}
-							onValidSubmit={onSavePreferences}
-						/>
+						<ProfilePreferencesForm form={preferencesForm} onValidSubmit={onSavePreferences} />
 					</section>
 				{/if}
 
 				{#if mailboxForm}
-					<section class="space-y-4 scroll-mt-6" id="mail" data-testid="personal-mail-section">
+					<section class="scroll-mt-6 space-y-4" id="mail" data-testid="personal-mail-section">
 						<div>
 							<h2 class="text-lg font-semibold tracking-tight">Mail</h2>
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								Your personal IMAP/SMTP for this organisation membership — not the org Email sending
 								integration used for quotes and campaigns.
 							</p>
@@ -298,7 +289,7 @@
 					</section>
 				{/if}
 			{:else if showContent && !configuration && viewState.kind === 'ready'}
-				<p class="text-muted-foreground text-sm">Configuration unavailable.</p>
+				<p class="text-sm text-muted-foreground">Configuration unavailable.</p>
 			{/if}
 		</div>
 	</main>
@@ -315,7 +306,7 @@
 			</Drawer.Header>
 			<div class="space-y-3 px-4 pb-6">
 				{#if taxSaveError}
-					<p class="text-destructive text-sm" role="alert" data-testid="tax-rate-save-error">
+					<p class="text-sm text-destructive" role="alert" data-testid="tax-rate-save-error">
 						{taxSaveError}
 					</p>
 				{/if}

@@ -76,7 +76,7 @@
 			placeholder="Northwind"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -101,7 +101,7 @@
 				aria-invalid={!!$errors.defaultCurrency}
 			/>
 			{#if $errors.defaultCurrency}
-				<p class="text-destructive text-xs">{$errors.defaultCurrency}</p>
+				<p class="text-xs text-destructive">{$errors.defaultCurrency}</p>
 			{/if}
 		</div>
 	</div>
@@ -117,7 +117,7 @@
 				placeholder="hello@northwind.com"
 				aria-invalid={!!$errors.primaryEmail}
 			/>
-			{#if $errors.primaryEmail}<p class="text-destructive text-xs">{$errors.primaryEmail}</p>{/if}
+			{#if $errors.primaryEmail}<p class="text-xs text-destructive">{$errors.primaryEmail}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="client-invoicing-email">Invoicing email</Label>
@@ -131,7 +131,7 @@
 				aria-invalid={!!$errors.invoicingEmail}
 			/>
 			{#if $errors.invoicingEmail}
-				<p class="text-destructive text-xs">{$errors.invoicingEmail}</p>
+				<p class="text-xs text-destructive">{$errors.invoicingEmail}</p>
 			{/if}
 		</div>
 	</div>
@@ -153,11 +153,11 @@
 			data-testid="client-email-domain"
 			aria-invalid={!!$errors.emailDomain}
 		/>
-		<p class="text-muted-foreground text-xs">
+		<p class="text-xs text-muted-foreground">
 			Used to match inbox mail from this company. Leave blank to fill from the primary email
 			(Gmail/Outlook/etc. are skipped).
 		</p>
-		{#if $errors.emailDomain}<p class="text-destructive text-xs">{$errors.emailDomain}</p>{/if}
+		{#if $errors.emailDomain}<p class="text-xs text-destructive">{$errors.emailDomain}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -187,7 +187,7 @@
 				aria-invalid={!!$errors.paymentTermsDays}
 			/>
 			{#if $errors.paymentTermsDays}
-				<p class="text-destructive text-xs">{$errors.paymentTermsDays}</p>
+				<p class="text-xs text-destructive">{$errors.paymentTermsDays}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -198,7 +198,7 @@
 				bind:value={$formData.renewalOn}
 				aria-invalid={!!$errors.renewalOn}
 			/>
-			{#if $errors.renewalOn}<p class="text-destructive text-xs">{$errors.renewalOn}</p>{/if}
+			{#if $errors.renewalOn}<p class="text-xs text-destructive">{$errors.renewalOn}</p>{/if}
 		</div>
 	</div>
 
@@ -209,11 +209,7 @@
 		</div>
 		<div class="space-y-2">
 			<Label for="client-reg">Registration number</Label>
-			<Input
-				id="client-reg"
-				name="registrationNumber"
-				bind:value={$formData.registrationNumber}
-			/>
+			<Input id="client-reg" name="registrationNumber" bind:value={$formData.registrationNumber} />
 		</div>
 	</div>
 
@@ -222,7 +218,7 @@
 			type="checkbox"
 			name="taxExempt"
 			bind:checked={$formData.taxExempt}
-			class="accent-primary size-4 rounded"
+			class="size-4 rounded accent-primary"
 			data-testid="client-tax-exempt"
 		/>
 		VAT exempt (new quote/invoice lines default to 0% tax)

@@ -25,9 +25,7 @@
 		class?: string;
 		oauthError?: string | null;
 		onValidSubmit?: () => boolean | void | Promise<boolean | void>;
-		onConnectOAuth?: (
-			provider: 'microsoft' | 'google'
-		) => boolean | void | Promise<boolean | void>;
+		onConnectOAuth?: (provider: 'microsoft' | 'google') => boolean | void | Promise<boolean | void>;
 		onTest?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onSync?: () => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onSaveSyncInterval?: (
@@ -105,10 +103,10 @@
 	const oauthConnected = $derived(
 		Boolean(
 			account?.credentials_configured &&
-				account.auth_mode === 'oauth' &&
-				((oauthProvider === 'microsoft' && account.oauth_provider === 'microsoft') ||
-					(oauthProvider === 'google' && account.oauth_provider === 'google') ||
-					(!oauthProvider && account.oauth_provider))
+			account.auth_mode === 'oauth' &&
+			((oauthProvider === 'microsoft' && account.oauth_provider === 'microsoft') ||
+				(oauthProvider === 'google' && account.oauth_provider === 'google') ||
+				(!oauthProvider && account.oauth_provider))
 		)
 	);
 	const showPasswordForm = $derived($formData.preset === 'custom');
@@ -218,8 +216,8 @@
 	<input type="hidden" name="smtpSecurity" value={$formData.smtpSecurity} />
 
 	<div class="rounded-2xl bg-muted/40 px-3 py-3 text-xs leading-relaxed">
-		<p class="text-foreground font-medium">Personal mailbox</p>
-		<p class="text-muted-foreground mt-1">
+		<p class="font-medium text-foreground">Personal mailbox</p>
+		<p class="mt-1 text-muted-foreground">
 			Connect your own IMAP/SMTP so contact, lead, and client Email tabs can show mail to and from
 			this address. Outlook and Gmail use one-click OAuth. Custom providers still use a password or
 			app password. This is separate from organisation Email sending under Org → Integrations.
@@ -227,20 +225,20 @@
 	</div>
 
 	{#if account?.credentials_configured && account.auth_mode === 'password'}
-		<p class="text-muted-foreground text-xs" data-testid="mailbox-credentials-saved">
+		<p class="text-xs text-muted-foreground" data-testid="mailbox-credentials-saved">
 			Password saved — leave blank to keep it, or enter a new one to replace.
 		</p>
 	{/if}
 
 	{#if account?.credentials_configured && account.auth_mode === 'oauth'}
-		<p class="text-muted-foreground text-xs" data-testid="mailbox-oauth-connected">
+		<p class="text-xs text-muted-foreground" data-testid="mailbox-oauth-connected">
 			Connected via {account.oauth_provider === 'microsoft' ? 'Microsoft' : 'Google'} as
 			{account.email_address}.
 		</p>
 	{/if}
 
 	{#if account?.last_checked_at || account?.last_error_code}
-		<p class="text-muted-foreground text-xs" data-testid="mailbox-sync-status">
+		<p class="text-xs text-muted-foreground" data-testid="mailbox-sync-status">
 			{#if account.last_checked_at}
 				Last checked {formatMailboxLastChecked(account.last_checked_at)}.
 			{/if}
@@ -285,8 +283,9 @@
 					{pendingSyncInterval ? 'Saving…' : 'Save sync interval'}
 				</Button>
 			</div>
-			<p class="text-muted-foreground text-xs">
-				Pulls new mail from your provider. Catch-up of older mail may sync more often until finished.
+			<p class="text-xs text-muted-foreground">
+				Pulls new mail from your provider. Catch-up of older mail may sync more often until
+				finished.
 			</p>
 			{#if syncIntervalFeedback}
 				<p
@@ -308,12 +307,19 @@
 	<div class="space-y-2">
 		<Label for="mailbox-preset">Provider preset</Label>
 		<Select.Root type="single" bind:value={$formData.preset} disabled={busy}>
-			<Select.Trigger id="mailbox-preset" class="w-full" data-testid="mailbox-preset-trigger" disabled={busy}>
+			<Select.Trigger
+				id="mailbox-preset"
+				class="w-full"
+				data-testid="mailbox-preset-trigger"
+				disabled={busy}
+			>
 				{presetLabel}
 			</Select.Trigger>
 			<Select.Content>
 				{#each mailboxPresets as option (option)}
-					<Select.Item value={option} label={presetLabels[option]}>{presetLabels[option]}</Select.Item>
+					<Select.Item value={option} label={presetLabels[option]}
+						>{presetLabels[option]}</Select.Item
+					>
 				{/each}
 			</Select.Content>
 		</Select.Root>
@@ -321,7 +327,7 @@
 
 	{#if oauthProvider}
 		{#if oauthError}
-			<p class="text-destructive text-sm" role="alert" data-testid="mailbox-oauth-error">
+			<p class="text-sm text-destructive" role="alert" data-testid="mailbox-oauth-error">
 				{oauthError}
 			</p>
 		{/if}
@@ -337,7 +343,7 @@
 					{pendingOAuth ? 'Redirecting…' : connectLabel}
 				</Button>
 			</div>
-			<p class="text-muted-foreground text-xs">
+			<p class="text-xs text-muted-foreground">
 				You’ll sign in with {oauthProvider === 'microsoft' ? 'Microsoft' : 'Google'} and return here.
 				IMAP must be enabled in your provider account settings.
 			</p>
@@ -357,7 +363,7 @@
 					data-testid="mailbox-email"
 				/>
 				{#if $errors.emailAddress}
-					<p class="text-destructive text-xs">{$errors.emailAddress}</p>
+					<p class="text-xs text-destructive">{$errors.emailAddress}</p>
 				{/if}
 			</div>
 			<div class="space-y-2">
@@ -383,7 +389,7 @@
 					placeholder={account?.credentials_configured ? '••••••••' : 'App password'}
 					data-testid="mailbox-password"
 				/>
-				<p class="text-muted-foreground text-xs">Write-only — never shown after save.</p>
+				<p class="text-xs text-muted-foreground">Write-only — never shown after save.</p>
 			</div>
 			<div class="space-y-2 sm:col-span-2">
 				<Label for="mailbox-from-name">From name</Label>

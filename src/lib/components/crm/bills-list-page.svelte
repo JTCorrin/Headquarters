@@ -60,12 +60,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -93,7 +89,7 @@
 						<Label for="bills-vendor-filter">Vendor</Label>
 						<select
 							id="bills-vendor-filter"
-							class="border-input bg-background h-9 min-w-[12rem] rounded-md border px-3 text-sm"
+							class="h-9 min-w-[12rem] rounded-md border border-input bg-background px-3 text-sm"
 							data-testid="bills-vendor-filter"
 							value={selectedVendorId ?? ''}
 							onchange={(event) => {

@@ -72,7 +72,7 @@
 		</Drawer.Header>
 		<div class="space-y-3 px-4 pb-6">
 			{#if displayError}
-				<p class="text-destructive text-sm" role="alert" data-testid="organisation-create-error">
+				<p class="text-sm text-destructive" role="alert" data-testid="organisation-create-error">
 					{displayError}
 				</p>
 			{/if}

@@ -1,11 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type {
-		QuoteClientOption,
-		QuoteContactOption,
-		QuoteFormData
-	} from '$lib/schemas/quote.js';
+	import type { QuoteClientOption, QuoteContactOption, QuoteFormData } from '$lib/schemas/quote.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -130,7 +126,7 @@
 					{/each}
 				</Select.Content>
 			</Select.Root>
-			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+			{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 		</div>
 	{:else}
 		<div class="space-y-2">
@@ -143,8 +139,8 @@
 				aria-invalid={!!$errors.clientName}
 				disabled={readonly}
 			/>
-			{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
-			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+			{#if $errors.clientName}<p class="text-xs text-destructive">{$errors.clientName}</p>{/if}
+			{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 		</div>
 	{/if}
 
@@ -158,7 +154,7 @@
 		}}
 	/>
 	{#if $errors.recipients}
-		<p class="text-destructive text-xs">{$errors.recipients}</p>
+		<p class="text-xs text-destructive">{$errors.recipients}</p>
 	{/if}
 
 	<div class="space-y-2">
@@ -171,7 +167,7 @@
 			aria-invalid={!!$errors.title}
 			disabled={readonly}
 		/>
-		{#if $errors.title}<p class="text-destructive text-xs">{$errors.title}</p>{/if}
+		{#if $errors.title}<p class="text-xs text-destructive">{$errors.title}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -202,8 +198,8 @@
 				aria-invalid={!!$errors.discount}
 				data-testid="quote-discount"
 			/>
-			{#if $errors.discount}<p class="text-destructive text-xs">{$errors.discount}</p>{/if}
-			<p class="text-muted-foreground text-xs">Fixed amount off the subtotal before tax rollup.</p>
+			{#if $errors.discount}<p class="text-xs text-destructive">{$errors.discount}</p>{/if}
+			<p class="text-xs text-muted-foreground">Fixed amount off the subtotal before tax rollup.</p>
 		</div>
 	</div>
 
@@ -220,7 +216,7 @@
 			data-testid="quote-status-readonly"
 			aria-describedby="quote-status-help"
 		/>
-		<p id="quote-status-help" class="text-muted-foreground text-xs">
+		<p id="quote-status-help" class="text-xs text-muted-foreground">
 			Status is locked — use <span class="font-medium">Accept</span>, then
 			<span class="font-medium">Convert to invoice</span>. Saving details does not change status.
 		</p>

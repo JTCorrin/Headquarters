@@ -8,9 +8,7 @@
 	import { leadCardToRow } from './leads-columns.js';
 	import LeadsTable from './leads-table.svelte';
 	import LeadFormDrawer from './lead-form-drawer.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -70,12 +68,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader title={viewMode === 'table' ? 'Leads table' : 'Leads'}>
@@ -117,7 +111,7 @@
 
 			{#if boardError && viewMode === 'board'}
 				<p
-					class="text-destructive rounded-3xl bg-destructive/10 px-4 py-3 text-sm"
+					class="rounded-3xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
 					role="alert"
 					data-testid="leads-board-error"
 				>
@@ -128,20 +122,14 @@
 			{#if viewState.kind === 'ready' || viewState.kind === 'empty'}
 				{#if leads.length === 0}
 					<p
-						class="text-muted-foreground rounded-3xl border border-dashed px-4 py-12 text-center text-sm"
+						class="rounded-3xl border border-dashed px-4 py-12 text-center text-sm text-muted-foreground"
 					>
 						No leads yet — create one to populate the board.
 					</p>
 				{:else if viewMode === 'table'}
 					<LeadsTable rows={tableRows} />
 				{:else}
-					<LeadsBoard
-						{leads}
-						class="min-h-[480px]"
-						{onSelectLead}
-						{onMoveLead}
-						{onMoveBlocked}
-					/>
+					<LeadsBoard {leads} class="min-h-[480px]" {onSelectLead} {onMoveLead} {onMoveBlocked} />
 				{/if}
 			{/if}
 		</div>

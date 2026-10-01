@@ -116,7 +116,7 @@
 			}}
 		>
 			{#if displayError}
-				<p class="text-destructive text-sm" role="alert" data-testid="ai-provider-connect-error">
+				<p class="text-sm text-destructive" role="alert" data-testid="ai-provider-connect-error">
 					{displayError}
 				</p>
 			{/if}
@@ -133,7 +133,7 @@
 					data-testid="ai-api-key"
 				/>
 				{#if $errors.apiKey}
-					<p class="text-destructive text-xs">{$errors.apiKey}</p>
+					<p class="text-xs text-destructive">{$errors.apiKey}</p>
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2">

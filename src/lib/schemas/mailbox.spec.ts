@@ -76,9 +76,7 @@ describe('mailbox schema', () => {
 
 	it('humanizes lease_held as another sync in progress', () => {
 		expect(humanizeMailboxSyncError('lease_held')).toMatch(/already running/i);
-		expect(humanizeMailboxSyncError('lease_held')).toBe(
-			humanizeMailboxSyncError('not_claimed')
-		);
+		expect(humanizeMailboxSyncError('lease_held')).toBe(humanizeMailboxSyncError('not_claimed'));
 		expect(describeMailboxSyncResult({ ok: false, ingested: 0, error_code: 'lease_held' })).toMatch(
 			/already running/i
 		);
@@ -108,9 +106,9 @@ describe('mailbox schema', () => {
 		expect(
 			describeMailboxSyncResult({ ok: false, ingested: 0, error_code: 'timeout', step: 'fetch' })
 		).toMatch(/during fetch/i);
-		expect(
-			describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null })
-		).toBe('Sync completed — no new messages.');
+		expect(describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null })).toBe(
+			'Sync completed — no new messages.'
+		);
 		expect(
 			describeMailboxSyncResult({
 				ok: true,
@@ -120,7 +118,12 @@ describe('mailbox schema', () => {
 			})
 		).toMatch(/Catch-up continues/i);
 		expect(
-			describeMailboxSyncResult({ ok: true, ingested: 0, error_code: null, catchup_complete: false })
+			describeMailboxSyncResult({
+				ok: true,
+				ingested: 0,
+				error_code: null,
+				catchup_complete: false
+			})
 		).toMatch(/still catching up/i);
 	});
 });

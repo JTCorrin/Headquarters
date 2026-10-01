@@ -94,9 +94,7 @@
 <Story name="Default">
 	{#snippet template(args)}
 		{@const props =
-			/** @type {import('$lib/components/crm/tasks-list-page.svelte').TasksListPageProps} */ (
-				args
-			)}
+			/** @type {import('$lib/components/crm/tasks-list-page.svelte').TasksListPageProps} */ (args)}
 		<div class="h-screen">
 			<TasksListPage {...props} />
 		</div>

@@ -211,9 +211,7 @@
 				);
 				return;
 			}
-			uploads = uploads.map((u) =>
-				u.id === id ? { ...u, progress: 100, status: 'complete' } : u
-			);
+			uploads = uploads.map((u) => (u.id === id ? { ...u, progress: 100, status: 'complete' } : u));
 			files = [
 				{
 					id: crypto.randomUUID(),
@@ -235,9 +233,7 @@
 		const item = uploads.find((u) => u.id === uploadId);
 		if (!item) return;
 		uploads = uploads.map((u) =>
-			u.id === uploadId
-				? { ...u, status: 'uploading', progress: 0, errorMessage: undefined }
-				: u
+			u.id === uploadId ? { ...u, status: 'uploading', progress: 0, errorMessage: undefined } : u
 		);
 		forceUploadOutcome = 'succeed';
 		simulateUpload(uploadId, new File([item.fileName], item.fileName));
@@ -262,19 +258,19 @@
 	{uploads}
 	{moveTargets}
 	class={className}
-	onNavigate={onNavigate}
+	{onNavigate}
 	onViewModeChange={(mode) => {
 		viewMode = mode;
 	}}
-	onUpload={onUpload}
-	onRetryUpload={onRetryUpload}
-	onCancelUpload={onCancelUpload}
-	onCreateFolder={onCreateFolder}
-	onRename={onRename}
-	onMove={onMove}
-	onDelete={onDelete}
-	onRestore={onRestore}
-	onDownload={onDownload}
-	onPreview={onPreview}
-	onRetryView={onRetryView}
+	{onUpload}
+	{onRetryUpload}
+	{onCancelUpload}
+	{onCreateFolder}
+	{onRename}
+	{onMove}
+	{onDelete}
+	{onRestore}
+	{onDownload}
+	{onPreview}
+	{onRetryView}
 />

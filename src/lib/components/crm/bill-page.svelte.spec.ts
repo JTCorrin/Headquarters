@@ -274,20 +274,22 @@ describe('BillPage detail flows', () => {
 		await page.getByLabelText('Internal reference').fill('REF-42');
 		await page.getByTestId('bill-form').getByRole('button', { name: 'Save details' }).click();
 
-		await expect.poll(() => patchBody).toMatchObject({
-			internal_reference: 'REF-42',
-			lines: [
-				{
-					product_id: PRODUCT_ID,
-					description: 'Monthly hosting',
-					quantity: 1,
-					unit_price_cents: 1900,
-					discount_percent: 5,
-					tax_rate_percent: 20,
-					position: 0
-				}
-			]
-		});
+		await expect
+			.poll(() => patchBody)
+			.toMatchObject({
+				internal_reference: 'REF-42',
+				lines: [
+					{
+						product_id: PRODUCT_ID,
+						description: 'Monthly hosting',
+						quantity: 1,
+						unit_price_cents: 1900,
+						discount_percent: 5,
+						tax_rate_percent: 20,
+						position: 0
+					}
+				]
+			});
 	});
 
 	it('disables Receive while dirty', async () => {
@@ -326,14 +328,10 @@ describe('BillPage detail flows', () => {
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
 		render(BillPage, { api, session, billId: BILL_ID });
 
-		await expect
-			.element(page.getByRole('button', { name: 'Receive', exact: true }))
-			.toBeEnabled();
+		await expect.element(page.getByRole('button', { name: 'Receive', exact: true })).toBeEnabled();
 		await page.getByLabelText('Internal reference').fill('DIRTY');
 		await expect.element(page.getByTestId('bill-dirty-hint')).toBeInTheDocument();
-		await expect
-			.element(page.getByRole('button', { name: 'Receive', exact: true }))
-			.toBeDisabled();
+		await expect.element(page.getByRole('button', { name: 'Receive', exact: true })).toBeDisabled();
 		expect(receiveCalled).toBe(false);
 	});
 
@@ -573,9 +571,11 @@ describe('BillPage detail flows', () => {
 			const file = new File(['hello'], 'vendor.pdf', { type: 'application/pdf' });
 			await input.upload(file);
 
-			await expect.poll(() => patchBody).toMatchObject({
-				attachment_document_id: DOC_ID
-			});
+			await expect
+				.poll(() => patchBody)
+				.toMatchObject({
+					attachment_document_id: DOC_ID
+				});
 			expect(putCalls).toEqual(['https://upload.test/put']);
 			await expect.element(page.getByTestId('bill-source-name')).toHaveTextContent('vendor.pdf');
 		} finally {

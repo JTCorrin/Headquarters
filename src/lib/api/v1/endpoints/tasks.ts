@@ -1,10 +1,5 @@
 import type { ApiRequestFn } from '../request.js';
-import type {
-	ApiTask,
-	ApiTaskCreateBody,
-	ApiTaskListParams,
-	ApiTaskUpdateBody
-} from '../types.js';
+import type { ApiTask, ApiTaskCreateBody, ApiTaskListParams, ApiTaskUpdateBody } from '../types.js';
 import type { TasksEndpoints } from './types.js';
 
 export function createTasksEndpoints(request: ApiRequestFn): TasksEndpoints {

@@ -29,7 +29,8 @@
 			state.kind === 'empty' && 'bg-muted/40 text-muted-foreground ring-foreground/5',
 			state.kind === 'forbidden' && 'bg-destructive/10 text-destructive ring-destructive/20',
 			state.kind === 'not_found' && 'bg-muted/50 text-foreground ring-foreground/10',
-			state.kind === 'conflict' && 'bg-amber-500/10 text-amber-950 ring-amber-500/30 dark:text-amber-100',
+			state.kind === 'conflict' &&
+				'bg-amber-500/10 text-amber-950 ring-amber-500/30 dark:text-amber-100',
 			state.kind === 'validation' && 'bg-destructive/10 text-destructive ring-destructive/20',
 			className
 		)}

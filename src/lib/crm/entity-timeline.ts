@@ -1,13 +1,7 @@
 import type { ApiV1Client } from '$lib/api/v1/client.js';
 import { isApiClientError } from '$lib/api/v1/errors.js';
-import {
-	toTimelineEvent,
-	toTimelineEventCreateBody
-} from '$lib/api/v1/mappers.js';
-import type {
-	ApiTimelineEntityType,
-	ApiTimelineEventListParams
-} from '$lib/api/v1/types.js';
+import { toTimelineEvent, toTimelineEventCreateBody } from '$lib/api/v1/mappers.js';
+import type { ApiTimelineEntityType, ApiTimelineEventListParams } from '$lib/api/v1/types.js';
 import type { TimelineComposerSubmit } from '$lib/components/crm/timeline-composer.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 

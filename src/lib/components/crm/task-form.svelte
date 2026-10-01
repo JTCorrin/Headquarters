@@ -59,8 +59,7 @@
 	);
 	const assigneeLabel = $derived(
 		$formData.assigneeMembershipId
-			? (assigneeOptions.find((o) => o.id === $formData.assigneeMembershipId)?.label ??
-				'Assignee')
+			? (assigneeOptions.find((o) => o.id === $formData.assigneeMembershipId)?.label ?? 'Assignee')
 			: 'Unassigned'
 	);
 </script>
@@ -88,9 +87,14 @@
 >
 	<div class="space-y-2">
 		<Label for="task-title">Title</Label>
-		<Input id="task-title" name="title" bind:value={$formData.title} aria-invalid={!!$errors.title} />
+		<Input
+			id="task-title"
+			name="title"
+			bind:value={$formData.title}
+			aria-invalid={!!$errors.title}
+		/>
 		{#if $errors.title}
-			<p class="text-destructive text-sm">{$errors.title}</p>
+			<p class="text-sm text-destructive">{$errors.title}</p>
 		{/if}
 	</div>
 
@@ -104,7 +108,7 @@
 			aria-invalid={!!$errors.description}
 		/>
 		{#if $errors.description}
-			<p class="text-destructive text-sm">{$errors.description}</p>
+			<p class="text-sm text-destructive">{$errors.description}</p>
 		{/if}
 	</div>
 

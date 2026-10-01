@@ -11,12 +11,12 @@
 
 <Handle type="target" position={Position.Top} class="!bg-muted-foreground" />
 <div
-	class="border-border bg-card text-card-foreground min-w-[160px] rounded-lg border px-3 py-2 shadow-sm"
+	class="min-w-[160px] rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-sm"
 >
 	<div class="mb-2 text-xs font-semibold tracking-wide uppercase">Stop</div>
 	<input
 		type="text"
-		class="border-input bg-background nodrag nopan w-full rounded border px-2 py-1 text-sm"
+		class="nodrag nopan w-full rounded border border-input bg-background px-2 py-1 text-sm"
 		placeholder="Reason (optional)"
 		value={data.reason}
 		oninput={(e) => updateNodeData(id, { reason: (e.target as HTMLInputElement).value })}

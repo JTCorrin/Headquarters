@@ -24,10 +24,7 @@ import type {
 	ThemeOption,
 	ThemePreferenceOption
 } from '$lib/schemas/organisation.js';
-import type {
-	InvoiceFormData,
-	InvoiceListItem
-} from '$lib/schemas/invoice.js';
+import type { InvoiceFormData, InvoiceListItem } from '$lib/schemas/invoice.js';
 import type {
 	RecurringInvoiceFormData,
 	RecurringInvoiceListItem,
@@ -176,9 +173,7 @@ import type { EntityProject } from '$lib/components/crm/entity-projects.svelte';
 import type { ProjectWorkCard } from '$lib/components/crm/project-workspace-board.svelte';
 import type { ProjectCard } from '$lib/components/crm/projects-board.svelte';
 
-export function toOrgMembershipSummary(
-	row: ApiOrganisationMembership
-): OrgMembershipSummary {
+export function toOrgMembershipSummary(row: ApiOrganisationMembership): OrgMembershipSummary {
 	return {
 		org_id: row.organisation.id,
 		org_name: row.organisation.name,
@@ -204,9 +199,7 @@ export function membershipFromCreateResult(
 	};
 }
 
-export function toOrganisationCreateBody(
-	data: OrganisationCreateData
-): ApiOrganisationCreateBody {
+export function toOrganisationCreateBody(data: OrganisationCreateData): ApiOrganisationCreateBody {
 	return {
 		name: data.name.trim(),
 		slug: data.slug.trim(),
@@ -337,9 +330,7 @@ export function toTaxRateCreateBody(data: TaxRateFormData): ApiTaxRateCreateBody
 	};
 }
 
-export function themePreferenceToApi(
-	value: ThemePreferenceOption
-): ThemeOption | null {
+export function themePreferenceToApi(value: ThemePreferenceOption): ThemeOption | null {
 	return value === 'org_default' ? null : value;
 }
 
@@ -349,9 +340,7 @@ export function themePreferenceFromApi(
 	return value ?? 'org_default';
 }
 
-export function toProfilePreferencesFormData(
-	prefs: ApiProfilePreferences
-): ProfilePreferencesData {
+export function toProfilePreferencesFormData(prefs: ApiProfilePreferences): ProfilePreferencesData {
 	return {
 		themePreference: themePreferenceFromApi(prefs.theme_preference)
 	};
@@ -1105,8 +1094,7 @@ export function toClientFormData(client: ApiClient): ClientFormData {
 		taxExempt: Boolean(client.tax_exempt),
 		registrationNumber: client.registration_number ?? '',
 		defaultCurrency: client.default_currency ?? '',
-		paymentTermsDays:
-			client.payment_terms_days == null ? '' : String(client.payment_terms_days),
+		paymentTermsDays: client.payment_terms_days == null ? '' : String(client.payment_terms_days),
 		renewalOn: client.renewal_on ?? '',
 		notes: client.notes ?? ''
 	};
@@ -1194,8 +1182,7 @@ export function toLeadFormData(lead: ApiLead): LeadFormData {
 		stage,
 		valueAmount: centsToAmountString(lead.value_cents),
 		currency: lead.currency,
-		probabilityPercent:
-			lead.probability_percent == null ? '' : String(lead.probability_percent),
+		probabilityPercent: lead.probability_percent == null ? '' : String(lead.probability_percent),
 		source: lead.source ?? '',
 		expectedCloseOn: lead.expected_close_on ?? '',
 		lostReason: lead.lost_reason ?? '',
@@ -1291,10 +1278,8 @@ export function toCalendarConnectionResource(
 		config.account_email?.trim() ||
 		config.username?.trim() ||
 		null;
-	const caldavUrl =
-		connection.caldav_url?.trim() || config.caldav_url?.trim() || null;
-	const calendarId =
-		connection.calendar_id?.trim() || config.calendar_id?.trim() || null;
+	const caldavUrl = connection.caldav_url?.trim() || config.caldav_url?.trim() || null;
+	const calendarId = connection.calendar_id?.trim() || config.calendar_id?.trim() || null;
 	return {
 		provider,
 		credentials_configured: Boolean(connection.credentials_configured),
@@ -1322,7 +1307,7 @@ export function toCaldavPutBody(data: CaldavFormData): ApiCalendarCaldavPutBody 
 export function toMailboxPutBody(data: MailboxFormData): ApiMailboxPutBody {
 	const body: ApiMailboxPutBody = {
 		email_address: data.emailAddress.trim(),
-		username: (data.username.trim() || data.emailAddress.trim()),
+		username: data.username.trim() || data.emailAddress.trim(),
 		from_name: emptyToNull(data.fromName),
 		imap_host: data.imapHost.trim(),
 		imap_port: Number(data.imapPort),
@@ -1336,7 +1321,9 @@ export function toMailboxPutBody(data: MailboxFormData): ApiMailboxPutBody {
 	return body;
 }
 
-function mapAiIntegrationStatus(status: string | null | undefined): AiIntegrationResource['status'] {
+function mapAiIntegrationStatus(
+	status: string | null | undefined
+): AiIntegrationResource['status'] {
 	if (status === 'active' || status === 'connected') return 'connected';
 	if (status === 'error') return 'error';
 	return 'disconnected';
@@ -1360,7 +1347,6 @@ export function aiSuggestionText(suggestion: {
 }): string {
 	return suggestion.output_text ?? suggestion.suggestion_text ?? '';
 }
-
 
 function firstAddress(value: unknown): string {
 	if (Array.isArray(value) && value.length > 0) {
@@ -1662,9 +1648,7 @@ export function toEmailTemplateUpdateBody(data: EmailTemplateFormData): ApiEmail
 	return toEmailTemplateCreateBody(data);
 }
 
-export function recurringInvoiceStatusLabel(
-	status: ApiRecurringInvoiceSchedule['status']
-): string {
+export function recurringInvoiceStatusLabel(status: ApiRecurringInvoiceSchedule['status']): string {
 	return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -1770,8 +1754,7 @@ export function toRecurringInvoiceFormData(
 		localRunTime: document.local_run_time.slice(0, 5),
 		startOn: document.start_on,
 		endOn: document.end_on ?? '',
-		maxOccurrences:
-			document.max_occurrences != null ? String(document.max_occurrences) : '',
+		maxOccurrences: document.max_occurrences != null ? String(document.max_occurrences) : '',
 		dueDays: document.due_days,
 		deliveryMode: document.delivery_mode,
 		pricingMode: document.pricing_mode,
@@ -1785,10 +1768,9 @@ export function toRecurringInvoiceFormData(
 	};
 }
 
-function recurringFrequencyFields(data: RecurringInvoiceFormData): Pick<
-	ApiRecurringInvoiceCreateBody,
-	'weekdays' | 'day_of_month' | 'month_of_year'
-> {
+function recurringFrequencyFields(
+	data: RecurringInvoiceFormData
+): Pick<ApiRecurringInvoiceCreateBody, 'weekdays' | 'day_of_month' | 'month_of_year'> {
 	if (data.frequency === 'weekly') {
 		const day = Number(data.weekday) || 1;
 		return { weekdays: [day], day_of_month: null, month_of_year: null };
@@ -1909,10 +1891,10 @@ export function toRecurringLineInput(
 	return input;
 }
 
-export function recurringLineRowsToInputs(rows: RecurringLineRow[]): ApiRecurringInvoiceLineInput[] {
-	return rows.map((row, index) =>
-		toRecurringLineInput(toRecurringLineFormData(row), index + 1)
-	);
+export function recurringLineRowsToInputs(
+	rows: RecurringLineRow[]
+): ApiRecurringInvoiceLineInput[] {
+	return rows.map((row, index) => toRecurringLineInput(toRecurringLineFormData(row), index + 1));
 }
 
 export function toRecurringInvoiceCreateBody(
@@ -2592,7 +2574,9 @@ export function toProjectCardUpdateBody(data: ProjectCardFormData): ApiProjectCa
 }
 
 export function toProjectListItem(project: ApiProject): ProjectListItem {
-	const status = projectBoardStatuses.includes(project.status as (typeof projectBoardStatuses)[number])
+	const status = projectBoardStatuses.includes(
+		project.status as (typeof projectBoardStatuses)[number]
+	)
 		? (project.status as (typeof projectBoardStatuses)[number])
 		: 'planning';
 	const cardCount = project.columns?.reduce((sum, col) => sum + (col.cards?.length ?? 0), 0);

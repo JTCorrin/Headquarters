@@ -20,7 +20,11 @@ export const paymentFormSchema = z
 	})
 	.superRefine((data, ctx) => {
 		if (data.direction === 'inbound') {
-			if (!data.clientId || data.clientId === emptyUuid || !z.uuid().safeParse(data.clientId).success) {
+			if (
+				!data.clientId ||
+				data.clientId === emptyUuid ||
+				!z.uuid().safeParse(data.clientId).success
+			) {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['clientId'],
@@ -35,7 +39,11 @@ export const paymentFormSchema = z
 				});
 			}
 		} else {
-			if (!data.vendorId || data.vendorId === emptyUuid || !z.uuid().safeParse(data.vendorId).success) {
+			if (
+				!data.vendorId ||
+				data.vendorId === emptyUuid ||
+				!z.uuid().safeParse(data.vendorId).success
+			) {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['vendorId'],

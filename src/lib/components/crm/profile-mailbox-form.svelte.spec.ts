@@ -35,9 +35,9 @@ describe('ProfileMailboxForm', () => {
 			account: accountFixture(),
 			onConnectOAuth
 		});
-		await expect.element(page.getByTestId('mailbox-oauth-connect')).toHaveTextContent(
-			/Connect with Google/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-oauth-connect'))
+			.toHaveTextContent(/Connect with Google/i);
 	});
 
 	it('labels Microsoft for the outlook preset', async () => {
@@ -45,16 +45,14 @@ describe('ProfileMailboxForm', () => {
 			account: accountFixture(),
 			preset: 'outlook'
 		});
-		await expect.element(page.getByTestId('mailbox-oauth-connect')).toHaveTextContent(
-			/Connect with Microsoft/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-oauth-connect'))
+			.toHaveTextContent(/Connect with Microsoft/i);
 	});
 
 	it('hides password fields for oauth presets', async () => {
 		render(ProfileMailboxFormTestHost, { account: accountFixture() });
-		await expect
-			.element(page.getByTestId('mailbox-password'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByTestId('mailbox-password')).not.toBeInTheDocument();
 	});
 
 	it('shows connected status for a linked Google mailbox and hides connect', async () => {
@@ -63,9 +61,7 @@ describe('ProfileMailboxForm', () => {
 		});
 		const status = page.getByTestId('mailbox-oauth-connected');
 		await expect.element(status).toHaveTextContent('Connected via Google as me@example.test');
-		await expect
-			.element(page.getByTestId('mailbox-oauth-connect'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByTestId('mailbox-oauth-connect')).not.toBeInTheDocument();
 	});
 
 	it('shows saved-password hint for password mailboxes on custom preset', async () => {
@@ -85,16 +81,12 @@ describe('ProfileMailboxForm', () => {
 			account: accountFixture(),
 			oauthError: 'OAuth failed'
 		});
-		await expect
-			.element(page.getByTestId('mailbox-oauth-error'))
-			.toHaveTextContent('OAuth failed');
+		await expect.element(page.getByTestId('mailbox-oauth-error')).toHaveTextContent('OAuth failed');
 	});
 
 	it('hides sync interval controls when no save handler is provided', async () => {
 		render(ProfileMailboxFormTestHost, { account: accountFixture() });
-		await expect
-			.element(page.getByTestId('mailbox-sync-interval'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByTestId('mailbox-sync-interval')).not.toBeInTheDocument();
 	});
 
 	it('shows sync interval controls when a save handler is provided', async () => {

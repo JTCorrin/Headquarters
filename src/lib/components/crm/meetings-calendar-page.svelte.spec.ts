@@ -132,13 +132,11 @@ describe('MeetingsCalendarPage integration', () => {
 		expect(rangeQueries.length).toBeGreaterThan(0);
 		expect(rangeQueries[0]?.after).toBeTruthy();
 		expect(rangeQueries[0]?.before).toBeTruthy();
-		expect(
-			new Date(rangeQueries[0]!.before!).getTime()
-		).toBeGreaterThan(new Date(rangeQueries[0]!.after!).getTime());
+		expect(new Date(rangeQueries[0]!.before!).getTime()).toBeGreaterThan(
+			new Date(rangeQueries[0]!.after!).getTime()
+		);
 
-		await expect
-			.element(page.getByTestId(`calendar-meeting-${MEETING_ID}`))
-			.toBeInTheDocument();
+		await expect.element(page.getByTestId(`calendar-meeting-${MEETING_ID}`)).toBeInTheDocument();
 		await page.getByTestId(`calendar-meeting-${MEETING_ID}`).click();
 		expect(onOpenMeeting).toHaveBeenCalledWith(MEETING_ID);
 	});

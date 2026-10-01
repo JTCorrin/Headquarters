@@ -11,22 +11,21 @@
 
 <Handle type="target" position={Position.Top} class="!bg-muted-foreground" />
 <div
-	class="border-border bg-card text-card-foreground min-w-[180px] rounded-lg border px-3 py-2 shadow-sm"
+	class="min-w-[180px] rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-sm"
 >
 	<div class="mb-2 text-xs font-semibold tracking-wide uppercase">Wait until</div>
 	<input
 		type="time"
-		class="border-input bg-background nodrag nopan w-full rounded border px-2 py-1 text-sm"
+		class="nodrag nopan w-full rounded border border-input bg-background px-2 py-1 text-sm"
 		value={data.time}
 		oninput={(e) => updateNodeData(id, { ...data, time: (e.target as HTMLInputElement).value })}
 	/>
 	<input
 		type="text"
-		class="border-input bg-background nodrag nopan mt-2 w-full rounded border px-2 py-1 text-xs"
+		class="nodrag nopan mt-2 w-full rounded border border-input bg-background px-2 py-1 text-xs"
 		placeholder="Timezone (optional, org default)"
 		value={data.timezone}
-		oninput={(e) =>
-			updateNodeData(id, { ...data, timezone: (e.target as HTMLInputElement).value })}
+		oninput={(e) => updateNodeData(id, { ...data, timezone: (e.target as HTMLInputElement).value })}
 	/>
 </div>
 <Handle type="source" position={Position.Bottom} class="!bg-primary" />

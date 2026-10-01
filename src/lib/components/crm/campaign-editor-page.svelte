@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { ApiCampaignAudiencePreview, ApiEmailTemplate, ApiOrgMailbox, ApiTag } from '$lib/api/v1/types.js';
+	import type {
+		ApiCampaignAudiencePreview,
+		ApiEmailTemplate,
+		ApiOrgMailbox,
+		ApiTag
+	} from '$lib/api/v1/types.js';
 	import type { CampaignFormData } from '$lib/schemas/campaign.js';
 	import { type AppNavGroup } from './app-nav.svelte';
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -146,18 +149,15 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			{#if viewState.kind !== 'ready' && viewState.kind !== 'validation'}
-				<ResourceStateBanner state={viewState} onReload={onReload} />
+				<ResourceStateBanner state={viewState} {onReload} />
 			{:else}
 				{#if viewState.kind === 'validation'}
-					<ResourceStateBanner state={viewState} onReload={onReload} />
+					<ResourceStateBanner state={viewState} {onReload} />
 				{/if}
 
 				<PageHeader
@@ -219,7 +219,7 @@
 								disabled={busy}
 							/>
 							{#if $errors.name}
-								<p class="text-destructive text-sm">{$errors.name}</p>
+								<p class="text-sm text-destructive">{$errors.name}</p>
 							{/if}
 						</div>
 
@@ -241,7 +241,7 @@
 								</Select.Content>
 							</Select.Root>
 							{#if $errors.template_id}
-								<p class="text-destructive text-sm">{$errors.template_id}</p>
+								<p class="text-sm text-destructive">{$errors.template_id}</p>
 							{/if}
 						</div>
 
@@ -260,13 +260,13 @@
 								</Select.Content>
 							</Select.Root>
 							{#if $errors.mailbox_id}
-								<p class="text-destructive text-sm">{$errors.mailbox_id}</p>
+								<p class="text-sm text-destructive">{$errors.mailbox_id}</p>
 							{/if}
 						</div>
 
 						<div class="space-y-2">
 							<Label>Audience tags</Label>
-							<p class="text-muted-foreground text-xs">
+							<p class="text-xs text-muted-foreground">
 								Only people (leads, contacts, or clients) with at least one of these tags are
 								included. This is not “everyone in the CRM”.
 							</p>
@@ -274,28 +274,26 @@
 								{#each orgTags as tag (tag.id)}
 									<button
 										type="button"
-										class="focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none"
+										class="rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 										disabled={busy}
 										onclick={() => toggleTag(tag.id)}
 									>
-										<Badge
-											variant={$formData.tag_ids.includes(tag.id) ? 'default' : 'outline'}
-										>
+										<Badge variant={$formData.tag_ids.includes(tag.id) ? 'default' : 'outline'}>
 											{tag.name}
 										</Badge>
 									</button>
 								{:else}
-									<p class="text-muted-foreground text-sm">No tags in this organisation yet.</p>
+									<p class="text-sm text-muted-foreground">No tags in this organisation yet.</p>
 								{/each}
 							</div>
 							{#if fieldError($errors.tag_ids)}
-								<p class="text-destructive text-sm">{fieldError($errors.tag_ids)}</p>
+								<p class="text-sm text-destructive">{fieldError($errors.tag_ids)}</p>
 							{/if}
 						</div>
 
 						<div class="space-y-2">
 							<Label>Among tagged people, include</Label>
-							<p class="text-muted-foreground text-xs">
+							<p class="text-xs text-muted-foreground">
 								Leave all checked to email every tagged lead, contact, and client. Uncheck a type
 								only to exclude that kind — it never expands the audience beyond the tags.
 							</p>
@@ -314,7 +312,7 @@
 								{/each}
 							</div>
 							{#if fieldError($errors.entity_types)}
-								<p class="text-destructive text-sm">{fieldError($errors.entity_types)}</p>
+								<p class="text-sm text-destructive">{fieldError($errors.entity_types)}</p>
 							{/if}
 						</div>
 
@@ -339,7 +337,7 @@
 					<aside class="space-y-4 rounded-lg border p-4">
 						<h2 class="text-sm font-medium">Audience preview</h2>
 						{#if previewLoading}
-							<p class="text-muted-foreground text-sm">Calculating audience…</p>
+							<p class="text-sm text-muted-foreground">Calculating audience…</p>
 						{:else if preview}
 							<dl class="space-y-2 text-sm">
 								<div class="flex justify-between gap-4">
@@ -356,17 +354,17 @@
 								</div>
 							</dl>
 							{#if preview.capped}
-								<p class="text-muted-foreground text-xs">Preview capped at 500 matches.</p>
+								<p class="text-xs text-muted-foreground">Preview capped at 500 matches.</p>
 							{/if}
 							{#if preview.sample.length > 0}
-								<ul class="text-muted-foreground space-y-1 text-xs">
+								<ul class="space-y-1 text-xs text-muted-foreground">
 									{#each preview.sample.slice(0, 5) as row, index (index)}
 										<li>{row.to_name ?? row.entity_type} · {row.to_email ?? 'no email'}</li>
 									{/each}
 								</ul>
 							{/if}
 						{:else}
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								Pick tags (and keep the record types you want), save the draft, then preview
 								sendable counts.
 							</p>

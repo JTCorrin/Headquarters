@@ -3,10 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import StatusBadge from './status-badge.svelte';
 	import OrgLogoMark from './org-logo-mark.svelte';
-	import {
-		roleLabel,
-		type OrgMembershipSummary
-	} from '$lib/schemas/organisation.js';
+	import { roleLabel, type OrgMembershipSummary } from '$lib/schemas/organisation.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface OrgSwitcherProps {
@@ -51,7 +48,7 @@
 					<OrgLogoMark name={current?.org_name ?? 'Org'} logoUrl={current?.logo_url} />
 					<span class="truncate font-medium">{current?.org_name ?? 'Select organisation'}</span>
 					{#if current}
-						<span class="text-muted-foreground hidden shrink-0 sm:inline">
+						<span class="hidden shrink-0 text-muted-foreground sm:inline">
 							<StatusBadge status={roleLabel(current.role)} />
 						</span>
 					{/if}
@@ -62,7 +59,7 @@
 			<DropdownMenu.Label>Organisations</DropdownMenu.Label>
 			<DropdownMenu.Separator />
 			{#if memberships.length === 0}
-				<div class="text-muted-foreground px-2 py-3 text-sm">No organisations yet.</div>
+				<div class="px-2 py-3 text-sm text-muted-foreground">No organisations yet.</div>
 			{:else}
 				{#each memberships as membership (membership.org_id)}
 					<DropdownMenu.Item
@@ -89,7 +86,7 @@
 	</DropdownMenu.Root>
 
 	{#if switchError}
-		<p class="text-destructive text-xs" role="alert" data-testid="org-switcher-error">
+		<p class="text-xs text-destructive" role="alert" data-testid="org-switcher-error">
 			{switchError}
 		</p>
 	{/if}

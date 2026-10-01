@@ -75,11 +75,7 @@ function calendarGetHandler(options: {
 		}
 		return {
 			body: {
-				data:
-					options.active ??
-					options.google ??
-					options.caldav ??
-					disconnectedCalendar('google')
+				data: options.active ?? options.google ?? options.caldav ?? disconnectedCalendar('google')
 			}
 		};
 	};
@@ -101,7 +97,7 @@ describe('PersonalSettingsController', () => {
 				'GET /api/v1/profile/preferences': async () => ({
 					body: { data: { theme_preference: null, locale: null, timezone: null } }
 				}),
-				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
+				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox')
 			}),
 			getOrgId: () => session.selectedOrgId
 		});
@@ -161,7 +157,11 @@ describe('PersonalSettingsController', () => {
 					}
 					return {
 						body: {
-							data: { ok: false, message: 'Missing saved credentials.', error_code: 'no_credentials' }
+							data: {
+								ok: false,
+								message: 'Missing saved credentials.',
+								error_code: 'no_credentials'
+							}
 						}
 					};
 				}
@@ -173,14 +173,14 @@ describe('PersonalSettingsController', () => {
 
 		await page.getByRole('tab', { name: 'Mail' }).click();
 		await page.getByTestId('mailbox-test').click();
-		await expect.element(page.getByTestId('mailbox-test-feedback')).toHaveTextContent(
-			/Credentials look valid/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-test-feedback'))
+			.toHaveTextContent(/Credentials look valid/i);
 
 		await page.getByTestId('mailbox-test').click();
-		await expect.element(page.getByTestId('mailbox-test-feedback')).toHaveTextContent(
-			/Missing saved credentials/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-test-feedback'))
+			.toHaveTextContent(/Missing saved credentials/i);
 	});
 
 	it('saves the selected mailbox sync interval and shows returned state or errors', async () => {
@@ -234,18 +234,18 @@ describe('PersonalSettingsController', () => {
 		await page.getByTestId('mailbox-sync-interval-save').click();
 
 		await expect.poll(() => updateSyncInterval).toHaveBeenCalledWith(30);
-		await expect.element(page.getByTestId('mailbox-sync-interval-feedback')).toHaveTextContent(
-			/Sync interval saved/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-sync-interval-feedback'))
+			.toHaveTextContent(/Sync interval saved/i);
 		await expect.element(trigger).toHaveTextContent('30 minutes');
 
 		await trigger.click();
 		await page.getByRole('option', { name: '60 minutes' }).click();
 		await page.getByTestId('mailbox-sync-interval-save').click();
 
-		await expect.element(page.getByTestId('mailbox-sync-interval-feedback')).toHaveTextContent(
-			/Could not save sync interval/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-sync-interval-feedback'))
+			.toHaveTextContent(/Could not save sync interval/i);
 	});
 
 	it('shows Connect with Microsoft for Outlook preset and starts mailbox OAuth', async () => {
@@ -277,9 +277,9 @@ describe('PersonalSettingsController', () => {
 		await page.getByTestId('mailbox-preset-trigger').click();
 		await page.getByRole('option', { name: 'Outlook / Microsoft 365' }).click();
 		await page.getByTestId('mailbox-oauth-connect').click();
-		await expect.element(page.getByTestId('mailbox-oauth-error')).toHaveTextContent(
-			/did not return a redirect URL/i
-		);
+		await expect
+			.element(page.getByTestId('mailbox-oauth-error'))
+			.toHaveTextContent(/did not return a redirect URL/i);
 		expect(oauthStarts).toBe(1);
 		expect(oauthProvider).toBe('microsoft');
 	});
@@ -312,18 +312,18 @@ describe('PersonalSettingsController', () => {
 		await page.getByRole('tab', { name: 'Calendar' }).click();
 		await expect.element(page.getByTestId('personal-calendar-section')).toBeInTheDocument();
 		await expect.element(page.getByTestId('calendar-xor-banner')).toHaveTextContent(/XOR/i);
-		await expect.element(page.getByTestId('calendar-connection-label')).toHaveTextContent(
-			/Not connected/i
-		);
+		await expect
+			.element(page.getByTestId('calendar-connection-label'))
+			.toHaveTextContent(/Not connected/i);
 		await expect.element(page.getByTestId('calendar-connect')).toBeInTheDocument();
 		await expect.element(page.getByTestId('profile-caldav-form')).toBeInTheDocument();
 		await expect.element(page.getByTestId('caldav-url')).toBeInTheDocument();
 
 		await page.getByTestId('calendar-connect').click();
 		await expect.poll(() => oauthStarts).toBe(1);
-		await expect.element(page.getByTestId('calendar-connect-error')).toHaveTextContent(
-			/did not return a redirect URL/i
-		);
+		await expect
+			.element(page.getByTestId('calendar-connect-error'))
+			.toHaveTextContent(/did not return a redirect URL/i);
 	});
 
 	it('renders connected Calendar status from GET /me/calendar', async () => {
@@ -360,12 +360,14 @@ describe('PersonalSettingsController', () => {
 		render(PersonalSettingsController, { api, session });
 
 		await page.getByRole('tab', { name: 'Calendar' }).click();
-		await expect.element(page.getByTestId('calendar-connection-label')).toHaveTextContent(
-			/joe@acme.test/i
-		);
+		await expect
+			.element(page.getByTestId('calendar-connection-label'))
+			.toHaveTextContent(/joe@acme.test/i);
 		await expect.element(page.getByTestId('calendar-disconnect')).toBeInTheDocument();
 		await expect.element(page.getByTestId('calendar-xor-banner')).toHaveTextContent(/Google/i);
-		await expect.element(page.getByTestId('caldav-xor-note')).toHaveTextContent(/Google is the active sync/i);
+		await expect
+			.element(page.getByTestId('caldav-xor-note'))
+			.toHaveTextContent(/Google is the active sync/i);
 	});
 
 	it('saves and tests CalDAV connection from Settings', async () => {
@@ -400,7 +402,9 @@ describe('PersonalSettingsController', () => {
 				'GET /api/v1/me/mailbox': async () => apiError(404, 'NOT_FOUND', 'No mailbox'),
 				'GET /api/v1/me/calendar': calendarGetHandler({
 					get active() {
-						return currentCaldav.status === 'active' ? currentCaldav : disconnectedCalendar('google');
+						return currentCaldav.status === 'active'
+							? currentCaldav
+							: disconnectedCalendar('google');
 					},
 					google: disconnectedCalendar('google'),
 					get caldav() {
@@ -438,22 +442,24 @@ describe('PersonalSettingsController', () => {
 		await page.getByTestId('caldav-password').fill('app-password');
 		await page.getByTestId('caldav-submit').click();
 
-		await expect.poll(() => putBody).toEqual({
-			provider: 'caldav',
-			caldav_url: 'https://caldav.example.test/SOGo/dav/user/Calendar/',
-			username: 'user@mail.test',
-			password: 'app-password',
-			calendar_id: null
-		});
-		await expect.element(page.getByTestId('caldav-connection-label')).toHaveTextContent(
-			/user@mail.test/i
-		);
+		await expect
+			.poll(() => putBody)
+			.toEqual({
+				provider: 'caldav',
+				caldav_url: 'https://caldav.example.test/SOGo/dav/user/Calendar/',
+				username: 'user@mail.test',
+				password: 'app-password',
+				calendar_id: null
+			});
+		await expect
+			.element(page.getByTestId('caldav-connection-label'))
+			.toHaveTextContent(/user@mail.test/i);
 		await expect.element(page.getByTestId('caldav-credentials-saved')).toBeInTheDocument();
 
 		await page.getByTestId('caldav-test').click();
 		await expect.poll(() => testCalls).toBe(1);
-		await expect.element(page.getByTestId('caldav-test-feedback')).toHaveTextContent(
-			/PROPFIND succeeded/i
-		);
+		await expect
+			.element(page.getByTestId('caldav-test-feedback'))
+			.toHaveTextContent(/PROPFIND succeeded/i);
 	});
 });

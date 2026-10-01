@@ -47,7 +47,7 @@
 
 <Story name="Drawer">
 	{#snippet template()}
-		<div class="bg-background flex h-[560px] items-start justify-center p-8">
+		<div class="flex h-[560px] items-start justify-center bg-background p-8">
 			<ContactFormDrawer bind:open {form} title="New contact" triggerLabel="New contact" />
 		</div>
 	{/snippet}
@@ -55,7 +55,7 @@
 
 <Story name="Drawer closed">
 	{#snippet template()}
-		<div class="bg-background flex h-[280px] items-start justify-center p-8">
+		<div class="flex h-[280px] items-start justify-center bg-background p-8">
 			<ContactFormDrawer open={false} {form} title="New contact" triggerLabel="New contact" />
 		</div>
 	{/snippet}

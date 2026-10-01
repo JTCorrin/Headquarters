@@ -62,15 +62,12 @@ export function createProjectsEndpoints(request: ApiRequestFn): ProjectsEndpoint
 			});
 		},
 		createColumn: async (projectId, body: ApiProjectColumnCreateBody, signal) => {
-			const { data } = await request<ApiProjectColumn>(
-				`/api/v1/projects/${projectId}/columns`,
-				{
-					method: 'POST',
-					body,
-					orgScoped: true,
-					signal
-				}
-			);
+			const { data } = await request<ApiProjectColumn>(`/api/v1/projects/${projectId}/columns`, {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
 			return data;
 		},
 		updateColumn: async (
@@ -109,13 +106,7 @@ export function createProjectsEndpoints(request: ApiRequestFn): ProjectsEndpoint
 			});
 			return data;
 		},
-		updateCard: async (
-			projectId,
-			cardId,
-			body: ApiProjectCardUpdateBody,
-			version,
-			signal
-		) => {
+		updateCard: async (projectId, cardId, body: ApiProjectCardUpdateBody, version, signal) => {
 			const { data } = await request<ApiProjectCard>(
 				`/api/v1/projects/${projectId}/cards/${cardId}`,
 				{

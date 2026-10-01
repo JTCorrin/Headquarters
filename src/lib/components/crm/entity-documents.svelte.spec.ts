@@ -122,7 +122,9 @@ describe('EntityDocuments workspace', () => {
 		});
 
 		await expect.element(page.getByTestId('documents-upload-queue')).toBeInTheDocument();
-		await expect.element(page.getByTestId('documents-upload-progress-u-active')).toBeInTheDocument();
+		await expect
+			.element(page.getByTestId('documents-upload-progress-u-active'))
+			.toBeInTheDocument();
 
 		await page.getByTestId('documents-upload-cancel-u-active').click();
 		await vi.waitFor(() => expect(onCancelUpload).toHaveBeenCalledWith('u-active'));

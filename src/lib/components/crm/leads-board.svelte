@@ -152,9 +152,7 @@
 		}
 		const beforeId = resolveLeadId(event.before ?? null);
 		const columnLeads = leads.filter((l) => l.stage === stage || l.id === id);
-		const optimisticColumn = columnLeads.map((l) =>
-			l.id === id ? { ...l, stage } : l
-		);
+		const optimisticColumn = columnLeads.map((l) => (l.id === id ? { ...l, stage } : l));
 		const position = computeBoardPosition(optimisticColumn, beforeId, id);
 		emitMove({ id, stage, position, beforeId });
 	}
@@ -189,7 +187,12 @@
   Won blocked (convert-only). remountKey resets SVAR after blocked pointer moves.
 -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class={cn(className)} data-testid="leads-board" onclick={selectFromEvent} onkeydown={onKeydown}>
+<div
+	class={cn(className)}
+	data-testid="leads-board"
+	onclick={selectFromEvent}
+	onkeydown={onKeydown}
+>
 	{#key remountKey}
 		<SvarKanbanShell
 			{cards}

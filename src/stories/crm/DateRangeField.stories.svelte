@@ -18,9 +18,9 @@
 
 <Story name="Range calendar">
 	{#snippet template()}
-		<div class="bg-background max-w-xl p-8">
+		<div class="max-w-xl bg-background p-8">
 			<DateRangeField bind:startValue={startOn} bind:endValue={endOn} />
-			<p class="text-muted-foreground mt-3 text-xs">
+			<p class="mt-3 text-xs text-muted-foreground">
 				Start {startOn || '—'} · End {endOn || '—'} (two YYYY-MM-DD strings)
 			</p>
 		</div>
@@ -29,9 +29,9 @@
 
 <Story name="Empty optional end">
 	{#snippet template()}
-		<div class="bg-background max-w-xl p-8">
+		<div class="max-w-xl bg-background p-8">
 			<DateRangeField bind:startValue={emptyStart} bind:endValue={emptyEnd} />
-			<p class="text-muted-foreground mt-3 text-xs">
+			<p class="mt-3 text-xs text-muted-foreground">
 				Pick a range in the calendar, or type. End stays optional; end ≥ start when both set.
 			</p>
 		</div>
@@ -40,7 +40,7 @@
 
 <Story name="Readonly">
 	{#snippet template()}
-		<div class="bg-background max-w-xl p-8">
+		<div class="max-w-xl bg-background p-8">
 			<DateRangeField startValue="2026-09-01" endValue="2026-12-31" readonly />
 		</div>
 	{/snippet}

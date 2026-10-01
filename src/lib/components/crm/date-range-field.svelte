@@ -192,7 +192,7 @@
 				{#if showStartClear}
 					<button
 						type="button"
-						class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-full"
+						class="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
 						data-testid="{dataTestId}-start-clear"
 						aria-label="Clear start date"
 						onclick={clearStart}
@@ -251,7 +251,7 @@
 					</Popover.Root>
 				{:else}
 					<span
-						class="text-muted-foreground inline-flex size-6 items-center justify-center opacity-50"
+						class="inline-flex size-6 items-center justify-center text-muted-foreground opacity-50"
 						aria-hidden="true"
 					>
 						<CalendarIcon class="size-3.5" />
@@ -285,7 +285,7 @@
 				{#if showEndClear}
 					<button
 						type="button"
-						class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-full"
+						class="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
 						data-testid="{dataTestId}-end-clear"
 						aria-label="Clear end date"
 						onclick={clearEnd}
@@ -296,7 +296,7 @@
 				{#if interactive}
 					<button
 						type="button"
-						class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-full"
+						class="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
 						aria-label="Open range calendar"
 						data-testid="{dataTestId}-calendar-end"
 						onclick={() => {
@@ -307,7 +307,7 @@
 					</button>
 				{:else}
 					<span
-						class="text-muted-foreground inline-flex size-6 items-center justify-center opacity-50"
+						class="inline-flex size-6 items-center justify-center text-muted-foreground opacity-50"
 						aria-hidden="true"
 					>
 						<CalendarIcon class="size-3.5" />

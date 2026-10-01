@@ -96,7 +96,9 @@
 		>
 			<Select.Trigger id="line-product" class="w-full">{productLabel}</Select.Trigger>
 			<Select.Content>
-				<Select.Item value={NONE} label="No product (custom line)">No product (custom line)</Select.Item>
+				<Select.Item value={NONE} label="No product (custom line)"
+					>No product (custom line)</Select.Item
+				>
 				{#each products as product (product.id)}
 					<Select.Item value={product.id} label={`${product.sku} · ${product.name}`}>
 						{product.sku} · {product.name}
@@ -104,7 +106,7 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-		<p class="text-muted-foreground text-xs">
+		<p class="text-xs text-muted-foreground">
 			Choosing a catalog product fills description and unit price; you can still edit them.
 		</p>
 	</div>
@@ -118,14 +120,14 @@
 			placeholder="Monthly retainer"
 			aria-invalid={!!$errors.description}
 		/>
-		{#if $errors.description}<p class="text-destructive text-xs">{$errors.description}</p>{/if}
+		{#if $errors.description}<p class="text-xs text-destructive">{$errors.description}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<div class="space-y-2">
 			<Label for="line-qty">Qty</Label>
 			<Input id="line-qty" name="qty" bind:value={$formData.qty} placeholder="1" />
-			{#if $errors.qty}<p class="text-destructive text-xs">{$errors.qty}</p>{/if}
+			{#if $errors.qty}<p class="text-xs text-destructive">{$errors.qty}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="line-unit">Unit price</Label>
@@ -135,7 +137,7 @@
 				bind:value={$formData.unitPrice}
 				placeholder="4200.00"
 			/>
-			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
+			{#if $errors.unitPrice}<p class="text-xs text-destructive">{$errors.unitPrice}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="line-discount">Discount %</Label>
@@ -148,7 +150,7 @@
 				data-testid="line-discount"
 			/>
 			{#if $errors.discountPercent}
-				<p class="text-destructive text-xs">{$errors.discountPercent}</p>
+				<p class="text-xs text-destructive">{$errors.discountPercent}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -162,7 +164,7 @@
 				data-testid="line-tax"
 			/>
 			{#if $errors.taxRatePercent}
-				<p class="text-destructive text-xs">{$errors.taxRatePercent}</p>
+				<p class="text-xs text-destructive">{$errors.taxRatePercent}</p>
 			{/if}
 		</div>
 	</div>

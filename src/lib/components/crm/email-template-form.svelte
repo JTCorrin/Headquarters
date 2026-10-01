@@ -82,7 +82,7 @@
 			placeholder="Invoice chase #1"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -119,8 +119,8 @@
 			placeholder={'Quick nudge on {{invoice.number}}'}
 			aria-invalid={!!$errors.subject}
 		/>
-		{#if $errors.subject}<p class="text-destructive text-xs">{$errors.subject}</p>{/if}
-		<p class="text-muted-foreground text-xs">
+		{#if $errors.subject}<p class="text-xs text-destructive">{$errors.subject}</p>{/if}
+		<p class="text-xs text-muted-foreground">
 			Variables: {'{{contact.name}}'}, {'{{client.name}}'}, {'{{invoice.number}}'}, {'{{quote.number}}'}
 		</p>
 	</div>
@@ -136,7 +136,7 @@
 			aria-invalid={!!$errors.body}
 			class="min-h-48 font-mono text-sm"
 		/>
-		{#if $errors.body}<p class="text-destructive text-xs">{$errors.body}</p>{/if}
+		{#if $errors.body}<p class="text-xs text-destructive">{$errors.body}</p>{/if}
 	</div>
 
 	<Button type="submit" disabled={$submitting || pendingSubmit}>{submitLabel}</Button>

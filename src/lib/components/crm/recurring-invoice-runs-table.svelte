@@ -13,27 +13,23 @@
 		onRetryDelivery?: (runId: string) => void | Promise<void>;
 	}
 
-	let {
-		rows = [],
-		class: className,
-		onRetryDelivery
-	}: RecurringInvoiceRunsTableProps = $props();
+	let { rows = [], class: className, onRetryDelivery }: RecurringInvoiceRunsTableProps = $props();
 </script>
 
 <div
 	class={cn(
-		'bg-card overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 >
 	<div class="border-b px-4 py-3">
 		<h3 class="text-sm font-medium">Run history</h3>
-		<p class="text-muted-foreground text-xs">
+		<p class="text-xs text-muted-foreground">
 			Scheduled and manual generation attempts, including email delivery status.
 		</p>
 	</div>
 	{#if rows.length === 0}
-		<p class="text-muted-foreground px-4 py-8 text-center text-sm">No runs yet.</p>
+		<p class="px-4 py-8 text-center text-sm text-muted-foreground">No runs yet.</p>
 	{:else}
 		<Table.Root>
 			<Table.Header>
@@ -55,7 +51,7 @@
 						<Table.Cell>
 							<span class="capitalize">{formatRecurringRunStatus(row.status)}</span>
 							{#if row.errorMessage && row.status === 'delivery_failed'}
-								<p class="text-destructive mt-1 max-w-xs text-xs">{row.errorMessage}</p>
+								<p class="mt-1 max-w-xs text-xs text-destructive">{row.errorMessage}</p>
 							{/if}
 						</Table.Cell>
 						<Table.Cell>

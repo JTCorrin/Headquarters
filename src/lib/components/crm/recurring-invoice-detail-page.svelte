@@ -103,12 +103,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -130,13 +126,11 @@
 						<Button
 							size="sm"
 							disabled={actionPending || !canActivate}
-							title={
-								isDirty
-									? 'Save changes before activating'
-									: lines.length === 0
-										? 'Add and save at least one line before activating'
-										: undefined
-							}
+							title={isDirty
+								? 'Save changes before activating'
+								: lines.length === 0
+									? 'Add and save at least one line before activating'
+									: undefined}
 							data-testid="recurring-activate"
 							onclick={() => onActivate?.()}
 						>
@@ -160,13 +154,7 @@
 							Cancel
 						</Button>
 					{:else if statusLower === 'paused'}
-						<Button
-							size="sm"
-							disabled={actionPending}
-							onclick={() => onResume?.()}
-						>
-							Resume
-						</Button>
+						<Button size="sm" disabled={actionPending} onclick={() => onResume?.()}>Resume</Button>
 						<Button
 							variant="outline"
 							size="sm"
@@ -194,17 +182,17 @@
 			</PageHeader>
 
 			{#if actionError}
-				<p class="text-destructive text-sm" role="alert">{actionError}</p>
+				<p class="text-sm text-destructive" role="alert">{actionError}</p>
 			{/if}
 
 			{#if nextRunAt && statusLower === 'active'}
-				<p class="text-muted-foreground text-sm">Next run: {nextRunAt}</p>
+				<p class="text-sm text-muted-foreground">Next run: {nextRunAt}</p>
 			{/if}
 
 			<div class="grid gap-6 lg:grid-cols-2">
 				<div class="space-y-6">
 					<div
-						class="bg-card space-y-6 rounded-3xl p-6 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-6 rounded-3xl bg-card p-6 ring-1 ring-foreground/5 dark:ring-foreground/10"
 						data-testid="recurring-schedule-editor"
 					>
 						<RecurringInvoiceForm
@@ -217,11 +205,7 @@
 							onValidSubmit={onSaveSchedule}
 						/>
 
-						<RecurringLinesTable
-							rows={lines}
-							readonly={!isEditable}
-							onRemove={onRemoveLine}
-						>
+						<RecurringLinesTable rows={lines} readonly={!isEditable} onRemove={onRemoveLine}>
 							{#snippet headerActions()}
 								{#if isEditable}
 									<RecurringLineFormDrawer
@@ -253,7 +237,7 @@
 						</RecurringLinesTable>
 
 						{#if isEditable && statusLower === 'draft' && lines.length === 0}
-							<p class="text-muted-foreground text-sm" data-testid="recurring-lines-hint">
+							<p class="text-sm text-muted-foreground" data-testid="recurring-lines-hint">
 								Add at least one line, then save, then Activate.
 							</p>
 						{/if}
@@ -269,7 +253,7 @@
 									Save changes
 								</Button>
 								{#if isDirty}
-									<span class="text-muted-foreground text-xs">Unsaved changes</span>
+									<span class="text-xs text-muted-foreground">Unsaved changes</span>
 								{/if}
 							</div>
 						{/if}

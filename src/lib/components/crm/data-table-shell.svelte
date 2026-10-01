@@ -20,11 +20,7 @@
 	import { cn } from '$lib/utils.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import {
-		ALL_FACET_VALUE,
-		withFacetFilterFns,
-		type DataTableFacet
-	} from './data-table-facets.js';
+	import { ALL_FACET_VALUE, withFacetFilterFns, type DataTableFacet } from './data-table-facets.js';
 
 	export type { DataTableFacet };
 
@@ -269,9 +265,7 @@
 				{#each table.getAllColumns().filter((col) => col.getCanHide()) as column (column.id)}
 					<DropdownMenu.CheckboxItem
 						class="capitalize"
-						bind:checked={
-							() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)
-						}
+						bind:checked={() => column.getIsVisible(), (v) => column.toggleVisibility(!!v)}
 					>
 						{column.id}
 					</DropdownMenu.CheckboxItem>
@@ -309,7 +303,7 @@
 					</Table.Row>
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={columns.length} class="text-muted-foreground h-24 text-center">
+						<Table.Cell colspan={columns.length} class="h-24 text-center text-muted-foreground">
 							{emptyMessage}
 						</Table.Cell>
 					</Table.Row>
@@ -318,7 +312,7 @@
 		</Table.Root>
 	</div>
 
-	<div class="text-muted-foreground flex flex-wrap items-center justify-between gap-3 px-1 text-sm">
+	<div class="flex flex-wrap items-center justify-between gap-3 px-1 text-sm text-muted-foreground">
 		<p>
 			{#if hasSelectColumn}
 				{selectedCount} of {filteredCount} row(s) selected.
@@ -338,12 +332,7 @@
 			>
 				Previous
 			</Button>
-			<Button
-				variant="outline"
-				size="sm"
-				onclick={() => table.nextPage()}
-				disabled={!canNextPage}
-			>
+			<Button variant="outline" size="sm" onclick={() => table.nextPage()} disabled={!canNextPage}>
 				Next
 			</Button>
 		</div>

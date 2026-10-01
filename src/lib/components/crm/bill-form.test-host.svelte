@@ -1,11 +1,7 @@
 <script lang="ts">
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
-	import {
-		billFormSchema,
-		type BillFormData,
-		type BillVendorOption
-	} from '$lib/schemas/bill.js';
+	import { billFormSchema, type BillFormData, type BillVendorOption } from '$lib/schemas/bill.js';
 	import BillForm from './bill-form.svelte';
 
 	export interface BillFormTestHostProps {

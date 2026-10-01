@@ -14,8 +14,14 @@
 		onDelete?: () => void;
 	}
 
-	let { id, label = 'row', viewHref, onView, onEdit, onDelete }: DataTableRowActionsProps =
-		$props();
+	let {
+		id,
+		label = 'row',
+		viewHref,
+		onView,
+		onEdit,
+		onDelete
+	}: DataTableRowActionsProps = $props();
 
 	function handleView() {
 		if (onView) {

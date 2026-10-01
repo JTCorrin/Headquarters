@@ -42,12 +42,7 @@ describe('timeline-mentions helpers', () => {
 	});
 
 	it('filters candidates by display name', () => {
-		const members = [
-			{ display_name: 'Ada Lovelace' },
-			{ display_name: 'Grace Hopper' }
-		];
-		expect(filterMentionCandidates(members, 'hop')).toEqual([
-			{ display_name: 'Grace Hopper' }
-		]);
+		const members = [{ display_name: 'Ada Lovelace' }, { display_name: 'Grace Hopper' }];
+		expect(filterMentionCandidates(members, 'hop')).toEqual([{ display_name: 'Grace Hopper' }]);
 	});
 });

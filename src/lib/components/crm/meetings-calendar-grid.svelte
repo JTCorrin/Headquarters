@@ -3,10 +3,7 @@
 	import { isSameMonth } from '@internationalized/date';
 	import type { MeetingListItem } from '$lib/schemas/meeting.js';
 	import { meetingCalendarLinkLabel } from '$lib/schemas/calendar-connection.js';
-	import {
-		calendarDateKey,
-		localDayKeyFromIso
-	} from '$lib/crm/meeting-calendar-range.js';
+	import { calendarDateKey, localDayKeyFromIso } from '$lib/crm/meeting-calendar-range.js';
 	import { cn } from '$lib/utils.js';
 
 	export interface MeetingsCalendarGridProps {
@@ -58,9 +55,11 @@
 	class={cn('overflow-hidden rounded-2xl border border-border', className)}
 	data-testid="meetings-calendar-grid"
 >
-	<div class="bg-muted/40 grid grid-cols-7 border-b border-border">
+	<div class="grid grid-cols-7 border-b border-border bg-muted/40">
 		{#each weekdayLabels as label (label)}
-			<div class="text-muted-foreground px-1 py-2 text-center text-xs font-medium tracking-wide sm:px-2">
+			<div
+				class="px-1 py-2 text-center text-xs font-medium tracking-wide text-muted-foreground sm:px-2"
+			>
 				<span class="sm:hidden">{label.slice(0, 1)}</span>
 				<span class="hidden sm:inline">{label}</span>
 			</div>
@@ -74,14 +73,14 @@
 			{@const inMonth = isSameMonth(day, month)}
 			<div
 				class={cn(
-					'min-h-16 border-border/70 flex flex-col gap-1 border-b border-r p-0.5 sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0',
+					'flex min-h-16 flex-col gap-1 border-r border-b border-border/70 p-0.5 sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0',
 					!inMonth && 'bg-muted/20'
 				)}
 			>
 				<button
 					type="button"
 					class={cn(
-						'hover:bg-accent/60 flex size-7 items-center justify-center rounded-full text-xs font-medium',
+						'flex size-7 items-center justify-center rounded-full text-xs font-medium hover:bg-accent/60',
 						!inMonth && 'text-muted-foreground'
 					)}
 					data-testid="calendar-day-{key}"
@@ -95,15 +94,15 @@
 						{@const linkedLabel = meetingCalendarLinkLabel(meeting.calendarProvider)}
 						<button
 							type="button"
-							class="bg-primary/10 text-primary hover:bg-primary/15 truncate rounded-md px-1.5 py-0.5 text-left text-[11px] leading-tight"
+							class="truncate rounded-md bg-primary/10 px-1.5 py-0.5 text-left text-[11px] leading-tight text-primary hover:bg-primary/15"
 							data-testid="calendar-meeting-{meeting.id}"
 							onclick={() => onSelectMeeting?.(meeting.id)}
 						>
 							<span class="font-medium">{timeLabel(meeting.startsAt)}</span>
-							<span class="text-primary/80 hidden sm:inline"> {meeting.title}</span>
+							<span class="hidden text-primary/80 sm:inline"> {meeting.title}</span>
 							{#if linkedLabel}
 								<span
-									class="text-primary/70 ml-0.5"
+									class="ml-0.5 text-primary/70"
 									data-testid="calendar-meeting-linked-{meeting.id}"
 									title="Linked to {linkedLabel} Calendar"
 								>
@@ -115,7 +114,7 @@
 					{#if dayMeetings.length > 3}
 						<button
 							type="button"
-							class="text-muted-foreground hover:text-foreground px-1 text-left text-[11px]"
+							class="px-1 text-left text-[11px] text-muted-foreground hover:text-foreground"
 							onclick={() => onSelectDay?.(day)}
 						>
 							+{dayMeetings.length - 3} more

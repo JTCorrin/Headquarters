@@ -11,11 +11,11 @@
 
 <Handle type="target" position={Position.Top} class="!bg-muted-foreground" />
 <div
-	class="border-border bg-card text-card-foreground min-w-[200px] rounded-lg border px-3 py-2 shadow-sm"
+	class="min-w-[200px] rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-sm"
 >
 	<div class="mb-2 text-xs font-semibold tracking-wide uppercase">Loop related</div>
 	<select
-		class="border-input bg-background nodrag nopan w-full rounded border px-2 py-1 text-sm"
+		class="nodrag nopan w-full rounded border border-input bg-background px-2 py-1 text-sm"
 		value={data.relation}
 		onchange={(e) =>
 			updateNodeData(id, {
@@ -24,6 +24,6 @@
 	>
 		<option value="client.contacts">Client → contacts</option>
 	</select>
-	<p class="text-muted-foreground mt-1 text-[10px]">Body steps: connect outgoing edges</p>
+	<p class="mt-1 text-[10px] text-muted-foreground">Body steps: connect outgoing edges</p>
 </div>
 <Handle type="source" position={Position.Bottom} class="!bg-primary" />

@@ -128,7 +128,7 @@
 		onValidSubmit={handleCreate}
 	/>
 	{#if openedConfigOrgId}
-		<p class="text-muted-foreground text-sm" data-testid="org-create-opened-config">
+		<p class="text-sm text-muted-foreground" data-testid="org-create-opened-config">
 			Opened configuration for
 			{memberships.find((m) => m.org_id === openedConfigOrgId)?.org_name ?? openedConfigOrgId}
 		</p>

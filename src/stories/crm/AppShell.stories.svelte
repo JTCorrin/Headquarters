@@ -38,12 +38,13 @@
 
 <Story name="Desktop" globals={storyViewport.desktop}>
 	{#snippet template(args)}
-		{@const props =
-			/** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (args)}
+		{@const props = /** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (
+			args
+		)}
 		<AppShell {...props}>
 			<div class="space-y-3 p-6">
 				<p class="text-lg font-semibold tracking-tight">Dashboard</p>
-				<p class="text-muted-foreground text-sm">
+				<p class="text-sm text-muted-foreground">
 					Placeholder content so the mobile nav sheet can overlay the page.
 				</p>
 			</div>
@@ -53,12 +54,13 @@
 
 <Story name="Tablet" globals={storyViewport.tablet}>
 	{#snippet template(args)}
-		{@const props =
-			/** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (args)}
+		{@const props = /** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (
+			args
+		)}
 		<AppShell {...props}>
 			<div class="space-y-3 p-6">
 				<p class="text-lg font-semibold tracking-tight">Dashboard</p>
-				<p class="text-muted-foreground text-sm">
+				<p class="text-sm text-muted-foreground">
 					Placeholder content so the mobile nav sheet can overlay the page.
 				</p>
 			</div>
@@ -68,14 +70,13 @@
 
 <Story name="Mobile" globals={storyViewport.mobile}>
 	{#snippet template(args)}
-		{@const props =
-			/** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (args)}
+		{@const props = /** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (
+			args
+		)}
 		<AppShell {...props}>
 			<div class="space-y-3 p-6">
 				<p class="text-lg font-semibold tracking-tight">Dashboard</p>
-				<p class="text-muted-foreground text-sm">
-					Tap the sidebar trigger to open navigation.
-				</p>
+				<p class="text-sm text-muted-foreground">Tap the sidebar trigger to open navigation.</p>
 			</div>
 		</AppShell>
 	{/snippet}
@@ -83,12 +84,13 @@
 
 <Story name="Mobile open" globals={storyViewport.mobile} play={playOpenMobileNav}>
 	{#snippet template(args)}
-		{@const props =
-			/** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (args)}
+		{@const props = /** @type {import('$lib/components/crm/app-shell.svelte').AppShellProps} */ (
+			args
+		)}
 		<AppShell {...props}>
 			<div class="space-y-3 p-6">
 				<p class="text-lg font-semibold tracking-tight">Dashboard</p>
-				<p class="text-muted-foreground text-sm">
+				<p class="text-sm text-muted-foreground">
 					The mobile nav sheet starts open over this content.
 				</p>
 			</div>

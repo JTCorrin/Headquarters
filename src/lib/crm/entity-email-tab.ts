@@ -28,10 +28,7 @@ const emptyState: EntityEmailTabState = {
 	smtpReady: false
 };
 
-function resolveEmptyState(
-	mailboxConnected: boolean,
-	messageCount: number
-): EntityEmailEmptyState {
+function resolveEmptyState(mailboxConnected: boolean, messageCount: number): EntityEmailEmptyState {
 	if (messageCount > 0) return 'no_matches';
 	if (!mailboxConnected) return 'no_mailbox';
 	return 'no_matches';

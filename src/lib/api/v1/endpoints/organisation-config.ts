@@ -34,10 +34,10 @@ export function createOrganisationConfigEndpoints(
 			return data;
 		},
 		getBranding: async (signal) => {
-			const { data } = await request<ApiOrganisationBranding>(
-				'/api/v1/organisation/branding',
-				{ orgScoped: true, signal }
-			);
+			const { data } = await request<ApiOrganisationBranding>('/api/v1/organisation/branding', {
+				orgScoped: true,
+				signal
+			});
 			return data;
 		},
 		createLogoUploadIntent: async (body: ApiOrganisationLogoUploadIntentBody, signal) => {
@@ -66,15 +66,12 @@ export function createOrganisationConfigEndpoints(
 			return data;
 		},
 		deleteLogo: async (version, signal) => {
-			const { data } = await request<ApiOrganisationConfiguration>(
-				'/api/v1/organisation/logo',
-				{
-					method: 'DELETE',
-					orgScoped: true,
-					ifMatchVersion: version,
-					signal
-				}
-			);
+			const { data } = await request<ApiOrganisationConfiguration>('/api/v1/organisation/logo', {
+				method: 'DELETE',
+				orgScoped: true,
+				ifMatchVersion: version,
+				signal
+			});
 			return data;
 		}
 	};

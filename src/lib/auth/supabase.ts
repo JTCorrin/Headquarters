@@ -1,10 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export function createSupabaseBrowserClient(
-	url: string,
-	anonKey: string
-): SupabaseClient {
+export function createSupabaseBrowserClient(url: string, anonKey: string): SupabaseClient {
 	return createBrowserClient(url, anonKey, {
 		auth: {
 			persistSession: true,

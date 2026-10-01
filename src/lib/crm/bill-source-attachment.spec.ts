@@ -12,9 +12,9 @@ describe('bill source attachment helpers', () => {
 			true
 		);
 		expect(isBillSourceAttachmentFile(new File(['x'], 'a.png', { type: 'image/png' }))).toBe(true);
-		expect(
-			isBillSourceAttachmentFile(new File(['x'], 'a.txt', { type: 'text/plain' }))
-		).toBe(false);
+		expect(isBillSourceAttachmentFile(new File(['x'], 'a.txt', { type: 'text/plain' }))).toBe(
+			false
+		);
 	});
 
 	it('formats byte sizes', () => {

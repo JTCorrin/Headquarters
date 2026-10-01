@@ -8,7 +8,7 @@
 </script>
 
 <a
-	class="text-foreground font-medium underline-offset-4 hover:underline"
+	class="font-medium text-foreground underline-offset-4 hover:underline"
 	href={`/email/templates/${id}`}
 	data-testid={`email-template-link-${id}`}
 >

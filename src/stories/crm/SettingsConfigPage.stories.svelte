@@ -109,7 +109,10 @@
 	{/snippet}
 </Story>
 
-<Story name="Forbidden" args={{ viewState: { kind: 'forbidden', message: 'Membership suspended' } }}>
+<Story
+	name="Forbidden"
+	args={{ viewState: { kind: 'forbidden', message: 'Membership suspended' } }}
+>
 	{#snippet template(args)}
 		{@const props =
 			/** @type {import('$lib/components/crm/settings-config-page.story-host.svelte').SettingsConfigPageStoryHostProps} */ (

@@ -78,32 +78,21 @@
 </script>
 
 <div
-	class={cn('crm-svar-kanban h-full min-h-[420px] w-full overflow-x-auto overflow-y-hidden rounded-3xl', className)}
+	class={cn(
+		'crm-svar-kanban h-full min-h-[420px] w-full overflow-x-auto overflow-y-hidden rounded-3xl',
+		className
+	)}
 >
 	{#if dark}
 		<WillowDark>
 			<div class="crm-svar-kanban-theme h-full">
-				<Kanban
-					{cards}
-					{columns}
-					{card}
-					{cardContent}
-					{readonly}
-					init={handleInit}
-				/>
+				<Kanban {cards} {columns} {card} {cardContent} {readonly} init={handleInit} />
 			</div>
 		</WillowDark>
 	{:else}
 		<Willow>
 			<div class="crm-svar-kanban-theme h-full">
-				<Kanban
-					{cards}
-					{columns}
-					{card}
-					{cardContent}
-					{readonly}
-					init={handleInit}
-				/>
+				<Kanban {cards} {columns} {card} {cardContent} {readonly} init={handleInit} />
 			</div>
 		</Willow>
 	{/if}

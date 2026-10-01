@@ -105,10 +105,5 @@
 	onclick={selectFromEvent}
 	onkeydown={onKeydown}
 >
-	<SvarKanbanShell
-		{cards}
-		{columns}
-		cardContent={CompactKanbanCard}
-		onMoveCard={handleMoveCard}
-	/>
+	<SvarKanbanShell {cards} {columns} cardContent={CompactKanbanCard} onMoveCard={handleMoveCard} />
 </div>

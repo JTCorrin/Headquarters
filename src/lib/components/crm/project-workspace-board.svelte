@@ -99,9 +99,7 @@
 		if (!columnId || !stageColumns.some((c) => c.id === columnId)) return;
 		const beforeId = resolveCardId(event.before ?? null);
 		const columnCards = workCards.filter((c) => c.column === columnId || c.id === id);
-		const optimisticColumn = columnCards.map((c) =>
-			c.id === id ? { ...c, column: columnId } : c
-		);
+		const optimisticColumn = columnCards.map((c) => (c.id === id ? { ...c, column: columnId } : c));
 		const position = computeBoardPosition(optimisticColumn, beforeId, id);
 		void onMoveCard?.({ id, columnId, position, beforeId });
 	}
@@ -132,10 +130,5 @@
 	onclick={selectFromEvent}
 	onkeydown={onKeydown}
 >
-	<SvarKanbanShell
-		{cards}
-		{columns}
-		cardContent={CompactKanbanCard}
-		onMoveCard={handleMoveCard}
-	/>
+	<SvarKanbanShell {cards} {columns} cardContent={CompactKanbanCard} onMoveCard={handleMoveCard} />
 </div>

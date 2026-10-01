@@ -18,7 +18,7 @@
 
 <button
 	type="button"
-	class="border-destructive/40 text-destructive hover:bg-destructive/10 rounded border bg-background px-2 py-1 text-xs font-medium disabled:pointer-events-none disabled:opacity-40"
+	class="rounded border border-destructive/40 bg-background px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-40"
 	onclick={() => void removeSelected()}
 	disabled={selectedCount === 0}
 	title="Remove selected nodes (Delete / Backspace)"

@@ -96,7 +96,7 @@
 			placeholder="Q2 retainer delivery"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -111,7 +111,7 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+		{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 	</div>
 
 	<div class="space-y-2">

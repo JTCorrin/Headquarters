@@ -9,7 +9,7 @@
 	<PageHeader title="Connect integrations" description="Coming soon — skip for this MVP." />
 	<Card.Root>
 		<Card.Content class="space-y-4 pt-6">
-			<p class="text-muted-foreground text-sm">
+			<p class="text-sm text-muted-foreground">
 				Integrations are out of scope for the email/password onboarding wave.
 			</p>
 			<Button

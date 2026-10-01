@@ -40,10 +40,7 @@
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
 		onTestMailbox?: () =>
-			| MailboxTestFeedback
-			| false
-			| void
-			| Promise<MailboxTestFeedback | false | void>;
+			MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onDisconnectMailbox?: () => boolean | void | Promise<boolean | void>;
 		onSaveTaxRate?: () => boolean | void | Promise<boolean | void>;
 		onSetDefaultTaxRate?: (taxRateId: string) => void;

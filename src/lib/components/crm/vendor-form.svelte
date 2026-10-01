@@ -61,7 +61,7 @@
 			placeholder="Cloudflare"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<Button type="submit" disabled={busy}>{submitLabel}</Button>

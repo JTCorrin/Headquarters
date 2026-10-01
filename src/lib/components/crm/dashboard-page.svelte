@@ -95,10 +95,7 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
@@ -111,7 +108,7 @@
 			</div>
 
 			{#if currencyHint}
-				<p class="text-muted-foreground text-xs">{currencyHint}</p>
+				<p class="text-xs text-muted-foreground">{currencyHint}</p>
 			{/if}
 
 			{#if showMoneyCharts}
@@ -129,14 +126,14 @@
 					</div>
 
 					<section
-						class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<div class="mb-4 flex items-center gap-2">
-							<AlertTriangleIcon class="text-muted-foreground size-4" />
+							<AlertTriangleIcon class="size-4 text-muted-foreground" />
 							<h2 class="text-sm font-semibold tracking-tight">Needs attention</h2>
 						</div>
 						{#if attentionItems.length === 0}
-							<p class="text-muted-foreground text-sm">All clear for now.</p>
+							<p class="text-sm text-muted-foreground">All clear for now.</p>
 						{:else}
 							<ul class="m-0 list-none space-y-3 p-0">
 								{#each attentionItems as item (item.id)}
@@ -149,7 +146,7 @@
 											{:else}
 												<p class="text-sm font-medium">{item.label}</p>
 											{/if}
-											<p class="text-muted-foreground truncate text-xs">{item.detail}</p>
+											<p class="truncate text-xs text-muted-foreground">{item.detail}</p>
 										</div>
 										{#if item.badge}
 											<StatusBadge status={item.badge} />
@@ -165,20 +162,10 @@
 			{/if}
 
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.85fr)]">
-				<MyTasksPanel
-					tasks={myTasks}
-					onToggleDone={onToggleTask}
-					{onSelectTask}
-					class="self-start"
-				>
+				<MyTasksPanel tasks={myTasks} onToggleDone={onToggleTask} {onSelectTask} class="self-start">
 					{#snippet headerActions()}
 						{#if form}
-							<TaskFormDrawer
-								bind:open={drawerOpen}
-								{form}
-								{assigneeOptions}
-								{onValidSubmit}
-							/>
+							<TaskFormDrawer bind:open={drawerOpen} {form} {assigneeOptions} {onValidSubmit} />
 						{:else}
 							<Button size="sm" href="/tasks">New task</Button>
 						{/if}
@@ -188,14 +175,14 @@
 				<div class="space-y-6">
 					{#if !showMoneyCharts}
 						<section
-							class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+							class="self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 						>
 							<div class="mb-4 flex items-center gap-2">
-								<AlertTriangleIcon class="text-muted-foreground size-4" />
+								<AlertTriangleIcon class="size-4 text-muted-foreground" />
 								<h2 class="text-sm font-semibold tracking-tight">Needs attention</h2>
 							</div>
 							{#if attentionItems.length === 0}
-								<p class="text-muted-foreground text-sm">All clear for now.</p>
+								<p class="text-sm text-muted-foreground">All clear for now.</p>
 							{:else}
 								<ul class="m-0 list-none space-y-3 p-0">
 									{#each attentionItems as item (item.id)}
@@ -208,7 +195,7 @@
 												{:else}
 													<p class="text-sm font-medium">{item.label}</p>
 												{/if}
-												<p class="text-muted-foreground truncate text-xs">{item.detail}</p>
+												<p class="truncate text-xs text-muted-foreground">{item.detail}</p>
 											</div>
 											{#if item.badge}
 												<StatusBadge status={item.badge} />
@@ -223,17 +210,17 @@
 					{/if}
 
 					<section
-						class="bg-card self-start rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<div class="mb-4 flex items-center justify-between gap-2">
 							<div class="flex items-center gap-2">
-								<CalendarIcon class="text-muted-foreground size-4" />
+								<CalendarIcon class="size-4 text-muted-foreground" />
 								<h2 class="text-sm font-semibold tracking-tight">Upcoming meetings</h2>
 							</div>
 							<Button type="button" variant="ghost" size="sm" href="/meetings">All</Button>
 						</div>
 						{#if upcomingMeetings.length === 0}
-							<p class="text-muted-foreground text-sm">No meetings on the horizon.</p>
+							<p class="text-sm text-muted-foreground">No meetings on the horizon.</p>
 						{:else}
 							<ul class="m-0 list-none space-y-3 p-0">
 								{#each upcomingMeetings as meeting (meeting.id)}
@@ -241,7 +228,7 @@
 										<a href="/meetings/{meeting.id}" class="text-sm font-medium hover:underline">
 											{meeting.title}
 										</a>
-										<p class="text-muted-foreground text-xs">
+										<p class="text-xs text-muted-foreground">
 											{meeting.when} · {meeting.withWhom}
 										</p>
 									</li>
@@ -256,7 +243,7 @@
 				events={recentActivity}
 				title="Recent activity"
 				emptyMessage="No recent activity yet."
-				class="bg-card rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
+				class="rounded-3xl bg-card p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 			/>
 		</div>
 	</main>

@@ -128,8 +128,8 @@
 					disabled={readonly}
 				/>
 			{/if}
-			{#if $errors.vendorId}<p class="text-destructive text-xs">{$errors.vendorId}</p>{/if}
-			{#if $errors.vendorName}<p class="text-destructive text-xs">{$errors.vendorName}</p>{/if}
+			{#if $errors.vendorId}<p class="text-xs text-destructive">{$errors.vendorId}</p>{/if}
+			{#if $errors.vendorName}<p class="text-xs text-destructive">{$errors.vendorName}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="bill-number">Vendor bill number</Label>
@@ -141,7 +141,7 @@
 				aria-invalid={!!$errors.number}
 				disabled={readonly}
 			/>
-			{#if $errors.number}<p class="text-destructive text-xs">{$errors.number}</p>{/if}
+			{#if $errors.number}<p class="text-xs text-destructive">{$errors.number}</p>{/if}
 		</div>
 	</div>
 
@@ -165,12 +165,7 @@
 		{#if !hideStatus}
 			<div class="space-y-2">
 				<Label for="bill-status">Status</Label>
-				<Select.Root
-					type="single"
-					bind:value={$formData.status}
-					name="status"
-					disabled={readonly}
-				>
+				<Select.Root type="single" bind:value={$formData.status} name="status" disabled={readonly}>
 					<Select.Trigger id="bill-status" class="w-full">{statusLabel}</Select.Trigger>
 					<Select.Content>
 						{#each statusOptions as option (option.value)}
@@ -201,7 +196,7 @@
 				name="issueOn"
 				bind:value={$formData.issueOn}
 				disabled={readonly}
-				readonly={readonly}
+				{readonly}
 			/>
 		</div>
 		<div class="space-y-2">
@@ -211,9 +206,9 @@
 				name="receivedOn"
 				bind:value={$formData.receivedOn}
 				disabled={readonly}
-				readonly={readonly}
+				{readonly}
 			/>
-			{#if $errors.receivedOn}<p class="text-destructive text-xs">{$errors.receivedOn}</p>{/if}
+			{#if $errors.receivedOn}<p class="text-xs text-destructive">{$errors.receivedOn}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="bill-due">Due on</Label>
@@ -222,17 +217,23 @@
 				name="dueOn"
 				bind:value={$formData.dueOn}
 				disabled={readonly}
-				readonly={readonly}
+				{readonly}
 				min={$formData.issueOn}
 				presets={['today', 'plus7', 'endOfMonth']}
 			/>
-			{#if $errors.dueOn}<p class="text-destructive text-xs">{$errors.dueOn}</p>{/if}
+			{#if $errors.dueOn}<p class="text-xs text-destructive">{$errors.dueOn}</p>{/if}
 		</div>
 	</div>
 
 	<div class="space-y-2">
 		<Label for="bill-notes">Notes</Label>
-		<Textarea id="bill-notes" name="notes" bind:value={$formData.notes} rows={2} disabled={readonly} />
+		<Textarea
+			id="bill-notes"
+			name="notes"
+			bind:value={$formData.notes}
+			rows={2}
+			disabled={readonly}
+		/>
 	</div>
 
 	{#if !readonly}

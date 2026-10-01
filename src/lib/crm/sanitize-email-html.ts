@@ -94,7 +94,9 @@ export function sanitizeEmailHtml(html: string): string {
 			.trim();
 	}
 	const doc = new DOMParser().parseFromString(input, 'text/html');
-	for (const node of [...doc.querySelectorAll('script, style, iframe, object, embed, link, meta')]) {
+	for (const node of [
+		...doc.querySelectorAll('script, style, iframe, object, embed, link, meta')
+	]) {
 		node.remove();
 	}
 	sanitizeElement(doc.body);

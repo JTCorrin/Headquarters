@@ -15,10 +15,7 @@
 	import DocumentPdfPreview from './document-pdf-preview.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
-	import {
-		buildMoneyDocumentDef,
-		moneyDocumentFilename
-	} from '$lib/pdf/money-document.js';
+	import { buildMoneyDocumentDef, moneyDocumentFilename } from '$lib/pdf/money-document.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 
 	export interface QuoteDetailPageProps {
@@ -156,12 +153,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -246,7 +239,7 @@
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.95fr)]">
 				<div class="space-y-6">
 					<section
-						class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-4 self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<h2 class="text-sm font-semibold tracking-tight">Quote details</h2>
 						<QuoteForm
@@ -292,7 +285,7 @@
 						{composerActor}
 						onAdd={onTimelineAdd}
 						emptyMessage="No quote activity yet."
-						class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="self-start rounded-3xl bg-card p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					/>
 				</div>
 

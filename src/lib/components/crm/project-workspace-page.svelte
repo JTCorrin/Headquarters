@@ -61,37 +61,23 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
-			<PageHeader title={projectName} status={status}>
+			<PageHeader title={projectName} {status}>
 				{#snippet actions()}
 					{#if owner}
-						<span class="text-muted-foreground hidden text-sm sm:inline">Owner {owner}</span>
+						<span class="hidden text-sm text-muted-foreground sm:inline">Owner {owner}</span>
 					{/if}
 					{#if onEdit}
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={actionBusy}
-							onclick={() => onEdit?.()}
-						>
+						<Button variant="outline" size="sm" disabled={actionBusy} onclick={() => onEdit?.()}>
 							<PencilIcon class="size-3.5" />
 							Edit
 						</Button>
 					{/if}
 					{#if onDelete}
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={actionBusy}
-							onclick={() => onDelete?.()}
-						>
+						<Button variant="outline" size="sm" disabled={actionBusy} onclick={() => onDelete?.()}>
 							<Trash2Icon class="size-3.5" />
 							Delete
 						</Button>
@@ -106,17 +92,11 @@
 			</PageHeader>
 
 			<div class="flex flex-wrap items-center gap-2">
-				<span class="text-muted-foreground text-xs">Attached to</span>
+				<span class="text-xs text-muted-foreground">Attached to</span>
 				<StatusBadge status={clientName} />
 			</div>
 
-			<ProjectWorkspaceBoard
-				{cards}
-				{columns}
-				{onMoveCard}
-				{onSelectCard}
-				class="min-h-[480px]"
-			/>
+			<ProjectWorkspaceBoard {cards} {columns} {onMoveCard} {onSelectCard} class="min-h-[480px]" />
 		</div>
 	</main>
 </AppSidebarFrame>

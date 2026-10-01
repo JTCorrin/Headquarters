@@ -18,17 +18,19 @@
 
 <Story name="Picker with input">
 	{#snippet template()}
-		<div class="bg-background flex max-w-sm flex-col gap-2 p-8">
+		<div class="flex max-w-sm flex-col gap-2 bg-background p-8">
 			<label class="text-sm font-medium" for="story-date-empty">Subscription date</label>
 			<DateField id="story-date-empty" bind:value={empty} />
-			<p class="text-muted-foreground text-xs">Typed YYYY-MM-DD + calendar trigger. Value: {empty || '—'}</p>
+			<p class="text-xs text-muted-foreground">
+				Typed YYYY-MM-DD + calendar trigger. Value: {empty || '—'}
+			</p>
 		</div>
 	{/snippet}
 </Story>
 
 <Story name="With value">
 	{#snippet template()}
-		<div class="bg-background flex max-w-sm flex-col gap-2 p-8">
+		<div class="flex max-w-sm flex-col gap-2 bg-background p-8">
 			<label class="text-sm font-medium" for="story-date-filled">Occurred on</label>
 			<DateField id="story-date-filled" bind:value={filled} />
 		</div>
@@ -37,14 +39,10 @@
 
 <Story name="Due date presets">
 	{#snippet template()}
-		<div class="bg-background flex max-w-sm flex-col gap-2 p-8">
+		<div class="flex max-w-sm flex-col gap-2 bg-background p-8">
 			<label class="text-sm font-medium" for="story-date-due">Due on</label>
-			<DateField
-				id="story-date-due"
-				bind:value={due}
-				presets={['today', 'plus7', 'endOfMonth']}
-			/>
-			<p class="text-muted-foreground text-xs">
+			<DateField id="story-date-due" bind:value={due} presets={['today', 'plus7', 'endOfMonth']} />
+			<p class="text-xs text-muted-foreground">
 				Presets: Today, +7 days, End of month. Value: {due || '—'}
 			</p>
 		</div>
@@ -53,7 +51,7 @@
 
 <Story name="Min from issue date">
 	{#snippet template()}
-		<div class="bg-background flex max-w-sm flex-col gap-4 p-8">
+		<div class="flex max-w-sm flex-col gap-4 bg-background p-8">
 			<div class="flex flex-col gap-2">
 				<label class="text-sm font-medium" for="story-date-issue">Issue on</label>
 				<DateField id="story-date-issue" bind:value={issue} />
@@ -67,14 +65,14 @@
 					presets={['today', 'plus7', 'endOfMonth']}
 				/>
 			</div>
-			<p class="text-muted-foreground text-xs">Due minValue tracks issue date ({issue || '—'}).</p>
+			<p class="text-xs text-muted-foreground">Due minValue tracks issue date ({issue || '—'}).</p>
 		</div>
 	{/snippet}
 </Story>
 
 <Story name="Disabled">
 	{#snippet template()}
-		<div class="bg-background flex max-w-sm flex-col gap-2 p-8">
+		<div class="flex max-w-sm flex-col gap-2 bg-background p-8">
 			<label class="text-sm font-medium" for="story-date-disabled">Locked date</label>
 			<DateField id="story-date-disabled" value="2026-01-01" disabled />
 		</div>

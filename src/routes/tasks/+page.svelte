@@ -23,7 +23,11 @@
 		const url = new URL(page.url);
 		url.searchParams.delete('entity_type');
 		url.searchParams.delete('entity_id');
-		void goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+		void goto(`${url.pathname}${url.search}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
 </script>
 

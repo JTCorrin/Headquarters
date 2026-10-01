@@ -131,13 +131,15 @@
 			>
 				<Select.Trigger id="invoice-quote" class="w-full">{quoteLabel}</Select.Trigger>
 				<Select.Content>
-					<Select.Item value={NONE} label="Blank draft (no quote)">Blank draft (no quote)</Select.Item>
+					<Select.Item value={NONE} label="Blank draft (no quote)"
+						>Blank draft (no quote)</Select.Item
+					>
 					{#each quoteOptions as option (option.id)}
 						<Select.Item value={option.id} label={option.label}>{option.label}</Select.Item>
 					{/each}
 				</Select.Content>
 			</Select.Root>
-			<p class="text-muted-foreground text-xs">
+			<p class="text-xs text-muted-foreground">
 				Converting an accepted quote copies party and line snapshots into a new draft invoice.
 			</p>
 		</div>
@@ -161,7 +163,7 @@
 					{/each}
 				</Select.Content>
 			</Select.Root>
-			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+			{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 		</div>
 	{:else}
 		<div class="space-y-2">
@@ -174,8 +176,8 @@
 				aria-invalid={!!$errors.clientName}
 				disabled={readonly}
 			/>
-			{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
-			{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+			{#if $errors.clientName}<p class="text-xs text-destructive">{$errors.clientName}</p>{/if}
+			{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 		</div>
 	{/if}
 
@@ -190,10 +192,10 @@
 			}}
 		/>
 		{#if $errors.recipients}
-			<p class="text-destructive text-xs">{$errors.recipients}</p>
+			<p class="text-xs text-destructive">{$errors.recipients}</p>
 		{/if}
 	{:else}
-		<p class="text-muted-foreground text-xs">
+		<p class="text-xs text-muted-foreground">
 			Recipients copy from the quote on convert — edit them on the draft after create.
 		</p>
 	{/if}
@@ -238,8 +240,8 @@
 			aria-invalid={!!$errors.discount}
 			data-testid="invoice-discount"
 		/>
-		{#if $errors.discount}<p class="text-destructive text-xs">{$errors.discount}</p>{/if}
-		<p class="text-muted-foreground text-xs">Fixed amount off the subtotal before tax rollup.</p>
+		{#if $errors.discount}<p class="text-xs text-destructive">{$errors.discount}</p>{/if}
+		<p class="text-xs text-muted-foreground">Fixed amount off the subtotal before tax rollup.</p>
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -250,9 +252,9 @@
 				name="issueOn"
 				bind:value={$formData.issueOn}
 				disabled={readonly}
-				readonly={readonly}
+				{readonly}
 			/>
-			{#if $errors.issueOn}<p class="text-destructive text-xs">{$errors.issueOn}</p>{/if}
+			{#if $errors.issueOn}<p class="text-xs text-destructive">{$errors.issueOn}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="invoice-due">Due on</Label>
@@ -261,11 +263,11 @@
 				name="dueOn"
 				bind:value={$formData.dueOn}
 				disabled={readonly}
-				readonly={readonly}
+				{readonly}
 				min={$formData.issueOn}
 				presets={['today', 'plus7', 'endOfMonth']}
 			/>
-			{#if $errors.dueOn}<p class="text-destructive text-xs">{$errors.dueOn}</p>{/if}
+			{#if $errors.dueOn}<p class="text-xs text-destructive">{$errors.dueOn}</p>{/if}
 		</div>
 	</div>
 

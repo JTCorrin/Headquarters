@@ -39,6 +39,8 @@ describe('ProductForm category', () => {
 
 		await expect.poll(() => onCreateCategory.mock.calls.length).toBe(1);
 		expect(onCreateCategory).toHaveBeenCalledWith('Services');
-		await expect.element(page.getByTestId('product-category-trigger')).toHaveTextContent('Services');
+		await expect
+			.element(page.getByTestId('product-category-trigger'))
+			.toHaveTextContent('Services');
 	});
 });

@@ -11,13 +11,11 @@ describe('meeting transcript attachment', () => {
 	it('accepts only .vtt transcripts', () => {
 		expect(isMeetingTranscriptFile(new File(['a'], 'a.vtt', { type: 'text/vtt' }))).toBe(true);
 		expect(isMeetingTranscriptFile(new File(['a'], 'a.VTT', { type: '' }))).toBe(true);
-		expect(isMeetingTranscriptFile(new File(['a'], 'a.txt', { type: 'text/plain' }))).toBe(
+		expect(isMeetingTranscriptFile(new File(['a'], 'a.txt', { type: 'text/plain' }))).toBe(false);
+		expect(isMeetingTranscriptFile(new File(['a'], 'a.md', { type: '' }))).toBe(false);
+		expect(isMeetingTranscriptFile(new File(['a'], 'a.pdf', { type: 'application/pdf' }))).toBe(
 			false
 		);
-		expect(isMeetingTranscriptFile(new File(['a'], 'a.md', { type: '' }))).toBe(false);
-		expect(
-			isMeetingTranscriptFile(new File(['a'], 'a.pdf', { type: 'application/pdf' }))
-		).toBe(false);
 		expect(
 			isMeetingTranscriptFile(new File(['a'], 'a.bin', { type: 'application/octet-stream' }))
 		).toBe(false);

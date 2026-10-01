@@ -60,9 +60,9 @@ describe('DataTableShell', () => {
 		});
 
 		await page.getByRole('button', { name: /name/i }).click();
-		await expect.element(page.getByRole('row').nth(1).getByRole('cell').nth(0)).toHaveTextContent(
-			'Amy'
-		);
+		await expect
+			.element(page.getByRole('row').nth(1).getByRole('cell').nth(0))
+			.toHaveTextContent('Amy');
 	});
 
 	it('filters by name', async () => {
@@ -88,7 +88,9 @@ describe('DataTableShell', () => {
 		});
 
 		await expect.element(page.getByText('3 row(s)')).toBeInTheDocument();
-		await expect.element(page.getByRole('checkbox', { name: 'Select row' })).not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('checkbox', { name: 'Select row' }))
+			.not.toBeInTheDocument();
 	});
 
 	it('selects a row via checkbox when a select column is present', async () => {
@@ -105,9 +107,7 @@ describe('DataTableShell', () => {
 
 	it('hides secondary columns on a mobile viewport', async () => {
 		await page.viewport(390, 844);
-		await expect
-			.poll(() => window.matchMedia('(max-width: 767px)').matches)
-			.toBe(true);
+		await expect.poll(() => window.matchMedia('(max-width: 767px)').matches).toBe(true);
 
 		render(DataTableShell, {
 			columns: contactColumns as ColumnDef<unknown, unknown>[],

@@ -24,9 +24,7 @@
 	import { type AppNavGroup } from './app-nav.svelte';
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import AiProviderConnectDrawer from './ai-provider-connect-drawer.svelte';
 	import OrgInvoiceEmailForm from './org-invoice-email-form.svelte';
@@ -59,7 +57,10 @@
 		onReload?: () => void;
 		onConnect?: (provider: AiProvider, apiKey: string) => boolean | void | Promise<boolean | void>;
 		onDisconnect?: (provider: AiProvider) => boolean | void | Promise<boolean | void>;
-		onSelectModel?: (provider: AiProvider, model: string) => boolean | void | Promise<boolean | void>;
+		onSelectModel?: (
+			provider: AiProvider,
+			model: string
+		) => boolean | void | Promise<boolean | void>;
 		onSavePrompts?: (prompts: AiPromptsFormState) => boolean | void | Promise<boolean | void>;
 		onInvoiceEmailSubmit?: () => boolean | void | Promise<boolean | void>;
 		onInvoiceEmailTest?: () =>
@@ -167,12 +168,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -181,7 +178,7 @@
 				description="Connect organisation AI providers for Draft response. Personal IMAP/SMTP lives under Config → Mail."
 			>
 				{#snippet actions()}
-					<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
+					<span class="text-xs text-muted-foreground">Your role: {roleLabel(role)}</span>
 				{/snippet}
 			</PageHeader>
 
@@ -191,7 +188,7 @@
 				<section class="space-y-4" data-testid="ai-integrations-section">
 					<div>
 						<h2 class="text-lg font-semibold tracking-tight">AI providers</h2>
-						<p class="text-muted-foreground text-sm">
+						<p class="text-sm text-muted-foreground">
 							API-key connect for OpenAI, Anthropic, Google, and OpenRouter. No fake OAuth buttons —
 							Draft response stays in the email reply composer.
 							{#if !canEdit}
@@ -200,7 +197,7 @@
 						</p>
 					</div>
 
-					<ul class="divide-border divide-y rounded-3xl border" data-testid="ai-integrations-list">
+					<ul class="divide-y divide-border rounded-3xl border" data-testid="ai-integrations-list">
 						{#each aiProviders as provider (provider)}
 							{@const item = statusFor(provider)}
 							{@const catalog = modelCatalogs[provider] ?? []}
@@ -217,9 +214,11 @@
 												<StatusBadge status="Not connected" />
 											{/if}
 										</div>
-										<p class="text-muted-foreground text-sm">
+										<p class="text-sm text-muted-foreground">
 											{#if item.credentials_configured}
-												Key saved{item.last_verified_at ? ` · verified ${item.last_verified_at}` : ''}.
+												Key saved{item.last_verified_at
+													? ` · verified ${item.last_verified_at}`
+													: ''}.
 												{#if item.selected_model}
 													· model <span class="text-foreground">{item.selected_model}</span>
 												{/if}
@@ -272,7 +271,7 @@
 										<Label for={`ai-model-${provider}`}>Model</Label>
 										<select
 											id={`ai-model-${provider}`}
-											class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+											class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 											disabled={!canEdit || modelsBusy === provider || catalog.length === 0}
 											value={item.selected_model ?? ''}
 											onchange={(event) => void handleSelectModel(provider, event)}
@@ -289,9 +288,9 @@
 												<option value={model.id}>{model.label}</option>
 											{/each}
 										</select>
-										<p class="text-muted-foreground text-xs">
-											Used for Draft response, Generate summary, and Draft chase when this
-											provider is active.
+										<p class="text-xs text-muted-foreground">
+											Used for Draft response, Generate summary, and Draft chase when this provider
+											is active.
 										</p>
 									</div>
 								{/if}
@@ -299,7 +298,7 @@
 						{/each}
 					</ul>
 					{#if modelError}
-						<p class="text-destructive text-sm" role="alert" data-testid="ai-model-error">
+						<p class="text-sm text-destructive" role="alert" data-testid="ai-model-error">
 							{modelError}
 						</p>
 					{/if}
@@ -309,7 +308,7 @@
 					<div class="flex flex-wrap items-start justify-between gap-3">
 						<div>
 							<h2 class="text-lg font-semibold tracking-tight">AI prompts</h2>
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								Defaults ship with the product. Edit to tune Draft response, meeting summary, and
 								chase assists for this organisation.
 								{#if !canEdit}
@@ -331,7 +330,7 @@
 					</div>
 
 					{#if promptsError}
-						<p class="text-destructive text-sm" role="alert" data-testid="ai-prompts-error">
+						<p class="text-sm text-destructive" role="alert" data-testid="ai-prompts-error">
 							{promptsError}
 						</p>
 					{/if}
@@ -353,7 +352,7 @@
 										</Button>
 									{/if}
 								</div>
-								<p class="text-muted-foreground text-xs">{aiPromptHints[key]}</p>
+								<p class="text-xs text-muted-foreground">{aiPromptHints[key]}</p>
 								<Textarea
 									id={`ai-prompt-${key}`}
 									rows={4}
@@ -369,7 +368,7 @@
 				<section class="space-y-4" data-testid="org-invoice-email-section">
 					<div>
 						<h2 class="text-lg font-semibold tracking-tight">Invoice email</h2>
-						<p class="text-muted-foreground text-sm">
+						<p class="text-sm text-muted-foreground">
 							Organisation SMTP used for recurring invoice auto-send. Your personal mailbox stays
 							under
 							<a class="underline underline-offset-2" href="{resolve('/settings')}#mail"
@@ -396,7 +395,7 @@
 							data-testid="org-invoice-email-readonly"
 						>
 							<p class="font-medium">{invoiceEmailAccount.from_address}</p>
-							<p class="text-muted-foreground text-sm">
+							<p class="text-sm text-muted-foreground">
 								Status: {invoiceEmailAccount.status}
 								{#if invoiceEmailAccount.credentials_configured}
 									· credentials configured
@@ -406,14 +405,13 @@
 								{/if}
 							</p>
 							{#if invoiceEmailAccount.last_error_message || invoiceEmailAccount.last_error_code}
-								<p class="text-destructive text-sm">
-									{invoiceEmailAccount.last_error_message ??
-										invoiceEmailAccount.last_error_code}
+								<p class="text-sm text-destructive">
+									{invoiceEmailAccount.last_error_message ?? invoiceEmailAccount.last_error_code}
 								</p>
 							{/if}
 						</div>
 					{:else}
-						<p class="text-muted-foreground text-sm" data-testid="org-invoice-email-not-configured">
+						<p class="text-sm text-muted-foreground" data-testid="org-invoice-email-not-configured">
 							Not configured
 						</p>
 					{/if}

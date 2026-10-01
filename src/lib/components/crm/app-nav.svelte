@@ -37,7 +37,7 @@
 <Sidebar.Root collapsible="offcanvas" class={cn('h-full border-r', className)}>
 	<Sidebar.Header class="gap-1 px-4 py-5">
 		<p class="text-lg font-semibold tracking-tight">Headquarters</p>
-		<p class="text-muted-foreground text-xs">{orgName}</p>
+		<p class="text-xs text-muted-foreground">{orgName}</p>
 	</Sidebar.Header>
 
 	<Sidebar.Content class="gap-0 px-2 pb-4">
@@ -79,7 +79,7 @@
 		{/each}
 	</Sidebar.Content>
 
-	<Sidebar.Footer class="text-muted-foreground border-t px-4 py-4 text-xs">
+	<Sidebar.Footer class="border-t px-4 py-4 text-xs text-muted-foreground">
 		{footerLabel}
 	</Sidebar.Footer>
 </Sidebar.Root>

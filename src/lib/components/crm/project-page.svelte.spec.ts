@@ -289,12 +289,14 @@ describe('ProjectPage integration', () => {
 		await projectForm.getByLabelText('Description').fill('Updated scope');
 		await projectForm.getByRole('button', { name: 'Save changes' }).click();
 
-		await expect.poll(() => projectPatch).toMatchObject({
-			name: 'Q2 retainer (rev)',
-			description: 'Updated scope',
-			status: 'active',
-			client_id: CLIENT_ID
-		});
+		await expect
+			.poll(() => projectPatch)
+			.toMatchObject({
+				name: 'Q2 retainer (rev)',
+				description: 'Updated scope',
+				status: 'active',
+				client_id: CLIENT_ID
+			});
 		await expect.element(page.getByText('Q2 retainer (rev)')).toBeInTheDocument();
 
 		await page.getByRole('button', { name: 'Add card' }).click();
@@ -303,11 +305,13 @@ describe('ProjectPage integration', () => {
 		await cardForm.getByLabelText('Description').fill('Include kickoff notes');
 		await cardForm.getByRole('button', { name: 'Create card' }).click();
 
-		await expect.poll(() => cardCreate).toMatchObject({
-			title: 'Ship onboarding pack',
-			description: 'Include kickoff notes',
-			column_id: COL_BACKLOG
-		});
+		await expect
+			.poll(() => cardCreate)
+			.toMatchObject({
+				title: 'Ship onboarding pack',
+				description: 'Include kickoff notes',
+				column_id: COL_BACKLOG
+			});
 		await expect.element(page.getByText('Ship onboarding pack')).toBeInTheDocument();
 	});
 });

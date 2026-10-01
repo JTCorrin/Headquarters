@@ -186,9 +186,7 @@ describe('MeetingsPage integration', () => {
 		await page.getByLabelText('Name').fill('Sam Ortiz');
 		await page.getByTestId('meeting-form').getByRole('button', { name: 'Save meeting' }).click();
 
-		await expect
-			.element(page.getByRole('link', { name: 'Renewal check-in' }))
-			.toBeInTheDocument();
+		await expect.element(page.getByRole('link', { name: 'Renewal check-in' })).toBeInTheDocument();
 		expect(createBody).toMatchObject({
 			title: 'Renewal check-in',
 			status: 'scheduled',

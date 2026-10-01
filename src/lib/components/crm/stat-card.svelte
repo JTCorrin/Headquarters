@@ -19,7 +19,7 @@
 		<Card.Description>{label}</Card.Description>
 		<Card.Title class="text-3xl font-semibold tracking-tight">{value}</Card.Title>
 		{#if hint}
-			<p class="text-muted-foreground text-xs">{hint}</p>
+			<p class="text-xs text-muted-foreground">{hint}</p>
 		{/if}
 		{#if action}
 			<Card.Action>{@render action()}</Card.Action>

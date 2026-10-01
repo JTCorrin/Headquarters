@@ -37,11 +37,11 @@
 </script>
 
 <div
-	class="border-border bg-card text-card-foreground min-w-[220px] rounded-lg border px-3 py-2 shadow-sm"
+	class="min-w-[220px] rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-sm"
 >
 	<div class="mb-2 text-xs font-semibold tracking-wide uppercase">Trigger</div>
 	<select
-		class="border-input bg-background nodrag nopan w-full rounded border px-2 py-1 text-sm"
+		class="nodrag nopan w-full rounded border border-input bg-background px-2 py-1 text-sm"
 		value={data.kind}
 		onchange={setKind}
 	>
@@ -54,12 +54,12 @@
 			<input
 				type="number"
 				min="1"
-				class="border-input bg-background nodrag nopan w-16 rounded border px-2 py-1 text-sm"
+				class="nodrag nopan w-16 rounded border border-input bg-background px-2 py-1 text-sm"
 				value={Number(data.config?.days) || 7}
 				oninput={(e) => patchConfig('days', Number((e.target as HTMLInputElement).value))}
 			/>
 			<select
-				class="border-input bg-background nodrag nopan flex-1 rounded border px-2 py-1 text-sm"
+				class="nodrag nopan flex-1 rounded border border-input bg-background px-2 py-1 text-sm"
 				value={(data.config?.basis as string) || 'due_on'}
 				onchange={(e) => patchConfig('basis', (e.target as HTMLSelectElement).value)}
 			>
@@ -71,7 +71,7 @@
 	{#if data.kind === 'schedule.cron'}
 		<input
 			type="text"
-			class="border-input bg-background nodrag nopan mt-2 w-full rounded border px-2 py-1 text-xs"
+			class="nodrag nopan mt-2 w-full rounded border border-input bg-background px-2 py-1 text-xs"
 			placeholder="Cron (e.g. 0 9 * * *)"
 			value={(data.config?.cron as string) || ''}
 			oninput={(e) => patchConfig('cron', (e.target as HTMLInputElement).value)}

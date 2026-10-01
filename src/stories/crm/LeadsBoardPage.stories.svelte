@@ -129,7 +129,7 @@
 			/** @type {import('$lib/components/crm/leads-board-page.story-host.svelte').LeadsBoardPageStoryHostProps} */ (
 				args
 			)}
-		<div class="h-screen dark">
+		<div class="dark h-screen">
 			<LeadsBoardPageStoryHost {...props} />
 		</div>
 	{/snippet}

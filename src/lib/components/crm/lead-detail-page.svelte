@@ -14,9 +14,7 @@
 	import ProfileTabs from './profile-tabs.svelte';
 	import LeadForm from './lead-form.svelte';
 	import ConvertLeadDialog from './convert-lead-dialog.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import InfoCard from './info-card.svelte';
 	import EntityEmailInbox, {
@@ -87,10 +85,7 @@
 			subject: string;
 			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
-		onUseSuggestion?: (payload: {
-			suggestionId?: string;
-			text: string;
-		}) => void | Promise<void>;
+		onUseSuggestion?: (payload: { suggestionId?: string; text: string }) => void | Promise<void>;
 		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 	}
 
@@ -164,12 +159,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0 space-y-6">
@@ -248,7 +239,7 @@
 								? 'Already converted — showing existing client.'
 								: 'Lead converted to client.'}
 						</p>
-						<p class="text-muted-foreground mt-1 text-xs">
+						<p class="mt-1 text-xs text-muted-foreground">
 							Client {lastConvertResult.client.name} ·
 							<button
 								type="button"
@@ -268,7 +259,7 @@
 						{#if active === 'details'}
 							<div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
 								<section
-									class="bg-card space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+									class="space-y-4 rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 								>
 									<div class="flex items-center justify-between gap-2">
 										<h2 class="text-sm font-semibold tracking-tight">Details</h2>
@@ -277,7 +268,7 @@
 										{/if}
 									</div>
 									{#if isWon}
-										<p class="text-muted-foreground text-sm">
+										<p class="text-sm text-muted-foreground">
 											Converted leads are read-only here — edit the client instead.
 										</p>
 										<InfoCard

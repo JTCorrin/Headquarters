@@ -27,10 +27,7 @@
 	import type { DocumentPreviewState } from '$lib/api/v1/document-workspace-controller.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
-	import {
-		buildMoneyDocumentDef,
-		moneyDocumentFilename
-	} from '$lib/pdf/money-document.js';
+	import { buildMoneyDocumentDef, moneyDocumentFilename } from '$lib/pdf/money-document.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 
 	export interface BillDetailPageProps {
@@ -160,7 +157,10 @@
 			status: status || formData.current.status,
 			dueOn: formData.current.dueOn,
 			lines,
-			issueDate: formData.current.issueOn || formData.current.receivedOn || new Date().toISOString().slice(0, 10),
+			issueDate:
+				formData.current.issueOn ||
+				formData.current.receivedOn ||
+				new Date().toISOString().slice(0, 10),
 			totals: moneyTotals
 				? {
 						subtotalCents: moneyTotals.subtotalCents,
@@ -191,12 +191,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -215,12 +211,7 @@
 						>
 							Delete draft
 						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={actionPending}
-							onclick={() => onVoid?.()}
-						>
+						<Button variant="outline" size="sm" disabled={actionPending} onclick={() => onVoid?.()}>
 							Void
 						</Button>
 						<Button
@@ -232,12 +223,7 @@
 							Receive
 						</Button>
 					{:else if statusLower === 'received'}
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={actionPending}
-							onclick={() => onVoid?.()}
-						>
+						<Button variant="outline" size="sm" disabled={actionPending} onclick={() => onVoid?.()}>
 							Void
 						</Button>
 					{/if}
@@ -247,11 +233,11 @@
 			<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.95fr)]">
 				<div class="space-y-6">
 					<section
-						class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-4 self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<h2 class="text-sm font-semibold tracking-tight">Bill details</h2>
 						{#if isDraft && isDirty}
-							<p class="text-muted-foreground text-xs" data-testid="bill-dirty-hint">
+							<p class="text-xs text-muted-foreground" data-testid="bill-dirty-hint">
 								Unsaved changes — save before receiving.
 							</p>
 						{/if}
@@ -330,7 +316,7 @@
 						{composerActor}
 						onAdd={onTimelineAdd}
 						emptyMessage="No bill activity yet."
-						class="bg-card self-start rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="self-start rounded-3xl bg-card p-4 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					/>
 				</div>
 

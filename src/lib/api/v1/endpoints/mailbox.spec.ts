@@ -96,6 +96,8 @@ describe('mailbox endpoints', () => {
 		expect(account.auth_mode).toBe('oauth');
 		expect(account.oauth_provider).toBe('microsoft');
 		expect(account.email_address).toBe('joe@outlook.test');
-		expect(JSON.stringify(account)).not.toMatch(/secret_ref|token_blob|refresh_token|access_token/i);
+		expect(JSON.stringify(account)).not.toMatch(
+			/secret_ref|token_blob|refresh_token|access_token/i
+		);
 	});
 });

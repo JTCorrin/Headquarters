@@ -21,10 +21,7 @@ export interface PersonalEmailInboxState {
 	listError?: string;
 }
 
-function resolveEmptyState(
-	mailboxConnected: boolean,
-	messageCount: number
-): EntityEmailEmptyState {
+function resolveEmptyState(mailboxConnected: boolean, messageCount: number): EntityEmailEmptyState {
 	if (messageCount > 0) return 'empty_inbox';
 	if (!mailboxConnected) return 'no_mailbox';
 	return 'empty_inbox';

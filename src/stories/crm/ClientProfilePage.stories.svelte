@@ -146,7 +146,7 @@
 			emailDomain: 'northwind.com',
 			phone: '',
 			taxIdentifier: '',
-		taxExempt: false,
+			taxExempt: false,
 			registrationNumber: '',
 			defaultCurrency: 'GBP',
 			paymentTermsDays: '30',

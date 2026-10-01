@@ -14,7 +14,9 @@ export interface MeetingColumnHandlers {
 	onDelete?: (id: string) => void;
 }
 
-export function createMeetingColumns(handlers: MeetingColumnHandlers = {}): ColumnDef<MeetingRow>[] {
+export function createMeetingColumns(
+	handlers: MeetingColumnHandlers = {}
+): ColumnDef<MeetingRow>[] {
 	const { onEdit, onDelete } = handlers;
 	return [
 		{
@@ -22,8 +24,7 @@ export function createMeetingColumns(handlers: MeetingColumnHandlers = {}): Colu
 			header: ({ table }) =>
 				renderComponent(DataTableCheckbox, {
 					checked: table.getIsAllPageRowsSelected(),
-					indeterminate:
-						table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
+					indeterminate: table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected(),
 					onCheckedChange: (value) => table.toggleAllPageRowsSelected(!!value),
 					'aria-label': 'Select all'
 				}),
@@ -91,9 +92,7 @@ export function createMeetingColumns(handlers: MeetingColumnHandlers = {}): Colu
 					onclick: column.getToggleSortingHandler()
 				}),
 			cell: ({ row }) =>
-				row.original.calendarProvider
-					? renderComponent(StatusBadge, { status: 'Linked' })
-					: '—'
+				row.original.calendarProvider ? renderComponent(StatusBadge, { status: 'Linked' }) : '—'
 		},
 		{
 			id: 'actions',

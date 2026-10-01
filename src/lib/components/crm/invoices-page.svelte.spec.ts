@@ -148,9 +148,7 @@ describe('InvoicesPage integration', () => {
 				body: { data: [], meta: { next_cursor: null } }
 			}),
 			'GET /api/v1/quotes': async (request) => {
-				expect(new URL(request.url, 'http://local').searchParams.get('status')).toBe(
-					'accepted'
-				);
+				expect(new URL(request.url, 'http://local').searchParams.get('status')).toBe('accepted');
 				return { body: { data: [], meta: { next_cursor: null } } };
 			},
 			'POST /api/v1/invoices': async (request) => {

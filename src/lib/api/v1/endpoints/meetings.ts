@@ -60,22 +60,14 @@ export function createMeetingsEndpoints(request: ApiRequestFn): MeetingsEndpoint
 				signal
 			});
 		},
-		attachTranscript: async (
-			id,
-			body: ApiMeetingTranscriptAttachBody,
-			version,
-			signal
-		) => {
-			const { data } = await request<ApiMeetingDocument>(
-				`/api/v1/meetings/${id}/transcript`,
-				{
-					method: 'POST',
-					body,
-					orgScoped: true,
-					ifMatchVersion: version,
-					signal
-				}
-			);
+		attachTranscript: async (id, body: ApiMeetingTranscriptAttachBody, version, signal) => {
+			const { data } = await request<ApiMeetingDocument>(`/api/v1/meetings/${id}/transcript`, {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				ifMatchVersion: version,
+				signal
+			});
 			return data;
 		},
 		generateSummary: async (id, version, signal) => {

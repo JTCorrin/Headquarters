@@ -26,15 +26,12 @@ export function createNotificationsEndpoints(request: ApiRequestFn): Notificatio
 			return data;
 		},
 		markRead: async (id, signal) => {
-			const { data } = await request<ApiUserNotification>(
-				`/api/v1/me/notifications/${id}`,
-				{
-					method: 'PATCH',
-					body: { read: true },
-					orgScoped: true,
-					signal
-				}
-			);
+			const { data } = await request<ApiUserNotification>(`/api/v1/me/notifications/${id}`, {
+				method: 'PATCH',
+				body: { read: true },
+				orgScoped: true,
+				signal
+			});
 			return data;
 		}
 	};

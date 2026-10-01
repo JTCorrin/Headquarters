@@ -1,12 +1,5 @@
 export type TimelineAccentId =
-	| 'slate'
-	| 'sky'
-	| 'violet'
-	| 'emerald'
-	| 'amber'
-	| 'orange'
-	| 'indigo'
-	| 'rose';
+	'slate' | 'sky' | 'violet' | 'emerald' | 'amber' | 'orange' | 'indigo' | 'rose';
 
 export interface TimelineAccent {
 	id: TimelineAccentId;
@@ -16,7 +9,12 @@ export interface TimelineAccent {
 }
 
 export const TIMELINE_ACCENTS: readonly TimelineAccent[] = [
-	{ id: 'slate', label: 'Slate', markerClass: 'bg-muted-foreground', swatchClass: 'bg-muted-foreground' },
+	{
+		id: 'slate',
+		label: 'Slate',
+		markerClass: 'bg-muted-foreground',
+		swatchClass: 'bg-muted-foreground'
+	},
 	{ id: 'sky', label: 'Sky', markerClass: 'bg-sky-500', swatchClass: 'bg-sky-500' },
 	{ id: 'violet', label: 'Violet', markerClass: 'bg-violet-500', swatchClass: 'bg-violet-500' },
 	{ id: 'emerald', label: 'Emerald', markerClass: 'bg-emerald-500', swatchClass: 'bg-emerald-500' },
@@ -69,7 +67,10 @@ export function renderTimelineMarkdown(source: string): string {
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
 
-	const withCode = escaped.replace(/`([^`]+)`/g, '<code class="rounded bg-muted px-1 text-[0.85em]">$1</code>');
+	const withCode = escaped.replace(
+		/`([^`]+)`/g,
+		'<code class="rounded bg-muted px-1 text-[0.85em]">$1</code>'
+	);
 	const withBold = withCode.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 	const withItalic = withBold.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
 	const withLinks = withItalic.replace(

@@ -105,7 +105,7 @@
 			/** @type {import('$lib/components/crm/org-switcher.story-host.svelte').OrgSwitcherStoryHostProps} */ (
 				args
 			)}
-		<div class="bg-background w-80 p-6">
+		<div class="w-80 bg-background p-6">
 			<OrgSwitcherStoryHost {...props} />
 		</div>
 	{/snippet}

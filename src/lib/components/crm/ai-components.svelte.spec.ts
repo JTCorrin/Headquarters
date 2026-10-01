@@ -25,9 +25,7 @@ describe('AiAssistAction', () => {
 	it('respects the disabled prop', async () => {
 		const onclick = vi.fn();
 		render(AiAssistAction, { label: 'Draft reply', disabled: true, onclick });
-		await expect
-			.element(page.getByRole('button', { name: /Draft reply/ }))
-			.toBeDisabled();
+		await expect.element(page.getByRole('button', { name: /Draft reply/ })).toBeDisabled();
 	});
 });
 
@@ -44,9 +42,7 @@ describe('AiSuggestionPanel', () => {
 	it('shows a drafting placeholder while generating', async () => {
 		render(AiSuggestionPanel, { status: 'generating' });
 		await expect.element(page.getByText('Drafting…')).toBeVisible();
-		await expect
-			.element(page.getByRole('button', { name: /Working/ }))
-			.toBeDisabled();
+		await expect.element(page.getByRole('button', { name: /Working/ })).toBeDisabled();
 	});
 
 	it('shows the editable draft with use/discard once ready', async () => {
@@ -92,9 +88,7 @@ describe('AiSuggestionPanel', () => {
 
 	it('uses a custom generate label while idle', async () => {
 		render(AiSuggestionPanel, { generateLabel: 'Suggest chase' });
-		await expect
-			.element(page.getByRole('button', { name: /Suggest chase/ }))
-			.toBeVisible();
+		await expect.element(page.getByRole('button', { name: /Suggest chase/ })).toBeVisible();
 	});
 
 	it('uses a custom label for the use action when ready', async () => {
@@ -103,8 +97,6 @@ describe('AiSuggestionPanel', () => {
 			status: 'ready',
 			onUse: () => {}
 		});
-		await expect
-			.element(page.getByRole('button', { name: 'Insert into email' }))
-			.toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Insert into email' })).toBeVisible();
 	});
 });

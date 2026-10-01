@@ -25,7 +25,7 @@
 	<Card.Content class="space-y-4">
 		{#each fields as field (field.label)}
 			<div class="space-y-1">
-				<p class="text-muted-foreground text-xs">{field.label}</p>
+				<p class="text-xs text-muted-foreground">{field.label}</p>
 				<p class="text-sm font-medium">{field.value}</p>
 			</div>
 		{/each}

@@ -68,16 +68,13 @@
 </script>
 
 <div
-	class={cn(
-		'bg-card space-y-4 rounded-2xl border border-border p-4 md:p-5',
-		className
-	)}
+	class={cn('space-y-4 rounded-2xl border border-border bg-card p-4 md:p-5', className)}
 	data-testid="profile-calendar-form"
 >
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div class="min-w-0 space-y-1">
 			<p class="font-medium">Google Calendar</p>
-			<p class="text-muted-foreground text-sm" data-testid="calendar-connection-label">
+			<p class="text-sm text-muted-foreground" data-testid="calendar-connection-label">
 				{connection ? calendarConnectionLabel(connection) : 'Not connected'}
 			</p>
 		</div>
@@ -86,20 +83,20 @@
 		</span>
 	</div>
 
-	<p class="text-muted-foreground text-sm">
-		Headquarters meetings stay the source of truth. When Google is the active sync, create/update/delete
-		pushes to your Google Calendar. Tokens never appear here.
+	<p class="text-sm text-muted-foreground">
+		Headquarters meetings stay the source of truth. When Google is the active sync,
+		create/update/delete pushes to your Google Calendar. Tokens never appear here.
 	</p>
 
 	{#if otherProviderActive && !connected}
-		<p class="text-muted-foreground text-xs" data-testid="calendar-google-xor-note">
-			{calendarProviderDisplayName('caldav')} is the active sync. Connecting Google disables CalDAV
-			push until you reconnect it.
+		<p class="text-xs text-muted-foreground" data-testid="calendar-google-xor-note">
+			{calendarProviderDisplayName('caldav')} is the active sync. Connecting Google disables CalDAV push
+			until you reconnect it.
 		</p>
 	{/if}
 
 	{#if connectError}
-		<p class="text-destructive text-sm" role="alert" data-testid="calendar-connect-error">
+		<p class="text-sm text-destructive" role="alert" data-testid="calendar-connect-error">
 			{connectError}
 		</p>
 	{/if}
@@ -128,7 +125,7 @@
 			{/if}
 		</div>
 	{:else}
-		<p class="text-muted-foreground text-sm" data-testid="calendar-readonly-note">
+		<p class="text-sm text-muted-foreground" data-testid="calendar-readonly-note">
 			Ask an owner, admin, or member to connect a personal calendar for push sync.
 		</p>
 	{/if}

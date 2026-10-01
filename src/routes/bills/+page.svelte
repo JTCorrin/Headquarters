@@ -26,7 +26,11 @@
 		const url = new URL(page.url);
 		if (next) url.searchParams.set('vendor_id', next);
 		else url.searchParams.delete('vendor_id');
-		void goto(`${url.pathname}${url.search}`, { replaceState: true, keepFocus: true, noScroll: true });
+		void goto(`${url.pathname}${url.search}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
 	}
 </script>
 

@@ -133,9 +133,7 @@ describe('LeadsBoard column affordances', () => {
 		expect(collapse).toBeTruthy();
 		collapse!.click();
 
-		await expect
-			.poll(() => emptyQualified!.classList.contains('wx-collapsed'))
-			.toBe(true);
+		await expect.poll(() => emptyQualified!.classList.contains('wx-collapsed')).toBe(true);
 
 		const expand = emptyQualified!.querySelector('.wx-expand') as HTMLButtonElement | null;
 		expect(expand).toBeTruthy();
@@ -144,8 +142,6 @@ describe('LeadsBoard column affordances', () => {
 		expect(getComputedStyle(expand!).pointerEvents).toBe('auto');
 
 		expand!.click();
-		await expect
-			.poll(() => emptyQualified!.classList.contains('wx-collapsed'))
-			.toBe(false);
+		await expect.poll(() => emptyQualified!.classList.contains('wx-collapsed')).toBe(false);
 	});
 });

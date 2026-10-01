@@ -49,14 +49,14 @@
 
 <section
 	class={cn(
-		'bg-card space-y-3 rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'space-y-3 rounded-3xl bg-card p-4 ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 >
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div class="min-w-0">
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
-			<p class="text-muted-foreground text-xs">{hint}</p>
+			<p class="text-xs text-muted-foreground">{hint}</p>
 		</div>
 		{#if status !== 'ready'}
 			<AiAssistAction
@@ -65,11 +65,7 @@
 				onclick={() => onGenerate?.()}
 			/>
 		{:else}
-			<AiAssistAction
-				label="Regenerate"
-				busy={false}
-				onclick={() => onGenerate?.()}
-			/>
+			<AiAssistAction label="Regenerate" busy={false} onclick={() => onGenerate?.()} />
 		{/if}
 	</div>
 
@@ -96,11 +92,11 @@
 	{/if}
 
 	{#if status === 'idle'}
-		<p class="text-muted-foreground rounded-2xl bg-muted/40 px-3 py-6 text-center text-sm">
+		<p class="rounded-2xl bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
 			Run the assist when you want a draft — you stay in control of send/save.
 		</p>
 	{:else if status === 'generating'}
-		<p class="text-muted-foreground rounded-2xl bg-muted/40 px-3 py-6 text-center text-sm">
+		<p class="rounded-2xl bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
 			Drafting…
 		</p>
 	{:else}

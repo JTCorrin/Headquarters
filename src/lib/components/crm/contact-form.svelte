@@ -83,7 +83,7 @@
 			placeholder="Ava Chen"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -104,10 +104,10 @@
 			}}
 			onCreateNew={onCreateClient}
 		/>
-		<p class="text-muted-foreground text-[11px]">
+		<p class="text-[11px] text-muted-foreground">
 			CRM client account link — separate from employer / company below.
 		</p>
-		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+		{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -120,14 +120,14 @@
 			placeholder="ava@northwind.com"
 			aria-invalid={!!$errors.email}
 		/>
-		{#if $errors.email}<p class="text-destructive text-xs">{$errors.email}</p>{/if}
+		{#if $errors.email}<p class="text-xs text-destructive">{$errors.email}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="space-y-2">
 			<Label for="contact-phone">Phone</Label>
 			<Input id="contact-phone" name="phone" bind:value={$formData.phone} placeholder="+44 …" />
-			{#if $errors.phone}<p class="text-destructive text-xs">{$errors.phone}</p>{/if}
+			{#if $errors.phone}<p class="text-xs text-destructive">{$errors.phone}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="contact-company">Employer / company</Label>
@@ -137,10 +137,10 @@
 				bind:value={$formData.company}
 				placeholder="Northwind"
 			/>
-			<p class="text-muted-foreground text-[11px]">
+			<p class="text-[11px] text-muted-foreground">
 				Free-text employer or affiliation — not the same as a linked client.
 			</p>
-			{#if $errors.company}<p class="text-destructive text-xs">{$errors.company}</p>{/if}
+			{#if $errors.company}<p class="text-xs text-destructive">{$errors.company}</p>{/if}
 		</div>
 	</div>
 
@@ -152,7 +152,7 @@
 			bind:value={$formData.title}
 			placeholder="Head of Operations"
 		/>
-		{#if $errors.title}<p class="text-destructive text-xs">{$errors.title}</p>{/if}
+		{#if $errors.title}<p class="text-xs text-destructive">{$errors.title}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -167,7 +167,7 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-		{#if $errors.status}<p class="text-destructive text-xs">{$errors.status}</p>{/if}
+		{#if $errors.status}<p class="text-xs text-destructive">{$errors.status}</p>{/if}
 	</div>
 
 	<Button type="submit" disabled={busy}>{submitLabel}</Button>

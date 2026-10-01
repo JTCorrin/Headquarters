@@ -32,10 +32,7 @@
 
 	/** Wave A empty states — personal inbox uses `empty_inbox`; entity tabs use `no_matches`. */
 	export type EntityEmailEmptyState =
-		| 'no_mailbox'
-		| 'no_matches'
-		| 'empty_inbox'
-		| 'teammate_nothing_shared';
+		'no_mailbox' | 'no_matches' | 'empty_inbox' | 'teammate_nothing_shared';
 
 	export type DraftTone = 'warm' | 'neutral' | 'firm';
 
@@ -85,10 +82,7 @@
 			subject: string;
 			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
-		onUseSuggestion?: (payload: {
-			suggestionId?: string;
-			text: string;
-		}) => void | Promise<void>;
+		onUseSuggestion?: (payload: { suggestionId?: string; text: string }) => void | Promise<void>;
 		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 	}
 
@@ -174,7 +168,12 @@
 
 	const emptyCopy = $derived.by(() => {
 		if (emptyMessage) {
-			return { title: emptyMessage, detail: null as string | null, ctaHref: null as string | null, ctaLabel: null as string | null };
+			return {
+				title: emptyMessage,
+				detail: null as string | null,
+				ctaHref: null as string | null,
+				ctaLabel: null as string | null
+			};
 		}
 		switch (emptyState) {
 			case 'no_mailbox':
@@ -417,7 +416,7 @@
 
 <div
 	class={cn(
-		'bg-card overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/5 dark:ring-foreground/10',
 		'grid h-full min-h-0 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]',
 		className
 	)}
@@ -427,14 +426,14 @@
 >
 	<aside
 		class={cn(
-			'border-border/80 flex min-h-0 flex-col border-b lg:border-r lg:border-b-0',
+			'flex min-h-0 flex-col border-b border-border/80 lg:border-r lg:border-b-0',
 			(showReadingPane || messages.length === 0) && 'hidden lg:flex'
 		)}
 	>
 		<div class="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
 			<p class="text-sm font-semibold tracking-tight">Inbox</p>
 			<div class="flex items-center gap-2">
-				<span class="text-muted-foreground text-xs">{messages.length}</span>
+				<span class="text-xs text-muted-foreground">{messages.length}</span>
 				{#if canCompose}
 					<Button
 						type="button"
@@ -456,7 +455,7 @@
 					<button
 						type="button"
 						class={cn(
-							'hover:bg-muted/60 w-full border-t px-4 py-3 text-left transition-colors',
+							'w-full border-t px-4 py-3 text-left transition-colors hover:bg-muted/60',
 							message.id === selectedId && !composingNew && 'bg-muted/80'
 						)}
 						onclick={() => {
@@ -465,26 +464,24 @@
 						}}
 					>
 						<div class="flex items-start justify-between gap-2">
-							<p
-								class={cn(
-									'truncate text-sm',
-									message.unread ? 'font-semibold' : 'font-medium'
-								)}
-							>
+							<p class={cn('truncate text-sm', message.unread ? 'font-semibold' : 'font-medium')}>
 								{message.direction === 'in' ? message.from : `To ${message.to}`}
 							</p>
-							<span class="text-muted-foreground shrink-0 text-[11px]">{message.occurredAt}</span>
+							<span class="shrink-0 text-[11px] text-muted-foreground">{message.occurredAt}</span>
 						</div>
 						<p class={cn('mt-0.5 truncate text-sm', message.unread && 'font-medium')}>
 							{message.subject}
 						</p>
-						<p class="text-muted-foreground mt-1 line-clamp-2 text-xs leading-relaxed">
+						<p class="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
 							{message.preview}
 						</p>
 					</button>
 				</li>
 			{:else}
-				<li class="text-muted-foreground px-4 py-10 text-center text-xs" data-testid="entity-email-list-empty">
+				<li
+					class="px-4 py-10 text-center text-xs text-muted-foreground"
+					data-testid="entity-email-list-empty"
+				>
 					Inbox empty
 				</li>
 			{/each}
@@ -513,7 +510,7 @@
 							Inbox
 						</Button>
 						<h3 class="text-base font-semibold tracking-tight">New email</h3>
-						<p class="text-muted-foreground text-xs">Write a new message, or use Draft response.</p>
+						<p class="text-xs text-muted-foreground">Write a new message, or use Draft response.</p>
 					</div>
 					<Button variant="ghost" size="sm" onclick={cancelCompose}>Cancel</Button>
 				</div>
@@ -521,7 +518,9 @@
 			<div class="min-h-0 flex-1 overflow-y-auto">
 				<div class="space-y-3 px-5 py-4">
 					<div class="space-y-2">
-						<label class="text-muted-foreground text-xs font-medium" for="email-compose-to">To</label>
+						<label class="text-xs font-medium text-muted-foreground" for="email-compose-to"
+							>To</label
+						>
 						<Input
 							id="email-compose-to"
 							type="email"
@@ -532,7 +531,7 @@
 						/>
 					</div>
 					<div class="space-y-2">
-						<label class="text-muted-foreground text-xs font-medium" for="email-compose-subject"
+						<label class="text-xs font-medium text-muted-foreground" for="email-compose-subject"
 							>Subject</label
 						>
 						<Input
@@ -572,7 +571,7 @@
 							Inbox
 						</Button>
 						<h3 class="text-base font-semibold tracking-tight">{selected.subject}</h3>
-						<p class="text-muted-foreground text-xs">
+						<p class="text-xs text-muted-foreground">
 							{selected.direction === 'in' ? 'From' : 'To'}
 							{selected.direction === 'in' ? selected.from : selected.to}
 							· {selected.occurredAt}
@@ -611,7 +610,7 @@
 					</div>
 				</div>
 				{#if shareError}
-					<p class="text-destructive text-xs" data-testid="email-share-error">{shareError}</p>
+					<p class="text-xs text-destructive" data-testid="email-share-error">{shareError}</p>
 				{/if}
 			</header>
 
@@ -633,20 +632,25 @@
 				{/if}
 
 				{#if selectedAttachments.length > 0}
-					<div class="border-border flex flex-wrap gap-2 border-t px-5 py-3" data-testid="email-attachments">
+					<div
+						class="flex flex-wrap gap-2 border-t border-border px-5 py-3"
+						data-testid="email-attachments"
+					>
 						{#each selectedAttachments as attachment (attachment.filename + attachment.contentType)}
 							<span
-								class="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-xs"
+								class="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
 								data-testid="email-attachment-chip"
 							>
-								{attachment.filename}{#if attachment.contentType}<span class="opacity-70"> · {attachment.contentType}</span>{/if}
+								{attachment.filename}{#if attachment.contentType}<span class="opacity-70">
+										· {attachment.contentType}</span
+									>{/if}
 							</span>
 						{/each}
 					</div>
 				{/if}
 
 				{#if composing}
-					<div class="border-border space-y-3 border-t px-5 py-4">
+					<div class="space-y-3 border-t border-border px-5 py-4">
 						{@render composerChrome(
 							'Reply',
 							`To ${selected.direction === 'in' ? selected.from : selected.to}`,
@@ -665,12 +669,12 @@
 			>
 				<p class="text-sm font-medium">{emptyCopy.title}</p>
 				{#if emptyCopy.detail}
-					<p class="text-muted-foreground max-w-sm text-xs leading-relaxed">{emptyCopy.detail}</p>
+					<p class="max-w-sm text-xs leading-relaxed text-muted-foreground">{emptyCopy.detail}</p>
 				{/if}
 				{#if emptyCopy.ctaHref && emptyCopy.ctaLabel}
 					<a
 						href={emptyCopy.ctaHref}
-						class="text-foreground text-xs font-medium underline underline-offset-2"
+						class="text-xs font-medium text-foreground underline underline-offset-2"
 						data-testid="entity-email-empty-cta"
 					>
 						{emptyCopy.ctaLabel}
@@ -692,15 +696,11 @@
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<div>
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
-			<p class="text-muted-foreground text-xs">{toLine}</p>
+			<p class="text-xs text-muted-foreground">{toLine}</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
 			<div class="flex gap-1">
-				{#each [
-					{ id: 'warm', label: 'Warm' },
-					{ id: 'neutral', label: 'Neutral' },
-					{ id: 'firm', label: 'Firm' }
-				] as option (option.id)}
+				{#each [{ id: 'warm', label: 'Warm' }, { id: 'neutral', label: 'Neutral' }, { id: 'firm', label: 'Firm' }] as option (option.id)}
 					<button
 						type="button"
 						class={cn(
@@ -725,28 +725,27 @@
 	</div>
 
 	{#if draftDisabled}
-		<p class="text-muted-foreground text-xs" data-testid="draft-response-gate">
+		<p class="text-xs text-muted-foreground" data-testid="draft-response-gate">
 			{draftGate.hint}
 			<a
 				href={draftGate.href || integrationsHref}
-				class="text-foreground font-medium underline underline-offset-2"
+				class="font-medium text-foreground underline underline-offset-2"
 			>
 				{draftGate.linkLabel}
 			</a>
 		</p>
 	{/if}
 	{#if draftError}
-		<p class="text-destructive text-xs" data-testid="draft-response-error">{draftError}</p>
+		<p class="text-xs text-destructive" data-testid="draft-response-error">{draftError}</p>
 	{/if}
 
 	{#if aiStatus === 'ready'}
-		<div class="bg-muted/40 space-y-2 rounded-2xl px-3 py-3" data-testid="draft-suggestion-panel">
+		<div class="space-y-2 rounded-2xl bg-muted/40 px-3 py-3" data-testid="draft-suggestion-panel">
 			<p class="text-xs font-medium">AI suggestion — edit before you send.</p>
-			<pre class="text-muted-foreground whitespace-pre-wrap font-sans text-xs leading-relaxed">{suggestionBody}</pre>
+			<pre
+				class="font-sans text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">{suggestionBody}</pre>
 			<div class="flex justify-end gap-2">
-				<Button type="button" size="sm" variant="ghost" onclick={discardSuggestion}>
-					Discard
-				</Button>
+				<Button type="button" size="sm" variant="ghost" onclick={discardSuggestion}>Discard</Button>
 				<Button type="button" size="sm" onclick={useSuggestion} data-testid="use-suggestion">
 					Use suggestion
 				</Button>
@@ -754,19 +753,14 @@
 		</div>
 	{/if}
 
-	<Textarea
-		bind:value={replyBody}
-		rows={7}
-		{placeholder}
-		class="min-h-[140px] resize-y text-sm"
-	/>
+	<Textarea bind:value={replyBody} rows={7} {placeholder} class="min-h-[140px] resize-y text-sm" />
 
 	<div class="flex flex-col items-end gap-1">
 		{#if sendError}
-			<p class="text-destructive text-xs" data-testid="email-send-error">{sendError}</p>
+			<p class="text-xs text-destructive" data-testid="email-send-error">{sendError}</p>
 		{/if}
 		{#if composingNew && !composeTo.trim()}
-			<p class="text-muted-foreground text-xs" data-testid="email-compose-to-hint">
+			<p class="text-xs text-muted-foreground" data-testid="email-compose-to-hint">
 				Add a recipient email before sending.
 			</p>
 		{/if}
@@ -792,11 +786,10 @@
 			</Button>
 		</div>
 		{#if !smtpReady}
-			<p class="text-muted-foreground text-xs" data-testid="email-send-gate">
+			<p class="text-xs text-muted-foreground" data-testid="email-send-gate">
 				Connect mailbox in <a
 					href={mailSettingsHref}
-					class="text-foreground font-medium underline underline-offset-2"
-					>My settings</a
+					class="font-medium text-foreground underline underline-offset-2">My settings</a
 				> before sending.
 			</p>
 		{/if}

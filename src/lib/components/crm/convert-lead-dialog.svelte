@@ -45,12 +45,15 @@
 </script>
 
 <Drawer.Root bind:open direction="bottom" shouldScaleBackground={false}>
-	<Drawer.Content class={cn('mx-auto w-full max-w-md', className)} data-testid="convert-lead-dialog">
+	<Drawer.Content
+		class={cn('mx-auto w-full max-w-md', className)}
+		data-testid="convert-lead-dialog"
+	>
 		<Drawer.Header class="text-left">
 			<Drawer.Title>Convert lead</Drawer.Title>
 			<Drawer.Description>
-				Turn <span class="font-medium text-foreground">{leadName}</span> into a client. Repeat
-				calls are idempotent.
+				Turn <span class="font-medium text-foreground">{leadName}</span> into a client. Repeat calls are
+				idempotent.
 			</Drawer.Description>
 		</Drawer.Header>
 		<form
@@ -72,7 +75,7 @@
 					placeholder="Defaults to lead / company name"
 					aria-invalid={!!$errors.clientName}
 				/>
-				{#if $errors.clientName}<p class="text-destructive text-xs">{$errors.clientName}</p>{/if}
+				{#if $errors.clientName}<p class="text-xs text-destructive">{$errors.clientName}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="convert-client-status">Client status</Label>

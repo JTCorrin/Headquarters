@@ -17,13 +17,10 @@ export function createTimelineEventsEndpoints(request: ApiRequestFn): TimelineEv
 		entityId: string,
 		signal?: AbortSignal
 	) {
-		const { data } = await request<ApiTimelineEvent[]>(
-			entityTimelinePath(entityType, entityId),
-			{
-				orgScoped: true,
-				signal
-			}
-		);
+		const { data } = await request<ApiTimelineEvent[]>(entityTimelinePath(entityType, entityId), {
+			orgScoped: true,
+			signal
+		});
 		return data;
 	}
 
@@ -47,21 +44,15 @@ export function createTimelineEventsEndpoints(request: ApiRequestFn): TimelineEv
 			if (typeof entityTypeOrParams === 'string') {
 				return listEntity(entityTypeOrParams, entityIdOrSignal as string, maybeSignal);
 			}
-			return listOrg(
-				entityTypeOrParams ?? {},
-				entityIdOrSignal as AbortSignal | undefined
-			);
+			return listOrg(entityTypeOrParams ?? {}, entityIdOrSignal as AbortSignal | undefined);
 		}) as TimelineEventsEndpoints['list'],
 		create: async (entityType, entityId, body: ApiTimelineEventCreateBody, signal) => {
-			const { data } = await request<ApiTimelineEvent>(
-				entityTimelinePath(entityType, entityId),
-				{
-					method: 'POST',
-					body,
-					orgScoped: true,
-					signal
-				}
-			);
+			const { data } = await request<ApiTimelineEvent>(entityTimelinePath(entityType, entityId), {
+				method: 'POST',
+				body,
+				orgScoped: true,
+				signal
+			});
 			return data;
 		}
 	};

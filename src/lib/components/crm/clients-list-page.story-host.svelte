@@ -39,7 +39,7 @@
 				emailDomain: '',
 				phone: '',
 				taxIdentifier: '',
-		taxExempt: false,
+				taxExempt: false,
 				registrationNumber: '',
 				defaultCurrency: 'GBP',
 				paymentTermsDays: '30',
@@ -51,7 +51,7 @@
 		{
 			validators: zod4(clientFormSchema),
 			SPA: true,
-		warnings: { duplicateId: false },
+			warnings: { duplicateId: false },
 			applyAction: false,
 			resetForm: false
 		}

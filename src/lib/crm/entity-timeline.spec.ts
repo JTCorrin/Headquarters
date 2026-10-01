@@ -52,8 +52,7 @@ describe('entity-timeline', () => {
 
 	it('soft-fails list to empty when the surface is missing', async () => {
 		const fetchMock = createMockFetch({
-			'GET /api/v1/entities/contact/c1/timeline-events': () =>
-				apiError(404, 'NOT_FOUND', 'missing')
+			'GET /api/v1/entities/contact/c1/timeline-events': () => apiError(404, 'NOT_FOUND', 'missing')
 		});
 		const api = createApiV1Client({
 			fetch: fetchMock,

@@ -28,7 +28,9 @@ describe('BillSourceAttachment', () => {
 			onClear,
 			onPreview
 		});
-		await expect.element(page.getByTestId('bill-source-name')).toHaveTextContent('vendor-invoice.pdf');
+		await expect
+			.element(page.getByTestId('bill-source-name'))
+			.toHaveTextContent('vendor-invoice.pdf');
 		await page.getByTestId('bill-source-preview').click();
 		expect(onPreview).toHaveBeenCalled();
 		await page.getByTestId('bill-source-clear').click();

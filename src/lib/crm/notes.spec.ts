@@ -87,10 +87,7 @@ describe('notes helpers', () => {
 	it('sorts pinned first, then newest updated', () => {
 		const items = [
 			toNoteListItem(listItem({ id: 'a', updated_at: '2026-09-14T08:00:00Z' }), NOW),
-			toNoteListItem(
-				listItem({ id: 'b', updated_at: '2026-09-14T07:00:00Z', pinned: true }),
-				NOW
-			),
+			toNoteListItem(listItem({ id: 'b', updated_at: '2026-09-14T07:00:00Z', pinned: true }), NOW),
 			toNoteListItem(listItem({ id: 'c', updated_at: '2026-09-14T10:00:00Z' }), NOW)
 		];
 		expect(sortNoteItems(items).map((i) => i.id)).toEqual(['b', 'c', 'a']);

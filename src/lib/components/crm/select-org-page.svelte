@@ -10,17 +10,12 @@
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import {
-		organisationCreateSchema,
-		roleLabel
-	} from '$lib/schemas/organisation.js';
+	import { organisationCreateSchema, roleLabel } from '$lib/schemas/organisation.js';
 	import PageHeader from './page-header.svelte';
 	import OrganisationCreateDrawer from './organisation-create-drawer.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import OrgLogoMark from './org-logo-mark.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -105,9 +100,7 @@
 	async function handleCreate(): Promise<boolean> {
 		createError = null;
 		try {
-			const result = await api.organisations.create(
-				toOrganisationCreateBody(get(createForm.form))
-			);
+			const result = await api.organisations.create(toOrganisationCreateBody(get(createForm.form)));
 			const membership = membershipFromCreateResult(result);
 			session.setMemberships([...session.memberships, membership]);
 			session.selectOrg(membership.org_id);
@@ -138,17 +131,17 @@
 				<li>
 					<button
 						type="button"
-						class="hover:bg-muted/60 flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left"
+						class="flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left hover:bg-muted/60"
 						data-testid={`select-org-${membership.org_id}`}
 						disabled={selectingId === membership.org_id}
 						onclick={() => selectOrg(membership.org_id)}
 					>
 						<OrgLogoMark name={membership.org_name} logoUrl={membership.logo_url} />
 						<span class="min-w-0 flex-1 truncate font-medium">{membership.org_name}</span>
-						<span class="text-muted-foreground truncate text-sm">{membership.org_slug}</span>
+						<span class="truncate text-sm text-muted-foreground">{membership.org_slug}</span>
 						<StatusBadge status={roleLabel(membership.role)} class="shrink-0" />
 						{#if session.selectedOrgId === membership.org_id}
-							<span class="text-muted-foreground text-xs" data-testid="select-org-current"
+							<span class="text-xs text-muted-foreground" data-testid="select-org-current"
 								>Current</span
 							>
 						{/if}

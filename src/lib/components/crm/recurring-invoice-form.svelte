@@ -141,7 +141,7 @@
 			disabled={readonly}
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -166,7 +166,7 @@
 		{:else}
 			<Input id="ri-client" bind:value={$formData.clientName} disabled={readonly} />
 		{/if}
-		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+		{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 	</div>
 
 	<DocumentRecipientsField
@@ -179,7 +179,7 @@
 		}}
 	/>
 	{#if $errors.recipients}
-		<p class="text-destructive text-xs">{$errors.recipients}</p>
+		<p class="text-xs text-destructive">{$errors.recipients}</p>
 	{/if}
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -334,7 +334,7 @@
 				name="anchorOn"
 				bind:value={$formData.anchorOn}
 				disabled={readonly}
-				readonly={readonly}
+				{readonly}
 			/>
 		</div>
 		<DateRangeField
@@ -346,7 +346,7 @@
 			bind:startValue={$formData.startOn}
 			bind:endValue={$formData.endOn}
 			disabled={readonly}
-			readonly={readonly}
+			{readonly}
 			data-testid="ri-date-range"
 		/>
 	</div>
@@ -371,10 +371,11 @@
 				</Select.Content>
 			</Select.Root>
 			{#if $formData.deliveryMode === 'auto_send'}
-				<p class="text-muted-foreground text-xs">
+				<p class="text-xs text-muted-foreground">
 					Requires organisation invoice email under
-					<a class="underline underline-offset-2" href={resolve('/org/integrations')}>Integrations</a>.
-					Generated invoices are emailed with a PDF attachment, then marked sent.
+					<a class="underline underline-offset-2" href={resolve('/org/integrations')}
+						>Integrations</a
+					>. Generated invoices are emailed with a PDF attachment, then marked sent.
 				</p>
 			{/if}
 		</div>

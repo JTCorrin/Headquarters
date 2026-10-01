@@ -192,7 +192,8 @@
 
 	function submit() {
 		const trimmedBody = body.trim();
-		const trimmedTitle = title.trim() || trimmedBody.split('\n')[0]?.slice(0, 80) || 'Untitled note';
+		const trimmedTitle =
+			title.trim() || trimmedBody.split('\n')[0]?.slice(0, 80) || 'Untitled note';
 		if (!trimmedBody && !title.trim()) return;
 		const nextMentions = dedupeMentions(pruneMentionsByBody(body, mentions)).slice(0, 20);
 		onSubmit?.({
@@ -220,30 +221,30 @@
 	<button
 		type="button"
 		class={cn(
-			'bg-card hover:bg-muted/50 flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left ring-1 ring-foreground/5 transition-colors dark:ring-foreground/10',
+			'flex w-full items-center justify-between gap-3 rounded-3xl bg-card px-4 py-3 text-left ring-1 ring-foreground/5 transition-colors hover:bg-muted/50 dark:ring-foreground/10',
 			className
 		)}
 		onclick={() => (expanded = true)}
 	>
 		<span class="flex min-w-0 items-center gap-2">
 			<span
-				class="bg-muted text-muted-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-xl"
+				class="inline-flex size-7 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
 			>
 				<PlusIcon class="size-3.5" />
 			</span>
 			<span class="min-w-0">
 				<span class="block text-sm font-semibold tracking-tight">Add to timeline</span>
-				<span class="text-muted-foreground block truncate text-xs">
+				<span class="block truncate text-xs text-muted-foreground">
 					Note or event · @teammates · markdown
 				</span>
 			</span>
 		</span>
-		<ChevronDownIcon class="text-muted-foreground size-4 shrink-0" />
+		<ChevronDownIcon class="size-4 shrink-0 text-muted-foreground" />
 	</button>
 {:else}
 	<form
 		class={cn(
-			'bg-card space-y-3 rounded-3xl p-4 ring-1 ring-foreground/5 dark:ring-foreground/10',
+			'space-y-3 rounded-3xl bg-card p-4 ring-1 ring-foreground/5 dark:ring-foreground/10',
 			className
 		)}
 		onsubmit={(e) => {
@@ -254,7 +255,7 @@
 		<div class="flex flex-wrap items-end justify-between gap-3">
 			<div>
 				<p class="text-sm font-semibold tracking-tight">Add to timeline</p>
-				<p class="text-muted-foreground text-xs">
+				<p class="text-xs text-muted-foreground">
 					Ad-hoc note or event · type @ to mention · posting as {actor}
 				</p>
 			</div>
@@ -369,7 +370,7 @@
 						bind:ref={bodyEl}
 						bind:value={body}
 						rows={4}
-						placeholder={"Type @ to mention a teammate. Supports **bold**, *italic*, `code`, lists, and [links](https://…)."}
+						placeholder={'Type @ to mention a teammate. Supports **bold**, *italic*, `code`, lists, and [links](https://…).'}
 						class="min-h-[96px] resize-y font-mono text-sm"
 						data-testid="timeline-composer-body"
 						oninput={onBodyInput}
@@ -392,21 +393,21 @@
 					/>
 					{#if mentionOpen}
 						<div
-							class="bg-popover text-popover-foreground absolute start-0 end-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-2xl border p-1 shadow-md"
+							class="absolute start-0 end-0 z-20 mt-1 max-h-48 overflow-y-auto rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md"
 							role="listbox"
 							aria-label="Mention teammate"
 							data-testid="timeline-mention-picker"
 						>
 							{#if !membersLoaded}
-								<p class="text-muted-foreground px-3 py-2 text-xs">Loading teammates…</p>
+								<p class="px-3 py-2 text-xs text-muted-foreground">Loading teammates…</p>
 							{:else if membersError}
-								<p class="text-destructive px-3 py-2 text-xs" role="alert">{membersError}</p>
+								<p class="px-3 py-2 text-xs text-destructive" role="alert">{membersError}</p>
 							{:else if orgMembers.length === 0}
-								<p class="text-muted-foreground px-3 py-2 text-xs">
+								<p class="px-3 py-2 text-xs text-muted-foreground">
 									No other teammates to mention yet.
 								</p>
 							{:else if mentionCandidates.length === 0}
-								<p class="text-muted-foreground px-3 py-2 text-xs">No matching teammates.</p>
+								<p class="px-3 py-2 text-xs text-muted-foreground">No matching teammates.</p>
 							{:else}
 								{#each mentionCandidates as member, index (member.membership_id)}
 									<button
@@ -421,7 +422,7 @@
 										onclick={() => pickMention(member)}
 									>
 										<span class="font-medium">{member.display_name}</span>
-										<span class="text-muted-foreground text-xs capitalize">{member.role}</span>
+										<span class="text-xs text-muted-foreground capitalize">{member.role}</span>
 									</button>
 								{/each}
 							{/if}
@@ -429,12 +430,12 @@
 					{/if}
 				</div>
 				{#if mentions.length > 0}
-					<p class="text-muted-foreground text-xs" data-testid="timeline-mention-chips">
+					<p class="text-xs text-muted-foreground" data-testid="timeline-mention-chips">
 						Will notify: {mentions.map((m) => m.display_name).join(', ')}
 					</p>
 				{/if}
 			{:else}
-				<div class="bg-muted/40 min-h-[96px] rounded-2xl px-3 py-2 text-sm leading-relaxed">
+				<div class="min-h-[96px] rounded-2xl bg-muted/40 px-3 py-2 text-sm leading-relaxed">
 					{#if body.trim()}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html renderTimelineMarkdown(body)}

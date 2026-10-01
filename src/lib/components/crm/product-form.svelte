@@ -127,7 +127,7 @@
 				placeholder="SVC-RETAIN"
 				aria-invalid={!!$errors.sku}
 			/>
-			{#if $errors.sku}<p class="text-destructive text-xs">{$errors.sku}</p>{/if}
+			{#if $errors.sku}<p class="text-xs text-destructive">{$errors.sku}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="product-status">Status</Label>
@@ -141,7 +141,7 @@
 					{/each}
 				</Select.Content>
 			</Select.Root>
-			{#if $errors.status}<p class="text-destructive text-xs">{$errors.status}</p>{/if}
+			{#if $errors.status}<p class="text-xs text-destructive">{$errors.status}</p>{/if}
 		</div>
 	</div>
 
@@ -154,7 +154,7 @@
 			placeholder="Monthly retainer"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -166,7 +166,7 @@
 			placeholder="Optional details for quotes and invoices"
 			rows={3}
 		/>
-		{#if $errors.description}<p class="text-destructive text-xs">{$errors.description}</p>{/if}
+		{#if $errors.description}<p class="text-xs text-destructive">{$errors.description}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -194,7 +194,7 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-		{#if $errors.categoryId}<p class="text-destructive text-xs">{$errors.categoryId}</p>{/if}
+		{#if $errors.categoryId}<p class="text-xs text-destructive">{$errors.categoryId}</p>{/if}
 		{#if onCreateCategory}
 			<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
 				<Input
@@ -226,7 +226,11 @@
 				</Button>
 			</div>
 			{#if categoryCreateError}
-				<p class="text-destructive text-xs" role="alert" data-testid="product-category-create-error">
+				<p
+					class="text-xs text-destructive"
+					role="alert"
+					data-testid="product-category-create-error"
+				>
 					{categoryCreateError}
 				</p>
 			{/if}
@@ -243,7 +247,7 @@
 				placeholder="4200.00"
 				aria-invalid={!!$errors.unitPrice}
 			/>
-			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
+			{#if $errors.unitPrice}<p class="text-xs text-destructive">{$errors.unitPrice}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="product-tax">Tax rate</Label>
@@ -276,7 +280,7 @@
 				disabled={!$formData.trackStock}
 				aria-invalid={!!$errors.stockQty}
 			/>
-			{#if $errors.stockQty}<p class="text-destructive text-xs">{$errors.stockQty}</p>{/if}
+			{#if $errors.stockQty}<p class="text-xs text-destructive">{$errors.stockQty}</p>{/if}
 		</div>
 	</div>
 
@@ -285,7 +289,7 @@
 			type="checkbox"
 			name="trackStock"
 			bind:checked={$formData.trackStock}
-			class="accent-primary size-4 rounded"
+			class="size-4 rounded accent-primary"
 		/>
 		Track inventory for this product
 	</label>

@@ -31,7 +31,7 @@
 	aria-hidden="true"
 >
 	<span
-		class="bg-muted text-muted-foreground flex size-full items-center justify-center text-[10px] font-semibold"
+		class="flex size-full items-center justify-center bg-muted text-[10px] font-semibold text-muted-foreground"
 	>
 		{initials(name)}
 	</span>
@@ -39,7 +39,7 @@
 		<img
 			src={logoUrl}
 			alt=""
-			class="bg-background absolute inset-0 size-full object-contain p-0.5"
+			class="absolute inset-0 size-full bg-background object-contain p-0.5"
 			data-testid="org-logo-image"
 			onerror={hideBrokenLogo}
 		/>

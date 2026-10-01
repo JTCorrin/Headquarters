@@ -182,7 +182,7 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
-				{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+				{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="payment-invoice">Invoice</Label>
@@ -209,7 +209,7 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
-				{#if $errors.vendorId}<p class="text-destructive text-xs">{$errors.vendorId}</p>{/if}
+				{#if $errors.vendorId}<p class="text-xs text-destructive">{$errors.vendorId}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="payment-bill">Bill</Label>
@@ -236,7 +236,7 @@
 				placeholder="4200.00"
 				aria-invalid={!!$errors.amount}
 			/>
-			{#if $errors.amount}<p class="text-destructive text-xs">{$errors.amount}</p>{/if}
+			{#if $errors.amount}<p class="text-xs text-destructive">{$errors.amount}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="payment-currency">Currency</Label>
@@ -264,9 +264,11 @@
 			</Select.Root>
 		</div>
 		<div class="space-y-2">
-			<Label for="payment-occurred">{$formData.direction === 'inbound' ? 'Received on' : 'Paid on'}</Label>
+			<Label for="payment-occurred"
+				>{$formData.direction === 'inbound' ? 'Received on' : 'Paid on'}</Label
+			>
 			<DateField id="payment-occurred" name="occurredOn" bind:value={$formData.occurredOn} />
-			{#if $errors.occurredOn}<p class="text-destructive text-xs">{$errors.occurredOn}</p>{/if}
+			{#if $errors.occurredOn}<p class="text-xs text-destructive">{$errors.occurredOn}</p>{/if}
 		</div>
 	</div>
 

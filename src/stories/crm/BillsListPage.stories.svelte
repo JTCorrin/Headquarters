@@ -105,9 +105,7 @@
 <Story name="Default">
 	{#snippet template(args)}
 		{@const props =
-			/** @type {import('$lib/components/crm/bills-list-page.svelte').BillsListPageProps} */ (
-				args
-			)}
+			/** @type {import('$lib/components/crm/bills-list-page.svelte').BillsListPageProps} */ (args)}
 		<div class="h-screen">
 			<BillsListPage {...props} {form} />
 		</div>

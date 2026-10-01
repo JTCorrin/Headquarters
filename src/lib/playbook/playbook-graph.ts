@@ -3,8 +3,7 @@ import { playbookGraphSchema, type PlaybookGraph } from '$lib/schemas/playbook-g
 import { newPlaybookNodeId } from './playbook-id.js';
 
 export type PlaybookGraphValidationResult =
-	| { ok: true; graph: PlaybookGraph }
-	| { ok: false; errors: string[]; zodError?: ZodError };
+	{ ok: true; graph: PlaybookGraph } | { ok: false; errors: string[]; zodError?: ZodError };
 
 /** Default canvas: single manual.run trigger. */
 export function createDefaultPlaybookGraph(): PlaybookGraph {

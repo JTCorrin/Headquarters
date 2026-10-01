@@ -80,8 +80,6 @@ describe('EntityTagsEditor', () => {
 		await page.getByTestId('entity-tags-edit').click();
 		await page.getByText('Partners').click();
 
-		await expect
-			.poll(() => replaceBody)
-			.toEqual({ tag_ids: [TAG_ID, TAG_B] });
+		await expect.poll(() => replaceBody).toEqual({ tag_ids: [TAG_ID, TAG_B] });
 	});
 });

@@ -70,12 +70,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div
 			class={cn(
@@ -106,12 +102,7 @@
 							</Button>
 						{/if}
 						{#if form}
-							<TaskFormDrawer
-								bind:open={drawerOpen}
-								{form}
-								{assigneeOptions}
-								{onValidSubmit}
-							/>
+							<TaskFormDrawer bind:open={drawerOpen} {form} {assigneeOptions} {onValidSubmit} />
 						{:else}
 							<Button type="button" size="sm">New task</Button>
 						{/if}
@@ -135,7 +126,7 @@
 					title="All tasks"
 					tasks={listTasks}
 					emptyMessage="No tasks yet — create your first task."
-					onToggleDone={onToggleDone}
+					{onToggleDone}
 					onSelectTask={onEditTask}
 					showViewAll={false}
 					class="w-full"

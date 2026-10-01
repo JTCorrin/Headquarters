@@ -1,13 +1,5 @@
 export type TimelineEventKind =
-	| 'note'
-	| 'email'
-	| 'call'
-	| 'payment'
-	| 'document'
-	| 'status'
-	| 'meeting'
-	| 'task'
-	| 'conversion';
+	'note' | 'email' | 'call' | 'payment' | 'document' | 'status' | 'meeting' | 'task' | 'conversion';
 
 /** All known kinds (including system-only). */
 export const TIMELINE_EVENT_KINDS: readonly TimelineEventKind[] = [

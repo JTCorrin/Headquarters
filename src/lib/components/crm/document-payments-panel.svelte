@@ -54,7 +54,7 @@
 
 <section
 	class={cn(
-		'bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'space-y-4 self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 	data-testid="document-payments-panel"
@@ -62,7 +62,7 @@
 	<div class="flex items-start justify-between gap-3">
 		<div class="space-y-1">
 			<h2 class="text-sm font-semibold tracking-tight">{title}</h2>
-			<p class="text-muted-foreground text-xs">
+			<p class="text-xs text-muted-foreground">
 				Paid {paidLabel} · Balance {balanceLabel}
 			</p>
 		</div>
@@ -88,14 +88,14 @@
 	</div>
 
 	{#if rows.length === 0}
-		<p class="text-muted-foreground text-sm">No linked payments yet.</p>
+		<p class="text-sm text-muted-foreground">No linked payments yet.</p>
 	{:else}
 		<ul class="divide-y divide-foreground/10">
 			{#each rows as row (row.id)}
 				<li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
 					<div class="min-w-0 space-y-0.5">
 						<p class="font-medium">{row.amount} · {row.method}</p>
-						<p class="text-muted-foreground text-xs">
+						<p class="text-xs text-muted-foreground">
 							{row.occurredOn} · {row.status} · {row.allocationsSummary}
 						</p>
 					</div>

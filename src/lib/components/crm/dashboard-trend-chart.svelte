@@ -28,9 +28,7 @@
 	const chartW = width - padX * 2;
 	const chartH = height - padY * 2;
 
-	const maxValue = $derived(
-		Math.max(1, ...points.flatMap((p) => [p.cashCents, p.bookedCents]))
-	);
+	const maxValue = $derived(Math.max(1, ...points.flatMap((p) => [p.cashCents, p.bookedCents])));
 
 	function xAt(index: number, count: number): number {
 		if (count <= 1) return padX + chartW / 2;
@@ -57,28 +55,25 @@
 </script>
 
 <section
-	class={cn(
-		'bg-card rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10',
-		className
-	)}
+	class={cn('rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10', className)}
 >
 	<div class="mb-3 flex items-center justify-between gap-3">
 		<h2 class="text-sm font-semibold tracking-tight">Cash vs booked</h2>
-		<div class="text-muted-foreground flex items-center gap-3 text-xs">
+		<div class="flex items-center gap-3 text-xs text-muted-foreground">
 			<span class="inline-flex items-center gap-1.5">
-				<span class="bg-foreground inline-block size-2 rounded-full"></span>
+				<span class="inline-block size-2 rounded-full bg-foreground"></span>
 				{cashLabel}
 			</span>
 			<span class="inline-flex items-center gap-1.5">
-				<span class="bg-foreground/35 inline-block size-2 rounded-full"></span>
+				<span class="inline-block size-2 rounded-full bg-foreground/35"></span>
 				{bookedLabel}
 			</span>
 		</div>
 	</div>
 	{#if points.length === 0}
-		<p class="text-muted-foreground text-sm">No monthly activity yet.</p>
+		<p class="text-sm text-muted-foreground">No monthly activity yet.</p>
 	{:else}
-		<svg viewBox={`0 0 ${width} ${height}`} class="text-foreground h-36 w-full" role="img">
+		<svg viewBox={`0 0 ${width} ${height}`} class="h-36 w-full text-foreground" role="img">
 			<title>Cash collected versus booked invoice totals by month</title>
 			{#if bookedPath}
 				<path
@@ -102,7 +97,7 @@
 				/>
 			{/if}
 		</svg>
-		<div class="text-muted-foreground mt-1 flex justify-between gap-2 text-[10px] tracking-wide">
+		<div class="mt-1 flex justify-between gap-2 text-[10px] tracking-wide text-muted-foreground">
 			{#each points as point (point.label)}
 				<span class="min-w-0 truncate">{point.label}</span>
 			{/each}

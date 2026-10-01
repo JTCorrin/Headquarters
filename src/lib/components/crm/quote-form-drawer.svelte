@@ -1,10 +1,6 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type {
-		QuoteClientOption,
-		QuoteContactOption,
-		QuoteFormData
-	} from '$lib/schemas/quote.js';
+	import type { QuoteClientOption, QuoteContactOption, QuoteFormData } from '$lib/schemas/quote.js';
 	import * as Drawer from '$lib/components/ui/drawer/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import QuoteForm from './quote-form.svelte';

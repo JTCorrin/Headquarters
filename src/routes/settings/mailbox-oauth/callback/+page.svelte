@@ -45,12 +45,12 @@
 	});
 </script>
 
-<main class="bg-background text-foreground flex min-h-svh items-center justify-center p-6">
+<main class="flex min-h-svh items-center justify-center bg-background p-6 text-foreground">
 	<div class="max-w-md space-y-3 text-center" data-testid="mailbox-oauth-callback">
 		<p class="font-medium">
 			{status === 'working' ? 'Finishing mailbox connect' : 'Mailbox connect failed'}
 		</p>
-		<p class="text-muted-foreground text-sm" role={status === 'error' ? 'alert' : 'status'}>
+		<p class="text-sm text-muted-foreground" role={status === 'error' ? 'alert' : 'status'}>
 			{message}
 		</p>
 		{#if status === 'error'}

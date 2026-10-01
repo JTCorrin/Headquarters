@@ -17,18 +17,18 @@
 
 <Handle type="target" position={Position.Top} class="!bg-muted-foreground" />
 <div
-	class="border-border bg-card text-card-foreground min-w-[200px] max-w-[260px] rounded-lg border px-3 py-2 shadow-sm"
+	class="max-w-[260px] min-w-[200px] rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-sm"
 >
 	<div class="mb-2 text-xs font-semibold tracking-wide uppercase">Create task</div>
 	<input
 		type="text"
-		class="border-input bg-background nodrag nopan mb-2 w-full rounded border px-2 py-1 text-sm"
+		class="nodrag nopan mb-2 w-full rounded border border-input bg-background px-2 py-1 text-sm"
 		placeholder="Title"
 		value={data.title}
 		oninput={(e) => updateNodeData(id, { ...data, title: (e.target as HTMLInputElement).value })}
 	/>
 	<select
-		class="border-input bg-background nodrag nopan mb-2 w-full rounded border px-2 py-1 text-sm"
+		class="nodrag nopan mb-2 w-full rounded border border-input bg-background px-2 py-1 text-sm"
 		value={data.priority}
 		onchange={(e) =>
 			updateNodeData(id, {
@@ -41,12 +41,12 @@
 		<option value="p3">P3</option>
 		<option value="p4">P4</option>
 	</select>
-	<label class="text-muted-foreground flex items-center gap-2 text-xs">
+	<label class="flex items-center gap-2 text-xs text-muted-foreground">
 		Due in
 		<input
 			type="number"
 			min="0"
-			class="border-input bg-background nodrag nopan w-16 rounded border px-2 py-1 text-sm"
+			class="nodrag nopan w-16 rounded border border-input bg-background px-2 py-1 text-sm"
 			value={data.dueOffsetDays}
 			oninput={(e) =>
 				updateNodeData(id, {

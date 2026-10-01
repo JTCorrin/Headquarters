@@ -91,10 +91,7 @@
 
 <form
 	method="POST"
-	class={cn(
-		'bg-card space-y-4 rounded-2xl border border-border p-4 md:p-5',
-		className
-	)}
+	class={cn('space-y-4 rounded-2xl border border-border bg-card p-4 md:p-5', className)}
 	data-testid="profile-caldav-form"
 	use:enhance={{
 		async onUpdate({ form: validated }) {
@@ -116,7 +113,7 @@
 	<div class="flex flex-wrap items-start justify-between gap-3">
 		<div class="min-w-0 space-y-1">
 			<p class="font-medium">CalDAV / Mailcow</p>
-			<p class="text-muted-foreground text-sm" data-testid="caldav-connection-label">
+			<p class="text-sm text-muted-foreground" data-testid="caldav-connection-label">
 				{connection ? calendarConnectionLabel(connection) : 'Not connected'}
 			</p>
 		</div>
@@ -125,25 +122,25 @@
 		</span>
 	</div>
 
-	<p class="text-muted-foreground text-sm">
+	<p class="text-sm text-muted-foreground">
 		Mailbox-shaped connect for Mailcow/SOGo (or any CalDAV URL). Use an app password when your host
 		requires it — passwords are write-only and never shown after save.
 	</p>
 
 	{#if otherProviderActive && !connected}
-		<p class="text-muted-foreground text-xs" data-testid="caldav-xor-note">
+		<p class="text-xs text-muted-foreground" data-testid="caldav-xor-note">
 			Google is the active sync. Saving CalDAV disables Google push until you reconnect it.
 		</p>
 	{/if}
 
 	{#if connection?.credentials_configured}
-		<p class="text-muted-foreground text-xs" data-testid="caldav-credentials-saved">
+		<p class="text-xs text-muted-foreground" data-testid="caldav-credentials-saved">
 			Password saved — leave blank to keep it, or enter a new one to replace.
 		</p>
 	{/if}
 
 	{#if connectError}
-		<p class="text-destructive text-sm" role="alert" data-testid="caldav-connect-error">
+		<p class="text-sm text-destructive" role="alert" data-testid="caldav-connect-error">
 			{connectError}
 		</p>
 	{/if}
@@ -162,7 +159,7 @@
 					data-testid="caldav-url"
 				/>
 				{#if $errors.caldavUrl}
-					<p class="text-destructive text-xs">{$errors.caldavUrl}</p>
+					<p class="text-xs text-destructive">{$errors.caldavUrl}</p>
 				{/if}
 			</div>
 			<div class="space-y-2">
@@ -176,7 +173,7 @@
 					data-testid="caldav-username"
 				/>
 				{#if $errors.username}
-					<p class="text-destructive text-xs">{$errors.username}</p>
+					<p class="text-xs text-destructive">{$errors.username}</p>
 				{/if}
 			</div>
 			<div class="space-y-2">
@@ -191,9 +188,9 @@
 					placeholder={connection?.credentials_configured ? '••••••••' : 'App password'}
 					data-testid="caldav-password"
 				/>
-				<p class="text-muted-foreground text-xs">Write-only — never shown after save.</p>
+				<p class="text-xs text-muted-foreground">Write-only — never shown after save.</p>
 				{#if $errors.password}
-					<p class="text-destructive text-xs">{$errors.password}</p>
+					<p class="text-xs text-destructive">{$errors.password}</p>
 				{/if}
 			</div>
 			<div class="space-y-2 sm:col-span-2">
@@ -207,7 +204,7 @@
 					data-testid="caldav-calendar-id"
 				/>
 				{#if $errors.calendarId}
-					<p class="text-destructive text-xs">{$errors.calendarId}</p>
+					<p class="text-xs text-destructive">{$errors.calendarId}</p>
 				{/if}
 			</div>
 		</div>
@@ -255,7 +252,7 @@
 			</Button>
 		</div>
 	{:else}
-		<p class="text-muted-foreground text-sm" data-testid="caldav-readonly-note">
+		<p class="text-sm text-muted-foreground" data-testid="caldav-readonly-note">
 			Ask an owner, admin, or member to connect CalDAV for push sync.
 		</p>
 	{/if}

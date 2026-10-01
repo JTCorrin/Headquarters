@@ -20,9 +20,7 @@
 	import MoneySummary, { type MoneySummaryItem } from './money-summary.svelte';
 	import ClientFormDrawer from './client-form-drawer.svelte';
 	import EntityTagsEditor from './entity-tags-editor.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import ContactNameLink from './contact-name-link.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -96,10 +94,7 @@
 			subject: string;
 			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
-		onUseSuggestion?: (payload: {
-			suggestionId?: string;
-			text: string;
-		}) => void | Promise<void>;
+		onUseSuggestion?: (payload: { suggestionId?: string; text: string }) => void | Promise<void>;
 		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 		/** Override New quote navigation (defaults to quotes create with client preselected). */
 		onNewQuote?: () => void;
@@ -188,12 +183,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
 		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0">
@@ -288,12 +279,12 @@
 													<p class="text-sm font-medium">
 														<ContactNameLink id={person.id} name={person.name} />
 													</p>
-													<p class="text-muted-foreground truncate text-xs">{person.email}</p>
+													<p class="truncate text-xs text-muted-foreground">{person.email}</p>
 												</div>
 												<StatusBadge status={person.role} />
 											</div>
 										{:else}
-											<p class="text-muted-foreground text-sm">
+											<p class="text-sm text-muted-foreground">
 												No people linked to this client yet.
 											</p>
 										{/each}
@@ -348,7 +339,7 @@
 								class="min-h-0 flex-1"
 							/>
 						{:else}
-							<p class="text-muted-foreground text-sm">Select a client to browse documents.</p>
+							<p class="text-sm text-muted-foreground">Select a client to browse documents.</p>
 						{/if}
 					{:else if active === 'money'}
 						<MoneySummary items={moneyItems} />

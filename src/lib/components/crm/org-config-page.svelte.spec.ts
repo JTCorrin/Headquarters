@@ -349,7 +349,9 @@ describe('OrgConfigPage integration', () => {
 		await expect.element(page.getByTestId('organisation-config-form')).toBeInTheDocument();
 		await page.getByLabelText(/default currency/i).fill('EUR');
 		await page.getByTestId('organisation-config-submit').click();
-		await expect.element(page.getByTestId('organisation-config-submit')).toHaveTextContent(/Saving/i);
+		await expect
+			.element(page.getByTestId('organisation-config-submit'))
+			.toHaveTextContent(/Saving/i);
 
 		// Switch while PATCH is gated — exercises epoch discard without UI overlay races.
 		session.selectOrg(ORG_B);

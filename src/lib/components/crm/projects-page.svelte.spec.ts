@@ -181,10 +181,12 @@ describe('ProjectsPage integration', () => {
 		await page.getByLabelText('Name').fill('Warehouse rollout');
 		await page.getByTestId('project-form').getByRole('button', { name: 'Save project' }).click();
 
-		await expect.poll(() => createBody).toMatchObject({
-			name: 'Warehouse rollout',
-			client_id: null,
-			status: 'planning'
-		});
+		await expect
+			.poll(() => createBody)
+			.toMatchObject({
+				name: 'Warehouse rollout',
+				client_id: null,
+				status: 'planning'
+			});
 	});
 });

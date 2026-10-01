@@ -56,9 +56,7 @@ describe('NotificationsBell', () => {
 		await page.getByTestId('notification-item').click();
 
 		await expect.poll(() => patchBody).toEqual({ read: true });
-		await expect.poll(() => onNavigate.mock.calls.at(-1)?.[0]).toBe(
-			`/email?message=${MESSAGE_ID}`
-		);
+		await expect.poll(() => onNavigate.mock.calls.at(-1)?.[0]).toBe(`/email?message=${MESSAGE_ID}`);
 	});
 
 	it('labels timeline.mention and deep-links to the entity timeline', async () => {
@@ -109,16 +107,14 @@ describe('NotificationsBell', () => {
 		render(NotificationsBell, { api, orgId: ORG_A, onNavigate });
 
 		await page.getByTestId('notifications-bell').click();
-		await expect
-			.element(page.getByText('Mentioned you', { exact: true }))
-			.toBeInTheDocument();
+		await expect.element(page.getByText('Mentioned you', { exact: true })).toBeInTheDocument();
 		await expect
 			.element(page.getByText('Mentioned you on a Client', { exact: true }))
 			.toBeInTheDocument();
 		await page.getByTestId('notification-item').click();
 
-		await expect.poll(() => onNavigate.mock.calls.at(-1)?.[0]).toBe(
-			`/clients/${CLIENT_ID}?timeline=${EVENT_ID}`
-		);
+		await expect
+			.poll(() => onNavigate.mock.calls.at(-1)?.[0])
+			.toBe(`/clients/${CLIENT_ID}?timeline=${EVENT_ID}`);
 	});
 });

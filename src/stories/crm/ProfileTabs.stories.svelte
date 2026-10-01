@@ -22,12 +22,13 @@
 
 <Story name="Default">
 	{#snippet template(args)}
-		{@const props = /** @type {import('$lib/components/crm/profile-tabs.svelte').ProfileTabsProps} */ (args)}
-		<div class="bg-background max-w-2xl p-4">
+		{@const props =
+			/** @type {import('$lib/components/crm/profile-tabs.svelte').ProfileTabsProps} */ (args)}
+		<div class="max-w-2xl bg-background p-4">
 			<ProfileTabs {...props}>
 				{#snippet children({ active })}
-					<p class="text-muted-foreground text-sm">
-						Active tab: <span class="text-foreground font-medium">{active}</span>
+					<p class="text-sm text-muted-foreground">
+						Active tab: <span class="font-medium text-foreground">{active}</span>
 					</p>
 				{/snippet}
 			</ProfileTabs>

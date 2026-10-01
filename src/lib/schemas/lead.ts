@@ -31,10 +31,7 @@ export const leadFormSchema = z
 			.max(320)
 			.optional()
 			.or(z.literal(''))
-			.refine(
-				(v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-				'Must be a valid email address'
-			),
+			.refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Must be a valid email address'),
 		clientId: z.string().uuid().optional().or(z.literal('')),
 		stage: z.enum(leadWritableStages),
 		/** Decimal major units for display — converted to/from cents at the API boundary. */
@@ -43,9 +40,7 @@ export const leadFormSchema = z
 			.optional()
 			.or(z.literal(''))
 			.refine((v) => v === undefined || v === '' || isValidAmountString(v), 'Enter a valid amount'),
-		currency: z
-			.string()
-			.regex(/^[A-Z]{3}$/, 'Use a 3-letter uppercase currency code'),
+		currency: z.string().regex(/^[A-Z]{3}$/, 'Use a 3-letter uppercase currency code'),
 		probabilityPercent: z
 			.string()
 			.optional()

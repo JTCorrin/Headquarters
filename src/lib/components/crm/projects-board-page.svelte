@@ -8,10 +8,7 @@
 	import { type AppNavGroup } from './app-nav.svelte';
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
-	import ProjectsBoard, {
-		type ProjectBoardMove,
-		type ProjectCard
-	} from './projects-board.svelte';
+	import ProjectsBoard, { type ProjectBoardMove, type ProjectCard } from './projects-board.svelte';
 	import ProjectFormDrawer from './project-form-drawer.svelte';
 	import type { ProjectClientOption } from './project-form.svelte';
 	import { cn } from '$lib/utils.js';
@@ -52,9 +49,7 @@
 		...clients
 	]);
 	const filtered = $derived(
-		clientFilter === 'all'
-			? projects
-			: projects.filter((p) => p.clientId === clientFilter)
+		clientFilter === 'all' ? projects : projects.filter((p) => p.clientId === clientFilter)
 	);
 </script>
 
@@ -63,27 +58,18 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader title="Projects">
 				{#snippet actions()}
-					<ProjectFormDrawer
-						bind:open={drawerOpen}
-						{form}
-						{clients}
-						{onValidSubmit}
-					/>
+					<ProjectFormDrawer bind:open={drawerOpen} {form} {clients} {onValidSubmit} />
 				{/snippet}
 			</PageHeader>
 
 			<div class="flex flex-wrap items-center gap-2">
-				<span class="text-muted-foreground text-xs font-medium tracking-wide uppercase"
+				<span class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
 					>Attach to</span
 				>
 				<button
@@ -114,12 +100,7 @@
 				{/each}
 			</div>
 
-			<ProjectsBoard
-				projects={filtered}
-				{onSelectProject}
-				{onMoveProject}
-				class="min-h-[480px]"
-			/>
+			<ProjectsBoard projects={filtered} {onSelectProject} {onMoveProject} class="min-h-[480px]" />
 		</div>
 	</main>
 </AppSidebarFrame>

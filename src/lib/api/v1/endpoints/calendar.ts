@@ -55,13 +55,10 @@ export function createCalendarEndpoints(request: ApiRequestFn): CalendarEndpoint
 			return data;
 		},
 		startOAuth: async (signal) => {
-			const { data } = await request<ApiCalendarOAuthStart>(
-				'/api/v1/me/calendar/oauth/start',
-				{
-					orgScoped: true,
-					signal
-				}
-			);
+			const { data } = await request<ApiCalendarOAuthStart>('/api/v1/me/calendar/oauth/start', {
+				orgScoped: true,
+				signal
+			});
 			return data;
 		},
 		disconnect: async (options) => {

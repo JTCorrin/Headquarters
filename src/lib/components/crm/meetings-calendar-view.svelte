@@ -56,21 +56,15 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 	data-testid="meetings-calendar-view"
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader title="Calendar">
 				{#snippet actions()}
 					{#if onOpenList}
-						<Button type="button" size="sm" variant="outline" onclick={onOpenList}>
-							List
-						</Button>
+						<Button type="button" size="sm" variant="outline" onclick={onOpenList}>List</Button>
 					{/if}
 					<MeetingFormDrawer bind:open={drawerOpen} {form} {api} {onValidSubmit} />
 				{/snippet}
@@ -104,13 +98,7 @@
 				</p>
 			</div>
 
-			<MeetingsCalendarGrid
-				{month}
-				{days}
-				{meetings}
-				{onSelectDay}
-				{onSelectMeeting}
-			/>
+			<MeetingsCalendarGrid {month} {days} {meetings} {onSelectDay} {onSelectMeeting} />
 		</div>
 	</main>
 </AppSidebarFrame>

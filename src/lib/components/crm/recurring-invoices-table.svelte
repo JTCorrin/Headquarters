@@ -1,7 +1,10 @@
 <script lang="ts">
 	import DataTableShell from './data-table-shell.svelte';
 	import { recurringInvoiceStatusFacet } from './data-table-facets.js';
-	import { recurringInvoiceColumns, type RecurringInvoiceRow } from './recurring-invoices-columns.js';
+	import {
+		recurringInvoiceColumns,
+		type RecurringInvoiceRow
+	} from './recurring-invoices-columns.js';
 
 	export type { RecurringInvoiceRow };
 

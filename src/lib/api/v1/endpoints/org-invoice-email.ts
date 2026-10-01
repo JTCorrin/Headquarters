@@ -7,9 +7,7 @@ import type {
 } from '../types.js';
 import type { OrgInvoiceEmailEndpoints } from './types.js';
 
-export function createOrgInvoiceEmailEndpoints(
-	request: ApiRequestFn
-): OrgInvoiceEmailEndpoints {
+export function createOrgInvoiceEmailEndpoints(request: ApiRequestFn): OrgInvoiceEmailEndpoints {
 	return {
 		get: async (signal) => {
 			try {

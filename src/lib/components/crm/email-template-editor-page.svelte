@@ -6,9 +6,7 @@
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import EmailTemplateForm from './email-template-form.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -53,7 +51,10 @@
 	const formData = fromStore(form.form);
 
 	function renderTemplate(text: string): string {
-		return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => sampleVars[key] ?? `{{${key}}}`);
+		return text.replace(
+			/\{\{\s*([\w.]+)\s*\}\}/g,
+			(_, key: string) => sampleVars[key] ?? `{{${key}}}`
+		);
 	}
 
 	const previewSubject = $derived(renderTemplate(formData.current.subject || '(no subject)'));
@@ -65,19 +66,15 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			{#if viewState.kind !== 'ready' && viewState.kind !== 'validation'}
-				<ResourceStateBanner state={viewState} onReload={onReload} />
+				<ResourceStateBanner state={viewState} {onReload} />
 			{:else}
 				{#if viewState.kind === 'validation'}
-					<ResourceStateBanner state={viewState} onReload={onReload} />
+					<ResourceStateBanner state={viewState} {onReload} />
 				{/if}
 				<PageHeader
 					breadcrumb="Comms / Email templates"
@@ -105,27 +102,26 @@
 
 				<div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
 					<section
-						class="bg-card self-start space-y-4 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="space-y-4 self-start rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10"
 					>
 						<h2 class="text-sm font-semibold tracking-tight">Template</h2>
 						<EmailTemplateForm {form} submitLabel="Save template" {onValidSubmit} />
 					</section>
 
 					<section
-						class="bg-muted/40 xl:sticky xl:top-6 self-start overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10"
+						class="self-start overflow-hidden rounded-3xl bg-muted/40 ring-1 ring-foreground/5 xl:sticky xl:top-6 dark:ring-foreground/10"
 					>
 						<div class="px-4 py-3">
 							<p class="text-sm font-semibold tracking-tight">Live preview</p>
-							<p class="text-muted-foreground text-xs">Sample contact / client variables</p>
+							<p class="text-xs text-muted-foreground">Sample contact / client variables</p>
 						</div>
 						<div
-							class="border-border/80 space-y-3 border-t bg-white p-5 text-black dark:bg-zinc-950 dark:text-zinc-50"
+							class="space-y-3 border-t border-border/80 bg-white p-5 text-black dark:bg-zinc-950 dark:text-zinc-50"
 						>
-							<p class="text-muted-foreground text-[11px] uppercase tracking-wide">Subject</p>
+							<p class="text-[11px] tracking-wide text-muted-foreground uppercase">Subject</p>
 							<p class="text-sm font-semibold">{previewSubject}</p>
-							<p class="text-muted-foreground pt-2 text-[11px] uppercase tracking-wide">Body</p>
-							<pre
-								class="font-sans text-sm leading-relaxed whitespace-pre-wrap">{previewBody ||
+							<p class="pt-2 text-[11px] tracking-wide text-muted-foreground uppercase">Body</p>
+							<pre class="font-sans text-sm leading-relaxed whitespace-pre-wrap">{previewBody ||
 									'Start typing to preview…'}</pre>
 						</div>
 					</section>

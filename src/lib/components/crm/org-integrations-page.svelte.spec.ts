@@ -77,9 +77,7 @@ describe('OrgIntegrationsPage', () => {
 
 		await page.getByTestId('ai-integration-connect-openai').click();
 		await expect.element(page.getByTestId('ai-provider-connect-drawer')).toBeInTheDocument();
-		await expect
-			.element(page.getByText(/OAuth is not offered here/i))
-			.toBeInTheDocument();
+		await expect.element(page.getByText(/OAuth is not offered here/i)).toBeInTheDocument();
 	});
 
 	it('hides connect actions for members', async () => {
@@ -93,9 +91,7 @@ describe('OrgIntegrationsPage', () => {
 		await expect
 			.element(page.getByTestId('ai-integrations-section').getByText(/Read-only for your role/i))
 			.toBeInTheDocument();
-		await expect
-			.element(page.getByTestId('ai-integration-connect-openai'))
-			.not.toBeInTheDocument();
+		await expect.element(page.getByTestId('ai-integration-connect-openai')).not.toBeInTheDocument();
 		await expect.element(page.getByTestId('ai-prompts-save')).not.toBeInTheDocument();
 	});
 

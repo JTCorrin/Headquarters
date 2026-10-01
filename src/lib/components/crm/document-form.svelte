@@ -44,7 +44,7 @@
 			placeholder="MSA — Northwind.pdf"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -59,7 +59,7 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-		{#if $errors.category}<p class="text-destructive text-xs">{$errors.category}</p>{/if}
+		{#if $errors.category}<p class="text-xs text-destructive">{$errors.category}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -71,10 +71,10 @@
 			placeholder="Optional context"
 			aria-invalid={!!$errors.notes}
 		/>
-		{#if $errors.notes}<p class="text-destructive text-xs">{$errors.notes}</p>{/if}
+		{#if $errors.notes}<p class="text-xs text-destructive">{$errors.notes}</p>{/if}
 	</div>
 
-	<p class="text-muted-foreground text-xs">
+	<p class="text-xs text-muted-foreground">
 		Storybook mock — file picker wires up with storage later.
 	</p>
 

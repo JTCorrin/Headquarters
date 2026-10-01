@@ -15,9 +15,9 @@ describe('ContactForm', () => {
 		await page.getByTestId('client-picker-input').click();
 		await page.getByText('Northwind Traders').click();
 
-		await expect.element(page.getByLabelText('Employer / company')).toHaveValue(
-			'Northwind Traders'
-		);
+		await expect
+			.element(page.getByLabelText('Employer / company'))
+			.toHaveValue('Northwind Traders');
 	});
 
 	it('does not overwrite an existing employer when selecting a client', async () => {
@@ -29,8 +29,8 @@ describe('ContactForm', () => {
 		await page.getByTestId('client-picker-input').click();
 		await page.getByText('Northwind Traders').click();
 
-		await expect.element(page.getByLabelText('Employer / company')).toHaveValue(
-			'Existing employer'
-		);
+		await expect
+			.element(page.getByLabelText('Employer / company'))
+			.toHaveValue('Existing employer');
 	});
 });

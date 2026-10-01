@@ -26,7 +26,7 @@
 <header class={cn('flex flex-wrap items-start justify-between gap-4', className)}>
 	<div class="space-y-2">
 		{#if breadcrumb}
-			<p class="text-muted-foreground text-sm">{breadcrumb}</p>
+			<p class="text-sm text-muted-foreground">{breadcrumb}</p>
 		{/if}
 		<div class="flex flex-wrap items-center gap-3">
 			<h1 class="text-2xl font-semibold tracking-tight">{title}</h1>
@@ -35,7 +35,7 @@
 			{/if}
 		</div>
 		{#if subtitle}
-			<p class="text-muted-foreground text-sm">{subtitle}</p>
+			<p class="text-sm text-muted-foreground">{subtitle}</p>
 		{/if}
 	</div>
 	<div class="flex flex-wrap items-center gap-2">

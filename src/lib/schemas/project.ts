@@ -4,13 +4,7 @@ import type { ApiProjectStatus } from '$lib/api/v1/types.js';
 export const projectBoardStatuses = ['planning', 'active', 'blocked', 'done'] as const;
 export type ProjectBoardStatus = (typeof projectBoardStatuses)[number];
 
-export const projectFormStatuses = [
-	'planning',
-	'active',
-	'blocked',
-	'done',
-	'archived'
-] as const;
+export const projectFormStatuses = ['planning', 'active', 'blocked', 'done', 'archived'] as const;
 export type ProjectFormStatus = (typeof projectFormStatuses)[number];
 
 /** Form/select sentinel for a project that is not attached to a client. */

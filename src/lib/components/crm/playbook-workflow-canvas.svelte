@@ -148,29 +148,29 @@
 </script>
 
 <div
-	class="bg-muted/30 relative h-[min(70vh,640px)] min-h-[420px] w-full overflow-hidden rounded-lg border"
+	class="relative h-[min(70vh,640px)] min-h-[420px] w-full overflow-hidden rounded-lg border bg-muted/30"
 >
 	{#if insertPicker}
 		<div
 			role="dialog"
 			aria-label="Add node on connection"
-			class="bg-popover text-popover-foreground pointer-events-auto fixed z-[200] flex max-w-[16rem] min-w-[10rem] flex-col gap-2 rounded-md border p-2 shadow-md"
+			class="pointer-events-auto fixed z-[200] flex max-w-[16rem] min-w-[10rem] flex-col gap-2 rounded-md border bg-popover p-2 text-popover-foreground shadow-md"
 			style:left="{insertPicker.screenX}px"
 			style:top="{insertPicker.screenY}px"
 			style:translate="-8px 8px"
 		>
-			<div class="text-muted-foreground text-xs font-medium">Insert node</div>
+			<div class="text-xs font-medium text-muted-foreground">Insert node</div>
 			<div class="flex flex-wrap gap-1.5">
 				{#each ADDABLE_NODE_LABELS as item (item.type)}
 					<button
 						type="button"
-						class="bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded px-2 py-1 text-xs font-medium"
+						class="rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90"
 						onclick={() => addNodeFromInsertPicker(item.type)}>{item.label}</button
 					>
 				{/each}
 				<button
 					type="button"
-					class="border-input hover:bg-muted rounded border bg-background px-2 py-1 text-xs"
+					class="rounded border border-input bg-background px-2 py-1 text-xs hover:bg-muted"
 					onclick={() => (insertPicker = null)}>Cancel</button
 				>
 			</div>
@@ -192,18 +192,18 @@
 		<Background gap={16} size={1} variant={BackgroundVariant.Dots} />
 		<Panel position="top-left">
 			<div
-				class="bg-background/95 flex max-w-[min(100%,42rem)] flex-wrap items-center gap-2 rounded-md border p-2 shadow-sm backdrop-blur"
+				class="flex max-w-[min(100%,42rem)] flex-wrap items-center gap-2 rounded-md border bg-background/95 p-2 shadow-sm backdrop-blur"
 			>
 				<button
 					type="button"
-					class="bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded px-2 py-1 text-xs font-medium disabled:opacity-40"
+					class="rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90 disabled:opacity-40"
 					onclick={addTrigger}
 					disabled={hasTrigger}>+ Trigger</button
 				>
 				{#each ADDABLE_NODE_LABELS as item (item.type)}
 					<button
 						type="button"
-						class="bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded px-2 py-1 text-xs font-medium"
+						class="rounded bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90"
 						onclick={() => addNode(item.type)}>+ {item.label}</button
 					>
 				{/each}

@@ -98,9 +98,7 @@ describe('organisation schemas', () => {
 		});
 		expect(invalid.success).toBe(false);
 		if (!invalid.success) {
-			expect(invalid.error.issues.some((issue) => /IANA timezone/i.test(issue.message))).toBe(
-				true
-			);
+			expect(invalid.error.issues.some((issue) => /IANA timezone/i.test(issue.message))).toBe(true);
 		}
 	});
 
@@ -132,9 +130,9 @@ describe('organisation schemas', () => {
 		});
 		expect(result.success).toBe(false);
 		if (!result.success) {
-			expect(
-				result.error.issues.some((issue) => /must remain active/i.test(issue.message))
-			).toBe(true);
+			expect(result.error.issues.some((issue) => /must remain active/i.test(issue.message))).toBe(
+				true
+			);
 		}
 	});
 
@@ -208,8 +206,8 @@ describe('organisation schemas', () => {
 				themeDefault: 'light'
 			}).success
 		).toBe(true);
-		expect(
-			profilePreferencesSchema.safeParse({ themePreference: 'org_default' }).success
-		).toBe(true);
+		expect(profilePreferencesSchema.safeParse({ themePreference: 'org_default' }).success).toBe(
+			true
+		);
 	});
 });

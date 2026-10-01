@@ -4,11 +4,7 @@ import type {
 	ThemeOption,
 	ThemePreferenceOption
 } from '$lib/schemas/organisation.js';
-import {
-	readSelectedOrgId,
-	writeSelectedOrgId,
-	type StorageLike
-} from './selected-org.js';
+import { readSelectedOrgId, writeSelectedOrgId, type StorageLike } from './selected-org.js';
 
 const ORG_SESSION_CONTEXT = Symbol('hq.org-session');
 
@@ -121,9 +117,7 @@ export function createOrgSession(options: CreateOrgSessionOptions = {}): OrgSess
 		patchOrgLogoUrl(orgId, logoUrl) {
 			const current = memberships.find((m) => m.org_id === orgId);
 			if (!current || current.logo_url === logoUrl) return;
-			memberships = memberships.map((m) =>
-				m.org_id === orgId ? { ...m, logo_url: logoUrl } : m
-			);
+			memberships = memberships.map((m) => (m.org_id === orgId ? { ...m, logo_url: logoUrl } : m));
 		},
 		selectOrg,
 		clearSelection,

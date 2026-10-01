@@ -76,11 +76,7 @@
 
 	<div class="space-y-2">
 		<Label for="profile-theme">Personal theme</Label>
-		<Select.Root
-			type="single"
-			bind:value={$formData.themePreference}
-			disabled={busy}
-		>
+		<Select.Root type="single" bind:value={$formData.themePreference} disabled={busy}>
 			<Select.Trigger
 				id="profile-theme"
 				class="w-full"
@@ -95,7 +91,7 @@
 				{/each}
 			</Select.Content>
 		</Select.Root>
-		<p class="text-muted-foreground text-xs">
+		<p class="text-xs text-muted-foreground">
 			Overrides the organisation default for your account across every org.
 		</p>
 	</div>

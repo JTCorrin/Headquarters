@@ -6,10 +6,7 @@
 		timelineKindMarkerClass,
 		type TimelineEventKind
 	} from './timeline-kinds.js';
-	import {
-		renderTimelineMarkdown,
-		timelineAccentMarkerClass
-	} from './timeline-accents.js';
+	import { renderTimelineMarkdown, timelineAccentMarkerClass } from './timeline-accents.js';
 	import TimelineIcon from './timeline-icon.svelte';
 
 	export interface TimelineEventCardProps {
@@ -57,13 +54,9 @@
 	});
 
 	const kindLabel = $derived(timelineKindLabel(kind));
-	const markerClass = $derived(
-		timelineAccentMarkerClass(accent) ?? timelineKindMarkerClass(kind)
-	);
+	const markerClass = $derived(timelineAccentMarkerClass(accent) ?? timelineKindMarkerClass(kind));
 	const hasBody = $derived(!!body?.trim());
-	const looksLikeMarkdown = $derived(
-		!!body && /(\*\*|`|^[-*]\s|\[.+\]\(https?:\/\/)/m.test(body)
-	);
+	const looksLikeMarkdown = $derived(!!body && /(\*\*|`|^[-*]\s|\[.+\]\(https?:\/\/)/m.test(body));
 </script>
 
 <article
@@ -82,13 +75,13 @@
 		<span
 			class={cn(
 				'mt-3 size-2.5 rounded-full ring-4 ring-background transition-transform duration-300 ease-out',
-				'group-hover/timeline-card:scale-125 group-focus-within/timeline-card:scale-125',
+				'group-focus-within/timeline-card:scale-125 group-hover/timeline-card:scale-125',
 				markerClass
 			)}
 			aria-hidden="true"
 		></span>
 		{#if !isLast}
-			<span class="bg-border mt-1 w-px flex-1" aria-hidden="true"></span>
+			<span class="mt-1 w-px flex-1 bg-border" aria-hidden="true"></span>
 		{/if}
 	</div>
 
@@ -105,21 +98,21 @@
 			<div class="flex items-start gap-2">
 				{#if icon}
 					<span
-						class="bg-muted text-muted-foreground mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-lg"
+						class="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
 					>
 						<TimelineIcon name={icon} />
 					</span>
 				{/if}
 				<div class="min-w-0 flex-1 space-y-1.5">
-					<p class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+					<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 						{occurredAt} · {kindLabel}
 						{#if actor}
-							<span class="normal-case tracking-normal"> · {actor}</span>
+							<span class="tracking-normal normal-case"> · {actor}</span>
 						{/if}
 					</p>
 					<Card.Title class="text-base font-semibold">
 						{#if href}
-							<a href={href} class="hover:underline focus-visible:underline outline-none">
+							<a {href} class="outline-none hover:underline focus-visible:underline">
 								{title}
 							</a>
 						{:else}
@@ -132,14 +125,12 @@
 								'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
 								defaultExpanded
 									? 'grid-rows-[1fr] opacity-100'
-									: 'grid-rows-[0fr] opacity-70 group-hover/timeline-card:grid-rows-[1fr] group-hover/timeline-card:opacity-100 group-focus-within/timeline-card:grid-rows-[1fr] group-focus-within/timeline-card:opacity-100'
+									: 'grid-rows-[0fr] opacity-70 group-focus-within/timeline-card:grid-rows-[1fr] group-focus-within/timeline-card:opacity-100 group-hover/timeline-card:grid-rows-[1fr] group-hover/timeline-card:opacity-100'
 							)}
 						>
 							<div class="overflow-hidden">
 								{#if looksLikeMarkdown}
-									<div
-										class="text-muted-foreground pt-1 text-sm leading-relaxed [&_a]:underline"
-									>
+									<div class="pt-1 text-sm leading-relaxed text-muted-foreground [&_a]:underline">
 										<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 										{@html renderTimelineMarkdown(body ?? '')}
 									</div>
@@ -152,7 +143,7 @@
 						</div>
 						{#if !defaultExpanded}
 							<p
-								class="text-muted-foreground text-[11px] transition-opacity duration-200 group-hover/timeline-card:opacity-0 group-focus-within/timeline-card:opacity-0"
+								class="text-[11px] text-muted-foreground transition-opacity duration-200 group-focus-within/timeline-card:opacity-0 group-hover/timeline-card:opacity-0"
 							>
 								Hover to expand
 							</p>

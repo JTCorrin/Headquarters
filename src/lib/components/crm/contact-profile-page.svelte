@@ -77,10 +77,7 @@
 			subject: string;
 			to: string;
 		}) => Promise<{ suggestionId?: string; suggestionText: string }>;
-		onUseSuggestion?: (payload: {
-			suggestionId?: string;
-			text: string;
-		}) => void | Promise<void>;
+		onUseSuggestion?: (payload: { suggestionId?: string; text: string }) => void | Promise<void>;
 		onDiscardSuggestion?: (payload: { suggestionId?: string }) => void | Promise<void>;
 	}
 
@@ -151,12 +148,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-h-0 min-w-0 flex-1 flex-col">
 		<div class="flex min-h-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 md:px-8">
 			<div class="shrink-0">
@@ -270,7 +263,7 @@
 								class="min-h-0 flex-1"
 							/>
 						{:else}
-							<p class="text-muted-foreground text-sm">Select a contact to browse documents.</p>
+							<p class="text-sm text-muted-foreground">Select a contact to browse documents.</p>
 						{/if}
 					{/if}
 				{/snippet}

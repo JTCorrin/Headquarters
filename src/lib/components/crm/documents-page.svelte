@@ -35,16 +35,13 @@
 	let busy = $state(false);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Documents', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-
 
 	function onSwitchOrg(orgId: string) {
 		switchError = null;
@@ -105,7 +102,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="documents-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening documents.
 		</p>
 	</div>

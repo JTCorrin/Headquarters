@@ -108,9 +108,7 @@
 		if (!(projectBoardStatuses as readonly string[]).includes(status)) return;
 		const beforeId = resolveProjectId(event.before ?? null);
 		const columnProjects = projects.filter((p) => p.stage === status || p.id === id);
-		const optimisticColumn = columnProjects.map((p) =>
-			p.id === id ? { ...p, stage: status } : p
-		);
+		const optimisticColumn = columnProjects.map((p) => (p.id === id ? { ...p, stage: status } : p));
 		const position = computeBoardPosition(optimisticColumn, beforeId, id);
 		void onMoveProject?.({ id, status, position, beforeId });
 	}
@@ -123,10 +121,5 @@
 	onclick={selectFromEvent}
 	onkeydown={onKeydown}
 >
-	<SvarKanbanShell
-		{cards}
-		{columns}
-		cardContent={CompactKanbanCard}
-		onMoveCard={handleMoveCard}
-	/>
+	<SvarKanbanShell {cards} {columns} cardContent={CompactKanbanCard} onMoveCard={handleMoveCard} />
 </div>

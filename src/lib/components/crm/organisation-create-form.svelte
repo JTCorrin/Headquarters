@@ -84,7 +84,7 @@
 			placeholder="Corrin Data"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -99,7 +99,7 @@
 			placeholder="corrin-data"
 			aria-invalid={!!$errors.slug}
 		/>
-		{#if $errors.slug}<p class="text-destructive text-xs">{$errors.slug}</p>{/if}
+		{#if $errors.slug}<p class="text-xs text-destructive">{$errors.slug}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -112,7 +112,7 @@
 				placeholder="Europe/London"
 				aria-invalid={!!$errors.timezone}
 			/>
-			{#if $errors.timezone}<p class="text-destructive text-xs">{$errors.timezone}</p>{/if}
+			{#if $errors.timezone}<p class="text-xs text-destructive">{$errors.timezone}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="org-create-currency">Currency</Label>
@@ -123,7 +123,7 @@
 				placeholder="GBP"
 				aria-invalid={!!$errors.currency}
 			/>
-			{#if $errors.currency}<p class="text-destructive text-xs">{$errors.currency}</p>{/if}
+			{#if $errors.currency}<p class="text-xs text-destructive">{$errors.currency}</p>{/if}
 		</div>
 	</div>
 
@@ -137,7 +137,7 @@
 				placeholder="en-GB"
 				aria-invalid={!!$errors.locale}
 			/>
-			{#if $errors.locale}<p class="text-destructive text-xs">{$errors.locale}</p>{/if}
+			{#if $errors.locale}<p class="text-xs text-destructive">{$errors.locale}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="org-create-country">Country</Label>
@@ -148,7 +148,7 @@
 				placeholder="GB"
 				aria-invalid={!!$errors.country}
 			/>
-			{#if $errors.country}<p class="text-destructive text-xs">{$errors.country}</p>{/if}
+			{#if $errors.country}<p class="text-xs text-destructive">{$errors.country}</p>{/if}
 		</div>
 	</div>
 

@@ -15,10 +15,7 @@ export interface ActiveMentionQuery {
  * Detect an in-progress `@mention` query immediately before the caret.
  * Stops at whitespace so multi-word display names are inserted as a whole token.
  */
-export function parseActiveMentionQuery(
-	text: string,
-	caret: number
-): ActiveMentionQuery | null {
+export function parseActiveMentionQuery(text: string, caret: number): ActiveMentionQuery | null {
 	if (caret < 0 || caret > text.length) return null;
 	const before = text.slice(0, caret);
 	const match = before.match(/@([^\s@]*)$/);

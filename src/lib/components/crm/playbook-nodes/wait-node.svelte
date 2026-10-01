@@ -11,7 +11,7 @@
 
 <Handle type="target" position={Position.Top} class="!bg-muted-foreground" />
 <div
-	class="border-border bg-card text-card-foreground min-w-[180px] rounded-lg border px-3 py-2 shadow-sm"
+	class="min-w-[180px] rounded-lg border border-border bg-card px-3 py-2 text-card-foreground shadow-sm"
 >
 	<div class="mb-2 text-xs font-semibold tracking-wide uppercase">Wait</div>
 	<div class="flex gap-2">
@@ -19,7 +19,7 @@
 			type="number"
 			min="1"
 			step="1"
-			class="border-input bg-background nodrag nopan w-16 rounded border px-2 py-1 text-sm"
+			class="nodrag nopan w-16 rounded border border-input bg-background px-2 py-1 text-sm"
 			value={data.duration}
 			oninput={(e) => {
 				const v = Number((e.target as HTMLInputElement).value);
@@ -27,7 +27,7 @@
 			}}
 		/>
 		<select
-			class="border-input bg-background nodrag nopan flex-1 rounded border px-2 py-1 text-sm"
+			class="nodrag nopan flex-1 rounded border border-input bg-background px-2 py-1 text-sm"
 			value={data.unit}
 			onchange={(e) =>
 				updateNodeData(id, {

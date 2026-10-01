@@ -7,6 +7,6 @@
 	let { title, onclick }: TaskTitleButtonProps = $props();
 </script>
 
-<button type="button" class="hover:text-primary text-left hover:underline" {onclick}>
+<button type="button" class="text-left hover:text-primary hover:underline" {onclick}>
 	{title}
 </button>

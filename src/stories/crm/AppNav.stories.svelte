@@ -58,7 +58,7 @@
 <Story name="Default">
 	{#snippet template(args)}
 		{@const props = /** @type {import('$lib/components/crm/app-nav.svelte').AppNavProps} */ (args)}
-		<div class="bg-background h-[720px]">
+		<div class="h-[720px] bg-background">
 			<AppSidebarFrame
 				orgName={props.orgName}
 				groups={props.groups}
@@ -68,7 +68,7 @@
 			>
 				<div class="p-6">
 					<p class="text-lg font-semibold tracking-tight">Page</p>
-					<p class="text-muted-foreground text-sm">Content beside the navigation.</p>
+					<p class="text-sm text-muted-foreground">Content beside the navigation.</p>
 				</div>
 			</AppSidebarFrame>
 		</div>
@@ -78,7 +78,7 @@
 <Story name="Mobile" globals={storyViewport.mobile}>
 	{#snippet template(args)}
 		{@const props = /** @type {import('$lib/components/crm/app-nav.svelte').AppNavProps} */ (args)}
-		<div class="bg-background h-screen">
+		<div class="h-screen bg-background">
 			<AppSidebarFrame
 				orgName={props.orgName}
 				groups={props.groups}
@@ -88,7 +88,7 @@
 			>
 				<div class="p-6">
 					<p class="text-lg font-semibold tracking-tight">Page</p>
-					<p class="text-muted-foreground text-sm">Tap the sidebar trigger to open navigation.</p>
+					<p class="text-sm text-muted-foreground">Tap the sidebar trigger to open navigation.</p>
 				</div>
 			</AppSidebarFrame>
 		</div>

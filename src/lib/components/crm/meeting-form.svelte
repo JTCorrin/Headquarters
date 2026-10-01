@@ -99,7 +99,10 @@
 	function setStartsFromParts(date: string, time: string) {
 		formData.update((current) => ({
 			...current,
-			startsAt: joinLocalDatetime(date, time || splitLocalDatetime(current.startsAt).time || '09:00')
+			startsAt: joinLocalDatetime(
+				date,
+				time || splitLocalDatetime(current.startsAt).time || '09:00'
+			)
 		}));
 	}
 
@@ -185,7 +188,7 @@
 			placeholder="Q2 planning"
 			aria-invalid={!!$errors.title}
 		/>
-		{#if $errors.title}<p class="text-destructive text-xs">{$errors.title}</p>{/if}
+		{#if $errors.title}<p class="text-xs text-destructive">{$errors.title}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -207,7 +210,7 @@
 				oninput={(e) =>
 					setStartsFromParts(startsDateLocal, (e.currentTarget as HTMLInputElement).value)}
 			/>
-			{#if $errors.startsAt}<p class="text-destructive text-xs">{$errors.startsAt}</p>{/if}
+			{#if $errors.startsAt}<p class="text-xs text-destructive">{$errors.startsAt}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="meeting-end-date">Ends</Label>
@@ -227,7 +230,7 @@
 				oninput={(e) =>
 					setEndsFromParts(endsDateLocal, (e.currentTarget as HTMLInputElement).value)}
 			/>
-			{#if $errors.endsAt}<p class="text-destructive text-xs">{$errors.endsAt}</p>{/if}
+			{#if $errors.endsAt}<p class="text-xs text-destructive">{$errors.endsAt}</p>{/if}
 		</div>
 	</div>
 
@@ -240,7 +243,7 @@
 			placeholder="Europe/London"
 			aria-invalid={!!$errors.timezone}
 		/>
-		{#if $errors.timezone}<p class="text-destructive text-xs">{$errors.timezone}</p>{/if}
+		{#if $errors.timezone}<p class="text-xs text-destructive">{$errors.timezone}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -289,7 +292,7 @@
 				</Select.Content>
 			</Select.Root>
 			{#if $errors.relatedEntityType}
-				<p class="text-destructive text-xs">{$errors.relatedEntityType}</p>
+				<p class="text-xs text-destructive">{$errors.relatedEntityType}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -320,7 +323,7 @@
 				/>
 			{/if}
 			{#if $errors.relatedEntityId}
-				<p class="text-destructive text-xs">{$errors.relatedEntityId}</p>
+				<p class="text-xs text-destructive">{$errors.relatedEntityId}</p>
 			{/if}
 		</div>
 	</div>
@@ -334,7 +337,7 @@
 			</Button>
 		</div>
 		{#if ($formData.attendees ?? []).length === 0}
-			<p class="text-muted-foreground text-xs">Add guests by email. Contact pickers come later.</p>
+			<p class="text-xs text-muted-foreground">Add guests by email. Contact pickers come later.</p>
 		{/if}
 		{#each $formData.attendees ?? [] as _, index (index)}
 			<div class="space-y-2 rounded-xl border p-3">
@@ -369,7 +372,7 @@
 					</div>
 				</div>
 				<label
-					class="text-muted-foreground flex items-center gap-2 text-xs"
+					class="flex items-center gap-2 text-xs text-muted-foreground"
 					for={`meeting-attendee-organiser-${index}`}
 				>
 					<Checkbox
@@ -390,7 +393,7 @@
 			</div>
 		{/each}
 		{#if $errors.attendees}
-			<p class="text-destructive text-xs">Check attendee emails.</p>
+			<p class="text-xs text-destructive">Check attendee emails.</p>
 		{/if}
 	</div>
 

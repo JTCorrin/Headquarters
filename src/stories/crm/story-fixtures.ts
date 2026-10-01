@@ -1,9 +1,6 @@
 import type { AppNavGroup } from '$lib/components/crm/app-nav.svelte';
 import type { EmailMessage } from '$lib/components/crm/entity-email-inbox.svelte';
-import type {
-	DocumentEntry,
-	EntityDocument
-} from '$lib/components/crm/entity-documents.svelte';
+import type { DocumentEntry, EntityDocument } from '$lib/components/crm/entity-documents.svelte';
 import type { TimelineEvent } from '$lib/components/crm/timeline.svelte';
 
 export const storyViewport = {

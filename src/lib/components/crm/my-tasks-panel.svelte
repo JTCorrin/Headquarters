@@ -64,14 +64,14 @@
 
 <section
 	class={cn(
-		'bg-card flex min-h-0 flex-col overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'flex min-h-0 flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 >
 	<div class="flex items-center justify-between gap-3 px-4 py-3">
 		<div>
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
-			<p class="text-muted-foreground text-xs">{openCount} open</p>
+			<p class="text-xs text-muted-foreground">{openCount} open</p>
 		</div>
 		<div class="flex flex-wrap items-center gap-2">
 			{#if headerActions}
@@ -88,11 +88,11 @@
 	</div>
 
 	{#if tasks.length === 0}
-		<p class="text-muted-foreground border-t px-4 py-8 text-center text-sm">{emptyMessage}</p>
+		<p class="border-t px-4 py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
 	{:else}
 		<ul class="m-0 max-h-[420px] list-none overflow-y-auto border-t p-0">
 			{#each tasks as task (task.id)}
-				<li class="border-border/80 flex items-start gap-3 border-t px-4 py-3 first:border-t-0">
+				<li class="flex items-start gap-3 border-t border-border/80 px-4 py-3 first:border-t-0">
 					<button
 						type="button"
 						class={cn(
@@ -120,7 +120,7 @@
 								<button
 									type="button"
 									class={cn(
-										'text-left text-sm font-medium leading-snug hover:underline',
+										'text-left text-sm leading-snug font-medium hover:underline',
 										isDone(task.status) && 'text-muted-foreground line-through'
 									)}
 									onclick={() => onSelectTask(task.id)}
@@ -130,7 +130,7 @@
 							{:else}
 								<p
 									class={cn(
-										'text-sm font-medium leading-snug',
+										'text-sm leading-snug font-medium',
 										isDone(task.status) && 'text-muted-foreground line-through'
 									)}
 								>
@@ -138,8 +138,9 @@
 								</p>
 							{/if}
 						</div>
-						<p class="text-muted-foreground mt-1 truncate text-xs">
-							{#if task.relatedTo}{task.relatedTo} · {/if}Due {task.dueOn}
+						<p class="mt-1 truncate text-xs text-muted-foreground">
+							{#if task.relatedTo}{task.relatedTo} ·
+							{/if}Due {task.dueOn}
 						</p>
 					</div>
 					<StatusBadge status={task.status} class="shrink-0" />

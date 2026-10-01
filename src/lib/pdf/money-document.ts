@@ -104,21 +104,19 @@ export function buildMoneyDocumentDef(input: MoneyDocumentInput): TDocumentDefin
 			{ text: 'Unit', style: 'tableHeader', alignment: 'right' as const },
 			{ text: 'Total', style: 'tableHeader', alignment: 'right' as const }
 		],
-		...lines.map(
-			(row): Content[] => [
-				{
-					text: lineDescription(row),
-					style: 'tableCell'
-				},
-				{ text: row.qty, style: 'tableCell', alignment: 'right' as const },
-				{
-					text: money(Number(row.unitPrice) || 0, currency),
-					style: 'tableCell',
-					alignment: 'right' as const
-				},
-				{ text: money(lineTotal(row), currency), style: 'tableCell', alignment: 'right' as const }
-			]
-		)
+		...lines.map((row): Content[] => [
+			{
+				text: lineDescription(row),
+				style: 'tableCell'
+			},
+			{ text: row.qty, style: 'tableCell', alignment: 'right' as const },
+			{
+				text: money(Number(row.unitPrice) || 0, currency),
+				style: 'tableCell',
+				alignment: 'right' as const
+			},
+			{ text: money(lineTotal(row), currency), style: 'tableCell', alignment: 'right' as const }
+		])
 	];
 
 	if (lines.length === 0) {

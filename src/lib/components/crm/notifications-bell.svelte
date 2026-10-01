@@ -95,9 +95,7 @@
 			if (!row.read_at) {
 				await api.notifications.markRead(row.id);
 				items = items.map((item) =>
-					item.id === row.id
-						? { ...item, read_at: item.read_at ?? new Date().toISOString() }
-						: item
+					item.id === row.id ? { ...item, read_at: item.read_at ?? new Date().toISOString() } : item
 				);
 				unreadCount = Math.max(0, unreadCount - 1);
 			}
@@ -157,16 +155,14 @@
 				variant="outline"
 				size="sm"
 				class={cn('relative', className)}
-				aria-label={unreadCount > 0
-					? `Notifications, ${unreadCount} unread`
-					: 'Notifications'}
+				aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
 				data-testid="notifications-bell"
 				{...props}
 			>
 				<BellIcon class="size-4" />
 				{#if badgeLabel}
 					<span
-						class="bg-primary text-primary-foreground absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none"
+						class="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-semibold text-primary-foreground"
 						data-testid="notifications-badge"
 					>
 						{badgeLabel}
@@ -178,17 +174,17 @@
 	<Popover.Content class="w-80 p-0" align="end" data-testid="notifications-panel">
 		<div class="border-b px-4 py-3">
 			<p class="text-sm font-semibold tracking-tight">Notifications</p>
-			<p class="text-muted-foreground text-xs">
+			<p class="text-xs text-muted-foreground">
 				{unreadCount > 0 ? `${unreadCount} unread` : 'You’re all caught up'}
 			</p>
 		</div>
 		<div class="max-h-80 overflow-y-auto">
 			{#if listLoading && items.length === 0}
-				<p class="text-muted-foreground px-4 py-6 text-sm">Loading…</p>
+				<p class="px-4 py-6 text-sm text-muted-foreground">Loading…</p>
 			{:else if listError}
-				<p class="text-destructive px-4 py-6 text-sm" role="alert">{listError}</p>
+				<p class="px-4 py-6 text-sm text-destructive" role="alert">{listError}</p>
 			{:else if items.length === 0}
-				<p class="text-muted-foreground px-4 py-6 text-sm">No notifications yet.</p>
+				<p class="px-4 py-6 text-sm text-muted-foreground">No notifications yet.</p>
 			{:else}
 				<ul class="m-0 list-none divide-y p-0">
 					{#each items as row (row.id)}
@@ -196,7 +192,7 @@
 							<button
 								type="button"
 								class={cn(
-									'hover:bg-muted/60 flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors',
+									'flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors hover:bg-muted/60',
 									!row.read_at && 'bg-muted/30'
 								)}
 								disabled={activatingId === row.id}
@@ -206,16 +202,17 @@
 									void onActivate(row);
 								}}
 							>
-								<span class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+								<span class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 									{kindLabel(row.kind)}
 								</span>
 								<span class={cn('text-sm', !row.read_at ? 'font-semibold' : 'font-medium')}>
 									{row.title}
 								</span>
 								{#if row.body}
-									<span class="text-muted-foreground line-clamp-2 text-xs">{row.body}</span>
+									<span class="line-clamp-2 text-xs text-muted-foreground">{row.body}</span>
 								{/if}
-								<span class="text-muted-foreground text-[11px]">{relativeTime(row.created_at)}</span>
+								<span class="text-[11px] text-muted-foreground">{relativeTime(row.created_at)}</span
+								>
 							</button>
 						</li>
 					{/each}

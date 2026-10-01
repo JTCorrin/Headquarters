@@ -79,7 +79,7 @@
 	}
 </script>
 
-<section class={cn('bg-background flex min-h-0 flex-col', className)} aria-label={title}>
+<section class={cn('flex min-h-0 flex-col bg-background', className)} aria-label={title}>
 	<div class="mb-3 flex items-center justify-between gap-3">
 		<h2 class="text-sm font-semibold tracking-tight">{title}</h2>
 		{#if headerActions}
@@ -90,16 +90,12 @@
 	</div>
 
 	{#if composable}
-		<TimelineComposer
-			actor={composerActor}
-			class="mb-4"
-			onSubmit={handleComposerSubmit}
-		/>
+		<TimelineComposer actor={composerActor} class="mb-4" onSubmit={handleComposerSubmit} />
 	{/if}
 
 	{#if events.length === 0}
 		<div
-			class="bg-muted/40 text-muted-foreground rounded-3xl border border-dashed px-4 py-10 text-center text-sm"
+			class="rounded-3xl border border-dashed bg-muted/40 px-4 py-10 text-center text-sm text-muted-foreground"
 		>
 			{emptyMessage}
 		</div>

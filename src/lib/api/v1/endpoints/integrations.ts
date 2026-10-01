@@ -20,15 +20,12 @@ export function createIntegrationsEndpoints(request: ApiRequestFn): Integrations
 			return data;
 		},
 		connectAi: async (provider: ApiAiProvider, body: ApiAiIntegrationConnectBody, signal) => {
-			const { data } = await request<ApiAiIntegration>(
-				`/api/v1/integrations/ai/${provider}`,
-				{
-					method: 'PUT',
-					body,
-					orgScoped: true,
-					signal
-				}
-			);
+			const { data } = await request<ApiAiIntegration>(`/api/v1/integrations/ai/${provider}`, {
+				method: 'PUT',
+				body,
+				orgScoped: true,
+				signal
+			});
 			return data;
 		},
 		disconnectAi: async (provider: ApiAiProvider, signal) => {

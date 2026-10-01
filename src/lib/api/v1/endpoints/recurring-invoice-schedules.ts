@@ -42,13 +42,10 @@ export function createRecurringInvoiceSchedulesEndpoints(
 			return data;
 		},
 		get: async (id, signal) => {
-			return request<ApiRecurringInvoiceDocument>(
-				`/api/v1/recurring-invoice-schedules/${id}`,
-				{
-					orgScoped: true,
-					signal
-				}
-			);
+			return request<ApiRecurringInvoiceDocument>(`/api/v1/recurring-invoice-schedules/${id}`, {
+				orgScoped: true,
+				signal
+			});
 		},
 		update: async (id, body: ApiRecurringInvoiceUpdateBody, version, signal) => {
 			const { data } = await request<ApiRecurringInvoiceDocument>(
@@ -84,17 +81,14 @@ export function createRecurringInvoiceSchedulesEndpoints(
 			return data;
 		},
 		listRuns: async (id, params = {}, signal) => {
-			return request<ApiRecurringInvoiceRun[]>(
-				`/api/v1/recurring-invoice-schedules/${id}/runs`,
-				{
-					orgScoped: true,
-					query: {
-						limit: params.limit,
-						cursor: params.cursor
-					},
-					signal
-				}
-			);
+			return request<ApiRecurringInvoiceRun[]>(`/api/v1/recurring-invoice-schedules/${id}/runs`, {
+				orgScoped: true,
+				query: {
+					limit: params.limit,
+					cursor: params.cursor
+				},
+				signal
+			});
 		},
 		getRun: async (scheduleId, runId, signal) => {
 			return request<ApiRecurringInvoiceRunDocument>(

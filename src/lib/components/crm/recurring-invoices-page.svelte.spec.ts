@@ -221,7 +221,10 @@ describe('RecurringInvoicesPage integration', () => {
 
 		await page.getByRole('button', { name: 'New schedule' }).click();
 		await page.getByLabelText('Schedule name').fill('Acme weekly support');
-		await page.getByTestId('recurring-invoice-form').getByRole('button', { name: 'Save schedule' }).click();
+		await page
+			.getByTestId('recurring-invoice-form')
+			.getByRole('button', { name: 'Save schedule' })
+			.click();
 
 		await expect
 			.element(page.getByRole('link', { name: 'Acme weekly support' }))

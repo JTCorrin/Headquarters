@@ -38,7 +38,12 @@ export interface CatalogProductOption {
 
 /** Org default active tax rate %, or `'0'` when none / client is VAT-exempt. */
 export function defaultTaxRatePercentString(
-	rates: { rate_percent: number; is_default: boolean; active: boolean; deleted_at?: string | null }[],
+	rates: {
+		rate_percent: number;
+		is_default: boolean;
+		active: boolean;
+		deleted_at?: string | null;
+	}[],
 	options?: { taxExempt?: boolean }
 ): string {
 	if (options?.taxExempt) return '0';

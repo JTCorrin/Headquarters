@@ -89,7 +89,7 @@
 			placeholder="VAT 20%"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -101,7 +101,7 @@
 			placeholder="20"
 			aria-invalid={!!$errors.ratePercent}
 		/>
-		{#if $errors.ratePercent}<p class="text-destructive text-xs">{$errors.ratePercent}</p>{/if}
+		{#if $errors.ratePercent}<p class="text-xs text-destructive">{$errors.ratePercent}</p>{/if}
 	</div>
 
 	<div class="grid gap-4 sm:grid-cols-2">
@@ -145,11 +145,9 @@
 					</Select.Item>
 				</Select.Content>
 			</Select.Root>
-			{#if $errors.active}<p class="text-destructive text-xs">{$errors.active}</p>{/if}
+			{#if $errors.active}<p class="text-xs text-destructive">{$errors.active}</p>{/if}
 			{#if $formData.isDefault === 'true'}
-				<p class="text-muted-foreground text-xs">
-					The organisation default cannot be archived.
-				</p>
+				<p class="text-xs text-muted-foreground">The organisation default cannot be archived.</p>
 			{/if}
 		</div>
 	</div>

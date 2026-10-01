@@ -115,12 +115,7 @@
 <Story name="Default">
 	{#snippet template()}
 		<div class="h-screen">
-			<QuotesListPage
-				orgName="Acme Org"
-				navGroups={navGroupsWithActive('Quotes')}
-				{rows}
-				{form}
-			/>
+			<QuotesListPage orgName="Acme Org" navGroups={navGroupsWithActive('Quotes')} {rows} {form} />
 		</div>
 	{/snippet}
 </Story>

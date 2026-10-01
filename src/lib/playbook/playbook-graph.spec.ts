@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	createDefaultPlaybookGraph,
-	validatePlaybookGraph
-} from './playbook-graph.js';
+import { createDefaultPlaybookGraph, validatePlaybookGraph } from './playbook-graph.js';
 import type { PlaybookGraph } from '$lib/schemas/playbook-graph.js';
 
 function trigger(id: string, x = 0, y = 0): PlaybookGraph['nodes'][number] {

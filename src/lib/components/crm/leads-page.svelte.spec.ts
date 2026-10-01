@@ -212,17 +212,17 @@ describe('LeadsPage integration', () => {
 		const api = createApiV1Client({ fetch: fetchMock, getOrgId: () => session.selectedOrgId });
 		render(LeadsPage, { api, session });
 
-		await expect
-			.element(page.getByLabelText('Bravo deal', { exact: true }))
-			.toBeInTheDocument();
+		await expect.element(page.getByLabelText('Bravo deal', { exact: true })).toBeInTheDocument();
 		await page.getByTestId(`lead-move-up-${LEAD_B}`).click();
 
 		await expect.poll(() => patchCount).toBe(1);
 		await expect.poll(() => lastPatch?.ifMatch).toBe('"2"');
-		await expect.poll(() => lastPatch?.body).toMatchObject({
-			stage: 'new',
-			position: expect.any(Number)
-		});
+		await expect
+			.poll(() => lastPatch?.body)
+			.toMatchObject({
+				stage: 'new',
+				position: expect.any(Number)
+			});
 
 		// Second move fails — board error visible and card still on the board.
 		await page.getByTestId(`lead-move-down-${LEAD_B}`).click();
@@ -230,9 +230,7 @@ describe('LeadsPage integration', () => {
 		await expect
 			.element(page.getByTestId('leads-board-error'))
 			.toHaveTextContent(/restored|match|conflict|could not move/i);
-		await expect
-			.element(page.getByLabelText('Bravo deal', { exact: true }))
-			.toBeInTheDocument();
+		await expect.element(page.getByLabelText('Bravo deal', { exact: true })).toBeInTheDocument();
 	});
 
 	it('loads the board for an invited member using org default currency', async () => {

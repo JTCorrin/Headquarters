@@ -45,12 +45,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -60,7 +56,7 @@
 			/>
 
 			<form
-				class="bg-card grid gap-4 rounded-3xl p-4 ring-1 ring-foreground/5 md:grid-cols-[repeat(4,minmax(0,1fr))_auto] dark:ring-foreground/10"
+				class="grid gap-4 rounded-3xl bg-card p-4 ring-1 ring-foreground/5 md:grid-cols-[repeat(4,minmax(0,1fr))_auto] dark:ring-foreground/10"
 				data-testid="audit-log-filters"
 				onsubmit={(event) => {
 					event.preventDefault();

@@ -100,8 +100,10 @@
 
 <Story name="Default" args={{ events: sampleEvents, title: 'Activity' }}>
 	{#snippet template(args)}
-		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (args)}
-		<div class="bg-background max-w-xl p-4">
+		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (
+			args
+		)}
+		<div class="max-w-xl bg-background p-4">
 			<Timeline {...props} />
 		</div>
 	{/snippet}
@@ -109,7 +111,7 @@
 
 <Story name="WithComposer">
 	{#snippet template()}
-		<div class="bg-background max-w-xl p-4">
+		<div class="max-w-xl bg-background p-4">
 			<Timeline
 				bind:events
 				title="Activity"
@@ -126,8 +128,10 @@
 	args={{ events: [], title: 'Activity', emptyMessage: 'No activity on this contact yet.' }}
 >
 	{#snippet template(args)}
-		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (args)}
-		<div class="bg-background max-w-xl p-4">
+		{@const props = /** @type {import('$lib/components/crm/timeline.svelte').TimelineProps} */ (
+			args
+		)}
+		<div class="max-w-xl bg-background p-4">
 			<Timeline {...props} composable composerActor="Joe" />
 		</div>
 	{/snippet}

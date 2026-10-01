@@ -34,9 +34,7 @@ describe('OrgSwitcher', () => {
 
 		await page.getByTestId('org-switcher-trigger').click();
 		await page.getByTestId(`org-switch-${memberships[1]!.org_id}`).click();
-		await vi.waitFor(() =>
-			expect(onSwitchOrg).toHaveBeenCalledWith(memberships[1]!.org_id)
-		);
+		await vi.waitFor(() => expect(onSwitchOrg).toHaveBeenCalledWith(memberships[1]!.org_id));
 	});
 
 	it('surfaces switch failure and create action', async () => {

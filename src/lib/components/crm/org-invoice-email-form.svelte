@@ -134,13 +134,13 @@
 	<input type="hidden" name="smtpSecurity" value={$formData.smtpSecurity} />
 
 	{#if account?.credentials_configured}
-		<p class="text-muted-foreground text-xs" data-testid="org-invoice-email-credentials-saved">
+		<p class="text-xs text-muted-foreground" data-testid="org-invoice-email-credentials-saved">
 			Password saved — leave blank to keep it, or enter a new one to replace.
 		</p>
 	{/if}
 
 	{#if account?.last_tested_at || account?.last_error_message || account?.last_error_code}
-		<p class="text-muted-foreground text-xs" data-testid="org-invoice-email-status">
+		<p class="text-xs text-muted-foreground" data-testid="org-invoice-email-status">
 			{#if account.status}
 				Status: {account.status}.
 			{/if}
@@ -168,7 +168,9 @@
 			</Select.Trigger>
 			<Select.Content>
 				{#each orgInvoiceEmailPresets as option (option)}
-					<Select.Item value={option} label={presetLabels[option]}>{presetLabels[option]}</Select.Item>
+					<Select.Item value={option} label={presetLabels[option]}
+						>{presetLabels[option]}</Select.Item
+					>
 				{/each}
 			</Select.Content>
 		</Select.Root>
@@ -186,7 +188,7 @@
 				data-testid="org-invoice-email-from-address"
 			/>
 			{#if $errors.fromAddress}
-				<p class="text-destructive text-xs">{$errors.fromAddress}</p>
+				<p class="text-xs text-destructive">{$errors.fromAddress}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -199,7 +201,7 @@
 				data-testid="org-invoice-email-from-name"
 			/>
 			{#if $errors.fromName}
-				<p class="text-destructive text-xs">{$errors.fromName}</p>
+				<p class="text-xs text-destructive">{$errors.fromName}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -213,7 +215,7 @@
 				data-testid="org-invoice-email-reply-to"
 			/>
 			{#if $errors.replyTo}
-				<p class="text-destructive text-xs">{$errors.replyTo}</p>
+				<p class="text-xs text-destructive">{$errors.replyTo}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -227,7 +229,7 @@
 				data-testid="org-invoice-email-username"
 			/>
 			{#if $errors.username}
-				<p class="text-destructive text-xs">{$errors.username}</p>
+				<p class="text-xs text-destructive">{$errors.username}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -242,9 +244,9 @@
 				placeholder={account?.credentials_configured ? '••••••••' : 'App password'}
 				data-testid="org-invoice-email-password"
 			/>
-			<p class="text-muted-foreground text-xs">Write-only — never shown after save.</p>
+			<p class="text-xs text-muted-foreground">Write-only — never shown after save.</p>
 			{#if $errors.password}
-				<p class="text-destructive text-xs">{$errors.password}</p>
+				<p class="text-xs text-destructive">{$errors.password}</p>
 			{/if}
 		</div>
 	</div>
@@ -260,7 +262,7 @@
 				data-testid="org-invoice-email-smtp-host"
 			/>
 			{#if $errors.smtpHost}
-				<p class="text-destructive text-xs">{$errors.smtpHost}</p>
+				<p class="text-xs text-destructive">{$errors.smtpHost}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -273,7 +275,7 @@
 				data-testid="org-invoice-email-smtp-port"
 			/>
 			{#if $errors.smtpPort}
-				<p class="text-destructive text-xs">{$errors.smtpPort}</p>
+				<p class="text-xs text-destructive">{$errors.smtpPort}</p>
 			{/if}
 		</div>
 		<div class="space-y-2 sm:col-span-3">
@@ -308,7 +310,7 @@
 			data-testid="org-invoice-email-subject"
 		/>
 		{#if $errors.subjectTemplate}
-			<p class="text-destructive text-xs">{$errors.subjectTemplate}</p>
+			<p class="text-xs text-destructive">{$errors.subjectTemplate}</p>
 		{/if}
 	</div>
 
@@ -322,12 +324,12 @@
 			disabled={fieldsDisabled}
 			data-testid="org-invoice-email-body"
 		/>
-		<p class="text-muted-foreground text-xs" data-testid="org-invoice-email-placeholders-hint">
+		<p class="text-xs text-muted-foreground" data-testid="org-invoice-email-placeholders-hint">
 			Placeholders: <code>{'{{invoice_number}}'}</code>, <code>{'{{client_name}}'}</code>,
 			<code>{'{{total}}'}</code>, <code>{'{{due_on}}'}</code>, <code>{'{{org_name}}'}</code>
 		</p>
 		{#if $errors.bodyTemplate}
-			<p class="text-destructive text-xs">{$errors.bodyTemplate}</p>
+			<p class="text-xs text-destructive">{$errors.bodyTemplate}</p>
 		{/if}
 	</div>
 

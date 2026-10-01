@@ -93,7 +93,9 @@
 		>
 			<Select.Trigger id="rline-product" class="w-full">{productLabel}</Select.Trigger>
 			<Select.Content>
-				<Select.Item value={NONE} label="No product (custom line)">No product (custom line)</Select.Item>
+				<Select.Item value={NONE} label="No product (custom line)"
+					>No product (custom line)</Select.Item
+				>
 				{#each products as product (product.id)}
 					<Select.Item value={product.id} label={`${product.sku} · ${product.name}`}>
 						{product.sku} · {product.name}
@@ -113,9 +115,9 @@
 			aria-invalid={!!$errors.descriptionTemplate}
 		/>
 		{#if $errors.descriptionTemplate}
-			<p class="text-destructive text-xs">{$errors.descriptionTemplate}</p>
+			<p class="text-xs text-destructive">{$errors.descriptionTemplate}</p>
 		{/if}
-		<p class="text-muted-foreground text-xs">
+		<p class="text-xs text-muted-foreground">
 			Variables: <code>{'{{period_start}}'}</code>, <code>{'{{period_end}}'}</code>,
 			<code>{'{{issue_date}}'}</code>
 		</p>
@@ -125,12 +127,17 @@
 		<div class="space-y-2">
 			<Label for="rline-qty">Qty</Label>
 			<Input id="rline-qty" name="qty" bind:value={$formData.qty} placeholder="1" />
-			{#if $errors.qty}<p class="text-destructive text-xs">{$errors.qty}</p>{/if}
+			{#if $errors.qty}<p class="text-xs text-destructive">{$errors.qty}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="rline-unit">Unit price</Label>
-			<Input id="rline-unit" name="unitPrice" bind:value={$formData.unitPrice} placeholder="4200.00" />
-			{#if $errors.unitPrice}<p class="text-destructive text-xs">{$errors.unitPrice}</p>{/if}
+			<Input
+				id="rline-unit"
+				name="unitPrice"
+				bind:value={$formData.unitPrice}
+				placeholder="4200.00"
+			/>
+			{#if $errors.unitPrice}<p class="text-xs text-destructive">{$errors.unitPrice}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="rline-tax">Tax % (optional)</Label>
@@ -142,7 +149,7 @@
 				aria-invalid={!!$errors.taxRatePercent}
 			/>
 			{#if $errors.taxRatePercent}
-				<p class="text-destructive text-xs">{$errors.taxRatePercent}</p>
+				<p class="text-xs text-destructive">{$errors.taxRatePercent}</p>
 			{/if}
 		</div>
 	</div>

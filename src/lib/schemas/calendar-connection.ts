@@ -7,11 +7,7 @@ import type {
 
 export type CalendarProvider = ApiCalendarProvider;
 
-export type CalendarConnectionStatus =
-	| 'disconnected'
-	| 'pending'
-	| 'connected'
-	| 'error';
+export type CalendarConnectionStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
 export interface CalendarConnectionResource {
 	provider: CalendarProvider | null;

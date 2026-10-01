@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import {
-		themeOptions,
-		type OrganisationConfigData
-	} from '$lib/schemas/organisation.js';
+	import { themeOptions, type OrganisationConfigData } from '$lib/schemas/organisation.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -102,20 +99,20 @@
 	<section class="space-y-4" data-testid="org-company-details-section">
 		<div>
 			<h3 class="text-base font-semibold tracking-tight">Company details</h3>
-			<p class="text-muted-foreground text-sm">
+			<p class="text-sm text-muted-foreground">
 				Shown on quotes and invoices — logo top left, address top right.
 			</p>
 		</div>
 
 		<div class="flex flex-wrap items-start gap-4">
 			<div
-				class="bg-muted/40 flex size-24 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-foreground/10"
+				class="flex size-24 items-center justify-center overflow-hidden rounded-2xl bg-muted/40 ring-1 ring-foreground/10"
 				data-testid="org-logo-preview"
 			>
 				{#if logoUrl}
 					<img src={logoUrl} alt="Organisation logo" class="size-full object-contain p-2" />
 				{:else}
-					<span class="text-muted-foreground px-2 text-center text-xs">No logo</span>
+					<span class="px-2 text-center text-xs text-muted-foreground">No logo</span>
 				{/if}
 			</div>
 			{#if !readonly}
@@ -152,7 +149,7 @@
 							</Button>
 						{/if}
 					</div>
-					<p class="text-muted-foreground text-xs">PNG, JPEG, or WebP up to 2 MB.</p>
+					<p class="text-xs text-muted-foreground">PNG, JPEG, or WebP up to 2 MB.</p>
 				</div>
 			{/if}
 		</div>
@@ -167,7 +164,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.name}
 				/>
-				{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+				{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-legal-name">Legal name</Label>
@@ -178,7 +175,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.legalName}
 				/>
-				{#if $errors.legalName}<p class="text-destructive text-xs">{$errors.legalName}</p>{/if}
+				{#if $errors.legalName}<p class="text-xs text-destructive">{$errors.legalName}</p>{/if}
 			</div>
 		</div>
 
@@ -192,7 +189,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.phone}
 				/>
-				{#if $errors.phone}<p class="text-destructive text-xs">{$errors.phone}</p>{/if}
+				{#if $errors.phone}<p class="text-xs text-destructive">{$errors.phone}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-billing-email">Billing email</Label>
@@ -205,7 +202,7 @@
 					aria-invalid={!!$errors.billingEmail}
 				/>
 				{#if $errors.billingEmail}
-					<p class="text-destructive text-xs">{$errors.billingEmail}</p>
+					<p class="text-xs text-destructive">{$errors.billingEmail}</p>
 				{/if}
 			</div>
 		</div>
@@ -220,7 +217,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.websiteUrl}
 				/>
-				{#if $errors.websiteUrl}<p class="text-destructive text-xs">{$errors.websiteUrl}</p>{/if}
+				{#if $errors.websiteUrl}<p class="text-xs text-destructive">{$errors.websiteUrl}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-country">Country</Label>
@@ -232,7 +229,7 @@
 					aria-invalid={!!$errors.country}
 					placeholder="GB"
 				/>
-				{#if $errors.country}<p class="text-destructive text-xs">{$errors.country}</p>{/if}
+				{#if $errors.country}<p class="text-xs text-destructive">{$errors.country}</p>{/if}
 			</div>
 		</div>
 
@@ -247,7 +244,7 @@
 					aria-invalid={!!$errors.taxIdentifier}
 				/>
 				{#if $errors.taxIdentifier}
-					<p class="text-destructive text-xs">{$errors.taxIdentifier}</p>
+					<p class="text-xs text-destructive">{$errors.taxIdentifier}</p>
 				{/if}
 			</div>
 			<div class="space-y-2">
@@ -260,7 +257,7 @@
 					aria-invalid={!!$errors.registrationNumber}
 				/>
 				{#if $errors.registrationNumber}
-					<p class="text-destructive text-xs">{$errors.registrationNumber}</p>
+					<p class="text-xs text-destructive">{$errors.registrationNumber}</p>
 				{/if}
 			</div>
 		</div>
@@ -274,7 +271,7 @@
 				disabled={readonly || busy}
 				aria-invalid={!!$errors.addressLine1}
 			/>
-			{#if $errors.addressLine1}<p class="text-destructive text-xs">{$errors.addressLine1}</p>{/if}
+			{#if $errors.addressLine1}<p class="text-xs text-destructive">{$errors.addressLine1}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="org-config-address2">Address line 2</Label>
@@ -285,7 +282,7 @@
 				disabled={readonly || busy}
 				aria-invalid={!!$errors.addressLine2}
 			/>
-			{#if $errors.addressLine2}<p class="text-destructive text-xs">{$errors.addressLine2}</p>{/if}
+			{#if $errors.addressLine2}<p class="text-xs text-destructive">{$errors.addressLine2}</p>{/if}
 		</div>
 		<div class="grid gap-4 sm:grid-cols-3">
 			<div class="space-y-2">
@@ -297,7 +294,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.city}
 				/>
-				{#if $errors.city}<p class="text-destructive text-xs">{$errors.city}</p>{/if}
+				{#if $errors.city}<p class="text-xs text-destructive">{$errors.city}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-region">Region / state</Label>
@@ -308,7 +305,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.region}
 				/>
-				{#if $errors.region}<p class="text-destructive text-xs">{$errors.region}</p>{/if}
+				{#if $errors.region}<p class="text-xs text-destructive">{$errors.region}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-postal">Postal code</Label>
@@ -319,7 +316,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.postalCode}
 				/>
-				{#if $errors.postalCode}<p class="text-destructive text-xs">{$errors.postalCode}</p>{/if}
+				{#if $errors.postalCode}<p class="text-xs text-destructive">{$errors.postalCode}</p>{/if}
 			</div>
 		</div>
 	</section>
@@ -327,7 +324,7 @@
 	<section class="space-y-4" data-testid="org-defaults-fields-section">
 		<div>
 			<h3 class="text-base font-semibold tracking-tight">Defaults</h3>
-			<p class="text-muted-foreground text-sm">Timezone, currency, locale, and theme.</p>
+			<p class="text-sm text-muted-foreground">Timezone, currency, locale, and theme.</p>
 		</div>
 		<div class="grid gap-4 sm:grid-cols-2">
 			<div class="space-y-2">
@@ -339,7 +336,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.timezone}
 				/>
-				{#if $errors.timezone}<p class="text-destructive text-xs">{$errors.timezone}</p>{/if}
+				{#if $errors.timezone}<p class="text-xs text-destructive">{$errors.timezone}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-currency">Default currency</Label>
@@ -350,7 +347,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.currency}
 				/>
-				{#if $errors.currency}<p class="text-destructive text-xs">{$errors.currency}</p>{/if}
+				{#if $errors.currency}<p class="text-xs text-destructive">{$errors.currency}</p>{/if}
 			</div>
 		</div>
 
@@ -364,7 +361,7 @@
 					disabled={readonly || busy}
 					aria-invalid={!!$errors.locale}
 				/>
-				{#if $errors.locale}<p class="text-destructive text-xs">{$errors.locale}</p>{/if}
+				{#if $errors.locale}<p class="text-xs text-destructive">{$errors.locale}</p>{/if}
 			</div>
 			<div class="space-y-2">
 				<Label for="org-config-theme">Organisation theme</Label>

@@ -25,7 +25,7 @@
 	<div class="flex items-center justify-between gap-3">
 		<div>
 			<h3 class="text-sm font-semibold tracking-tight">Projects</h3>
-			<p class="text-muted-foreground text-xs">Kanban boards attached to this client.</p>
+			<p class="text-xs text-muted-foreground">Kanban boards attached to this client.</p>
 		</div>
 		{#if onNewProject}
 			<Button type="button" size="sm" variant="outline" onclick={onNewProject}>New project</Button>
@@ -33,21 +33,23 @@
 	</div>
 
 	{#if projects.length === 0}
-		<p class="text-muted-foreground rounded-2xl px-4 py-8 text-center text-sm ring-1 ring-foreground/5">
+		<p
+			class="rounded-2xl px-4 py-8 text-center text-sm text-muted-foreground ring-1 ring-foreground/5"
+		>
 			No projects yet — attach a board when delivery work starts.
 		</p>
 	{:else}
-		<ul class="divide-border divide-y rounded-2xl ring-1 ring-foreground/5">
+		<ul class="divide-y divide-border rounded-2xl ring-1 ring-foreground/5">
 			{#each projects as project (project.id)}
 				<li class="flex items-center justify-between gap-3 px-4 py-3">
 					<div class="min-w-0">
 						<a
 							href={`/projects/${project.id}`}
-							class="hover:text-foreground truncate text-sm font-medium underline-offset-4 hover:underline"
+							class="truncate text-sm font-medium underline-offset-4 hover:text-foreground hover:underline"
 						>
 							{project.name}
 						</a>
-						<p class="text-muted-foreground truncate text-xs">
+						<p class="truncate text-xs text-muted-foreground">
 							{[
 								project.owner ? `Owner ${project.owner}` : null,
 								project.cardCount !== undefined ? `${project.cardCount} cards` : null,

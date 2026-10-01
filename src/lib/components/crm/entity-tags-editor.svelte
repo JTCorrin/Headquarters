@@ -110,11 +110,11 @@
 </script>
 
 <div class={cn('flex flex-wrap items-center gap-2', className)} data-testid="entity-tags-editor">
-	<span class="text-muted-foreground text-xs font-medium uppercase tracking-wide">Tags</span>
+	<span class="text-xs font-medium tracking-wide text-muted-foreground uppercase">Tags</span>
 	{#if loading}
-		<span class="text-muted-foreground text-sm">Loading tags…</span>
+		<span class="text-sm text-muted-foreground">Loading tags…</span>
 	{:else if error && entityTags.length === 0}
-		<span class="text-destructive text-sm" role="alert">{error}</span>
+		<span class="text-sm text-destructive" role="alert">{error}</span>
 	{:else}
 		{#each entityTags as tag (tag.id)}
 			<Badge variant="outline" class="font-normal" style={tagStyle(tag.color)}>
@@ -122,7 +122,7 @@
 			</Badge>
 		{/each}
 		{#if entityTags.length === 0 && !canEdit}
-			<span class="text-muted-foreground text-sm">No tags</span>
+			<span class="text-sm text-muted-foreground">No tags</span>
 		{/if}
 	{/if}
 
@@ -149,7 +149,7 @@
 					<div class="max-h-48 space-y-1 overflow-y-auto">
 						{#each orgTags as tag (tag.id)}
 							<label
-								class="hover:bg-muted flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+								class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
 							>
 								<input
 									type="checkbox"
@@ -161,7 +161,7 @@
 								<span>{tag.name}</span>
 							</label>
 						{:else}
-							<p class="text-muted-foreground px-2 py-1 text-sm">No org tags yet.</p>
+							<p class="px-2 py-1 text-sm text-muted-foreground">No org tags yet.</p>
 						{/each}
 					</div>
 					<form
@@ -183,7 +183,7 @@
 						</Button>
 					</form>
 					{#if error}
-						<p class="text-destructive text-xs" role="alert">{error}</p>
+						<p class="text-xs text-destructive" role="alert">{error}</p>
 					{/if}
 				</div>
 			</Popover.Content>

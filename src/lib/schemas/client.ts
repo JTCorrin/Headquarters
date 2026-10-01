@@ -1,12 +1,6 @@
 import { z } from 'zod';
 
-export const clientStatuses = [
-	'prospect',
-	'active',
-	'on_hold',
-	'inactive',
-	'archived'
-] as const;
+export const clientStatuses = ['prospect', 'active', 'on_hold', 'inactive', 'archived'] as const;
 
 const dateOnly = z
 	.string()
@@ -50,7 +44,11 @@ export const PUBLIC_EMAIL_DOMAINS = new Set([
 ]);
 
 export function normalizeEmailDomain(value: string): string {
-	return value.trim().toLowerCase().replace(/^@+/, '').replace(/^www\./, '');
+	return value
+		.trim()
+		.toLowerCase()
+		.replace(/^@+/, '')
+		.replace(/^www\./, '');
 }
 
 export function isPublicEmailDomain(domain: string): boolean {
@@ -67,10 +65,7 @@ export const clientFormSchema = z.object({
 		.max(320)
 		.optional()
 		.or(z.literal(''))
-		.refine(
-			(v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
-			'Must be a valid email address'
-		),
+		.refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Must be a valid email address'),
 	invoicingEmail: z.email('Enter a valid email').or(z.literal('')),
 	emailDomain: z
 		.string()
@@ -78,7 +73,8 @@ export const clientFormSchema = z.object({
 		.optional()
 		.or(z.literal(''))
 		.refine(
-			(v) => !v || /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i.test(v),
+			(v) =>
+				!v || /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i.test(v),
 			'Must be a domain like hesis.co.uk'
 		)
 		.refine((v) => !v || !isPublicEmailDomain(v), 'Public mailbox domains cannot be used'),

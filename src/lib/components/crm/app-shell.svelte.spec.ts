@@ -31,9 +31,7 @@ describe('AppShell sidebar', () => {
 
 	it('opens and closes the mobile nav sheet', async () => {
 		await page.viewport(390, 844);
-		await expect
-			.poll(() => window.matchMedia('(max-width: 767px)').matches)
-			.toBe(true);
+		await expect.poll(() => window.matchMedia('(max-width: 767px)').matches).toBe(true);
 
 		render(AppShell, {
 			currentOrgId: memberships[0]!.org_id,

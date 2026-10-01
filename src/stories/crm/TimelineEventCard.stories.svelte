@@ -48,7 +48,7 @@
 
 <Story name="All kinds">
 	{#snippet template()}
-		<div class="bg-background max-w-lg space-y-0 p-4">
+		<div class="max-w-lg space-y-0 bg-background p-4">
 			{#each TIMELINE_EVENT_KINDS as kind, index (kind)}
 				<TimelineEventCard
 					{kind}

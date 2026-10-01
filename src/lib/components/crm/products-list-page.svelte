@@ -12,9 +12,7 @@
 	import type { ProductRow } from './products-columns.js';
 	import ProductFormDrawer from './product-form-drawer.svelte';
 	import StatCard from './stat-card.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -55,8 +53,7 @@
 	const trackedCount = $derived(rows.filter((r) => r.stock !== undefined).length);
 	const lowStockCount = $derived(
 		rows.filter(
-			(r) =>
-				r.stock !== undefined && r.lowStockAt !== undefined && r.stock <= r.lowStockAt
+			(r) => r.stock !== undefined && r.lowStockAt !== undefined && r.stock <= r.lowStockAt
 		).length
 	);
 </script>
@@ -66,16 +63,12 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			{#if viewState.kind === 'empty' || viewState.kind === 'validation'}
-				<ResourceStateBanner state={viewState} onReload={onReload} />
+				<ResourceStateBanner state={viewState} {onReload} />
 			{/if}
 
 			<PageHeader title="Products">

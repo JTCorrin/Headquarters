@@ -7,9 +7,7 @@
 	import { type AppNavGroup } from './app-nav.svelte';
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import StatusBadge from './status-badge.svelte';
 	import OrgApiKeysCreateDrawer from './org-api-keys-create-drawer.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -86,12 +84,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -101,7 +95,7 @@
 			>
 				{#snippet actions()}
 					<div class="flex flex-wrap items-center gap-3">
-						<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
+						<span class="text-xs text-muted-foreground">Your role: {roleLabel(role)}</span>
 						<Button
 							type="button"
 							size="sm"
@@ -121,11 +115,11 @@
 			{#if showContent}
 				<section class="space-y-4" data-testid="org-api-keys-section">
 					{#if keys.length === 0}
-						<p class="text-muted-foreground text-sm" data-testid="org-api-keys-empty">
+						<p class="text-sm text-muted-foreground" data-testid="org-api-keys-empty">
 							No active API keys yet. Create one to connect an agent host to Headquarters.
 						</p>
 					{:else}
-						<ul class="divide-border divide-y rounded-3xl border" data-testid="org-api-keys-list">
+						<ul class="divide-y divide-border rounded-3xl border" data-testid="org-api-keys-list">
 							{#each keys as key (key.id)}
 								<li
 									class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
@@ -135,13 +129,12 @@
 										<div class="flex flex-wrap items-center gap-2">
 											<p class="truncate font-medium">{key.name}</p>
 											<StatusBadge status="Active" />
-											<span
-												class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs"
+											<span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
 												>{apiKeyRoleLabel(key.role)}</span
 											>
 										</div>
-										<p class="text-muted-foreground font-mono text-sm">{key.prefix}…</p>
-										<p class="text-muted-foreground text-xs">
+										<p class="font-mono text-sm text-muted-foreground">{key.prefix}…</p>
+										<p class="text-xs text-muted-foreground">
 											Created {formatWhen(key.created_at)} · Last used {formatWhen(
 												key.last_used_at
 											)}

@@ -115,8 +115,7 @@ describe('startVisibilityPoll', () => {
 			onTick: () => {},
 			onVisible,
 			getVisibilityState: () => 'visible',
-			setIntervalFn: ((fn: () => void) =>
-				setInterval(fn, 45_000)) as typeof setInterval,
+			setIntervalFn: ((fn: () => void) => setInterval(fn, 45_000)) as typeof setInterval,
 			clearIntervalFn: clearInterval,
 			addEventListener: () => {},
 			removeEventListener: () => {}

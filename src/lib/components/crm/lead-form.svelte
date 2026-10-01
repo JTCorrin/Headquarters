@@ -57,9 +57,7 @@
 		stageOptions.find((o) => o.value === $formData.stage)?.label ?? 'Stage'
 	);
 
-	const selectedClient = $derived(
-		clientOptions.find((c) => c.id === $formData.clientId) ?? null
-	);
+	const selectedClient = $derived(clientOptions.find((c) => c.id === $formData.clientId) ?? null);
 
 	const valueSymbol = $derived(currencySymbol($formData.currency || 'GBP'));
 
@@ -107,7 +105,7 @@
 			placeholder="Contoso expansion"
 			aria-invalid={!!$errors.name}
 		/>
-		{#if $errors.name}<p class="text-destructive text-xs">{$errors.name}</p>{/if}
+		{#if $errors.name}<p class="text-xs text-destructive">{$errors.name}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -121,7 +119,7 @@
 			aria-invalid={!!$errors.primaryEmail}
 			data-testid="lead-email"
 		/>
-		{#if $errors.primaryEmail}<p class="text-destructive text-xs">{$errors.primaryEmail}</p>{/if}
+		{#if $errors.primaryEmail}<p class="text-xs text-destructive">{$errors.primaryEmail}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -139,15 +137,15 @@
 			onCreateNew={onCreateClient}
 		/>
 		{#if selectedClient?.defaultCurrency}
-			<p class="text-muted-foreground text-[11px]">
+			<p class="text-[11px] text-muted-foreground">
 				Currency follows client default ({selectedClient.defaultCurrency}).
 			</p>
 		{:else if orgCurrency}
-			<p class="text-muted-foreground text-[11px]">
+			<p class="text-[11px] text-muted-foreground">
 				Currency follows organisation default ({orgCurrency}).
 			</p>
 		{/if}
-		{#if $errors.clientId}<p class="text-destructive text-xs">{$errors.clientId}</p>{/if}
+		{#if $errors.clientId}<p class="text-xs text-destructive">{$errors.clientId}</p>{/if}
 	</div>
 
 	<div class="space-y-2">
@@ -173,15 +171,15 @@
 					{/each}
 				</Select.Content>
 			</Select.Root>
-			<p class="text-muted-foreground text-[11px]">Won only via Convert lead.</p>
-			{#if $errors.stage}<p class="text-destructive text-xs">{$errors.stage}</p>{/if}
+			<p class="text-[11px] text-muted-foreground">Won only via Convert lead.</p>
+			{#if $errors.stage}<p class="text-xs text-destructive">{$errors.stage}</p>{/if}
 		</div>
 		<div class="space-y-2">
 			<Label for="lead-value">Value</Label>
 			<input type="hidden" name="currency" value={$formData.currency} />
 			<div class="relative">
 				<span
-					class="text-muted-foreground pointer-events-none absolute top-0 left-3 flex h-9 items-center text-sm"
+					class="pointer-events-none absolute top-0 left-3 flex h-9 items-center text-sm text-muted-foreground"
 					aria-hidden="true"
 				>
 					{valueSymbol}
@@ -197,10 +195,10 @@
 					aria-describedby="lead-currency-hint"
 				/>
 			</div>
-			<p id="lead-currency-hint" class="text-muted-foreground text-[11px]">
+			<p id="lead-currency-hint" class="text-[11px] text-muted-foreground">
 				{$formData.currency}
 			</p>
-			{#if $errors.valueAmount}<p class="text-destructive text-xs">{$errors.valueAmount}</p>{/if}
+			{#if $errors.valueAmount}<p class="text-xs text-destructive">{$errors.valueAmount}</p>{/if}
 		</div>
 	</div>
 
@@ -215,7 +213,7 @@
 				aria-invalid={!!$errors.probabilityPercent}
 			/>
 			{#if $errors.probabilityPercent}
-				<p class="text-destructive text-xs">{$errors.probabilityPercent}</p>
+				<p class="text-xs text-destructive">{$errors.probabilityPercent}</p>
 			{/if}
 		</div>
 		<div class="space-y-2">
@@ -234,7 +232,7 @@
 			presets={['today', 'plus7', 'endOfMonth']}
 		/>
 		{#if $errors.expectedCloseOn}
-			<p class="text-destructive text-xs">{$errors.expectedCloseOn}</p>
+			<p class="text-xs text-destructive">{$errors.expectedCloseOn}</p>
 		{/if}
 	</div>
 
@@ -249,7 +247,7 @@
 				placeholder="Required when marking lost"
 				aria-invalid={!!$errors.lostReason}
 			/>
-			{#if $errors.lostReason}<p class="text-destructive text-xs">{$errors.lostReason}</p>{/if}
+			{#if $errors.lostReason}<p class="text-xs text-destructive">{$errors.lostReason}</p>{/if}
 		</div>
 	{/if}
 

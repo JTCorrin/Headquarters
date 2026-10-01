@@ -19,9 +19,7 @@
 	import AppSidebarFrame from './app-sidebar-frame.svelte';
 	import PageHeader from './page-header.svelte';
 	import ProfileTabs from './profile-tabs.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 	import ProfilePreferencesForm from './profile-preferences-form.svelte';
 	import ProfileMailboxForm from './profile-mailbox-form.svelte';
 	import ProfileCalendarForm from './profile-calendar-form.svelte';
@@ -49,15 +47,9 @@
 		onSavePreferences?: () => boolean | void | Promise<boolean | void>;
 		onSaveMailbox?: () => boolean | void | Promise<boolean | void>;
 		onTestMailbox?: () =>
-			| MailboxTestFeedback
-			| false
-			| void
-			| Promise<MailboxTestFeedback | false | void>;
+			MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onSyncMailbox?: () =>
-			| MailboxTestFeedback
-			| false
-			| void
-			| Promise<MailboxTestFeedback | false | void>;
+			MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
 		onSaveMailboxSyncInterval?: (
 			minutes: number
 		) => MailboxTestFeedback | false | void | Promise<MailboxTestFeedback | false | void>;
@@ -70,10 +62,7 @@
 		onDisconnectCalendar?: () => boolean | void | Promise<boolean | void>;
 		onSaveCaldav?: () => boolean | void | Promise<boolean | void>;
 		onTestCaldav?: () =>
-			| CaldavTestFeedback
-			| false
-			| void
-			| Promise<CaldavTestFeedback | false | void>;
+			CaldavTestFeedback | false | void | Promise<CaldavTestFeedback | false | void>;
 		onDisconnectCaldav?: () => boolean | void | Promise<boolean | void>;
 	}
 
@@ -150,12 +139,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-svh' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-8 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -164,7 +149,7 @@
 				description="Your personal theme, mailbox, and calendar for this organisation. Organisation defaults and AI providers stay under Owner Config / Integrations."
 			>
 				{#snippet actions()}
-					<span class="text-muted-foreground text-xs">Your role: {roleLabel(role)}</span>
+					<span class="text-xs text-muted-foreground">Your role: {roleLabel(role)}</span>
 				{/snippet}
 			</PageHeader>
 
@@ -177,24 +162,17 @@
 							<section class="space-y-4" data-testid="personal-theme-section">
 								<div>
 									<h2 class="text-lg font-semibold tracking-tight">Personal theme</h2>
-									<p class="text-muted-foreground text-sm">
+									<p class="text-sm text-muted-foreground">
 										Optional override that applies across every organisation you belong to.
 									</p>
 								</div>
-								<ProfilePreferencesForm
-									form={preferencesForm}
-									onValidSubmit={onSavePreferences}
-								/>
+								<ProfilePreferencesForm form={preferencesForm} onValidSubmit={onSavePreferences} />
 							</section>
 						{:else if active === 'mail'}
-							<section
-								class="space-y-4 scroll-mt-6"
-								id="mail"
-								data-testid="personal-mail-section"
-							>
+							<section class="scroll-mt-6 space-y-4" id="mail" data-testid="personal-mail-section">
 								<div>
 									<h2 class="text-lg font-semibold tracking-tight">Mail</h2>
-									<p class="text-muted-foreground text-sm">
+									<p class="text-sm text-muted-foreground">
 										Your personal IMAP/SMTP for this organisation membership — not organisation
 										Email sending used for quotes and campaigns.
 									</p>
@@ -213,13 +191,13 @@
 							</section>
 						{:else if active === 'calendar'}
 							<section
-								class="space-y-4 scroll-mt-6"
+								class="scroll-mt-6 space-y-4"
 								id="calendar"
 								data-testid="personal-calendar-section"
 							>
 								<div>
 									<h2 class="text-lg font-semibold tracking-tight">Calendar</h2>
-									<p class="text-muted-foreground text-sm">
+									<p class="text-sm text-muted-foreground">
 										Connect Google OAuth or CalDAV (Mailcow/SOGo) for this organisation membership.
 										Push is one-way from Headquarters meetings — the meetings calendar works without
 										a connection.
@@ -227,12 +205,14 @@
 								</div>
 
 								<p
-									class="bg-muted/40 text-muted-foreground rounded-2xl px-3 py-3 text-xs leading-relaxed"
+									class="rounded-2xl bg-muted/40 px-3 py-3 text-xs leading-relaxed text-muted-foreground"
 									data-testid="calendar-xor-banner"
 								>
 									{#if activeProviderLabel}
-										Active sync: <span class="text-foreground font-medium">{activeProviderLabel}</span>.
-										Only one provider can push at a time — connecting the other disables this one.
+										Active sync: <span class="font-medium text-foreground"
+											>{activeProviderLabel}</span
+										>. Only one provider can push at a time — connecting the other disables this
+										one.
 									{:else}
 										Only one active sync per membership (XOR). Connecting Google or CalDAV disables
 										the other if it was active.

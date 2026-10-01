@@ -33,7 +33,9 @@ function paymentLabel(payment: ApiPayment): string {
 	return ref ? `${method} · ${ref}` : method;
 }
 
-export function toMoneySummaryItemFromQuote(quote: ApiQuote): MoneySummaryItem & { sortKey: string } {
+export function toMoneySummaryItemFromQuote(
+	quote: ApiQuote
+): MoneySummaryItem & { sortKey: string } {
 	return {
 		id: quote.id,
 		kind: 'quote',

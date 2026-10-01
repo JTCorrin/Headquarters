@@ -101,7 +101,9 @@
 		}
 	]);
 
-	function prependEvent(partial: Omit<TimelineEvent, 'id' | 'occurredAt'> & { occurredAt?: string }) {
+	function prependEvent(
+		partial: Omit<TimelineEvent, 'id' | 'occurredAt'> & { occurredAt?: string }
+	) {
 		timelineEvents = [
 			{
 				id: crypto.randomUUID(),

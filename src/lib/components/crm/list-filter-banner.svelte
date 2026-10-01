@@ -13,7 +13,7 @@
 
 <div
 	class={cn(
-		'bg-muted/40 text-muted-foreground flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm ring-1 ring-foreground/5',
+		'flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-sm text-muted-foreground ring-1 ring-foreground/5',
 		className
 	)}
 	data-testid="list-filter-banner"
@@ -21,7 +21,13 @@
 >
 	<p>{label}</p>
 	{#if onClear}
-		<Button type="button" size="sm" variant="ghost" data-testid="list-filter-clear" onclick={onClear}>
+		<Button
+			type="button"
+			size="sm"
+			variant="ghost"
+			data-testid="list-filter-clear"
+			onclick={onClear}
+		>
 			Clear filter
 		</Button>
 	{/if}

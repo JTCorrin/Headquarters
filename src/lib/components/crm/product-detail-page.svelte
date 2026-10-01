@@ -59,12 +59,8 @@
 	groups={navGroups}
 	{showNav}
 	showTrigger={showNav}
-	class={cn(
-		showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col',
-		className
-	)}
+	class={cn(showNav ? 'h-full min-h-[720px]' : 'min-h-0 flex-1 flex-col', className)}
 >
-
 	<main class="flex min-w-0 flex-1 flex-col">
 		<div class="space-y-6 px-4 py-6 sm:px-6 md:px-8">
 			<PageHeader
@@ -108,28 +104,28 @@
 				<section class="space-y-3">
 					<div>
 						<h3 class="text-sm font-semibold tracking-tight">Used on</h3>
-						<p class="text-muted-foreground text-xs">
+						<p class="text-xs text-muted-foreground">
 							Recent quote and invoice lines referencing this SKU.
 						</p>
 					</div>
 					{#if usage.length === 0}
 						<p
-							class="text-muted-foreground rounded-2xl px-4 py-8 text-center text-sm ring-1 ring-foreground/5"
+							class="rounded-2xl px-4 py-8 text-center text-sm text-muted-foreground ring-1 ring-foreground/5"
 						>
 							Not on any open documents yet.
 						</p>
 					{:else}
-						<ul class="divide-border divide-y rounded-2xl ring-1 ring-foreground/5">
+						<ul class="divide-y divide-border rounded-2xl ring-1 ring-foreground/5">
 							{#each usage as row (row.id)}
 								<li class="flex items-start justify-between gap-3 px-4 py-3">
 									<div class="min-w-0">
 										<p class="truncate text-sm font-medium">{row.label}</p>
-										<p class="text-muted-foreground truncate text-xs">
+										<p class="truncate text-xs text-muted-foreground">
 											{row.clientName} · qty {row.qty} · {row.amount}
 										</p>
 									</div>
 									<div class="flex shrink-0 flex-col items-end gap-1">
-										<span class="text-muted-foreground text-[10px] tracking-wide uppercase"
+										<span class="text-[10px] tracking-wide text-muted-foreground uppercase"
 											>{row.kind}</span
 										>
 										<StatusBadge status={row.status} />

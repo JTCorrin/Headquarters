@@ -24,9 +24,7 @@
 		/** Reveal-once secret after a successful create. */
 		revealedSecret?: string | null;
 		class?: string;
-		onCreate?: (
-			input: ApiKeyCreateData
-		) => boolean | void | Promise<boolean | void>;
+		onCreate?: (input: ApiKeyCreateData) => boolean | void | Promise<boolean | void>;
 		onDismissSecret?: () => void;
 	}
 
@@ -143,10 +141,10 @@
 				</Drawer.Description>
 			</Drawer.Header>
 			<div class="space-y-4 px-4 pb-6" data-testid="org-api-keys-secret-reveal">
-				<div class="bg-muted/60 rounded-3xl border px-3 py-3">
+				<div class="rounded-3xl border bg-muted/60 px-3 py-3">
 					<button
 						type="button"
-						class="text-foreground block w-full cursor-text break-all text-left font-mono text-sm select-all"
+						class="block w-full cursor-text text-left font-mono text-sm break-all text-foreground select-all"
 						data-testid="org-api-keys-secret-value"
 						title="Click to select"
 						onclick={onSecretClick}
@@ -155,7 +153,7 @@
 					</button>
 				</div>
 				{#if copyError}
-					<p class="text-destructive text-sm" role="alert" data-testid="org-api-keys-copy-error">
+					<p class="text-sm text-destructive" role="alert" data-testid="org-api-keys-copy-error">
 						{copyError}
 					</p>
 				{/if}
@@ -204,7 +202,7 @@
 						data-testid="org-api-keys-name"
 					/>
 					{#if $errors.name}
-						<p class="text-destructive text-xs">{$errors.name}</p>
+						<p class="text-xs text-destructive">{$errors.name}</p>
 					{/if}
 				</div>
 
@@ -233,7 +231,7 @@
 				</div>
 
 				{#if displayError}
-					<p class="text-destructive text-sm" role="alert" data-testid="org-api-keys-create-error">
+					<p class="text-sm text-destructive" role="alert" data-testid="org-api-keys-create-error">
 						{displayError}
 					</p>
 				{/if}

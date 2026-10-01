@@ -44,12 +44,7 @@ export function createDocumentsEndpoints(request: ApiRequestFn): DocumentsEndpoi
 			);
 			return data;
 		},
-		createFolder: async (
-			entityType,
-			entityId,
-			body: ApiDocumentFolderCreateBody,
-			signal
-		) => {
+		createFolder: async (entityType, entityId, body: ApiDocumentFolderCreateBody, signal) => {
 			const { data } = await request<ApiDocumentFolderResult>(
 				entityFoldersPath(entityType, entityId),
 				{
@@ -61,12 +56,7 @@ export function createDocumentsEndpoints(request: ApiRequestFn): DocumentsEndpoi
 			);
 			return data;
 		},
-		updateFolder: async (
-			folderId,
-			body: ApiDocumentFolderPatchBody,
-			version,
-			signal
-		) => {
+		updateFolder: async (folderId, body: ApiDocumentFolderPatchBody, version, signal) => {
 			const { data } = await request<ApiDocumentFolderResult>(
 				`/api/v1/document-folders/${folderId}`,
 				{
@@ -99,12 +89,7 @@ export function createDocumentsEndpoints(request: ApiRequestFn): DocumentsEndpoi
 			);
 			return data;
 		},
-		createUploadIntent: async (
-			entityType,
-			entityId,
-			body: ApiDocumentUploadIntentBody,
-			signal
-		) => {
+		createUploadIntent: async (entityType, entityId, body: ApiDocumentUploadIntentBody, signal) => {
 			const { data } = await request<ApiDocumentUploadIntentResult>(
 				entityDocumentsPath(entityType, entityId, '/upload-intent'),
 				{
@@ -129,8 +114,7 @@ export function createDocumentsEndpoints(request: ApiRequestFn): DocumentsEndpoi
 			return data;
 		},
 		download: async (documentId, options) => {
-			const opts =
-				options instanceof AbortSignal ? { signal: options } : (options ?? {});
+			const opts = options instanceof AbortSignal ? { signal: options } : (options ?? {});
 			const { data } = await request<ApiDocumentDownloadResult>(
 				`/api/v1/documents/${documentId}/download`,
 				{
@@ -173,15 +157,12 @@ export function createDocumentsEndpoints(request: ApiRequestFn): DocumentsEndpoi
 			});
 		},
 		restore: async (documentId, version, signal) => {
-			const { data } = await request<ApiDocumentResult>(
-				`/api/v1/documents/${documentId}/restore`,
-				{
-					method: 'POST',
-					orgScoped: true,
-					ifMatchVersion: version,
-					signal
-				}
-			);
+			const { data } = await request<ApiDocumentResult>(`/api/v1/documents/${documentId}/restore`, {
+				method: 'POST',
+				orgScoped: true,
+				ifMatchVersion: version,
+				signal
+			});
 			return data;
 		}
 	};

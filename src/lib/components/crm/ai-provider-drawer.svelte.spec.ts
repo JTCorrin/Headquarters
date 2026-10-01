@@ -7,12 +7,8 @@ describe('AiProviderConnectDrawer', () => {
 	it('shows the provider title and write-only key hint when open', async () => {
 		render(AiProviderDrawerTestHost, { provider: 'openai' as const });
 		await expect.element(page.getByTestId('ai-provider-connect-drawer')).toBeVisible();
-		await expect
-			.element(page.getByText(/Connect OpenAI/))
-			.toBeVisible();
-		await expect
-			.element(page.getByText(/write-only/i))
-			.toBeVisible();
+		await expect.element(page.getByText(/Connect OpenAI/)).toBeVisible();
+		await expect.element(page.getByText(/write-only/i)).toBeVisible();
 	});
 
 	it('submits the API key and closes on success', async () => {
@@ -25,9 +21,7 @@ describe('AiProviderConnectDrawer', () => {
 		await vi.waitFor(() => {
 			expect(onConnect).toHaveBeenCalledWith('sk-test-123');
 		});
-		await expect
-			.element(page.getByTestId('drawer-open-state'))
-			.toHaveTextContent('false');
+		await expect.element(page.getByTestId('drawer-open-state')).toHaveTextContent('false');
 	});
 
 	it('keeps the drawer visible and shows the fallback error when connect returns false', async () => {
@@ -57,8 +51,6 @@ describe('AiProviderConnectDrawer', () => {
 
 	it('disables submit until a provider is selected', async () => {
 		render(AiProviderDrawerTestHost, { provider: null });
-		await expect
-			.element(page.getByTestId('ai-provider-connect-submit'))
-			.toBeDisabled();
+		await expect.element(page.getByTestId('ai-provider-connect-submit')).toBeDisabled();
 	});
 });
