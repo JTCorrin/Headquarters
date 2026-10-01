@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -18,10 +19,7 @@
 		toQuoteUpdateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiQuoteDocument, ApiTaxRate } from '$lib/api/v1/types.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import { centsToAmountString } from '$lib/money.js';
 	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
@@ -133,12 +131,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Quotes', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -278,8 +274,7 @@
 					if (isStale(epoch)) return;
 					options.push({
 						id: pinned.data.id,
-						label:
-							pinned.data.display_name || pinned.data.primary_email || pinned.data.id,
+						label: pinned.data.display_name || pinned.data.primary_email || pinned.data.id,
 						clientId: pinned.data.client_id ?? null
 					});
 				} catch {
@@ -546,7 +541,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void quoteId;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -603,13 +598,13 @@
 						bind:lines
 						bind:timelineEvents
 						bind:lineDrawerOpen
-						onSaveQuote={onSaveQuote}
-						onAddLine={onAddLine}
-						onRemoveLine={onRemoveLine}
-						onSend={onSend}
-						onReject={onReject}
-						onAccept={onAccept}
-						onConvert={onConvert}
+						{onSaveQuote}
+						{onAddLine}
+						{onRemoveLine}
+						{onSend}
+						{onReject}
+						{onAccept}
+						{onConvert}
 						onDelete={canSend && canMutateCrmRecords(role) ? onDelete : undefined}
 						{onTimelineAdd}
 						showNav={false}
@@ -621,7 +616,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="quote-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening quotes.
 		</p>
 	</div>

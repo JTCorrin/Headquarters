@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { fromStore, get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -137,9 +138,7 @@
 		if (Object.keys(scheduleErrors).length > 0) {
 			scheduleForm.errors.update((current) => ({
 				...current,
-				...Object.fromEntries(
-					Object.entries(scheduleErrors).map(([field, msg]) => [field, msg])
-				)
+				...Object.fromEntries(Object.entries(scheduleErrors).map(([field, msg]) => [field, msg]))
 			}));
 		}
 
@@ -193,22 +192,16 @@
 	const formSnapshot = fromStore(scheduleForm.form);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Recurring', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-	const isEditable = $derived(
-		schedule?.status === 'draft' || schedule?.status === 'paused'
-	);
+	const isEditable = $derived(schedule?.status === 'draft' || schedule?.status === 'paused');
 	const title = $derived(schedule?.name ?? 'Recurring schedule');
-	const statusLabel = $derived(
-		schedule ? recurringInvoiceStatusLabel(schedule.status) : 'Draft'
-	);
+	const statusLabel = $derived(schedule ? recurringInvoiceStatusLabel(schedule.status) : 'Draft');
 	const nextRunAt = $derived(
 		schedule?.next_run_at
 			? new Date(schedule.next_run_at).toLocaleString(undefined, {
@@ -218,7 +211,10 @@
 			: null
 	);
 
-	function fingerprintFrom(form: ReturnType<typeof toRecurringInvoiceFormData>, rowLines: RecurringLineRow[]) {
+	function fingerprintFrom(
+		form: ReturnType<typeof toRecurringInvoiceFormData>,
+		rowLines: RecurringLineRow[]
+	) {
 		return JSON.stringify({ form, lines: rowLines });
 	}
 
@@ -418,10 +414,7 @@
 			if (isStale(epoch)) return false;
 			if (isApiClientError(error) && error.isValidationError && error.fields) {
 				applyApiFieldsToForms(error.fields);
-				actionError = userMessage(
-					error,
-					'Could not save schedule — fix the highlighted fields.'
-				);
+				actionError = userMessage(error, 'Could not save schedule — fix the highlighted fields.');
 				return false;
 			}
 			actionError = userMessage(error, 'Could not save schedule.');
@@ -562,7 +555,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void scheduleId;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 
 	$effect(() => {
@@ -627,12 +620,13 @@
 						onActivate={() =>
 							runLifecycle((v) => api.recurringInvoiceSchedules.activate(scheduleId, v), {
 								requireLines: true
-							})
-						}
+							})}
 						onPause={() => runLifecycle((v) => api.recurringInvoiceSchedules.pause(scheduleId, v))}
-						onResume={() => runLifecycle((v) => api.recurringInvoiceSchedules.resume(scheduleId, v))}
-						onCancel={() => runLifecycle((v) => api.recurringInvoiceSchedules.cancel(scheduleId, v))}
-						onRunNow={onRunNow}
+						onResume={() =>
+							runLifecycle((v) => api.recurringInvoiceSchedules.resume(scheduleId, v))}
+						onCancel={() =>
+							runLifecycle((v) => api.recurringInvoiceSchedules.cancel(scheduleId, v))}
+						{onRunNow}
 						onRetryDelivery={async (runId) => {
 							actionPending = true;
 							actionError = null;
@@ -646,7 +640,7 @@
 								actionPending = false;
 							}
 						}}
-						onDelete={onDelete}
+						{onDelete}
 						onReload={loadAll}
 						showNav={false}
 						class="min-h-0 flex-1"
@@ -657,7 +651,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="recurring-invoice-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening recurring invoices.
 		</p>
 	</div>

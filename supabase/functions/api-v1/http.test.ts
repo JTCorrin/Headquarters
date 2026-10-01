@@ -1569,6 +1569,26 @@ Deno.test('document upload intent validation defaults and rejects bad digests/si
   )
 })
 
+Deno.test('document upload intent only accepts allowlisted business MIME types', () => {
+  const base = { name: 'x', category: 'contract', size_bytes: 10, sha256: 'a'.repeat(64) }
+  assertEquals(
+    validateUploadIntentBody({ ...base, mime_type: 'Application/PDF; charset=binary' })
+      .mime_type,
+    'application/pdf',
+  )
+  for (
+    const mime of [
+      'text/html',
+      'image/svg+xml',
+      'application/xhtml+xml',
+      'application/javascript',
+      '',
+    ]
+  ) {
+    assertThrows(() => validateUploadIntentBody({ ...base, mime_type: mime }), ApiError)
+  }
+})
+
 Deno.test('document folder create validation trims name and allows null parent', () => {
   const ok = validateFolderCreateBody({ name: ' Contracts ', parent_id: null })
   assertEquals(ok.name, 'Contracts')

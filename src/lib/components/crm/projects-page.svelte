@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -64,12 +65,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Projects', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -140,13 +139,14 @@
 			]);
 			if (isStale(epoch)) return;
 
-			rows = listed.data
-				.filter((p) => p.status !== 'archived')
-				.map(toProjectListItem);
+			rows = listed.data.filter((p) => p.status !== 'archived').map(toProjectListItem);
 			clients = clientRows.data.map((c) => ({ id: c.id, name: c.name }));
 			viewState =
 				rows.length === 0
-					? { kind: 'empty', message: 'No projects yet — create an internal project or attach one to a client.' }
+					? {
+							kind: 'empty',
+							message: 'No projects yet — create an internal project or attach one to a client.'
+						}
 					: { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -200,9 +200,7 @@
 				existing.version
 			);
 			if (isStale(epoch)) return;
-			rows = rows.map((row) =>
-				row.id === move.id ? toProjectListItem(updated) : row
-			);
+			rows = rows.map((row) => (row.id === move.id ? toProjectListItem(updated) : row));
 		} catch (error) {
 			if (isStale(epoch)) return;
 			rows = previous;
@@ -248,7 +246,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -279,7 +277,7 @@
 					{clients}
 					form={projectForm}
 					bind:drawerOpen
-					onSelectProject={onSelectProject}
+					{onSelectProject}
 					{onMoveProject}
 					onValidSubmit={onCreateProject}
 					showNav={false}
@@ -290,7 +288,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="projects-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening projects.
 		</p>
 	</div>

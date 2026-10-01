@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -19,16 +20,16 @@
 		toTaskListItem,
 		toTaskUpdateBody
 	} from '$lib/api/v1/mappers.js';
-	import type { ApiOrganisationMembership, ApiOrgMember, ApiTaskEntityType } from '$lib/api/v1/types.js';
+	import type {
+		ApiOrganisationMembership,
+		ApiOrgMember,
+		ApiTaskEntityType
+	} from '$lib/api/v1/types.js';
 	import type { EntityListFilter } from '$lib/crm/entity-list-filter.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import {
-		taskFormSchema,
-		type TaskAssigneeOption,
-		type TaskListItem
-	} from '$lib/schemas/task.js';
+	import { taskFormSchema, type TaskAssigneeOption, type TaskListItem } from '$lib/schemas/task.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import TasksListPage, { type TasksViewMode } from './tasks-list-page.svelte';
@@ -89,12 +90,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Tasks', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -323,7 +322,8 @@
 			tasks = tasks.map((row) =>
 				row.id === taskId ? toTaskListItem(updated, listItemOptions()) : row
 			);
-			viewState = tasks.length === 0 ? { kind: 'empty', message: 'No tasks yet.' } : { kind: 'ready' };
+			viewState =
+				tasks.length === 0 ? { kind: 'empty', message: 'No tasks yet.' } : { kind: 'ready' };
 		} catch (error) {
 			if (isStale(epoch)) return;
 			if (isApiClientError(error) && error.isPreconditionFailed) {
@@ -438,7 +438,7 @@
 		void session.cacheGeneration;
 		void entityFilter?.entity_type;
 		void entityFilter?.entity_id;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -492,7 +492,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="tasks-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening tasks.
 		</p>
 	</div>

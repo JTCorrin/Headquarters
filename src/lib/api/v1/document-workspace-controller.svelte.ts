@@ -8,6 +8,11 @@ import type {
 	EntityDocumentsProps
 } from '$lib/components/crm/entity-documents.svelte';
 import { digestBytesToHex, sha256HexSync } from '$lib/crypto/sha256-hex.js';
+import {
+	isInlinePreviewMimeType,
+	resolveDocumentMimeType,
+	UNSUPPORTED_DOCUMENT_TYPE_MESSAGE
+} from '$lib/crm/document-mime.js';
 import type { ApiV1Client } from './client.js';
 import { isApiClientError } from './errors.js';
 import type {
@@ -37,9 +42,7 @@ export type DocumentPreviewState = {
 
 /** True when Preview should open an in-app lightbox instead of a new tab. */
 export function isInlineDocumentPreview(mimeType: string | null | undefined): boolean {
-	if (!mimeType) return false;
-	const mime = mimeType.toLowerCase().split(';')[0]?.trim() ?? '';
-	return mime.startsWith('image/') || mime === 'application/pdf';
+	return isInlinePreviewMimeType(mimeType);
 }
 
 export interface DocumentWorkspaceControllerOptions {
@@ -280,10 +283,7 @@ export function createDocumentWorkspaceController(
 		}
 
 		const meta = metaById.get(nextFolderId);
-		breadcrumbs = [
-			...breadcrumbs,
-			{ id: nextFolderId, name: meta?.name ?? 'Folder' }
-		];
+		breadcrumbs = [...breadcrumbs, { id: nextFolderId, name: meta?.name ?? 'Folder' }];
 		folderId = nextFolderId;
 		await load(nextFolderId);
 	}
@@ -291,13 +291,14 @@ export function createDocumentWorkspaceController(
 	async function putSignedUpload(
 		signedUrl: string,
 		file: File,
+		mimeType: string,
 		signal: AbortSignal
 	): Promise<void> {
 		const response = await uploadFetch(signedUrl, {
 			method: 'PUT',
 			body: file,
 			headers: {
-				'Content-Type': file.type || 'application/octet-stream'
+				'Content-Type': mimeType
 			},
 			signal
 		});
@@ -310,6 +311,15 @@ export function createDocumentWorkspaceController(
 		const pending = pendingByUploadId.get(uploadId);
 		if (!pending) return;
 		const { file, controller } = pending;
+
+		const mimeType = resolveDocumentMimeType(file);
+		if (!mimeType) {
+			patchUpload(uploadId, {
+				status: 'failed',
+				errorMessage: UNSUPPORTED_DOCUMENT_TYPE_MESSAGE
+			});
+			return;
+		}
 
 		patchUpload(uploadId, {
 			status: 'uploading',
@@ -329,7 +339,7 @@ export function createDocumentWorkspaceController(
 				{
 					name: file.name.slice(0, 160) || 'upload',
 					category: defaultCategory,
-					mime_type: file.type || 'application/octet-stream',
+					mime_type: mimeType,
 					size_bytes: file.size,
 					sha256: digest,
 					folder_id: folderId
@@ -338,7 +348,7 @@ export function createDocumentWorkspaceController(
 			);
 			patchUpload(uploadId, { progress: 40 });
 
-			await putSignedUpload(intent.upload.signed_url, file, controller.signal);
+			await putSignedUpload(intent.upload.signed_url, file, mimeType, controller.signal);
 			patchUpload(uploadId, { progress: 80 });
 
 			await docs.finalize(
@@ -490,10 +500,7 @@ export function createDocumentWorkspaceController(
 		const meta = metaById.get(id);
 		if (!meta || meta.kind !== 'file') return;
 		try {
-			const result = await docs.download(
-				id,
-				mode === 'preview' ? { inline: true } : undefined
-			);
+			const result = await docs.download(id, mode === 'preview' ? { inline: true } : undefined);
 			if (mode === 'download') {
 				if (typeof document !== 'undefined') {
 					const anchor = document.createElement('a');

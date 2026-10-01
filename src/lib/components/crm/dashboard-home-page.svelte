@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -23,11 +24,7 @@
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import {
-		taskFormSchema,
-		type TaskAssigneeOption,
-		type TaskListItem
-	} from '$lib/schemas/task.js';
+	import { taskFormSchema, type TaskAssigneeOption, type TaskListItem } from '$lib/schemas/task.js';
 	import type { MeetingListItem } from '$lib/schemas/meeting.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
@@ -91,12 +88,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Dashboard', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -364,7 +359,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -416,7 +411,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="dashboard-home-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening the dashboard.
 		</p>
 	</div>

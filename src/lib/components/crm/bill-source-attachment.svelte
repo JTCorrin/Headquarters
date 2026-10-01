@@ -52,7 +52,7 @@
 
 <section
 	class={cn(
-		'bg-card space-y-3 rounded-3xl p-5 ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'space-y-3 rounded-3xl bg-card p-5 ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 	data-testid="bill-source-attachment"
@@ -60,15 +60,13 @@
 	<div class="flex items-start justify-between gap-3">
 		<div class="min-w-0">
 			<h2 class="text-sm font-semibold tracking-tight">Source document</h2>
-			<p class="text-muted-foreground text-xs">
-				Vendor PDF or image linked to this bill.
-			</p>
+			<p class="text-xs text-muted-foreground">Vendor PDF or image linked to this bill.</p>
 		</div>
 		{#if canEdit && !attachment}
 			<input
 				bind:this={fileInput}
 				type="file"
-				accept="application/pdf,image/*"
+				accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
 				class="sr-only"
 				data-testid="bill-source-file-input"
 				onchange={onFileChange}
@@ -93,21 +91,21 @@
 	</div>
 
 	{#if errorMessage}
-		<p class="text-destructive text-xs" role="alert" data-testid="bill-source-error">
+		<p class="text-xs text-destructive" role="alert" data-testid="bill-source-error">
 			{errorMessage}
 		</p>
 	{/if}
 
 	{#if attachment}
 		<div
-			class="bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-3 py-2.5"
+			class="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted/40 px-3 py-2.5"
 			data-testid="bill-source-meta"
 		>
 			<div class="min-w-0">
 				<p class="truncate text-sm font-medium" data-testid="bill-source-name">
 					{attachment.name}
 				</p>
-				<p class="text-muted-foreground text-xs" data-testid="bill-source-size">
+				<p class="text-xs text-muted-foreground" data-testid="bill-source-size">
 					{formatBillSourceAttachmentSize(attachment.sizeBytes)}
 					{#if attachment.mimeType}
 						· {attachment.mimeType}
@@ -130,7 +128,7 @@
 					<input
 						bind:this={fileInput}
 						type="file"
-						accept="application/pdf,image/*"
+						accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
 						class="sr-only"
 						data-testid="bill-source-file-input"
 						onchange={onFileChange}
@@ -160,18 +158,14 @@
 			</div>
 		</div>
 	{:else if !canEdit}
-		<p class="text-muted-foreground text-sm" data-testid="bill-source-empty">
+		<p class="text-sm text-muted-foreground" data-testid="bill-source-empty">
 			No source document attached.
 		</p>
 	{:else}
-		<p class="text-muted-foreground text-sm" data-testid="bill-source-empty">
+		<p class="text-sm text-muted-foreground" data-testid="bill-source-empty">
 			Upload the vendor invoice or receipt PDF/image.
 		</p>
 	{/if}
 </section>
 
-<DocumentFilePreview
-	{preview}
-	onClose={onClosePreview}
-	onDownload={onDownloadPreview}
-/>
+<DocumentFilePreview {preview} onClose={onClosePreview} onDownload={onDownloadPreview} />

@@ -24,7 +24,7 @@ async function putSignedUpload(
 		method: 'PUT',
 		body: file,
 		headers: {
-			'Content-Type': file.type || 'application/octet-stream'
+			'Content-Type': 'text/vtt'
 		},
 		signal
 	});
@@ -53,7 +53,7 @@ export async function uploadMeetingTranscriptDocument(
 		{
 			name: file.name.slice(0, 160) || 'meeting-transcript.vtt',
 			category: 'transcript',
-			mime_type: file.type || 'text/vtt',
+			mime_type: 'text/vtt',
 			size_bytes: file.size,
 			sha256: digest,
 			folder_id: null
@@ -92,9 +92,7 @@ export async function attachMeetingTranscriptFile(
 		meeting.id,
 		{
 			document_id: document.id,
-			...(plainText
-				? { plain_text: plainText, status: 'ready' as const }
-				: {})
+			...(plainText ? { plain_text: plainText, status: 'ready' as const } : {})
 		},
 		meeting.version,
 		options.signal

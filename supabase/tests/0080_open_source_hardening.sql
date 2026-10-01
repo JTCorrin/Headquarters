@@ -1,6 +1,6 @@
 begin;
 
-select plan(15);
+select plan(16);
 
 -- Grants
 select ok(
@@ -231,6 +231,14 @@ select is(
   public.read_mailbox_sync_credentials((select mailbox_id from _osh_fixture)) ->> 'email_address',
   'osh-mail@example.test',
   'service_role can read credentials without an org scope'
+);
+
+select ok(
+  (select 'application/pdf' = any (allowed_mime_types)
+      and not ('text/html' = any (allowed_mime_types))
+      and not ('image/svg+xml' = any (allowed_mime_types))
+   from storage.buckets where id = 'org-documents'),
+  'org-documents bucket allows business files but not HTML/SVG'
 );
 
 select * from finish();

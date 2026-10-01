@@ -21,6 +21,10 @@ Thumbs.db
 # Local stack state (dev-up.sh)
 .local/
 
+# Private local-network CI / staging deploy (not part of the public repo)
+/.forgejo/
+/scripts/staging-remote-deploy.sh
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*

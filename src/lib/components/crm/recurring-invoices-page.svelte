@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { fromStore, get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -71,12 +72,10 @@
 	const formSnapshot = fromStore(scheduleForm.form);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Recurring', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -227,10 +226,7 @@
 				toRecurringInvoiceCreateBody(form, [])
 			);
 			if (isStale(epoch)) return false;
-			rows = [
-				toRecurringInvoiceListItem(created, form.clientName ?? ''),
-				...rows
-			];
+			rows = [toRecurringInvoiceListItem(created, form.clientName ?? ''), ...rows];
 			viewState = { kind: 'ready' };
 			resetCreateForm();
 			drawerOpen = false;
@@ -275,7 +271,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 
 	$effect(() => {
@@ -324,7 +320,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="recurring-invoices-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening recurring invoices.
 		</p>
 	</div>

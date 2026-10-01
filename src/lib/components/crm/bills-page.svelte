@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -16,11 +17,7 @@
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import {
-		billFormSchema,
-		type BillListItem,
-		type BillVendorOption
-	} from '$lib/schemas/bill.js';
+	import { billFormSchema, type BillListItem, type BillVendorOption } from '$lib/schemas/bill.js';
 	import { vendorFormSchema } from '$lib/schemas/vendor.js';
 	import { looksLikeVendorId } from '$lib/crm/entity-list-filter.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -97,24 +94,19 @@
 		}
 	);
 
-	const vendorForm = superForm(
-		defaults({ name: '' }, zod4(vendorFormSchema)),
-		{
-			validators: zod4(vendorFormSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
+	const vendorForm = superForm(defaults({ name: '' }, zod4(vendorFormSchema)), {
+		validators: zod4(vendorFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Bills', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -124,7 +116,6 @@
 		const name = vendorOptions.find((v) => v.id === activeVendorId)?.name;
 		return name ? `Filtered by vendor: ${name}` : 'Filtered by vendor';
 	});
-
 
 	interface RequestEpoch {
 		orgId: string | null;
@@ -328,7 +319,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void activeVendorId;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -357,16 +348,14 @@
 					{navGroups}
 					{rows}
 					form={billForm}
-					vendorForm={vendorForm}
+					{vendorForm}
 					{vendorOptions}
 					selectedVendorId={activeVendorId}
 					filterLabel={vendorFilterLabel}
-					onVendorFilterChange={onVendorFilterChange}
-					onClearFilter={
-						activeVendorId && onVendorFilterChange
-							? () => onVendorFilterChange(null)
-							: undefined
-					}
+					{onVendorFilterChange}
+					onClearFilter={activeVendorId && onVendorFilterChange
+						? () => onVendorFilterChange(null)
+						: undefined}
 					bind:drawerOpen
 					bind:vendorDrawerOpen
 					onValidSubmit={onCreateBill}
@@ -379,7 +368,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="bills-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening bills.
 		</p>
 	</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
@@ -22,10 +23,7 @@
 		type AiPromptKey,
 		type AiProvider
 	} from '$lib/schemas/integration.js';
-	import {
-		canAccessOrgConfigRoutes,
-		type MembershipRole
-	} from '$lib/schemas/organisation.js';
+	import { canAccessOrgConfigRoutes, type MembershipRole } from '$lib/schemas/organisation.js';
 	import {
 		emptyOrgInvoiceEmailFormData,
 		orgInvoiceEmailFormFromResource,
@@ -83,12 +81,10 @@
 	);
 
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const navGroups = $derived(appNavGroups('Integrations', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -115,7 +111,6 @@
 	function isStale(epoch: RequestEpoch): boolean {
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
 	}
-
 
 	function toOrgInvoiceEmailAccountResource(
 		account: ApiOrgInvoiceEmailAccount
@@ -172,9 +167,7 @@
 			modelCatalogs = { ...modelCatalogs, [provider]: models };
 			if (bundle.selected_model) {
 				integrations = integrations.map((item) =>
-					item.provider === provider
-						? { ...item, selected_model: bundle.selected_model }
-						: item
+					item.provider === provider ? { ...item, selected_model: bundle.selected_model } : item
 				);
 			}
 			return models;
@@ -250,9 +243,7 @@
 			promptDefaults = { ...DEFAULT_AI_PROMPTS, ...promptBundle.defaults };
 			prompts = { ...promptDefaults, ...promptBundle.effective };
 			promptsError = null;
-			invoiceEmailAccount = invoiceEmail
-				? toOrgInvoiceEmailAccountResource(invoiceEmail)
-				: null;
+			invoiceEmailAccount = invoiceEmail ? toOrgInvoiceEmailAccountResource(invoiceEmail) : null;
 			applyInvoiceEmailFormFromServer(invoiceEmailAccount);
 			viewState = { kind: 'ready' };
 			void loadConnectedModelCatalogs(integrations, epoch);
@@ -287,9 +278,7 @@
 				return false;
 			}
 			const resource = toAiIntegrationResource(updated);
-			integrations = integrations.map((item) =>
-				item.provider === provider ? resource : item
-			);
+			integrations = integrations.map((item) => (item.provider === provider ? resource : item));
 			void refreshModelsFor(provider, epoch);
 			return true;
 		} catch (error) {
@@ -349,9 +338,7 @@
 				return false;
 			}
 			const resource = toAiIntegrationResource(updated);
-			integrations = integrations.map((item) =>
-				item.provider === provider ? resource : item
-			);
+			integrations = integrations.map((item) => (item.provider === provider ? resource : item));
 			return true;
 		} catch (error) {
 			if (isStale(epoch)) {
@@ -363,9 +350,7 @@
 		}
 	}
 
-	async function onSavePrompts(
-		next: Record<AiPromptKey, string>
-	): Promise<boolean> {
+	async function onSavePrompts(next: Record<AiPromptKey, string>): Promise<boolean> {
 		const epoch = captureEpoch();
 		promptsBusy = true;
 		promptsError = null;
@@ -486,7 +471,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -505,7 +490,7 @@
 		>
 			{#if !canAccessOrgConfigRoutes(role)}
 				<div class="space-y-3 p-6" data-testid="org-integrations-forbidden">
-					<p class="text-destructive text-sm" role="alert">
+					<p class="text-sm text-destructive" role="alert">
 						Organisation Integrations are available to Owners only.
 					</p>
 					<a class="text-sm font-medium underline underline-offset-2" href={resolve('/settings')}
@@ -544,7 +529,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="org-integrations-controller">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening integrations.
 		</p>
 	</div>

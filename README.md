@@ -161,8 +161,6 @@ pnpm start                      # node build/index.js
 
 Public settings are read at runtime (`$env/dynamic/*`), so the same build can be promoted between environments. `ORIGIN` is required for SvelteKit's form-action CSRF check; behind a reverse proxy you can use `PROTOCOL_HEADER` / `HOST_HEADER` instead (see the [adapter-node docs](https://svelte.dev/docs/kit/adapter-node)). `node build/index.js` does not load `.env` itself; use your process manager's environment or `node --env-file=.env build/index.js`.
 
-`scripts/staging-remote-deploy.sh` and `.forgejo/workflows/staging-deploy.yml` show a single-host staging setup (local Supabase stack plus `vite preview` and crontab schedulers). It is meant for a private staging box, not production.
-
 ## Contributing and security
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).

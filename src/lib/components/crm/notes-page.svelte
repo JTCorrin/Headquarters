@@ -280,7 +280,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void activeQuery;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 

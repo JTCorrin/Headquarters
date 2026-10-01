@@ -11,6 +11,7 @@
 --    DELETE/TRUNCATE/REFERENCES/TRIGGER privileges legacy default ACLs may grant
 --    (TRUNCATE bypasses RLS). No DELETE policies exist on these tables.
 -- 6. Indexes for composite tenant FKs used by entity detail lookups and cascades.
+-- 7. org-documents bucket accepts business file types only (no HTML/SVG).
 
 -- ---------------------------------------------------------------------------
 -- 1. Credential read: unscoped path is service_role only
@@ -337,3 +338,39 @@ create index if not exists document_links_org_folder_idx
 create index if not exists document_folders_org_parent_idx
   on public.document_folders (org_id, parent_id)
   where parent_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- 7. org-documents: business file types only
+-- ---------------------------------------------------------------------------
+-- Uploads go straight to Storage via signed URL with a client-chosen
+-- Content-Type, and signed downloads are served from the storage origin, so the
+-- bucket itself must refuse HTML/SVG/script types. Keep in sync with
+-- ALLOWED_DOCUMENT_MIME_TYPES in supabase/functions/api-v1/documents.ts and
+-- src/lib/crm/document-mime.ts. Existing objects are unaffected.
+
+update storage.buckets
+set allowed_mime_types = array[
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'text/plain',
+  'text/csv',
+  'text/vtt',
+  'application/rtf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.presentation',
+  'message/rfc822',
+  'application/vnd.ms-outlook'
+]
+where id = 'org-documents';

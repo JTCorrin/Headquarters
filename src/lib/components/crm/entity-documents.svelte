@@ -9,6 +9,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { cn } from '$lib/utils.js';
+	import { DOCUMENT_ACCEPT } from '$lib/crm/document-mime.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FolderIcon from '@lucide/svelte/icons/folder';
@@ -77,12 +78,7 @@
 
 	export type DocumentViewMode = 'list' | 'grid';
 
-	export type DocumentUploadStatus =
-		| 'queued'
-		| 'uploading'
-		| 'failed'
-		| 'complete'
-		| 'cancelled';
+	export type DocumentUploadStatus = 'queued' | 'uploading' | 'failed' | 'complete' | 'cancelled';
 
 	export interface DocumentUploadItem {
 		id: string;
@@ -258,7 +254,7 @@
 
 <section
 	class={cn(
-		'bg-card flex min-h-0 flex-col overflow-hidden rounded-3xl ring-1 ring-foreground/5 dark:ring-foreground/10',
+		'flex min-h-0 flex-col overflow-hidden rounded-3xl bg-card ring-1 ring-foreground/5 dark:ring-foreground/10',
 		className
 	)}
 	data-testid="entity-documents"
@@ -268,7 +264,7 @@
 		<div class="min-w-0">
 			<p class="text-sm font-semibold tracking-tight">{title}</p>
 			{#if resolvedView.kind === 'ready'}
-				<p class="text-muted-foreground text-xs">
+				<p class="text-xs text-muted-foreground">
 					{entries.length} item{entries.length === 1 ? '' : 's'}
 				</p>
 			{/if}
@@ -276,7 +272,7 @@
 		<div class="flex flex-wrap items-center gap-2">
 			{#if workspaceEnabled}
 				<div
-					class="bg-muted/60 flex rounded-xl p-0.5 ring-1 ring-foreground/5"
+					class="flex rounded-xl bg-muted/60 p-0.5 ring-1 ring-foreground/5"
 					role="group"
 					aria-label="View mode"
 				>
@@ -326,6 +322,7 @@
 						bind:this={fileInput}
 						type="file"
 						class="sr-only"
+						accept={DOCUMENT_ACCEPT}
 						multiple
 						data-testid="documents-file-input"
 						onchange={onFilesSelected}
@@ -355,16 +352,21 @@
 				{#each breadcrumbs as crumb, index (crumb.id ?? 'root')}
 					<li class="flex items-center gap-1">
 						{#if index > 0}
-							<ChevronRightIcon class="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
+							<ChevronRightIcon
+								class="size-3.5 shrink-0 text-muted-foreground"
+								aria-hidden="true"
+							/>
 						{/if}
 						{#if index === breadcrumbs.length - 1}
-							<span class="font-medium" aria-current="page" data-testid="documents-breadcrumb-current"
-								>{crumb.name}</span
+							<span
+								class="font-medium"
+								aria-current="page"
+								data-testid="documents-breadcrumb-current">{crumb.name}</span
 							>
 						{:else}
 							<button
 								type="button"
-								class="text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+								class="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 								data-testid={`documents-breadcrumb-${crumb.id ?? 'root'}`}
 								onclick={() => onNavigate?.(crumb.id)}
 							>
@@ -378,28 +380,32 @@
 	{/if}
 
 	{#if uploads.length > 0}
-		<div class="shrink-0 border-t px-4 py-3" data-testid="documents-upload-queue" aria-live="polite">
+		<div
+			class="shrink-0 border-t px-4 py-3"
+			data-testid="documents-upload-queue"
+			aria-live="polite"
+		>
 			<p class="mb-2 text-xs font-medium tracking-tight">Uploads</p>
 			<ul class="m-0 list-none space-y-2 p-0">
 				{#each uploads as upload (upload.id)}
 					<li
-						class="bg-muted/40 flex items-center gap-3 rounded-2xl px-3 py-2 ring-1 ring-foreground/5"
+						class="flex items-center gap-3 rounded-2xl bg-muted/40 px-3 py-2 ring-1 ring-foreground/5"
 						data-testid={`documents-upload-${upload.id}`}
 					>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-medium">{upload.fileName}</p>
 							{#if upload.status === 'failed'}
-								<p class="text-destructive mt-0.5 text-xs">
+								<p class="mt-0.5 text-xs text-destructive">
 									{upload.errorMessage ?? 'Upload failed'}
 								</p>
 							{:else if upload.status === 'cancelled'}
-								<p class="text-muted-foreground mt-0.5 text-xs">Cancelled</p>
+								<p class="mt-0.5 text-xs text-muted-foreground">Cancelled</p>
 							{:else if upload.status === 'complete'}
-								<p class="text-muted-foreground mt-0.5 text-xs">Complete</p>
+								<p class="mt-0.5 text-xs text-muted-foreground">Complete</p>
 							{:else}
-								<div class="bg-muted mt-1.5 h-1.5 overflow-hidden rounded-full">
+								<div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
 									<div
-										class="bg-primary h-full transition-[width]"
+										class="h-full bg-primary transition-[width]"
 										style={`width: ${Math.max(0, Math.min(100, upload.progress))}%`}
 										data-testid={`documents-upload-progress-${upload.id}`}
 									></div>
@@ -437,25 +443,29 @@
 
 	{#if resolvedView.kind === 'loading'}
 		<div
-			class="text-muted-foreground border-t px-4 py-10 text-center text-sm"
+			class="border-t px-4 py-10 text-center text-sm text-muted-foreground"
 			role="status"
 			data-testid="documents-loading"
 		>
 			Loading documents…
 		</div>
 	{:else if resolvedView.kind === 'error'}
-		<div
-			class="border-t px-4 py-8 text-center"
-			role="alert"
-			data-testid="documents-error"
-		>
-			<div class="text-destructive mx-auto mb-2 flex size-10 items-center justify-center rounded-2xl bg-destructive/10">
+		<div class="border-t px-4 py-8 text-center" role="alert" data-testid="documents-error">
+			<div
+				class="mx-auto mb-2 flex size-10 items-center justify-center rounded-2xl bg-destructive/10 text-destructive"
+			>
 				<AlertCircleIcon class="size-5" />
 			</div>
 			<p class="text-sm font-medium">{resolvedView.message}</p>
 			{#if onRetryView}
 				<div class="mt-3">
-					<Button type="button" size="sm" variant="outline" data-testid="documents-retry" onclick={onRetryView}>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						data-testid="documents-retry"
+						onclick={onRetryView}
+					>
 						Retry
 					</Button>
 				</div>
@@ -463,7 +473,7 @@
 		</div>
 	{:else if isEmpty}
 		<p
-			class="text-muted-foreground border-t px-4 py-8 text-center text-sm"
+			class="border-t px-4 py-8 text-center text-sm text-muted-foreground"
 			data-testid="documents-empty"
 		>
 			{emptyMessage}
@@ -477,22 +487,22 @@
 				<li>
 					<div
 						class={cn(
-							'hover:bg-muted/40 group flex h-full flex-col rounded-2xl p-3 ring-1 ring-foreground/5',
+							'group flex h-full flex-col rounded-2xl p-3 ring-1 ring-foreground/5 hover:bg-muted/40',
 							entry.kind === 'folder' && 'cursor-pointer'
 						)}
 						data-testid={`documents-entry-${entry.id}`}
 					>
-					<button
-						type="button"
-						class="flex min-h-0 flex-1 flex-col items-start gap-2 text-left"
-						data-testid={`documents-open-${entry.id}`}
-						onclick={() => {
-							if (entry.kind === 'folder') onNavigate?.(entry.id);
-							else onPreview?.(entry.id);
-						}}
-					>
+						<button
+							type="button"
+							class="flex min-h-0 flex-1 flex-col items-start gap-2 text-left"
+							data-testid={`documents-open-${entry.id}`}
+							onclick={() => {
+								if (entry.kind === 'folder') onNavigate?.(entry.id);
+								else onPreview?.(entry.id);
+							}}
+						>
 							<div
-								class="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-xl"
+								class="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground"
 							>
 								{#if entry.kind === 'folder'}
 									<FolderIcon class="size-5" />
@@ -501,7 +511,7 @@
 								{/if}
 							</div>
 							<p class="line-clamp-2 w-full text-sm font-medium">{entry.name}</p>
-							<p class="text-muted-foreground text-xs">{entryMeta(entry)}</p>
+							<p class="text-xs text-muted-foreground">{entryMeta(entry)}</p>
 						</button>
 						{#if entry.kind === 'file' && entry.category}
 							<div class="mt-2">
@@ -522,7 +532,7 @@
 		>
 			{#each entries as entry (entry.id)}
 				<li
-					class="hover:bg-muted/40 flex items-start gap-3 border-t px-4 py-3 first:border-t-0"
+					class="flex items-start gap-3 border-t px-4 py-3 first:border-t-0 hover:bg-muted/40"
 					data-testid={`documents-entry-${entry.id}`}
 				>
 					<button
@@ -535,7 +545,7 @@
 						}}
 					>
 						<div
-							class="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl"
+							class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
 						>
 							{#if entry.kind === 'folder'}
 								<FolderIcon class="size-4" />
@@ -545,7 +555,7 @@
 						</div>
 						<div class="min-w-0 flex-1">
 							<p class="truncate text-sm font-medium">{entry.name}</p>
-							<p class="text-muted-foreground mt-0.5 text-xs">{entryMeta(entry)}</p>
+							<p class="mt-0.5 text-xs text-muted-foreground">{entryMeta(entry)}</p>
 						</div>
 					</button>
 					{#if entry.kind === 'file' && entry.category}
@@ -635,7 +645,11 @@
 {/snippet}
 
 <Sheet.Root bind:open={createFolderOpen}>
-	<Sheet.Content side="bottom" class="mx-auto w-full max-w-md" data-testid="documents-create-folder-sheet">
+	<Sheet.Content
+		side="bottom"
+		class="mx-auto w-full max-w-md"
+		data-testid="documents-create-folder-sheet"
+	>
 		<Sheet.Header>
 			<Sheet.Title>New folder</Sheet.Title>
 			<Sheet.Description>Create a folder in the current location.</Sheet.Description>
@@ -656,7 +670,12 @@
 					}}
 				/>
 			</div>
-			<Button type="button" class="w-full" data-testid="documents-folder-submit" onclick={submitCreateFolder}>
+			<Button
+				type="button"
+				class="w-full"
+				data-testid="documents-folder-submit"
+				onclick={submitCreateFolder}
+			>
 				Create folder
 			</Button>
 		</div>
@@ -684,7 +703,12 @@
 					}}
 				/>
 			</div>
-			<Button type="button" class="w-full" data-testid="documents-rename-submit" onclick={submitRename}>
+			<Button
+				type="button"
+				class="w-full"
+				data-testid="documents-rename-submit"
+				onclick={submitRename}
+			>
 				Save name
 			</Button>
 		</div>
@@ -699,7 +723,7 @@
 		</Sheet.Header>
 		<div class="space-y-3 px-4 pb-4">
 			{#if moveTargets.length === 0}
-				<p class="text-muted-foreground text-sm">No move destinations available.</p>
+				<p class="text-sm text-muted-foreground">No move destinations available.</p>
 			{:else}
 				<ul class="m-0 list-none space-y-1 p-0" role="listbox" aria-label="Move destinations">
 					{#each moveTargets as target (target.id ?? 'root')}
@@ -707,7 +731,7 @@
 							<button
 								type="button"
 								class={cn(
-									'hover:bg-muted/60 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm ring-1 ring-transparent',
+									'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm ring-1 ring-transparent hover:bg-muted/60',
 									moveTargetId === target.id && 'bg-muted ring-foreground/10'
 								)}
 								role="option"
@@ -717,13 +741,18 @@
 									moveTargetId = target.id;
 								}}
 							>
-								<FolderIcon class="text-muted-foreground size-4" />
+								<FolderIcon class="size-4 text-muted-foreground" />
 								{target.name}
 							</button>
 						</li>
 					{/each}
 				</ul>
-				<Button type="button" class="w-full" data-testid="documents-move-submit" onclick={submitMove}>
+				<Button
+					type="button"
+					class="w-full"
+					data-testid="documents-move-submit"
+					onclick={submitMove}
+				>
 					Move here
 				</Button>
 			{/if}

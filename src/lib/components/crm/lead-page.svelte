@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -479,7 +480,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void leadId;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 

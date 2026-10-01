@@ -25,6 +25,46 @@ const MAX_UPLOAD_BYTES = 52_428_800
 const SIGNED_UPLOAD_SECONDS = 3600
 const SIGNED_DOWNLOAD_SECONDS = 300
 
+// Must match src/lib/crm/document-mime.ts and the `org-documents` bucket
+// allowed_mime_types (migration 20261001100000_open_source_hardening.sql).
+export const ALLOWED_DOCUMENT_MIME_TYPES: ReadonlySet<string> = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'text/plain',
+  'text/csv',
+  'text/vtt',
+  'application/rtf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.presentation',
+  'message/rfc822',
+  'application/vnd.ms-outlook',
+])
+
+// Signed URLs are served from the storage origin; only these render inline.
+const INLINE_DOCUMENT_MIME_TYPES: ReadonlySet<string> = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+])
+
+function normalizeMimeType(value: string): string {
+  return value.toLowerCase().split(';')[0]?.trim() ?? ''
+}
+
 type DatabaseClient = SupabaseClient<Database>
 type MembershipRole = Database['public']['Tables']['memberships']['Row']['role']
 
@@ -166,8 +206,10 @@ export function validateUploadIntentBody(
   const category = typeof body.category === 'string' ? body.category : ''
   if (!CATEGORIES.has(category)) fields.category = 'Must be a valid category'
 
-  const mimeType = typeof body.mime_type === 'string' ? body.mime_type.trim() : ''
-  if (!mimeType || mimeType.length > 255) fields.mime_type = 'Must be a MIME type'
+  const mimeType = typeof body.mime_type === 'string' ? normalizeMimeType(body.mime_type) : ''
+  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(mimeType)) {
+    fields.mime_type = 'Unsupported file type'
+  }
 
   const sizeBytes = body.size_bytes
   if (
@@ -419,7 +461,8 @@ async function downloadDocument(
   // Preview embeds the signed URL in <img>/<iframe>. Forcing Content-Disposition:
   // attachment (via `download: name`) makes browsers download instead of render —
   // PDFs can enter an unrecoverable download loop. Inline omits that option.
-  const inline = wantsInlineDocumentDownload(req)
+  const inline = wantsInlineDocumentDownload(req) &&
+    INLINE_DOCUMENT_MIME_TYPES.has(normalizeMimeType(doc.mime_type ?? ''))
   const admin = serviceRoleClient()
   const signedResult = inline
     ? await admin.storage

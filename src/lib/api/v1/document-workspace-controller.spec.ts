@@ -90,9 +90,7 @@ describe('document workspace helpers', () => {
 		const bytes = new TextEncoder().encode('hello');
 		const digest = await sha256Hex(bytes.buffer);
 		expect(digest).toMatch(/^[a-f0-9]{64}$/);
-		expect(digest).toBe(
-			'2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
-		);
+		expect(digest).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
 	});
 
 	it('hashes via pure-JS when crypto.subtle is undefined', async () => {
@@ -106,9 +104,7 @@ describe('document workspace helpers', () => {
 		try {
 			const digest = await sha256Hex(bytes.buffer);
 			expect(digest).toBe(expected);
-			expect(digest).toBe(
-				'2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'
-			);
+			expect(digest).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
 		} finally {
 			Object.defineProperty(globalThis, 'crypto', {
 				configurable: true,
@@ -126,9 +122,7 @@ describe('document workspace helpers', () => {
 	});
 
 	it('maps browse payload onto DocumentWorkspace view models', () => {
-		const mapped = mapBrowseToWorkspaceView(sampleBrowse, [
-			{ id: null, name: 'Documents' }
-		]);
+		const mapped = mapBrowseToWorkspaceView(sampleBrowse, [{ id: null, name: 'Documents' }]);
 		expect(mapped.view.kind).toBe('ready');
 		if (mapped.view.kind !== 'ready') return;
 		expect(mapped.view.entries).toHaveLength(2);
@@ -219,9 +213,7 @@ describe('createDocumentWorkspaceController', () => {
 				browseCalls += 1;
 				return { body: { data: sampleBrowse } };
 			},
-			[`POST /api/v1/entities/client/${ENTITY_ID}/documents/upload-intent`]: async (
-				request
-			) => {
+			[`POST /api/v1/entities/client/${ENTITY_ID}/documents/upload-intent`]: async (request) => {
 				const body = await request.json();
 				expect(body.name).toBe('brief.pdf');
 				expect(body.category).toBe('other');
@@ -250,9 +242,7 @@ describe('createDocumentWorkspaceController', () => {
 					}
 				};
 			},
-			'POST /api/v1/documents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/finalize': async (
-				request
-			) => {
+			'POST /api/v1/documents/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/finalize': async (request) => {
 				const body = await request.json();
 				expect(body.expected_size_bytes).toBe(5);
 				expect(body.expected_sha256).toMatch(/^[a-f0-9]{64}$/);
@@ -370,7 +360,7 @@ describe('createDocumentWorkspaceController', () => {
 
 		await vi.waitFor(() => expect(controller.view.kind).toBe('ready'));
 		controller.uploadFiles([
-			new File([new Uint8Array([9])], 'retry.bin', { type: 'application/octet-stream' })
+			new File([new Uint8Array([9])], 'retry.pdf', { type: 'application/pdf' })
 		]);
 
 		await vi.waitFor(() => {

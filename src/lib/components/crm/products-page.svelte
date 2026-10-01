@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -76,16 +77,13 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Products', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-
 
 	interface RequestEpoch {
 		orgId: string | null;
@@ -179,9 +177,7 @@
 		const created = await api.productCategories.create({ name });
 		const option = { id: created.id, label: created.name };
 		if (!categoryOptions.some((c) => c.id === option.id)) {
-			categoryOptions = [...categoryOptions, option].sort((a, b) =>
-				a.label.localeCompare(b.label)
-			);
+			categoryOptions = [...categoryOptions, option].sort((a, b) => a.label.localeCompare(b.label));
 		}
 		return option;
 	}
@@ -243,7 +239,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -287,7 +283,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="products-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening products.
 		</p>
 	</div>

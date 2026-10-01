@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -12,10 +13,7 @@
 		toOrganisationCreateBody,
 		toOrgMembershipSummary
 	} from '$lib/api/v1/mappers.js';
-	import {
-		preserveSelectedMessageId,
-		startVisibilityPoll
-	} from '$lib/browser/visibility-poll.js';
+	import { preserveSelectedMessageId, startVisibilityPoll } from '$lib/browser/visibility-poll.js';
 	import {
 		emptyPersonalEmailInboxState,
 		loadPersonalEmailInbox,
@@ -25,11 +23,7 @@
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import { describeMailboxSyncResult } from '$lib/schemas/mailbox.js';
-	import {
-		leadFormSchema,
-		type LeadClientOption,
-		type LeadFormData
-	} from '$lib/schemas/lead.js';
+	import { leadFormSchema, type LeadClientOption, type LeadFormData } from '$lib/schemas/lead.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -107,16 +101,13 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Email', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-
 
 	interface RequestEpoch {
 		orgId: string | null;
@@ -349,7 +340,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 
 	$effect(() => {
@@ -399,11 +390,9 @@
 									size="sm"
 									variant="outline"
 									disabled={syncPending || !inbox.mailboxConnected}
-									title={
-										inbox.mailboxConnected
-											? 'Fetch new mail for your connected mailbox'
-											: 'Connect a mailbox under My settings → Mail first'
-									}
+									title={inbox.mailboxConnected
+										? 'Fetch new mail for your connected mailbox'
+										: 'Connect a mailbox under My settings → Mail first'}
 									data-testid="email-inbox-sync"
 									onclick={() => void onSyncMailbox()}
 								>
@@ -413,7 +402,7 @@
 						</PageHeader>
 						{#if syncFeedback}
 							<p
-								class="text-muted-foreground mb-2 text-xs"
+								class="mb-2 text-xs text-muted-foreground"
 								role="status"
 								data-testid="email-inbox-sync-feedback"
 							>
@@ -454,7 +443,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="email-inbox-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening email.
 		</p>
 	</div>

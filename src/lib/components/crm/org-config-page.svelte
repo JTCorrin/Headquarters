@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -110,12 +111,10 @@
 	);
 
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const navGroups = $derived(appNavGroups('Config', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -385,10 +384,6 @@
 		}
 	}
 
-
-
-
-
 	async function onSaveTaxRate(): Promise<boolean> {
 		const epoch = captureEpoch();
 		const values = get(taxRateForm.form);
@@ -400,9 +395,7 @@
 				if (!current) return false;
 				const updated = await api.taxRates.update(editingId, body, current.version);
 				if (isStale(epoch)) return false;
-				taxRates = taxRates.map((r) =>
-					r.id === updated.id ? toTaxRateResource(updated) : r
-				);
+				taxRates = taxRates.map((r) => (r.id === updated.id ? toTaxRateResource(updated) : r));
 			} else {
 				const created = await api.taxRates.create(body);
 				if (isStale(epoch)) return false;
@@ -515,7 +508,7 @@
 		// Re-load when selection or cache generation changes (switch resets caches).
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -535,10 +528,13 @@
 		>
 			{#if !canAccessOrgConfigRoutes(role)}
 				<div class="space-y-3 p-6" data-testid="org-config-forbidden">
-					<p class="text-destructive text-sm" role="alert">
-						Organisation Config is available to Owners only. Use My settings for personal theme and mailbox.
+					<p class="text-sm text-destructive" role="alert">
+						Organisation Config is available to Owners only. Use My settings for personal theme and
+						mailbox.
 					</p>
-					<a class="text-sm font-medium underline underline-offset-2" href="/settings">Open My settings</a>
+					<a class="text-sm font-medium underline underline-offset-2" href="/settings"
+						>Open My settings</a
+					>
 				</div>
 			{:else}
 				<SettingsConfigPage
@@ -569,7 +565,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="org-config-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening configuration.
 		</p>
 	</div>

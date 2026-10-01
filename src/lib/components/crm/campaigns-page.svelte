@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
 	import {
@@ -43,12 +44,10 @@
 	let busy = $state(false);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Campaigns', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -60,9 +59,7 @@
 			status: campaign.status,
 			recipientsTotal: campaign.recipient_counts.total,
 			recipientsSent: campaign.recipient_counts.sent,
-			scheduledAt: campaign.scheduled_at
-				? new Date(campaign.scheduled_at).toLocaleString()
-				: null,
+			scheduledAt: campaign.scheduled_at ? new Date(campaign.scheduled_at).toLocaleString() : null,
 			updatedAt: new Date(campaign.updated_at).toLocaleString(),
 			version: campaign.version
 		};
@@ -164,7 +161,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -179,7 +176,7 @@
 			{createError}
 			{busy}
 			{onSwitchOrg}
-			onValidCreate={onValidCreate}
+			{onValidCreate}
 			{onLogout}
 		>
 			<CampaignsListPage

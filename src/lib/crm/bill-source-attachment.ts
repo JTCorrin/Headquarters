@@ -1,6 +1,7 @@
 import type { ApiV1Client } from '$lib/api/v1/client.js';
 import type { ApiDocument } from '$lib/api/v1/types.js';
 import { sha256HexSync } from '$lib/crypto/sha256-hex.js';
+import { isInlinePreviewMimeType, resolveDocumentMimeType } from '$lib/crm/document-mime.js';
 
 async function sha256Hex(data: ArrayBuffer): Promise<string> {
 	if (globalThis.crypto?.subtle) {
@@ -18,13 +19,9 @@ export type BillSourceAttachmentMeta = {
 	sizeBytes: number;
 };
 
-const ACCEPTED_MIME_PREFIXES = ['image/'] as const;
-const ACCEPTED_MIME_EXACT = new Set(['application/pdf']);
-
+/** Bill sources must be previewable inline: PDF or a raster image (never SVG). */
 export function isBillSourceAttachmentFile(file: File): boolean {
-	const mime = (file.type || '').toLowerCase().split(';')[0]?.trim() ?? '';
-	if (ACCEPTED_MIME_EXACT.has(mime)) return true;
-	return ACCEPTED_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix));
+	return isInlinePreviewMimeType(resolveDocumentMimeType(file));
 }
 
 export function formatBillSourceAttachmentSize(bytes: number): string {
@@ -38,13 +35,14 @@ async function putSignedUpload(
 	fetchImpl: typeof fetch,
 	signedUrl: string,
 	file: File,
+	mimeType: string,
 	signal?: AbortSignal
 ): Promise<void> {
 	const response = await fetchImpl(signedUrl, {
 		method: 'PUT',
 		body: file,
 		headers: {
-			'Content-Type': file.type || 'application/octet-stream'
+			'Content-Type': mimeType
 		},
 		signal
 	});
@@ -60,7 +58,8 @@ export async function uploadBillSourceDocument(
 	file: File,
 	options: { fetchImpl?: typeof fetch; signal?: AbortSignal } = {}
 ): Promise<ApiDocument> {
-	if (!isBillSourceAttachmentFile(file)) {
+	const mimeType = resolveDocumentMimeType(file);
+	if (!mimeType || !isInlinePreviewMimeType(mimeType)) {
 		throw new Error('Source attachment must be a PDF or image.');
 	}
 
@@ -73,7 +72,7 @@ export async function uploadBillSourceDocument(
 		{
 			name: file.name.slice(0, 160) || 'bill-source',
 			category: 'receipt',
-			mime_type: file.type || 'application/octet-stream',
+			mime_type: mimeType,
 			size_bytes: file.size,
 			sha256: digest,
 			folder_id: null
@@ -81,7 +80,7 @@ export async function uploadBillSourceDocument(
 		options.signal
 	);
 
-	await putSignedUpload(fetchImpl, intent.upload.signed_url, file, options.signal);
+	await putSignedUpload(fetchImpl, intent.upload.signed_url, file, mimeType, options.signal);
 
 	const finalized = await api.documents.finalize(
 		intent.document.id,

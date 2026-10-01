@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { setContext } from 'svelte';
+	import { setContext, untrack } from 'svelte';
 	import type { Edge, Node } from '@xyflow/svelte';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
@@ -29,9 +29,7 @@
 	import PageHeader from './page-header.svelte';
 	import { PLAYBOOK_TEMPLATES_CTX } from '$lib/playbook/playbook-context.js';
 	import PlaybookWorkflowCanvas from './playbook-workflow-canvas.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 
 	export interface PlaybookEditorPageProps {
 		api: ApiV1Client;
@@ -74,16 +72,13 @@
 	setContext(PLAYBOOK_TEMPLATES_CTX, () => emailTemplates);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Playbooks', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-
 
 	function syncGraphTextFromFlow() {
 		graphText = JSON.stringify(flowToPlaybookGraph(flowNodes, flowEdges), null, 2);
@@ -124,7 +119,9 @@
 				api.emailTemplates
 					.list({ limit: 100 })
 					.catch(() => ({ data: [] as { id: string; name: string }[] })),
-				api.playbooks.listRuns(playbookId, { limit: 20 }).catch(() => ({ data: [] as ApiPlaybookRun[] }))
+				api.playbooks
+					.listRuns(playbookId, { limit: 20 })
+					.catch(() => ({ data: [] as ApiPlaybookRun[] }))
 			]);
 			playbook = result.data;
 			name = playbook.name;
@@ -277,7 +274,7 @@
 		void currentOrgId;
 		void playbookId;
 		void session.cacheGeneration;
-		void load();
+		untrack(() => void load());
 	});
 </script>
 
@@ -359,43 +356,43 @@
 							{#if showJson}
 								<textarea
 									id="pb-graph"
-									class="border-input bg-background focus-visible:ring-ring min-h-[320px] w-full rounded-md border px-3 py-2 font-mono text-xs focus-visible:ring-2 focus-visible:outline-none"
+									class="min-h-[320px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									bind:value={graphText}
 									disabled={busy}
-									spellcheck="false"
-								></textarea>
+									spellcheck="false"></textarea>
 							{:else}
 								<PlaybookWorkflowCanvas bind:nodes={flowNodes} bind:edges={flowEdges} />
 							{/if}
 						</div>
 
 						{#if saveError}
-							<p class="text-destructive text-sm">{saveError}</p>
+							<p class="text-sm text-destructive">{saveError}</p>
 						{/if}
 						{#if saveOk}
-							<p class="text-muted-foreground text-sm">{saveOk}</p>
+							<p class="text-sm text-muted-foreground">{saveOk}</p>
 						{/if}
 						{#if runMessage}
-							<p class="text-muted-foreground text-sm">{runMessage}</p>
+							<p class="text-sm text-muted-foreground">{runMessage}</p>
 						{/if}
 
 						{#if runs.length > 0}
 							<div class="space-y-2">
 								<p class="text-sm font-medium">Recent runs</p>
-								<ul class="divide-border border-border divide-y rounded-lg border text-sm">
+								<ul class="divide-y divide-border rounded-lg border border-border text-sm">
 									{#each runs as run (run.id)}
 										<li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
 											<span class="font-mono text-xs">{run.id.slice(0, 8)}</span>
-											<span class="text-muted-foreground text-xs">{run.status}</span>
-											<span class="text-muted-foreground text-xs"
+											<span class="text-xs text-muted-foreground">{run.status}</span>
+											<span class="text-xs text-muted-foreground"
 												>{new Date(run.created_at).toLocaleString()}</span
 											>
 										</li>
 									{/each}
 								</ul>
-								<p class="text-muted-foreground text-xs">
-									Waiting runs resume via <code>jobs-playbooks</code> cron
-									(<code>PLAYBOOKS_CRON_SECRET</code>).
+								<p class="text-xs text-muted-foreground">
+									Waiting runs resume via <code>jobs-playbooks</code> cron (<code
+										>PLAYBOOKS_CRON_SECRET</code
+									>).
 								</p>
 							</div>
 						{/if}
@@ -416,7 +413,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="playbook-editor-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before editing playbooks.
 		</p>
 	</div>

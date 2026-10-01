@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -97,20 +98,16 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Projects', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
 	const projectName = $derived(project?.name ?? 'Project');
 	const clientName = $derived(project ? projectClientDisplayName(project) : 'Client');
-	const clientHref = $derived(
-		project?.client_id ? `/clients/${project.client_id}` : undefined
-	);
+	const clientHref = $derived(project?.client_id ? `/clients/${project.client_id}` : undefined);
 	const status = $derived(project ? projectStatusLabel(project.status) : 'Planning');
 	const columns = $derived(project ? workspaceColumnsFromProject(project) : []);
 
@@ -224,10 +221,7 @@
 				viewState = { kind: 'forbidden', message: userMessage(error, 'Forbidden') };
 				return;
 			}
-			if (
-				isApiClientError(error) &&
-				(error.status === 404 || error.code === 'NOT_FOUND')
-			) {
+			if (isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND')) {
 				viewState = { kind: 'validation', message: userMessage(error, 'Project not found.') };
 				return;
 			}
@@ -243,9 +237,7 @@
 		if (!existing || !project) return;
 		const previous = workCards;
 		workCards = workCards.map((card) =>
-			card.id === move.id
-				? { ...card, column: move.columnId, position: move.position }
-				: card
+			card.id === move.id ? { ...card, column: move.columnId, position: move.position } : card
 		);
 		const epoch = captureEpoch();
 		try {
@@ -256,9 +248,7 @@
 				existing.version ?? 1
 			);
 			if (isStale(epoch)) return;
-			workCards = workCards.map((card) =>
-				card.id === move.id ? toWorkspaceCard(updated) : card
-			);
+			workCards = workCards.map((card) => (card.id === move.id ? toWorkspaceCard(updated) : card));
 			cardDocuments = { ...cardDocuments, [updated.id]: updated };
 		} catch (error) {
 			if (isStale(epoch)) return;
@@ -301,8 +291,7 @@
 
 		try {
 			if (cardDrawerMode === 'create') {
-				const backlog =
-					project.columns.find((c) => c.key === 'backlog') ?? project.columns[0];
+				const backlog = project.columns.find((c) => c.key === 'backlog') ?? project.columns[0];
 				if (!backlog) return false;
 				const created = await api.projects.createCard(project.id, {
 					...toProjectCardCreateBody(get(cardForm.form)),
@@ -322,9 +311,7 @@
 					existing.version
 				);
 				if (isStale(epoch)) return false;
-				workCards = workCards.map((card) =>
-					card.id === cardId ? toWorkspaceCard(updated) : card
-				);
+				workCards = workCards.map((card) => (card.id === cardId ? toWorkspaceCard(updated) : card));
 				cardDocuments = { ...cardDocuments, [updated.id]: updated };
 			}
 			cardDrawerOpen = false;
@@ -468,7 +455,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void projectId;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -494,7 +481,7 @@
 				{/if}
 				{#if actionError && viewState.kind === 'ready'}
 					<div class="px-6 pt-4 md:px-8">
-						<p class="text-destructive text-sm" role="alert">{actionError}</p>
+						<p class="text-sm text-destructive" role="alert">{actionError}</p>
 					</div>
 				{/if}
 				{#if viewState.kind === 'ready' && project}
@@ -545,7 +532,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="project-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening projects.
 		</p>
 	</div>

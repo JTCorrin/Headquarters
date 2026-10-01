@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { fromStore, get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -21,10 +22,7 @@
 		toVendorCreateBody
 	} from '$lib/api/v1/mappers.js';
 	import type { ApiBillDocument, ApiTaxRate } from '$lib/api/v1/types.js';
-	import {
-		createEntityTimelineEvent,
-		loadEntityTimeline
-	} from '$lib/crm/entity-timeline.js';
+	import { createEntityTimelineEvent, loadEntityTimeline } from '$lib/crm/entity-timeline.js';
 	import {
 		isBillSourceAttachmentFile,
 		loadBillSourceAttachmentMeta,
@@ -37,20 +35,10 @@
 	import { formatOrgLetterheadLines, loadOrgLogoDataUrl } from '$lib/org/branding.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
-	import {
-		lineItemFormSchema,
-		type CatalogProductOption
-	} from '$lib/schemas/line-item.js';
+	import { lineItemFormSchema, type CatalogProductOption } from '$lib/schemas/line-item.js';
 	import type { MembershipRole, OrganisationCreateData } from '$lib/schemas/organisation.js';
-	import {
-		billFormSchema,
-		type BillFormData,
-		type BillVendorOption
-	} from '$lib/schemas/bill.js';
-	import {
-		paymentFormSchema,
-		type PaymentListItem
-	} from '$lib/schemas/payment.js';
+	import { billFormSchema, type BillFormData, type BillVendorOption } from '$lib/schemas/bill.js';
+	import { paymentFormSchema, type PaymentListItem } from '$lib/schemas/payment.js';
 	import { vendorFormSchema } from '$lib/schemas/vendor.js';
 	import type { LineItemRow } from './line-items-table.svelte';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
@@ -138,16 +126,13 @@
 		}
 	);
 
-	const vendorForm = superForm(
-		defaults({ name: '' }, zod4(vendorFormSchema)),
-		{
-			validators: zod4(vendorFormSchema),
-			SPA: true,
-			warnings: { duplicateId: false },
-			applyAction: false,
-			resetForm: false
-		}
-	);
+	const vendorForm = superForm(defaults({ name: '' }, zod4(vendorFormSchema)), {
+		validators: zod4(vendorFormSchema),
+		SPA: true,
+		warnings: { duplicateId: false },
+		applyAction: false,
+		resetForm: false
+	});
 
 	const lineForm = superForm(
 		defaults(
@@ -198,12 +183,10 @@
 	const formSnapshot = fromStore(billForm.form);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Bills', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -320,9 +303,7 @@
 			invoiceId: '',
 			billId: document.id,
 			amount:
-				document.balance_due_cents > 0
-					? centsToAmountString(document.balance_due_cents) || ''
-					: '',
+				document.balance_due_cents > 0 ? centsToAmountString(document.balance_due_cents) || '' : '',
 			currency:
 				document.currency === 'USD' || document.currency === 'EUR' || document.currency === 'GBP'
 					? document.currency
@@ -921,7 +902,7 @@
 		void session.selectedOrgId;
 		void session.cacheGeneration;
 		void billId;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -953,7 +934,7 @@
 						title={bill.number}
 						status={billStatusLabel(bill.status)}
 						{billForm}
-						vendorForm={vendorForm}
+						{vendorForm}
 						{lineForm}
 						{products}
 						{vendorOptions}
@@ -987,15 +968,15 @@
 						bind:timelineEvents
 						bind:lineDrawerOpen
 						bind:vendorDrawerOpen
-						onSaveBill={onSaveBill}
-						onAddLine={onAddLine}
-						onRemoveLine={onRemoveLine}
-						onReceive={onReceive}
-						onVoid={onVoid}
-						onDelete={onDelete}
+						{onSaveBill}
+						{onAddLine}
+						{onRemoveLine}
+						{onReceive}
+						{onVoid}
+						{onDelete}
 						onValidVendorCreate={onCreateVendor}
-						onRecordPayment={onRecordPayment}
-						onReversePayment={onReversePayment}
+						{onRecordPayment}
+						{onReversePayment}
 						{onTimelineAdd}
 						{sourceAttachment}
 						{sourceAttachmentPending}
@@ -1015,7 +996,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="bill-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening bills.
 		</p>
 	</div>

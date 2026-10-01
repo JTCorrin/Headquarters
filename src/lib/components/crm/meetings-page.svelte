@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
 	import { zod4 } from 'sveltekit-superforms/adapters';
@@ -80,12 +81,10 @@
 	});
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Meetings', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -94,7 +93,6 @@
 			? `Filtered by ${entityFilter.entity_type} · ${entityFilter.entity_id.slice(0, 8)}…`
 			: null
 	);
-
 
 	interface RequestEpoch {
 		orgId: string | null;
@@ -336,7 +334,7 @@
 		void session.cacheGeneration;
 		void entityFilter?.entity_type;
 		void entityFilter?.entity_id;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -374,7 +372,7 @@
 					onValidSubmit={onCreateMeeting}
 					onValidEdit={onEditMeeting}
 					onEditMeeting={openEditMeeting}
-					onDeleteMeeting={onDeleteMeeting}
+					{onDeleteMeeting}
 					{onOpenCalendar}
 					showNav={false}
 					class="min-h-0 flex-1"
@@ -384,7 +382,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="meetings-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening meetings.
 		</p>
 	</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { get } from 'svelte/store';
 	import { defaults, superForm } from 'sveltekit-superforms';
@@ -112,12 +113,10 @@
 	});
 
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const navGroups = $derived(appNavGroups('My settings', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -203,28 +202,15 @@
 				if (isStale(epoch)) return;
 				mailboxAccount = account ? toMailboxAccountResource(account) : null;
 				if (orgId) {
-					applyMailboxFormFromServer(
-						orgId,
-						mailboxAccount,
-						options?.forceMailboxReload ?? false
-					);
+					applyMailboxFormFromServer(orgId, mailboxAccount, options?.forceMailboxReload ?? false);
 				}
 			} catch (error) {
 				if (isStale(epoch)) return;
 				mailboxAccount = null;
 				if (orgId) {
-					applyMailboxFormFromServer(
-						orgId,
-						null,
-						options?.forceMailboxReload ?? false
-					);
+					applyMailboxFormFromServer(orgId, null, options?.forceMailboxReload ?? false);
 				}
-				if (
-					!(
-						isApiClientError(error) &&
-						(error.status === 404 || error.code === 'NOT_FOUND')
-					)
-				) {
+				if (!(isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND'))) {
 					// Non-fatal — still show prefs.
 				}
 			}
@@ -248,12 +234,7 @@
 				googleConnection = emptyCalendarConnection();
 				caldavConnection = emptyCalendarConnection();
 				caldavForm.form.set(emptyCaldavFormData());
-				if (
-					!(
-						isApiClientError(error) &&
-						(error.status === 404 || error.code === 'NOT_FOUND')
-					)
-				) {
+				if (!(isApiClientError(error) && (error.status === 404 || error.code === 'NOT_FOUND'))) {
 					calendarConnectError = userMessage(error, 'Could not load calendar connection.');
 				}
 			}
@@ -334,8 +315,7 @@
 				const humanized = humanizeMailboxSyncError(result.error_code, {
 					message: apiMessage
 				});
-				const known =
-					humanized != null && !humanized.startsWith('Sync issue (');
+				const known = humanized != null && !humanized.startsWith('Sync issue (');
 				return {
 					ok: false,
 					message:
@@ -381,9 +361,7 @@
 		}
 	}
 
-	async function onSaveMailboxSyncInterval(
-		minutes: number
-	): Promise<MailboxTestFeedback | false> {
+	async function onSaveMailboxSyncInterval(minutes: number): Promise<MailboxTestFeedback | false> {
 		const epoch = captureEpoch();
 		try {
 			const updated = await api.mailbox.updateSyncInterval(minutes);
@@ -601,7 +579,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 
 	$effect(() => {
@@ -662,7 +640,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="personal-settings-controller">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening settings.
 		</p>
 	</div>

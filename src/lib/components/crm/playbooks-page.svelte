@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
@@ -15,9 +16,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import AppShell from './app-shell.svelte';
 	import PageHeader from './page-header.svelte';
-	import ResourceStateBanner, {
-		type ResourceViewState
-	} from './resource-state-banner.svelte';
+	import ResourceStateBanner, { type ResourceViewState } from './resource-state-banner.svelte';
 
 	export interface PlaybooksPageProps {
 		api: ApiV1Client;
@@ -46,16 +45,13 @@
 	let busy = $state(false);
 
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const navGroups = $derived(appNavGroups('Playbooks', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
-
 
 	interface RequestEpoch {
 		orgId: string | null;
@@ -149,7 +145,7 @@
 	$effect(() => {
 		void currentOrgId;
 		void session.cacheGeneration;
-		void loadPlaybooks();
+		untrack(() => void loadPlaybooks());
 	});
 </script>
 
@@ -186,7 +182,7 @@
 					}}
 				>
 					<div class="min-w-0 flex-1 space-y-1">
-						<label class="text-muted-foreground text-xs font-medium" for="playbook-name"
+						<label class="text-xs font-medium text-muted-foreground" for="playbook-name"
 							>New playbook</label
 						>
 						<Input
@@ -200,19 +196,19 @@
 				</form>
 
 				{#if viewState.kind === 'loading'}
-					<p class="text-muted-foreground text-sm">Loading playbooks…</p>
+					<p class="text-sm text-muted-foreground">Loading playbooks…</p>
 				{:else if rows.length > 0}
-					<ul class="divide-border border-border divide-y rounded-lg border">
+					<ul class="divide-y divide-border rounded-lg border border-border">
 						{#each rows as row (row.id)}
 							<li>
 								<a
 									href={`/playbooks/${row.id}`}
-									class="hover:bg-muted/50 flex items-center justify-between gap-4 px-4 py-3 transition-colors"
+									class="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
 								>
 									<div class="min-w-0">
 										<p class="truncate text-sm font-medium">{row.name}</p>
 										{#if row.description}
-											<p class="text-muted-foreground truncate text-xs">{row.description}</p>
+											<p class="truncate text-xs text-muted-foreground">{row.description}</p>
 										{/if}
 									</div>
 									<span
@@ -232,7 +228,7 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="playbooks-page">
-		<p class="text-destructive text-sm" role="alert">
+		<p class="text-sm text-destructive" role="alert">
 			Select an organisation before opening playbooks.
 		</p>
 	</div>

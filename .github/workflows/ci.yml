@@ -1,7 +1,5 @@
 name: CI
 
-# GitHub mirror of .forgejo/workflows/frontend-ci.yml + backend-ci.yml.
-
 on:
   push:
     branches: [main, dev]
@@ -58,7 +56,7 @@ jobs:
       - name: Storybook build
         run: pnpm build-storybook
 
-      # Report-only until existing type/lint debt is cleared (matches Forgejo CI).
+      # Report-only until existing type/lint debt is cleared.
       - name: svelte-check (report only)
         continue-on-error: true
         run: pnpm check

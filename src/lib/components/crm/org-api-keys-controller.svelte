@@ -1,18 +1,13 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { ApiV1Client } from '$lib/api/v1/client.js';
 	import { isApiClientError, userMessage } from '$lib/api/v1/errors.js';
-	import {
-		roleFromMemberships,
-		toOrgMembershipSummary
-	} from '$lib/api/v1/mappers.js';
+	import { roleFromMemberships, toOrgMembershipSummary } from '$lib/api/v1/mappers.js';
 	import type { ApiOrgApiKey } from '$lib/api/v1/types.js';
 	import { appNavGroups } from '$lib/org/nav.js';
 	import type { OrgSession } from '$lib/org/session.svelte.js';
 	import type { ApiKeyCreateData } from '$lib/schemas/api-key.js';
-	import {
-		canAccessApiKeys,
-		type MembershipRole
-	} from '$lib/schemas/organisation.js';
+	import { canAccessApiKeys, type MembershipRole } from '$lib/schemas/organisation.js';
 	import type { ResourceViewState } from './resource-state-banner.svelte';
 	import AppShell from './app-shell.svelte';
 	import OrgApiKeysPage from './org-api-keys-page.svelte';
@@ -44,12 +39,10 @@
 	let busy = $state(false);
 
 	const role = $derived(
-		(roleFromMemberships(session.memberships, session.selectedOrgId) ??
-			'member') as MembershipRole
+		(roleFromMemberships(session.memberships, session.selectedOrgId) ?? 'member') as MembershipRole
 	);
 	const orgName = $derived(
-		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ??
-			'Organisation'
+		session.memberships.find((m) => m.org_id === session.selectedOrgId)?.org_name ?? 'Organisation'
 	);
 	const navGroups = $derived(appNavGroups('API keys', role));
 	const currentOrgId = $derived(session.selectedOrgId ?? '');
@@ -76,7 +69,6 @@
 	function isStale(epoch: RequestEpoch): boolean {
 		return epoch.orgId !== liveEpoch.orgId || epoch.generation !== liveEpoch.generation;
 	}
-
 
 	async function loadAll() {
 		if (!session.selectedOrgId) {
@@ -194,7 +186,7 @@
 	$effect(() => {
 		void session.selectedOrgId;
 		void session.cacheGeneration;
-		void loadAll();
+		untrack(() => void loadAll());
 	});
 </script>
 
@@ -213,7 +205,7 @@
 		>
 			{#if !canAccessApiKeys(role)}
 				<div class="space-y-3 p-6" data-testid="org-api-keys-forbidden">
-					<p class="text-destructive text-sm" role="alert">
+					<p class="text-sm text-destructive" role="alert">
 						API keys are available to Owners and Admins.
 					</p>
 					<a class="text-sm font-medium underline underline-offset-2" href="/settings"
@@ -240,6 +232,6 @@
 	</div>
 {:else}
 	<div class="p-6" data-testid="org-api-keys-controller">
-		<p class="text-muted-foreground text-sm">Select an organisation to manage API keys.</p>
+		<p class="text-sm text-muted-foreground">Select an organisation to manage API keys.</p>
 	</div>
 {/if}
