@@ -138,14 +138,13 @@ The cron workers have `verify_jwt = false` and authenticate with a shared-secret
 
 - **`mailbox-sync`** — a migration schedules it every minute with `pg_cron` + `pg_net`. It needs a Vault secret named `project_url` holding your project URL, e.g. `select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');`. The header secret (`mailbox_sync_secret`) is generated in Vault by the migration.
 - **`jobs-campaigns`** — run `SUPABASE_PROJECT_REF=<ref> SUPABASE_ACCESS_TOKEN=<token> node scripts/configure-campaign-scheduler.mjs` once. It stores a generated secret in Vault and as the `CAMPAIGNS_CRON_SECRET` function secret, and schedules a per-minute `pg_cron` job. Re-running reuses the existing secret.
-- **`jobs-recurring-invoices`** and **`jobs-playbooks`** — schedule them yourself (every 1–5 minutes), e.g. with `pg_cron` + `pg_net` or any external scheduler:
+- **`jobs-recurring-invoices`** — a migration schedules it every 5 minutes with `pg_cron` + `pg_net`. It needs a Vault secret named `project_url` holding your project URL (same as mailbox-sync). The header secret (`recurring_invoices_cron_secret`) is generated in Vault by the migration; the Edge Function accepts that vault secret via `verify_recurring_invoices_cron_secret`, or `RECURRING_INVOICES_CRON_SECRET` / service-role bearer for self-hosted wrappers.
+- **`jobs-playbooks`** — schedule yourself (every 1–5 minutes), e.g. with `pg_cron` + `pg_net` or any external scheduler:
 
   ```sh
-  curl -fsS -X POST https://<project-ref>.supabase.co/functions/v1/jobs-recurring-invoices \
-    -H "x-recurring-invoices-cron-secret: $RECURRING_INVOICES_CRON_SECRET"
+  curl -fsS -X POST https://<project-ref>.supabase.co/functions/v1/jobs-playbooks \
+    -H "x-playbooks-cron-secret: $PLAYBOOKS_CRON_SECRET"
   ```
-
-  `jobs-playbooks` uses the `x-playbooks-cron-secret` header with `PLAYBOOKS_CRON_SECRET`.
 
 ### 4. App server
 

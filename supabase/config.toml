@@ -466,8 +466,8 @@ import_map = "./functions/mailbox-sync/deno.json"
 entrypoint = "./functions/mailbox-sync/index.ts"
 
 # Recurring invoices: claim due schedules + generate draft invoices.
-# Schedule externally (e.g. every 1–5m) against /functions/v1/jobs-recurring-invoices
-# with header x-recurring-invoices-cron-secret = RECURRING_INVOICES_CRON_SECRET.
+# Hosted: migration schedules pg_cron every 5m → jobs-recurring-invoices (vault secret).
+# Self-hosted: call every 1–5m with x-recurring-invoices-cron-secret = RECURRING_INVOICES_CRON_SECRET.
 [functions.jobs-recurring-invoices]
 enabled = true
 verify_jwt = false

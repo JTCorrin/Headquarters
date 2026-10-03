@@ -260,19 +260,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const auth = authorizeCronRequest(req, {
-    envSecret: Deno.env.get("RECURRING_INVOICES_CRON_SECRET"),
-    headerName: "x-recurring-invoices-cron-secret",
-    serviceRoleKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-    missingConfigLog:
-      "RECURRING_INVOICES_CRON_SECRET and SUPABASE_SERVICE_ROLE_KEY are unset; refusing to run",
-  });
-  if (!auth.ok) {
-    return new Response(JSON.stringify({ error: auth.error }), {
-      status: auth.status,
-    });
-  }
-
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) {
@@ -284,6 +271,38 @@ Deno.serve(async (req) => {
   const service = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const auth = authorizeCronRequest(req, {
+    envSecret: Deno.env.get("RECURRING_INVOICES_CRON_SECRET"),
+    headerName: "x-recurring-invoices-cron-secret",
+    serviceRoleKey: key,
+    missingConfigLog:
+      "RECURRING_INVOICES_CRON_SECRET and SUPABASE_SERVICE_ROLE_KEY are unset; refusing to run",
+  });
+  if (!auth.ok) {
+    // Hosted pg_cron sends the vault secret; accept when RPC confirms it.
+    const supplied = req.headers.get("x-recurring-invoices-cron-secret")?.trim() ??
+      "";
+    let vaultOk = false;
+    if (supplied) {
+      const { data, error: verifyError } = await service.rpc(
+        "verify_recurring_invoices_cron_secret",
+        { p_supplied: supplied },
+      );
+      if (verifyError) {
+        console.error("verify_recurring_invoices_cron_secret failed", {
+          code: verifyError.code,
+        });
+      } else {
+        vaultOk = data === true;
+      }
+    }
+    if (!vaultOk) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+      });
+    }
+  }
 
   const holder = `cron-${crypto.randomUUID()}`;
   const { data: scheduleData, error } = await service.rpc(

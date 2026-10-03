@@ -3338,6 +3338,10 @@ export type Database = {
         Args: { p_limit?: number; p_claimed_by?: string | null }
         Returns: Json
       }
+      verify_recurring_invoices_cron_secret: {
+        Args: { p_supplied: string }
+        Returns: boolean
+      }
       get_email_message_ai_context: {
         Args: { p_org_id: string; p_message_id: string }
         Returns: Json
