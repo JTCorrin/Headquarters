@@ -124,8 +124,23 @@ jobs:
 
       - name: Verify database type generation
         run: |
-          supabase gen types typescript --local > "${RUNNER_TEMP}/database.generated.ts"
-          test -s "${RUNNER_TEMP}/database.generated.ts"
+          # `gen types --local` pulls public.ecr.aws/supabase/postgres-meta. Anonymous
+          # ECR pulls are rate-limited on GitHub-hosted runners; retry instead of failing
+          # a green migration/pgTAP run.
+          attempt=1
+          max=5
+          while true; do
+            if supabase gen types typescript --local > "${RUNNER_TEMP}/database.generated.ts" \
+              && test -s "${RUNNER_TEMP}/database.generated.ts"; then
+              break
+            fi
+            if [ "${attempt}" -ge "${max}" ]; then
+              echo "supabase gen types failed after ${max} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 20))
+            attempt=$((attempt + 1))
+          done
 
       - name: Stop local Supabase
         if: always()
