@@ -148,6 +148,11 @@ describe('PaymentsPage integration', () => {
 		expect(seenOrgHeaders[0]).toBe(ORG_A);
 
 		await page.getByRole('button', { name: 'Record payment' }).click();
+		await expect.element(page.getByTestId('payment-form')).toBeVisible();
+		const drawer = document.querySelector('[data-slot="drawer-content"]');
+		expect(drawer, 'drawer content should mount').toBeTruthy();
+		expect(drawer!.classList.contains('fixed')).toBe(true);
+		expect(drawer!.classList.contains('relative')).toBe(false);
 		await page.getByLabelText('Amount').fill('25.00');
 		await page.getByTestId('payment-form').getByRole('button', { name: 'Save payment' }).click();
 
